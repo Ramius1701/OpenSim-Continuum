@@ -1678,6 +1678,7 @@ namespace OpenSim.ApplicationPlugins.RemoteController
 
                     bool mergeOar = false;
                     bool skipAssets = false;
+                    bool lookupAliases = false;
 
                     if ((string)requestData["merge"] == "true")
                     {
@@ -1687,11 +1688,16 @@ namespace OpenSim.ApplicationPlugins.RemoteController
                     {
                         skipAssets = true;
                     }
+                    if ((string)requestData["lookup-aliases"] == "true")
+                    {
+                        lookupAliases = true;
+                    }
 
                     IRegionArchiverModule archiver = scene.RequestModuleInterface<IRegionArchiverModule>();
                     Dictionary<string, object> archiveOptions = new Dictionary<string, object>();
                     if (mergeOar) archiveOptions.Add("merge", null);
                     if (skipAssets) archiveOptions.Add("skipAssets", null);
+                    if (lookupAliases) archiveOptions.Add("lookupAliases", null);
                     if (archiver != null)
                         archiver.DearchiveRegion(filename, Guid.Empty, archiveOptions);
                     else

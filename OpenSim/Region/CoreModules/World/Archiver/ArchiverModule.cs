@@ -104,6 +104,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             bool mergeReplaceObjects = false;
             bool skipAssets = false;
             bool forceAssets = false;
+            bool lookupAliases = false;
             bool mergeTerrain = false;
             bool mergeParcels = false;
             bool noObjects = false;
@@ -120,6 +121,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             options.Add("mergeReplaceObjects", delegate (string v) { mergeReplaceObjects = (v != null); });
             options.Add("s|skip-assets", delegate(string v) { skipAssets = (v != null); });
             options.Add("force-assets", delegate(string v) { forceAssets = (v != null); });
+            options.Add("lookup-aliases", delegate(string v) { lookupAliases = (v != null); });
             options.Add("merge-terrain", delegate(string v) { mergeTerrain = (v != null); });
             options.Add("force-terrain", delegate (string v) { mergeTerrain = (v != null); });   // downward compatibility
             options.Add("forceterrain", delegate (string v) { mergeTerrain = (v != null); });   // downward compatibility
@@ -219,6 +221,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
             if (mergeOar) archiveOptions.Add("merge", null);
             if (skipAssets) archiveOptions.Add("skipAssets", null);
             if (forceAssets) archiveOptions.Add("forceAssets", null);
+            if (lookupAliases) archiveOptions.Add("lookupAliases", null);
             if (mergeReplaceObjects) archiveOptions.Add("mReplaceObjects", null);
             if (mergeTerrain) archiveOptions.Add("merge-terrain", null);
             if (mergeParcels) archiveOptions.Add("merge-parcels", null);

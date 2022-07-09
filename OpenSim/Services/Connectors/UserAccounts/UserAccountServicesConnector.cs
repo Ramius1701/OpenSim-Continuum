@@ -441,6 +441,5 @@ namespace OpenSim.Services.Connectors
 
             return false;
         }
-
     }
 }
