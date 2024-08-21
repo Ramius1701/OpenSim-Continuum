@@ -551,6 +551,10 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             //if (stkN != null)
             //    m_StackLeft = int.Parse(stkN.InnerText);
 
+            XmlElement experienceKey = (XmlElement)scriptStateN.SelectSingleNode("ExperienceKey");
+            if (experienceKey is not null)
+                UUID.TryParse(experienceKey.InnerText, out m_Item.ExperienceID);
+
             XmlElement permissionsN = (XmlElement)scriptStateN.SelectSingleNode("Permissions");
             m_Item.PermsGranter = new UUID(permissionsN.GetAttribute("granter"));
             m_Item.PermsMask = Convert.ToInt32(permissionsN.GetAttribute("mask"));
@@ -600,6 +604,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             int permsMask = 0;
             double minEventDelay = 0.0;
             Object[] pluginData = new Object[0];
+            UUID experienceKey = UUID.Zero;
 
             LinkedList<EventParams> eventQueue = new LinkedList<EventParams>();
 
@@ -667,6 +672,9 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                             break;
                         case "Running":
                             running = bool.Parse(part.InnerText);
+                            break;
+                        case "ExperienceKey":
+                            experienceKey = UUID.Parse(part.InnerText);
                             break;
                         case "Variables":
                             int indx;
@@ -887,6 +895,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
             m_Item.PermsGranter = permsGranter;
             m_Item.PermsMask = permsMask;
+            m_Item.ExperienceID = experienceKey;
             m_Part.Inventory.UpdateInventoryItem(m_Item, false, false);
 
             lock (m_RunLock)

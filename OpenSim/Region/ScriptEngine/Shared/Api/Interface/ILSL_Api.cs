@@ -538,5 +538,20 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
          LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);
                void llSetRenderMaterial(LSL_String material, LSL_Integer face);
+
+      void llRequestExperiencePermissions(string agent_id, string unused);
+      LSL_Integer llAgentInExperience(string agent_id);
+      LSL_List llGetExperienceDetails(string experience_key);
+      LSL_String llGetExperienceErrorMessage(LSL_Integer error);
+      LSL_Integer llSitOnLink(string agent_id, LSL_Integer link);
+      LSL_Key llCreateKeyValue(string key, string value);
+      LSL_Key llDeleteKeyValue(string key);
+      LSL_Key llReadKeyValue(string key);
+      LSL_Key llUpdateKeyValue(string key, string value, LSL_Integer check, string original);
+      LSL_Key llKeyCountKeyValue();
+      LSL_Key llKeysKeyValue(LSL_Integer first, LSL_Integer count);
+      LSL_Key llDataSizeKeyValue();
+      LSL_Integer llSetAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_List param_list);
+      LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment);
     }
 }

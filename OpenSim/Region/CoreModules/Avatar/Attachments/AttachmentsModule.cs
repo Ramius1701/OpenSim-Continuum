@@ -585,12 +585,12 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
         }
 
         public bool AttachObject(IScenePresence sp, SceneObjectGroup group, uint attachmentPt, bool silent,
-                    bool addToInventory, bool append)
+                    bool addToInventory, bool append, UUID experience)
         {
             if (!Enabled)
                 return false;
 
-            return AttachObjectInternal(sp, group, attachmentPt, silent, addToInventory, false, append);
+            return AttachObjectInternal(sp, group, attachmentPt, silent, addToInventory, false, append, experience);
         }
 
         /// <summary>
@@ -604,7 +604,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
         /// <param name='addToInventory'>If true then add object to user inventory.</param>
         /// <param name='resumeScripts'>If true then scripts are resumed on the attached object.</param>
         private bool AttachObjectInternal(IScenePresence sp, SceneObjectGroup group, uint attachmentPt,
-                bool silent, bool addToInventory, bool resumeScripts, bool append)
+                bool silent, bool addToInventory, bool resumeScripts, bool append, UUID experience)
         {
             //m_log.DebugFormat(
             //      "[ATTACHMENTS MODULE]: Attaching object {0} {1} to {2} point {3} from ground (silent = {4})",
@@ -718,7 +718,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
                 if (addToInventory && sp.PresenceType != PresenceType.Npc)
                     UpdateUserInventoryWithAttachment(sp, group, attachmentPt, append);
 
-                AttachToAgent(sp, group, attachmentPt, attachPos, silent);
+                AttachToAgent(sp, group, attachmentPt, attachPos, silent, experience);
 
                 if (resumeScripts)
                 {
@@ -1098,7 +1098,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
         /// <param name="attachmentpoint"></param>
         /// <param name="attachOffset"></param>
         /// <param name="silent"></param>
-        private void AttachToAgent(IScenePresence sp, SceneObjectGroup so, uint attachmentpoint, Vector3 attachOffset, bool silent)
+        private void AttachToAgent(IScenePresence sp, SceneObjectGroup so, uint attachmentpoint, Vector3 attachOffset, bool silent, UUID experience)
         {
             if (DebugLevel > 0)
                 m_log.DebugFormat(
@@ -1126,6 +1126,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
             so.RootPart.AttachedPos = attachOffset;
             so.RootPart.GroupPosition = attachOffset; // can not set absolutepos
             so.IsAttachment = true;
+            so.AttachedExperienceID = experience;
 
             sp.AddAttachment(so);
 
@@ -1335,7 +1336,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
                     objatt.ResetOwnerChangeFlag();
                 }
 
-                doneAttach = AttachObjectInternal(sp, objatt, attachmentPt, false, true, true, append);
+                doneAttach = AttachObjectInternal(sp, objatt, attachmentPt, false, true, true, append, UUID.Zero);
             }
             catch (Exception e)
             {
@@ -1465,7 +1466,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
                 AttachmentPt &= 0x7f;
 
                 // Calls attach with a Zero position
-                if (AttachObject(sp, group , AttachmentPt, false, true, append))
+                if (AttachObject(sp, group , AttachmentPt, false, true, append, UUID.Zero))
                 {
                     if (DebugLevel > 0)
                         m_log.Debug(
