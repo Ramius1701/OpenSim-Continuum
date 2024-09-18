@@ -99,9 +99,30 @@ namespace OpenSim.Services.Interfaces
 
         public int Created;
 
+        public string DisplayName;
+        public uint NameChanged;
+
         public string Name
         {
             get { return FirstName + " " + LastName; }
+        }
+
+        public string FormattedName
+        {
+            get
+            {
+                bool is_resident = LastName.ToLower() == "resident";
+
+                if (string.IsNullOrWhiteSpace(DisplayName))
+                {
+                    return is_resident ? FirstName : $"{FirstName} {LastName}";
+                }
+                else
+                {
+                    var username = is_resident ? FirstName : $"{FirstName}.{LastName}";
+                    return $"{DisplayName} ({username.ToLower()})";
+                }
+            }
         }
 
         public UserAccount(Dictionary<string, object> kvp)
@@ -127,6 +148,10 @@ namespace OpenSim.Services.Interfaces
                 UserCountry = otmp.ToString();
             if (kvp.TryGetValue("LocalToGrid", out otmp))
                 _ = bool.TryParse(otmp.ToString(), out LocalToGrid);
+            if (kvp.TryGetValue("DisplayName", out otmp))
+                DisplayName = otmp.ToString();
+            if (kvp.TryGetValue("NameChanged", out otmp))
+                NameChanged = Convert.ToUInt32(otmp.ToString());
 
             if (kvp.TryGetValue("Created", out otmp))
                 Created = Convert.ToInt32(otmp.ToString());
@@ -160,7 +185,9 @@ namespace OpenSim.Services.Interfaces
                 ["UserFlags"] = UserFlags.ToString(),
                 ["UserTitle"] = UserTitle,
                 ["UserCountry"] = UserCountry,
-                ["LocalToGrid"] = LocalToGrid.ToString()
+                ["LocalToGrid"] = LocalToGrid.ToString(),
+                ["DisplayName"] = DisplayName,
+                ["NameChanged"] = NameChanged.ToString()
             };
 
             if(ServiceURLs.Count == 0)
@@ -188,6 +215,8 @@ namespace OpenSim.Services.Interfaces
         UserAccount GetUserAccount(UUID scopeID, UUID userID);
         UserAccount GetUserAccount(UUID scopeID, string FirstName, string LastName);
         UserAccount GetUserAccount(UUID scopeID, string Email);
+
+        bool SetDisplayName(UUID agentID, string displayName);
 
         /// <summary>
         /// Returns the list of avatars that matches both the search criterion and the scope ID passed

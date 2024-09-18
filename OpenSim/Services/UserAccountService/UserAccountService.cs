@@ -145,6 +145,11 @@ namespace OpenSim.Services.UserAccountService
                             "show account",
                             "show account <first> <last>",
                             "Show account details for the given user", HandleShowAccount);
+
+                    MainConsole.Instance.Commands.AddCommand("Users", false,
+                            "set display name",
+                            "set display name <first> <last> <new display name>",
+                            "Sets the display name for the given user", HandleSetDisplayName);
                 }
             }
         }
@@ -227,6 +232,14 @@ namespace OpenSim.Services.UserAccountService
                         System.Web.HttpUtility.UrlDecode(parts[1]);
                 }
             }
+            if (d.Data.TryGetValue("DisplayName", out string displayName) && displayName != null)
+                u.DisplayName = displayName;
+            else
+                u.DisplayName = string.Empty;
+
+            if (d.Data.TryGetValue("NameChanged", out string nameChanged) && nameChanged != null)
+                uint.TryParse(nameChanged, out u.NameChanged);
+
             return u;
         }
 
@@ -336,6 +349,9 @@ namespace OpenSim.Services.UserAccountService
             else
                 d.Data["ServiceURLs"] = string.Empty;
 
+            d.Data["DisplayName"] = data.DisplayName;
+            d.Data["NameChanged"] = data.NameChanged.ToString();
+
             return m_Database.Store(d);
         }
 
@@ -367,6 +383,19 @@ namespace OpenSim.Services.UserAccountService
                 ret.Add(MakeUserAccount(data));
 
             return ret;
+        }
+
+        public bool SetDisplayName(UUID agentID, string displayName)
+        {
+            var account = GetUserAccount(UUID.Zero, agentID);
+
+            if (account is null)
+                return false;
+
+            account.DisplayName = displayName;
+            account.NameChanged = Utils.GetUnixTime();
+
+            return StoreUserAccount(account);
         }
 
         #endregion
@@ -457,7 +486,7 @@ namespace OpenSim.Services.UserAccountService
                 return;
             }
 
-            MainConsole.Instance.Output("Name:    {0}", ua.Name);
+            MainConsole.Instance.Output("Name:    {0}", ua.FormattedName);
             MainConsole.Instance.Output("ID:      {0}", ua.PrincipalID);
             MainConsole.Instance.Output("Title:   {0}", ua.UserTitle);
             MainConsole.Instance.Output("E-mail:  {0}", ua.Email);
@@ -577,6 +606,40 @@ namespace OpenSim.Services.UserAccountService
                 MainConsole.Instance.Output("Unable to set user level for account {0} {1}.", firstName, lastName);
             else
                 MainConsole.Instance.Output("User level set for user {0} {1} to {2}", firstName, lastName, level);
+        }
+
+        protected void HandleSetDisplayName(string module, string[] cmdparams)
+        {
+            string firstName;
+            string lastName;
+            string displayName;
+
+            if (cmdparams.Length < 4)
+                firstName = MainConsole.Instance.Prompt("First name");
+            else firstName = cmdparams[3];
+
+            if (cmdparams.Length < 5)
+                lastName = MainConsole.Instance.Prompt("Last name");
+            else lastName = cmdparams[4];
+
+            if (cmdparams.Length < 6)
+                displayName = MainConsole.Instance.Prompt("Display name");
+            else displayName = cmdparams[5];
+
+            UserAccount account = GetUserAccount(UUID.Zero, firstName, lastName);
+            if (account == null)
+            {
+                MainConsole.Instance.Output("No such user as {0} {1}", firstName, lastName);
+                return;
+            }
+
+            account.DisplayName = displayName;
+            account.NameChanged = Utils.GetUnixTime();
+
+            if (StoreUserAccount(account))
+                MainConsole.Instance.Output("Display name updated!");
+            else
+                MainConsole.Instance.Output("Unable to set DisplayName for account {0} {1}.", firstName, lastName);
         }
 
         #endregion
