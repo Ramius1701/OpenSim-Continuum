@@ -100,7 +100,7 @@ namespace OpenSim.Services.ExperienceService
                 owner_id = account.PrincipalID
             };
 
-            var stored_info = UpdateExpereienceInfo(new_info);
+            var stored_info = UpdateExperienceInfo(new_info);
 
             if (stored_info == null)
                 MainConsole.Instance.Output("Unable to create experience!");
@@ -169,7 +169,7 @@ namespace OpenSim.Services.ExperienceService
 
             if(update)
             {
-                var updated = UpdateExpereienceInfo(info);
+                var updated = UpdateExperienceInfo(info);
                 if (updated != null)
                 {
                     MainConsole.Instance.Output(message);
@@ -231,7 +231,7 @@ namespace OpenSim.Services.ExperienceService
             return m_Database.GetGroupExperiences(group_id);
         }
 
-        public ExperienceInfo UpdateExpereienceInfo(ExperienceInfo info)
+        public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
         {
             ExperienceInfoData data = new ExperienceInfoData();
 
