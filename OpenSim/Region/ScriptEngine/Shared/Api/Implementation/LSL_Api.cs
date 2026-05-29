@@ -9302,6 +9302,327 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             ScriptSleep(3000);
         }
 
+        public LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options)
+        {
+            if (inventory.Length == 0)
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            if (!UUID.TryParse(agentID, out UUID destID) || destID.IsZero())
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            if (!World.TryGetScenePresence(destID, out ScenePresence sp))
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            bool isNotOwner = sp.UUID.NotEqual(m_host.OwnerID);
+            List<UUID> itemList = new(inventory.Length);
+            foreach (object item in inventory.Data)
+            {
+                string rawItemString = item.ToString();
+                TaskInventoryItem taskItem = (UUID.TryParse(rawItemString, out UUID itemID)) ?
+                    m_host.Inventory.GetInventoryItem(itemID) : m_host.Inventory.GetInventoryItem(rawItemString);
+
+                if(taskItem is null)
+                    continue;
+
+                if ((taskItem.CurrentPermissions & (uint)PermissionMask.Copy) == 0)
+                    continue;
+
+                if (isNotOwner && (taskItem.CurrentPermissions & (uint)PermissionMask.Transfer) == 0)
+                    continue;
+
+                itemList.Add(taskItem.ItemID);
+            }
+
+            if (itemList.Count == 0)
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            UUID folderID = m_ScriptEngine.World.MoveTaskInventoryItems(destID, folderName, m_host, itemList, false);
+            if (folderID.IsZero())
+                return ScriptBaseClass.ERR_GENERIC;
+
+            if (m_TransferModule != null)
+            {
+                byte[] bucket = new byte[] { (byte)AssetType.Folder };
+                Vector3 pos = m_host.AbsolutePosition;
+
+                GridInstantMessage msg = new(World, m_host.OwnerID, m_host.Name, destID,
+                        (byte)InstantMessageDialog.TaskInventoryOffered,
+                        m_host.OwnerID.Equals(m_host.GroupID),
+                        string.Format("'{0}'", folderName),
+                        folderID, false, pos,
+                        bucket, false);
+
+                sp.ControllingClient.SendInstantMessage(msg);
+            }
+
+            ScriptSleep(3000);
+            return 0;
+        }
+
+        private bool TryGetReturnPermissionClient(out IClientAPI client)
+        {
+            client = null;
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_RETURN_OBJECTS) == 0)
+                return false;
+
+            ScenePresence granter = World.GetScenePresence(m_item.PermsGranter);
+            if (granter is null || granter.IsDeleted || granter.IsChildAgent)
+                return false;
+
+            client = granter.ControllingClient;
+            return client is not null;
+        }
+
+        private static bool SameParcel(ILandObject parcel, SceneObjectGroup group)
+        {
+            if (parcel is null || group is null)
+                return false;
+
+            Vector3 pos = group.AbsolutePosition;
+            return parcel.ContainsPoint((int)pos.X, (int)pos.Y);
+        }
+
+        private LSL_Integer ReturnSceneObjects(List<SceneObjectGroup> groups, IClientAPI client, ILandObject parcel)
+        {
+            if (groups.Count == 0)
+                return 0;
+
+            List<SceneObjectGroup> allowed = new(groups);
+            if (!World.Permissions.CanReturnObjects(parcel, client, allowed) || allowed.Count == 0)
+                return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+
+            World.returnObjects(allowed.ToArray(), client);
+            return allowed.Count;
+        }
+
+        public LSL_Integer llReturnObjectsByID(LSL_List objects)
+        {
+            if (!TryGetReturnPermissionClient(out IClientAPI client))
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+
+            if (objects is null || objects.Length == 0)
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            List<SceneObjectGroup> groups = new();
+            HashSet<UUID> seen = new();
+            foreach (object entry in objects.Data)
+            {
+                if (!UUID.TryParse(entry.ToString(), out UUID objectID) || objectID.IsZero())
+                    return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+                SceneObjectGroup group = World.GetSceneObjectGroup(objectID);
+                if (group is null || group.IsDeleted || group.IsAttachment || !seen.Add(group.UUID))
+                    continue;
+
+                groups.Add(group);
+            }
+
+            return ReturnSceneObjects(groups, client, null);
+        }
+
+        public LSL_Integer llReturnObjectsByOwner(LSL_Key owner, LSL_Integer scope)
+        {
+            if (!TryGetReturnPermissionClient(out IClientAPI client))
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+
+            if (!UUID.TryParse(owner, out UUID ownerID) || ownerID.IsZero())
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            ILandObject scriptParcel = World.LandChannel?.GetLandObject(m_host.GetWorldPosition());
+            if (scriptParcel is null)
+                return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+
+            List<SceneObjectGroup> groups = new();
+            foreach (SceneObjectGroup group in World.GetSceneObjectGroups())
+            {
+                if (group is null || group.IsDeleted || group.IsAttachment || group.OwnerID.NotEqual(ownerID))
+                    continue;
+
+                Vector3 pos = group.AbsolutePosition;
+                ILandObject objectParcel = World.LandChannel?.GetLandObject(pos.X, pos.Y);
+                if (objectParcel is null)
+                    continue;
+
+                switch (scope.value)
+                {
+                    case ScriptBaseClass.OBJECT_RETURN_PARCEL:
+                        if (SameParcel(scriptParcel, group))
+                            groups.Add(group);
+                        break;
+
+                    case ScriptBaseClass.OBJECT_RETURN_PARCEL_OWNER:
+                        if (objectParcel.LandData.OwnerID.Equals(m_host.OwnerID))
+                            groups.Add(group);
+                        break;
+
+                    case ScriptBaseClass.OBJECT_RETURN_REGION:
+                        groups.Add(group);
+                        break;
+
+                    default:
+                        return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+                }
+            }
+
+            ILandObject permissionParcel = scope.value == ScriptBaseClass.OBJECT_RETURN_PARCEL ? scriptParcel : null;
+            return ReturnSceneObjects(groups, client, permissionParcel);
+        }
+
+        private static UUID DefaultGroundTextureID(int layer)
+        {
+            return layer switch
+            {
+                0 => OpenSim.Framework.RegionSettings.DEFAULT_TERRAIN_TEXTURE_1,
+                1 => OpenSim.Framework.RegionSettings.DEFAULT_TERRAIN_TEXTURE_2,
+                2 => OpenSim.Framework.RegionSettings.DEFAULT_TERRAIN_TEXTURE_3,
+                3 => OpenSim.Framework.RegionSettings.DEFAULT_TERRAIN_TEXTURE_4,
+                _ => UUID.Zero
+            };
+        }
+
+        private UUID ResolveGroundTextureID(string texture, int layer)
+        {
+            if (string.IsNullOrEmpty(texture) || texture == ScriptBaseClass.NULL_KEY)
+                return DefaultGroundTextureID(layer);
+
+            UUID textureID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, texture);
+            return textureID;
+        }
+
+        public LSL_Integer llSetGroundTexture(LSL_List changes)
+        {
+            if (changes is null || changes.Length == 0)
+                return 0;
+
+            if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, true))
+            {
+                Error("llSetGroundTexture", "Script owner must be estate owner or estate manager");
+                return 0;
+            }
+
+            IEstateModule estate = World.RequestModuleInterface<IEstateModule>();
+            if (estate is null)
+                return 0;
+
+            List<UUID> terrainIDs = new()
+            {
+                World.RegionInfo.RegionSettings.TerrainTexture1,
+                World.RegionInfo.RegionSettings.TerrainTexture2,
+                World.RegionInfo.RegionSettings.TerrainTexture3,
+                World.RegionInfo.RegionSettings.TerrainTexture4
+            };
+
+            bool textureChanged = false;
+            int i = 0;
+            while (i < changes.Length)
+            {
+                int op = changes.GetLSLIntegerItem(i++);
+                if (op >= ScriptBaseClass.TERRAIN_DETAIL_1 && op <= ScriptBaseClass.TERRAIN_DETAIL_4)
+                {
+                    if (i >= changes.Length)
+                        break;
+
+                    UUID textureID = ResolveGroundTextureID(changes.GetStrictLSLStringItem(i++), op);
+                    terrainIDs[op] = textureID;
+                    textureChanged = true;
+                    continue;
+                }
+
+                int corner = -1;
+                switch (op)
+                {
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_SW:
+                        corner = 0;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_SE:
+                        corner = 2;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_NW:
+                        corner = 1;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_NE:
+                        corner = 3;
+                        break;
+                }
+
+                if (corner >= 0)
+                {
+                    if (i + 1 >= changes.Length)
+                        break;
+
+                    float low = (float)changes.GetLSLFloatItem(i++);
+                    float high = (float)changes.GetLSLFloatItem(i++);
+                    estate.setEstateTerrainTextureHeights(corner, low, high);
+                    continue;
+                }
+
+                if (op >= ScriptBaseClass.TERRAIN_PBR_SCALE_1 && op <= ScriptBaseClass.TERRAIN_PBR_OFFSET_4)
+                {
+                    // OpenSim's current terrain settings persist PBR material IDs, but not per-layer UV transforms.
+                    i++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (textureChanged)
+                estate.SetEstateTerrainTextures(terrainIDs, 2);
+
+            return 0;
+        }
+
+        public LSL_Integer llTransferOwnership(LSL_Key agent_id, LSL_Integer flags, LSL_List options)
+        {
+            if (options is not null && options.Length > 0)
+                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+
+            if ((flags.value & ScriptBaseClass.TRANSFER_FLAG_RESERVED) != 0)
+                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+
+            if ((flags.value & (ScriptBaseClass.TRANSFER_FLAG_COPY | ScriptBaseClass.TRANSFER_FLAG_TAKE)) != 0)
+                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+
+            if (!UUID.TryParse(agent_id, out UUID agentID) || agentID.IsZero())
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            if (!World.TryGetScenePresence(agentID, out ScenePresence target) || target.IsChildAgent)
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group is null || group.IsDeleted)
+                return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+            if (group.IsAttachment)
+                return ScriptBaseClass.TRANSFER_NO_ATTACHMENT;
+
+            if (target.UUID.Equals(group.OwnerID))
+                return ScriptBaseClass.TRANSFER_OK;
+
+            uint effectivePerms = group.EffectiveOwnerPerms;
+            if ((effectivePerms & (uint)PermissionMask.Transfer) == 0)
+                return ScriptBaseClass.TRANSFER_NO_PERMS;
+
+            UUID permsGranter = m_item.PermsGranter;
+            int permsMask = m_item.PermsMask;
+            group.SetOwner(target.UUID, target.ControllingClient.ActiveGroupId);
+
+            if (World.Permissions.PropagatePermissions())
+            {
+                foreach (SceneObjectPart child in group.Parts)
+                {
+                    child.Inventory.ChangeInventoryOwner(target.UUID);
+                    child.TriggerScriptChangedEvent(Changed.OWNER);
+                    child.ApplyNextOwnerPermissions();
+                }
+                group.InvalidateEffectivePerms();
+            }
+
+            m_item.PermsMask = permsMask;
+            m_item.PermsGranter = permsGranter;
+            return ScriptBaseClass.TRANSFER_OK;
+        }
+
         public void llSetVehicleType(int type)
         {
 
