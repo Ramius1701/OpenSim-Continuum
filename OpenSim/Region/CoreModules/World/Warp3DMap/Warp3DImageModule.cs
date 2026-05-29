@@ -28,6 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Reflection;
@@ -72,19 +73,62 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         // caches per rendering 
         private Dictionary<UUID, warp_Texture> m_warpTextures;
         private Dictionary<UUID, int> m_colors;
+        private Dictionary<UUID, MapSpriteTexture> m_spriteTextures;
 
         private bool m_drawPrimVolume = true;   // true if should render the prims on the tile
         private bool m_textureTerrain = true;   // true if to create terrain splatting texture
         private bool m_textureAverageTerrain = false; // replace terrain textures by their average color
         private bool m_texturePrims = true;     // true if should texture the rendered prims
         private float m_texturePrimSize = 48f;  // size of prim before we consider texturing it
-        private bool m_renderMeshes = false;    // true if to render meshes rather than just bounding boxes
+        private bool m_renderMeshes = true;     // true if to render meshes rather than just bounding boxes
+        private bool m_useCachedAssetsOnly = true;
+        private bool m_skipMissingExternalGeometry = true;
+        private bool m_skipFlatTextureCardsWithoutTexture = true;
+        private bool m_forceGC = false;
+        private int m_renderTimeBudgetMS = 30000;
+        private int m_maxMeshAssetDecodes = 2048;
+        private int m_maxTextureAssetDecodes = 192;
+        private int m_textureDownsample = 8;
+        private bool m_drawFlatTextureCardSprites = true;
+        private int m_spriteRenderTimeBudgetMS = 12000;
+        private int m_maxSpriteTextureDecodes = 512;
+        private int m_spriteTextureMaxSize = 256;
+        private float m_spriteMinAlphaCoverage = 0.02f;
+        private float m_spriteMaxOpaqueCoverage = 0.98f;
+        private float m_spriteMaxSizeMeters = 32f;
 
         private const float m_cameraHeight = 4096f;
         private float m_renderMinHeight = -100f;
         private float m_renderMaxHeight = 4096f;
 
         private bool m_Enabled = false;
+        private readonly HashSet<string> m_failedGeometryAssets = new HashSet<string>();
+        private readonly HashSet<UUID> m_failedTextureAssets = new HashSet<UUID>();
+        private int m_renderStartMS;
+        private int m_renderedParts;
+        private int m_renderedFaces;
+        private int m_missingGeometrySkipped;
+        private int m_budgetSkipped;
+        private int m_flatTextureCardSkipped;
+        private int m_meshAssetDecodesThisPass;
+        private int m_textureAssetDecodesThisPass;
+        private int m_spriteStartMS;
+        private int m_spriteCardsDrawn;
+        private int m_spriteCardsSkipped;
+        private int m_spriteTextureDecodesThisPass;
+
+        private sealed class MapSpriteTexture : IDisposable
+        {
+            public Bitmap Bitmap;
+            public float AlphaCoverage;
+            public float OpaqueCoverage;
+
+            public void Dispose()
+            {
+                Bitmap?.Dispose();
+                Bitmap = null;
+            }
+        }
 
         #region Region Module interface
 
@@ -112,6 +156,36 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 Util.GetConfigVarFromSections<float>(source, "TexturePrimSize", configSections, m_texturePrimSize);
             m_renderMeshes =
                 Util.GetConfigVarFromSections<bool>(source, "RenderMeshes", configSections, m_renderMeshes);
+            m_useCachedAssetsOnly =
+                Util.GetConfigVarFromSections<bool>(source, "Map3DUseCachedAssetsOnly", configSections, m_useCachedAssetsOnly);
+            m_skipMissingExternalGeometry =
+                Util.GetConfigVarFromSections<bool>(source, "Map3DSkipMissingExternalGeometry", configSections, m_skipMissingExternalGeometry);
+            m_skipFlatTextureCardsWithoutTexture =
+                Util.GetConfigVarFromSections<bool>(source, "Map3DSkipFlatTextureCardsWithoutTexture", configSections, m_skipFlatTextureCardsWithoutTexture);
+            m_forceGC =
+                Util.GetConfigVarFromSections<bool>(source, "Map3DForceGC", configSections, m_forceGC);
+            m_renderTimeBudgetMS = Math.Max(0,
+                Util.GetConfigVarFromSections<int>(source, "Map3DRenderTimeBudgetMS", configSections, m_renderTimeBudgetMS));
+            m_maxMeshAssetDecodes = Math.Max(0,
+                Util.GetConfigVarFromSections<int>(source, "Map3DMaxMeshAssetDecodes", configSections, m_maxMeshAssetDecodes));
+            m_maxTextureAssetDecodes = Math.Max(0,
+                Util.GetConfigVarFromSections<int>(source, "Map3DMaxTextureAssetDecodes", configSections, m_maxTextureAssetDecodes));
+            m_textureDownsample = Math.Max(1, Math.Min(10,
+                Util.GetConfigVarFromSections<int>(source, "Map3DTextureDownsample", configSections, m_textureDownsample)));
+            m_drawFlatTextureCardSprites =
+                Util.GetConfigVarFromSections<bool>(source, "Map3DDrawFlatTextureCardSprites", configSections, m_drawFlatTextureCardSprites);
+            m_spriteRenderTimeBudgetMS = Math.Max(0,
+                Util.GetConfigVarFromSections<int>(source, "Map3DTextureCardSpriteBudgetMS", configSections, m_spriteRenderTimeBudgetMS));
+            m_maxSpriteTextureDecodes = Math.Max(0,
+                Util.GetConfigVarFromSections<int>(source, "Map3DMaxSpriteTextureDecodes", configSections, m_maxSpriteTextureDecodes));
+            m_spriteTextureMaxSize = Math.Max(32, Math.Min(1024,
+                Util.GetConfigVarFromSections<int>(source, "Map3DSpriteTextureMaxSize", configSections, m_spriteTextureMaxSize)));
+            m_spriteMinAlphaCoverage = Math.Max(0f, Math.Min(1f,
+                Util.GetConfigVarFromSections<float>(source, "Map3DSpriteMinAlphaCoverage", configSections, m_spriteMinAlphaCoverage)));
+            m_spriteMaxOpaqueCoverage = Math.Max(0f, Math.Min(1f,
+                Util.GetConfigVarFromSections<float>(source, "Map3DSpriteMaxOpaqueCoverage", configSections, m_spriteMaxOpaqueCoverage)));
+            m_spriteMaxSizeMeters = Math.Max(1f,
+                Util.GetConfigVarFromSections<float>(source, "Map3DSpriteMaxSizeMeters", configSections, m_spriteMaxSizeMeters));
 
             m_renderMaxHeight = Util.GetConfigVarFromSections<float>(source, "RenderMaxHeight", configSections, m_renderMaxHeight);
             m_renderMinHeight = Util.GetConfigVarFromSections<float>(source, "RenderMinHeight", configSections, m_renderMinHeight);
@@ -195,23 +269,29 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
             }
 
-            viewWidth = (int)m_scene.RegionInfo.RegionSizeX;
-            viewHeight = (int)m_scene.RegionInfo.RegionSizeY;
+            try
+            {
+                viewWidth = (int)m_scene.RegionInfo.RegionSizeX;
+                viewHeight = (int)m_scene.RegionInfo.RegionSizeY;
 
-            cameraPos = new Vector3(
-                            viewWidth * 0.5f,
-                            viewHeight * 0.5f,
-                            m_cameraHeight);
+                cameraPos = new Vector3(
+                                viewWidth * 0.5f,
+                                viewHeight * 0.5f,
+                                m_cameraHeight);
 
-            cameraDir = -Vector3.UnitZ;
-            orto = true;
+                cameraDir = -Vector3.UnitZ;
+                orto = true;
 
-            Bitmap tile = GenImage();
-            // image may be reloaded elsewhere, so no compression format
-            string filename = "MAP-" + m_scene.RegionInfo.RegionID.ToString() + ".png";
-            tile.Save(filename,ImageFormat.Png);
-            m_primMesher = null;
-            return tile;
+                Bitmap tile = GenImage();
+                // image may be reloaded elsewhere, so no compression format
+                string filename = "MAP-" + m_scene.RegionInfo.RegionID.ToString() + ".png";
+                tile.Save(filename,ImageFormat.Png);
+                return tile;
+            }
+            finally
+            {
+                m_primMesher = null;
+            }
         }
 
         public Bitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
@@ -229,15 +309,34 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             fov = pfov;
             orto = false;
 
-            Bitmap tile = GenImage();
-            m_primMesher = null;
-            return tile;
+            try
+            {
+                return GenImage();
+            }
+            finally
+            {
+                m_primMesher = null;
+            }
         }
 
         private Bitmap GenImage()
         {
             m_colors= new Dictionary<UUID, int>();
             m_warpTextures= new Dictionary<UUID, warp_Texture>();
+            m_spriteTextures = new Dictionary<UUID, MapSpriteTexture>();
+            m_failedGeometryAssets.Clear();
+            m_failedTextureAssets.Clear();
+            m_renderStartMS = Environment.TickCount;
+            m_renderedParts = 0;
+            m_renderedFaces = 0;
+            m_missingGeometrySkipped = 0;
+            m_budgetSkipped = 0;
+            m_flatTextureCardSkipped = 0;
+            m_meshAssetDecodesThisPass = 0;
+            m_textureAssetDecodesThisPass = 0;
+            m_spriteCardsDrawn = 0;
+            m_spriteCardsSkipped = 0;
+            m_spriteTextureDecodesThisPass = 0;
 
             WarpRenderer renderer = new WarpRenderer();
 
@@ -269,19 +368,32 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             renderer.Render();
 
             Bitmap bitmap = renderer.Scene.getImage();
+            if (m_drawFlatTextureCardSprites)
+                DrawFlatTextureCardSprites(bitmap);
 
             renderer.Scene.destroy();
             renderer.Reset();
             renderer = null;
 
+            DisposeSpriteTextures();
             m_colors = null;
             m_warpTextures = null;
+            m_spriteTextures = null;
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
+            if (m_forceGC)
+            {
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
+            }
+
+            m_log.DebugFormat(
+                "[WARP 3D IMAGE MODULE]: Rendered {0} parts/{1} faces, drew {2} texture-card sprites, skipped {3} missing exact geometry, {4} flat texture-card faces, {5} texture-card sprites and {6} budget-limited items in {7}ms",
+                m_renderedParts, m_renderedFaces, m_spriteCardsDrawn, m_missingGeometrySkipped,
+                m_flatTextureCardSkipped, m_spriteCardsSkipped, m_budgetSkipped,
+                Util.EnvironmentTickCountSubtract(Environment.TickCount, m_renderStartMS));
             return bitmap;
         }
 
@@ -429,19 +541,237 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             if (m_primMesher == null)
                 return;
 
+            bool budgetExhausted = false;
             m_scene.ForEachSOG(
                 delegate (SceneObjectGroup group)
                 {
+                    if (budgetExhausted)
+                        return;
+
                     foreach (SceneObjectPart child in group.Parts)
                     {
+                        if (Map3DBudgetExpired())
+                        {
+                            m_budgetSkipped++;
+                            budgetExhausted = true;
+                            break;
+                        }
+
                         try { CreatePrim(renderer, child); }
                         catch (Exception e)
                         {
-                            m_log.Warn($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
+                            m_log.Debug($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
                         }
                     }
                 }
             );
+        }
+
+        private void DrawFlatTextureCardSprites(Bitmap bitmap)
+        {
+            if (bitmap == null)
+                return;
+
+            m_spriteStartMS = Environment.TickCount;
+
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.CompositingMode = CompositingMode.SourceOver;
+                graphics.CompositingQuality = CompositingQuality.HighSpeed;
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                graphics.SmoothingMode = SmoothingMode.None;
+
+                bool budgetExhausted = false;
+                m_scene.ForEachSOG(
+                    delegate (SceneObjectGroup group)
+                    {
+                        if (budgetExhausted)
+                            return;
+
+                        foreach (SceneObjectPart child in group.Parts)
+                        {
+                            if (TextureCardSpriteBudgetExpired())
+                            {
+                                m_budgetSkipped++;
+                                budgetExhausted = true;
+                                break;
+                            }
+
+                            if (!IsLikelyFlatTextureCard(child))
+                                continue;
+
+                            try
+                            {
+                                if (!TryGetTextureCardSpriteFace(child, out Primitive.TextureEntryFace face))
+                                {
+                                    m_spriteCardsSkipped++;
+                                    continue;
+                                }
+
+                                MapSpriteTexture sprite = GetSpriteTexture(face.TextureID, child);
+                                if (sprite == null ||
+                                    sprite.AlphaCoverage < m_spriteMinAlphaCoverage ||
+                                    sprite.OpaqueCoverage > m_spriteMaxOpaqueCoverage)
+                                {
+                                    m_spriteCardsSkipped++;
+                                    continue;
+                                }
+
+                                if (!TryDrawTextureCardSprite(graphics, bitmap, child, face, sprite.Bitmap))
+                                {
+                                    m_spriteCardsSkipped++;
+                                    continue;
+                                }
+
+                                m_spriteCardsDrawn++;
+                            }
+                            catch (Exception e)
+                            {
+                                m_spriteCardsSkipped++;
+                                m_log.Debug($"[Warp3D] failed to draw texture-card sprite {child.Name} at {child.GetWorldPosition()}: {e.Message}");
+                            }
+                        }
+                    }
+                );
+            }
+        }
+
+        private bool TryDrawTextureCardSprite(Graphics graphics, Bitmap bitmap, SceneObjectPart part,
+            Primitive.TextureEntryFace face, Bitmap texture)
+        {
+            if (!TryGetTextureCardSpritePlacement(part, bitmap, out float centerX, out float centerY,
+                out float width, out float height, out float angleDegrees))
+                return false;
+
+            Color4 tint = face.RGBA;
+            using (ImageAttributes attributes = new ImageAttributes())
+            {
+                ColorMatrix matrix = new ColorMatrix(new float[][]
+                {
+                    new float[] { tint.R, 0, 0, 0, 0 },
+                    new float[] { 0, tint.G, 0, 0, 0 },
+                    new float[] { 0, 0, tint.B, 0, 0 },
+                    new float[] { 0, 0, 0, tint.A, 0 },
+                    new float[] { 0, 0, 0, 0, 1 }
+                });
+                attributes.SetColorMatrix(matrix, ColorMatrixFlag.Default, ColorAdjustType.Bitmap);
+
+                System.Drawing.Drawing2D.Matrix oldTransform = graphics.Transform;
+                try
+                {
+                    graphics.TranslateTransform(centerX, centerY);
+                    graphics.RotateTransform(angleDegrees);
+
+                    Rectangle destination = new Rectangle(
+                        (int)MathF.Round(width * -0.5f),
+                        (int)MathF.Round(height * -0.5f),
+                        Math.Max(1, (int)MathF.Round(width)),
+                        Math.Max(1, (int)MathF.Round(height)));
+
+                    graphics.DrawImage(texture, destination, 0, 0, texture.Width, texture.Height,
+                        GraphicsUnit.Pixel, attributes);
+                }
+                finally
+                {
+                    graphics.Transform = oldTransform;
+                    oldTransform.Dispose();
+                }
+            }
+
+            return true;
+        }
+
+        private bool TryGetTextureCardSpritePlacement(SceneObjectPart part, Bitmap bitmap,
+            out float centerX, out float centerY, out float width, out float height, out float angleDegrees)
+        {
+            centerX = 0;
+            centerY = 0;
+            width = 0;
+            height = 0;
+            angleDegrees = 0;
+
+            Vector3 position = part.GetWorldPosition();
+            if (position.Z < m_renderMinHeight || position.Z > m_renderMaxHeight)
+                return false;
+
+            float regionWidth = m_scene.RegionInfo.RegionSizeX;
+            float regionHeight = m_scene.RegionInfo.RegionSizeY;
+            if (regionWidth <= 0 || regionHeight <= 0)
+                return false;
+
+            centerX = position.X * bitmap.Width / regionWidth;
+            centerY = bitmap.Height - (position.Y * bitmap.Height / regionHeight);
+
+            Vector3 scale = part.Scale;
+            float widthMeters;
+            float heightMeters;
+            float angleOffset = 0f;
+
+            if (scale.Z <= scale.X && scale.Z <= scale.Y)
+            {
+                widthMeters = scale.X;
+                heightMeters = scale.Y;
+            }
+            else if (scale.X <= scale.Y && scale.X <= scale.Z)
+            {
+                widthMeters = scale.Y;
+                heightMeters = scale.Z;
+                angleOffset = 90f;
+            }
+            else
+            {
+                widthMeters = scale.X;
+                heightMeters = scale.Z;
+            }
+
+            if (widthMeters <= 0.05f || heightMeters <= 0.05f ||
+                widthMeters > m_spriteMaxSizeMeters || heightMeters > m_spriteMaxSizeMeters)
+                return false;
+
+            width = Math.Max(1f, widthMeters * bitmap.Width / regionWidth);
+            height = Math.Max(1f, heightMeters * bitmap.Height / regionHeight);
+
+            Quaternion rotation = part.GetWorldRotation();
+            rotation.GetEulerAngles(out _, out _, out float yaw);
+            angleDegrees = (float)(-(yaw * 180.0 / Math.PI) - angleOffset);
+
+            return true;
+        }
+
+        private bool TryGetTextureCardSpriteFace(SceneObjectPart part, out Primitive.TextureEntryFace selectedFace)
+        {
+            selectedFace = null;
+
+            Primitive.TextureEntry textures = part.Shape?.Textures;
+            if (textures == null)
+                return false;
+
+            for (uint i = 0; i < 32; i++)
+            {
+                Primitive.TextureEntryFace face = textures.GetFace(i);
+                if (IsUsableSpriteFace(face))
+                {
+                    selectedFace = face;
+                    return true;
+                }
+            }
+
+            if (IsUsableSpriteFace(textures.DefaultTexture))
+            {
+                selectedFace = textures.DefaultTexture;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsUsableSpriteFace(Primitive.TextureEntryFace face)
+        {
+            return face != null &&
+                face.RGBA.A > 0f &&
+                face.TextureID.IsNotZero() &&
+                !InvPrimMagicTexture.Equals(face.TextureID);
         }
 
         private void UVPlanarMap(ref Vertex v, ref Vector3 scale, out float tu, out float tv)
@@ -475,6 +805,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private static readonly UUID InvPrimMagicTexture = new UUID("e97cf410-8e61-7005-ec06-629eba4cd1fb");
         private void CreatePrim(WarpRenderer renderer, SceneObjectPart prim)
         {
+            if (prim == null || prim.Shape == null)
+                return;
+
             if ((PCode)prim.Shape.PCode != PCode.Prim)
                 return;
 
@@ -501,44 +834,22 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             FacetedMesh renderMesh = null;
             Primitive omvPrim = prim.Shape.ToOmvPrimitive(prim.OffsetPosition, prim.RotationOffset);
+            bool externalGeometry = UsesExternalGeometry(omvPrim);
 
-            if (m_renderMeshes)
-            {
-                if (omvPrim.Sculpt is not null && omvPrim.Sculpt.SculptTexture.IsNotZero())
-                {
-                    // Try fetchinng the asset
-                    AssetBase sculptAsset = m_scene.AssetService.Get(omvPrim.Sculpt.SculptTexture.ToString());
-                    if (sculptAsset is not null)
-                    {
-                        // Is it a mesh?
-                        if (omvPrim.Sculpt.Type == SculptType.Mesh)
-                        {
-                            //AssetMesh meshAsset = new AssetMesh(omvPrim.Sculpt.SculptTexture, sculptAsset.Data);
-                            //FacetedMesh.TryDecodeFromAsset(omvPrim, meshAsset, lod, out renderMesh);
-                            FacetedMesh.TryDecodeFromBytes(sculptAsset.Data, lod, out renderMesh, true);
-                        }
-                        else // It's sculptie
-                        {
-                            //Image sculpt = m_imgDecoder.DecodeToImage(sculptAsset.Data);
-                            Image sculpt = J2kImage.FromBytes(sculptAsset.Data, null, true, 12);
-                            if (sculpt is not null)
-                            {
-                                renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, (Bitmap)sculpt, lod);
-                                //sculpt.Save("lixo12-"+prim.UUID.ToString()+".png",ImageFormat.Png);
-                                sculpt.Dispose();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        m_log.WarnFormat("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
-                            omvPrim.Sculpt.SculptTexture.ToString(), prim.Name, prim.GetWorldPosition().ToString());
-                    }
-                }
-            }
+            if (m_renderMeshes && externalGeometry)
+                renderMesh = TryGetExternalRenderMesh(omvPrim, prim, lod);
 
             // If not a mesh or sculptie, try the regular mesher
-            renderMesh ??= m_primMesher.GenerateFacetedMesh(omvPrim, lod);
+            if (renderMesh is null)
+            {
+                if (externalGeometry && m_renderMeshes && m_skipMissingExternalGeometry)
+                {
+                    m_missingGeometrySkipped++;
+                    return;
+                }
+
+                renderMesh = m_primMesher.GenerateFacetedMesh(omvPrim, lod);
+            }
 
             if (renderMesh is null)
                 return;
@@ -551,24 +862,43 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             float rc = 0;
             float rs = 0;
+            bool flatTextureCard = IsLikelyFlatTextureCard(prim);
+            int facesAdded = 0;
 
             for (int i = 0; i < renderMesh.Faces.Count; i++)
             {
+                if (Map3DBudgetExpired())
+                {
+                    m_budgetSkipped++;
+                    break;
+                }
+
                 Primitive.TextureEntryFace teFace = te.GetFace((uint)i);
+                if (teFace is null)
+                    teFace = te.DefaultTexture;
+                if (teFace is null)
+                    continue;
 
                 Color4 faceColor = teFace.RGBA;
                 if (faceColor.A == 0)
                     continue;
 
                 if (faceColor.A == 1.0f && InvPrimMagicTexture.Equals(teFace.TextureID))
-                        break;
+                    break;
 
                 warp_Material faceMaterial;
                 if (m_texturePrims)
                 {
-                    faceMaterial = GetOrCreateMaterial(renderer, faceColor, teFace.TextureID, false, prim);
+                    bool requireTexture = m_skipFlatTextureCardsWithoutTexture &&
+                        flatTextureCard &&
+                        !teFace.TextureID.IsZero();
+                    faceMaterial = GetOrCreateMaterial(renderer, faceColor, teFace.TextureID, false, requireTexture, prim);
                     if (faceMaterial is null)
+                    {
+                        if (requireTexture)
+                            m_flatTextureCardSkipped++;
                         continue;
+                    }
                     if ((faceMaterial.getColor() & warp_Color.MASKALPHA) == 0)
                         continue;
                 }
@@ -581,7 +911,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 Face face = renderMesh.Faces[i];
                 if (faceMaterial.getTexture() is null)
                 {
-                    // uv map details dont not matter for color;
+                    // UV map details do not matter for flat color.
                     for (int j = 0; j < face.Vertices.Count; j++)
                     {
                         warp_Vector pos = ConvertVector(face.Vertices[j].Position);
@@ -631,7 +961,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     }
                 }
 
-                for (int j = 0; j < face.Indices.Count; j += 3)
+                for (int j = 0; j + 2 < face.Indices.Count; j += 3)
                 {
                     faceObj.addTriangle(
                         face.Indices[j + 0],
@@ -644,7 +974,121 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 faceObj.setPos(primPos);
 
                 renderer.Scene.addObject(primID + i.ToString(), faceObj);
+                facesAdded++;
+                m_renderedFaces++;
             }
+
+            if (facesAdded > 0)
+                m_renderedParts++;
+        }
+
+        private FacetedMesh TryGetExternalRenderMesh(Primitive omvPrim, SceneObjectPart prim, DetailLevel lod)
+        {
+            if (omvPrim?.Sculpt is null || omvPrim.Sculpt.SculptTexture.IsZero())
+                return null;
+
+            if (Map3DBudgetExpired())
+            {
+                m_budgetSkipped++;
+                return null;
+            }
+
+            string cacheKey = omvPrim.Sculpt.SculptTexture + ":" + omvPrim.Sculpt.Type + ":" + lod;
+            if (m_failedGeometryAssets.Contains(cacheKey))
+                return null;
+
+            if (m_maxMeshAssetDecodes > 0 && m_meshAssetDecodesThisPass >= m_maxMeshAssetDecodes)
+            {
+                m_budgetSkipped++;
+                return null;
+            }
+
+            byte[] sculptData = GetMapAssetData(omvPrim.Sculpt.SculptTexture);
+            if (sculptData is null || sculptData.Length == 0)
+            {
+                m_failedGeometryAssets.Add(cacheKey);
+                return null;
+            }
+
+            m_meshAssetDecodesThisPass++;
+            FacetedMesh renderMesh = null;
+            try
+            {
+                if ((((int)omvPrim.Sculpt.Type) & 0x07) == (int)SculptType.Mesh)
+                {
+                    FacetedMesh.TryDecodeFromBytes(sculptData, lod, out renderMesh, true);
+                }
+                else
+                {
+                    using (Image sculpt = DecodeSculptMapImage(sculptData))
+                    {
+                        if (sculpt is not null)
+                        {
+                            using (Bitmap sculptBitmap = new Bitmap(sculpt))
+                                renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, sculptBitmap, lod);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[Warp3D] failed to decode mesh/sculpt asset {0} of prim {1} at {2}: {3}",
+                    omvPrim.Sculpt.SculptTexture, prim.Name, prim.GetWorldPosition(), e.Message);
+            }
+
+            if (renderMesh is null)
+                m_failedGeometryAssets.Add(cacheKey);
+
+            return renderMesh;
+        }
+
+        private bool Map3DBudgetExpired()
+        {
+            return m_renderTimeBudgetMS > 0 &&
+                Util.EnvironmentTickCountSubtract(Environment.TickCount, m_renderStartMS) >= m_renderTimeBudgetMS;
+        }
+
+        private static bool UsesExternalGeometry(Primitive prim)
+        {
+            return prim != null &&
+                prim.Sculpt != null &&
+                prim.Sculpt.SculptTexture.IsNotZero() &&
+                (((int)prim.Sculpt.Type) & 0x07) != (int)SculptType.None;
+        }
+
+        private static bool IsLikelyFlatTextureCard(SceneObjectPart part)
+        {
+            Vector3 scale = part.Scale;
+            float min = Math.Min(scale.X, Math.Min(scale.Y, scale.Z));
+            float max = Math.Max(scale.X, Math.Max(scale.Y, scale.Z));
+
+            if (max < 1f)
+                return false;
+
+            float middle = scale.X + scale.Y + scale.Z - min - max;
+            return min <= Math.Max(0.08f, middle * 0.08f);
+        }
+
+        private byte[] GetMapAssetData(UUID assetID)
+        {
+            if (assetID.IsZero())
+                return null;
+
+            try
+            {
+                AssetBase asset = m_useCachedAssetsOnly
+                    ? m_scene.AssetService.GetCached(assetID.ToString())
+                    : m_scene.AssetService.Get(assetID.ToString());
+
+                if (asset != null && asset.Data != null && asset.Data.Length > 0)
+                    return asset.Data;
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[Warp3D]: Asset fetch failed for map asset {0}: {1}", assetID, e.Message);
+            }
+
+            return null;
         }
 
         private int GetFaceColor(Primitive.TextureEntryFace face)
@@ -723,10 +1167,13 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             return material;
         }
 
-        public warp_Material GetOrCreateMaterial(WarpRenderer renderer, Color4 faceColor, UUID textureID, bool useAverageTextureColor, SceneObjectPart sop)
+        public warp_Material GetOrCreateMaterial(WarpRenderer renderer, Color4 faceColor, UUID textureID,
+            bool useAverageTextureColor, bool requireTexture, SceneObjectPart sop)
         {
             int color = ConvertColor(faceColor);
-            string idstr = textureID.ToString() + color.ToString();
+            string idstr = textureID.ToString() + color.ToString() +
+                (useAverageTextureColor ? ":avg" : ":tex") +
+                (requireTexture ? ":required" : ":fallback");
             string materialName = "MAPMAT" + idstr;
 
             if (renderer.Scene.TryGetMaterial(materialName, out warp_Material mat))
@@ -740,6 +1187,10 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                     color = warp_Color.multiply(color, texture.averageColor);
                 else
                     mat.setTexture(texture);
+            }
+            else if (requireTexture)
+            {
+                return null;
             }
             else
                 color = warp_Color.multiply(color, warp_Color.Grey);
@@ -756,30 +1207,187 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 return null;
             if (m_warpTextures.TryGetValue(id, out warp_Texture ret))
                 return ret;
-
-            AssetBase asset = m_scene.AssetService.Get(id.ToString());
-            if (asset is not null)
+            if (m_failedTextureAssets.Contains(id))
             {
+                m_warpTextures[id] = null;
+                return null;
+            }
+            if (m_maxTextureAssetDecodes > 0 && m_textureAssetDecodesThisPass >= m_maxTextureAssetDecodes)
+            {
+                m_warpTextures[id] = null;
+                return null;
+            }
+
+            byte[] data = GetMapAssetData(id);
+            if (data is not null && data.Length > 0)
+            {
+                m_textureAssetDecodesThisPass++;
                 try
                 {
-                    //using (Bitmap img = (Bitmap)m_imgDecoder.DecodeToImage(asset.Data))
-                    using (Bitmap img = (Bitmap)J2kImage.FromBytes(asset.Data,null, false, 16))
+                    using (Image image = DecodeTextureMapImage(data))
                     {
-                        //img.Save("lixo"+id.ToString()+".png",ImageFormat.Png);
-                        ret = new warp_Texture(img, 8); // reduce textures size to 256 * 256
+                        if (image is not null)
+                        {
+                            using (Bitmap img = new Bitmap(image))
+                                ret = new warp_Texture(img, m_textureDownsample);
+                        }
                     }
                 }
                 catch (Exception e)
                 {
-                    m_log.WarnFormat("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}", id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
+                    m_log.DebugFormat("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}",
+                        id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
                 }
             }
-            else
-                m_log.WarnFormat("[Warp3D]: missing texture {0} data for prim {1} at {2}",
-                    id.ToString(), sop.Name, sop.GetWorldPosition().ToString());
+
+            if (ret is null)
+                m_failedTextureAssets.Add(id);
 
             m_warpTextures[id] = ret;
             return ret;
+        }
+
+        private MapSpriteTexture GetSpriteTexture(UUID id, SceneObjectPart sop)
+        {
+            if (id.IsZero())
+                return null;
+
+            if (m_spriteTextures.TryGetValue(id, out MapSpriteTexture cached))
+                return cached;
+
+            if (m_failedTextureAssets.Contains(id))
+            {
+                m_spriteTextures[id] = null;
+                return null;
+            }
+
+            if (m_maxSpriteTextureDecodes > 0 && m_spriteTextureDecodesThisPass >= m_maxSpriteTextureDecodes)
+            {
+                m_spriteTextures[id] = null;
+                return null;
+            }
+
+            MapSpriteTexture sprite = null;
+            byte[] data = GetMapAssetData(id);
+            if (data is not null && data.Length > 0)
+            {
+                m_spriteTextureDecodesThisPass++;
+                try
+                {
+                    using (Image image = DecodeTextureMapImage(data))
+                    {
+                        if (image is not null)
+                            sprite = CreateSpriteTexture(image);
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.DebugFormat("[Warp3D]: Failed to decode texture-card sprite {0} for prim {1} at {2}, exception {3}",
+                        id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
+                }
+            }
+
+            if (sprite is null)
+                m_failedTextureAssets.Add(id);
+
+            m_spriteTextures[id] = sprite;
+            return sprite;
+        }
+
+        private MapSpriteTexture CreateSpriteTexture(Image image)
+        {
+            int width = image.Width;
+            int height = image.Height;
+            int largest = Math.Max(width, height);
+
+            if (largest > m_spriteTextureMaxSize)
+            {
+                float scale = m_spriteTextureMaxSize / (float)largest;
+                width = Math.Max(1, (int)MathF.Round(width * scale));
+                height = Math.Max(1, (int)MathF.Round(height * scale));
+            }
+
+            Bitmap bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using (Graphics graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.CompositingMode = CompositingMode.SourceCopy;
+                graphics.CompositingQuality = CompositingQuality.HighSpeed;
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                graphics.SmoothingMode = SmoothingMode.None;
+                graphics.DrawImage(image, 0, 0, width, height);
+            }
+
+            GetSpriteAlphaCoverage(bitmap, out float alphaCoverage, out float opaqueCoverage);
+            return new MapSpriteTexture
+            {
+                Bitmap = bitmap,
+                AlphaCoverage = alphaCoverage,
+                OpaqueCoverage = opaqueCoverage
+            };
+        }
+
+        private static void GetSpriteAlphaCoverage(Bitmap bitmap, out float alphaCoverage, out float opaqueCoverage)
+        {
+            int visible = 0;
+            int opaque = 0;
+            int total = bitmap.Width * bitmap.Height;
+
+            BitmapData bitmapData = bitmap.LockBits(new Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+            try
+            {
+                unsafe
+                {
+                    byte* row = (byte*)bitmapData.Scan0;
+                    for (int y = 0; y < bitmap.Height; y++)
+                    {
+                        byte* pixel = row;
+                        for (int x = 0; x < bitmap.Width; x++)
+                        {
+                            byte alpha = pixel[3];
+                            if (alpha > 16)
+                                visible++;
+                            if (alpha > 240)
+                                opaque++;
+                            pixel += 4;
+                        }
+                        row += bitmapData.Stride;
+                    }
+                }
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
+
+            if (total <= 0)
+            {
+                alphaCoverage = 0f;
+                opaqueCoverage = 0f;
+                return;
+            }
+
+            alphaCoverage = visible / (float)total;
+            opaqueCoverage = opaque / (float)total;
+        }
+
+        private bool TextureCardSpriteBudgetExpired()
+        {
+            return m_spriteRenderTimeBudgetMS > 0 &&
+                Util.EnvironmentTickCountSubtract(Environment.TickCount, m_spriteStartMS) >= m_spriteRenderTimeBudgetMS;
+        }
+
+        private void DisposeSpriteTextures()
+        {
+            if (m_spriteTextures == null)
+                return;
+
+            foreach (MapSpriteTexture sprite in m_spriteTextures.Values)
+                sprite?.Dispose();
+
+            m_spriteTextures.Clear();
         }
 
         #endregion Rendering Methods
@@ -817,6 +1425,85 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             return c;
         }
 
+        private static Image DecodeSculptMapImage(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+                return null;
+
+            if (!LooksLikeJpeg2000(data))
+                return null;
+
+            try
+            {
+                return J2kImage.FromBytes(data, null, true, 12);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Image DecodeTextureMapImage(byte[] data)
+        {
+            if (data == null || data.Length == 0)
+                return null;
+
+            if (!LooksLikeJpeg2000(data))
+                return null;
+
+            try
+            {
+                return J2kImage.FromBytes(data, null, false, 16);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static bool LooksLikeJpeg2000(byte[] data)
+        {
+            if (data.Length < 16)
+                return false;
+
+            bool rawCodestream = data[0] == 0xff && data[1] == 0x4f;
+            bool jp2Container = data[0] == 0x00 && data[1] == 0x00 &&
+                data[2] == 0x00 && data[3] == 0x0c &&
+                data[4] == 0x6a && data[5] == 0x50 &&
+                data[6] == 0x20 && data[7] == 0x20;
+
+            if (!rawCodestream && !jp2Container)
+                return false;
+
+            return HasJpeg2000EocMarker(data) && !HasUnknownJpeg2000CommentMarker(data);
+        }
+
+        private static bool HasJpeg2000EocMarker(byte[] data)
+        {
+            for (int i = data.Length - 2; i >= 0; i--)
+            {
+                if (data[i] == 0xff && data[i + 1] == 0xd9)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasUnknownJpeg2000CommentMarker(byte[] data)
+        {
+            for (int i = 0; i + 5 < data.Length; i++)
+            {
+                if (data[i] != 0xff || data[i + 1] != 0x64)
+                    continue;
+
+                int registration = (data[i + 4] << 8) | data[i + 5];
+                if (registration == 0)
+                    return true;
+            }
+
+            return false;
+        }
+
         private static Vector3 SurfaceNormal(Vector3 c1, Vector3 c2, Vector3 c3)
         {
             Vector3 normal = Vector3.Cross(c2 - c1, c3 - c1);
@@ -835,50 +1522,55 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
             try
             {
-                using (Bitmap bitmap = (Bitmap)J2kImage.FromBytes(j2kData))
+                using (Image image = DecodeTextureMapImage(j2kData))
                 {
-                    width = bitmap.Width;
-                    height = bitmap.Height;
+                    if (image == null)
+                        throw new InvalidDataException("invalid or unsupported JPEG2000 texture");
 
-                    BitmapData bitmapData = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, bitmap.PixelFormat);
-                    pixelBytes = (bitmapData.PixelFormat == PixelFormat.Format24bppRgb) ? 3 : 4;
-
-                    // Sum up the individual channels
-                    unsafe
+                    using (Bitmap bitmap = new Bitmap(image))
                     {
-                        byte* start = (byte*)bitmapData.Scan0;
-                        if (pixelBytes == 4)
+                        width = bitmap.Width;
+                        height = bitmap.Height;
+
+                        BitmapData bitmapData = bitmap.LockBits(new Rectangle(0, 0, width, height), ImageLockMode.ReadOnly, bitmap.PixelFormat);
+                        pixelBytes = (bitmapData.PixelFormat == PixelFormat.Format24bppRgb) ? 3 : 4;
+
+                        // Sum up the individual channels
+                        unsafe
                         {
-                            for (int y = 0; y < height; y++)
+                            byte* start = (byte*)bitmapData.Scan0;
+                            if (pixelBytes == 4)
                             {
-                                
-                                byte* end = start + 4 * width;
-                                for(byte* row = start; row < end; row += 4)
+                                for (int y = 0; y < height; y++)
                                 {
-                                    b += row[0];
-                                    g += row[1];
-                                    r += row[2];
-                                    a += row[3];
+                                    byte* end = start + 4 * width;
+                                    for(byte* row = start; row < end; row += 4)
+                                    {
+                                        b += row[0];
+                                        g += row[1];
+                                        r += row[2];
+                                        a += row[3];
+                                    }
+                                    start += bitmapData.Stride;
                                 }
-                                start += bitmapData.Stride;
+                            }
+                            else
+                            {
+                                for (int y = 0; y < height; y++)
+                                {
+                                    byte* end = start + 3 * width;
+                                    for (byte* row = start; row < end; row += 3)
+                                    {
+                                        b += row[0];
+                                        g += row[1];
+                                        r += row[2];
+                                    }
+                                    start += bitmapData.Stride;
+                                }
                             }
                         }
-                        else
-                        {
-                            for (int y = 0; y < height; y++)
-                            {
-                                byte* end = start + 3 * width;
-                                for (byte* row = start; row < end; row += 3)
-                                {
-                                    b += row[0];
-                                    g += row[1];
-                                    r += row[2];
-                                }
-                                start += bitmapData.Stride;
-                            }
-                        }
+                        bitmap.UnlockBits(bitmapData);
                     }
-                    bitmap.UnlockBits(bitmapData);
                 }
                 // Get the averages for each channel
                 double invtotalPixels = 1.0/(255.0 * width * height);
@@ -890,9 +1582,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat(
+                m_log.DebugFormat(
                     "[WARP 3D IMAGE MODULE]: Error decoding JPEG2000 texture {0} ({1} bytes): {2}",
-                    textureID, j2kData.Length, ex.Message);
+                    textureID, j2kData?.Length ?? 0, ex.Message);
 
                 width = 0;
                 height = 0;
