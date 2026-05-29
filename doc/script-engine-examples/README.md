@@ -1,0 +1,92 @@
+# Second Life-style Script Engine Examples
+
+These scripts demonstrate features that work in Second Life through Experiences,
+but are missing or incomplete in stock OpenSim. They are intended to work with
+this build's Experience-Lite script engine.
+
+Required simulator config:
+
+```ini
+[ScriptExperiences]
+Enabled = true
+AllowEstateManagers = true
+KeyValueStoreEnabled = true
+```
+
+Trust the script owner or the specific object:
+
+```ini
+TrustedOwners = 00000000-0000-0000-0000-000000000000
+TrustedObjects = 00000000-0000-0000-0000-000000000000
+```
+
+The scripts use:
+
+- `llRequestExperiencePermissions`
+- `experience_permissions`
+- `experience_permissions_denied`
+- `llAgentInExperience`
+- `llGetExperienceDetails`
+- `llSitOnLink`
+- `llCreateKeyValue`
+- `llReadKeyValue`
+- `llUpdateKeyValue`
+- `llDeleteKeyValue`
+- `llDataSizeKeyValue`
+- `llKeyCountKeyValue`
+- `llKeysKeyValue`
+- `llGetExperienceKeyValueStoreStats`
+- `llGetExperienceErrorMessage`
+- `llSetLinkSitFlags`
+- `llGetLinkSitFlags`
+- `PRIM_SCRIPTED_SIT_ONLY`
+- `PRIM_ALLOW_UNSIT`
+- `llDetectedRezzer`
+- `llGetAttachedListFiltered`
+- `llFindNotecardTextSync`
+- `llMatchGroup`
+- `llSetParcelForSale`
+- `llReturnObjectsByID`
+- `llReturnObjectsByOwner`
+- `llSetGroundTexture`
+- `llSetLinkRenderMaterial`
+- `llSetLinkGLTFOverrides`
+- `PRIM_RENDER_MATERIAL`
+- `PRIM_GLTF_*` setters through primitive params
+- `PRIM_GLTF_NORMAL`
+- `PRIM_GLTF_EMISSIVE`
+- `PRIM_GLTF_METALLIC_ROUGHNESS`
+- `PRIM_GLTF_BASE_COLOR`
+- `PRIM_PHYSICS_MATERIAL`
+- `llGiveAgentInventory`
+- `llTransferOwnership`
+- `PARCEL_MEDIA_COMMAND_LOOP_SET`
+- `TRANSFER_DEST`
+- `TRANSFER_FLAGS`
+- `TRANSFER_FLAG_COPY`
+- `TRANSFER_FLAG_TAKE`
+
+## Files
+
+- `01_experience_camera_tour_pad.lsl`: visitor memory, camera, controls and KVP stats.
+- `02_experience_teleporter.lsl`: popup-free trusted teleporter with remembered visits.
+- `03_persistent_access_door.lsl`: owner-managed access door backed by persistent KVP.
+- `04_experience_quest_tracker.lsl`: persistent per-avatar quest progress.
+- `05_vehicle_preference_rezzer.lsl`: remembers per-avatar vehicle model/color preferences.
+- `06_ai_build_memory_panel.lsl`: stores AI build project notes and command history.
+- `07_daily_reward_vendor.lsl`: daily reward cooldown remembered per avatar.
+- `08_region_passport_station.lsl`: persistent travel passport stamps.
+- `09_persistent_rental_meter.lsl`: owner-controlled rental tenant/expiry memory.
+- `10_scene_preset_controller.lsl`: persistent estate scene preset switcher.
+- `11_experience_leaderboard.lsl`: persistent player score storage and listing.
+- `12_experience_seat_manager.lsl`: Experience scripted sitting on linked seats.
+- `13_scripted_only_sit_flags.lsl`: blocks manual sit and seats avatars only through `llSitOnLink`.
+- `14_modern_estate_operations_console.lsl`: complex estate console using group matching, attachment filtering, policy notecard search, parcel sale, object return, terrain and PBR helpers.
+- `15_rezzer_provenance_quarantine.lsl`: complex provenance scanner using rezzer detection, notecard trust policy, HUD filtering and scripted return-by-ID quarantine.
+- `16_inventory_transfer_and_ownership_lab.lsl`: complex inventory transfer lab using `llGiveAgentInventory`, destination roots, transfer result codes and ownership copy/take modes.
+- `17_parcel_media_loop_console.lsl`: parcel media console using loop-set command/query, media type, description, integer size and auto-align persistence.
+- `18_pbr_gltf_physics_param_lab.lsl`: render material, GLTF override readback and physics material primitive-param lab.
+
+Stock OpenSim may fail to compile or run these scripts because Experience events,
+KVP functions, scripted-only sit flags and newer Second Life LSL compatibility
+functions are not available there.
