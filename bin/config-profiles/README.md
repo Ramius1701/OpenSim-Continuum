@@ -13,39 +13,10 @@ Quick Workflow
 Easy server wrappers from `bin`:
 
 ```bat
-start-vanilla-setup.bat
 switch-to-standalone-hg.bat
 switch-to-osgrid.bat
 switch-to-multigrid.bat
 ```
-
-For a brand new Vanilla Sim install, run the browser setup wizard first:
-
-```bat
-start-vanilla-setup.bat
-```
-
-It opens `http://127.0.0.1:9090` on the server and asks for the public grid
-domain, grid name, first region, first avatar and the showroom features to
-enable. The happy path keeps everything on: Warp3D maps, RegionWeb, weather,
-currency, groups, TextBuild, multi-grid publication, LSL scripting, offline IM
-and Vanilla Sim physics tuning.
-
-When you press **Create Vanilla Sim**, the wizard writes the configuration,
-starts `OpenSim.exe`, shows a startup splash page, creates or confirms the first
-avatar through localhost RemoteAdmin and redirects the browser to RegionWeb as
-soon as `/regionweb` is ready.
-
-If the browser is closed before startup finishes, use the generated fallback
-launcher:
-
-```bat
-start-vanilla-sim-first-run.bat
-```
-
-That starts `OpenSim.exe`, waits for local RemoteAdmin and creates or confirms
-the first avatar with its home set to the starter region. After that, open the
-viewer, use the login URI shown by the wizard and start inworld.
 
 The standalone and multigrid wrappers default to `vanilla-sim.com`. To use a
 different public Hypergrid DNS name, pass it as the first argument:
@@ -120,8 +91,7 @@ What The Standalone Profile Enables
 - `config-include/StandaloneHypergrid.ini`
 - `GatekeeperURI` and `HomeURI` for Hypergrid travel
 - YEngine
-- ubODE physics with Vanilla Sim realism tuning for solver precision, avatar movement, terrain contact, material friction/bounce and procedural boat water dynamics
-- Automatic avatar cloud recovery with baked-texture persistence and quick rebake requests
+- ubODE physics with Vanilla Sim realism tuning for solver precision, terrain contact, material friction/bounce and procedural boat water dynamics
 - Warp3D map rendering with depth-shaded water
 - Weather module with automatic forecast cycling and visitor IMs
 - Built-in Groups Module V2 with local SQLite storage
@@ -139,224 +109,32 @@ Vanilla Sim uses ubODE by default and reads the realism profile from
 `[ODEPhysicsSettings]` in `OpenSimDefaults.ini`. The important knobs are:
 
 ```ini
-world_stepsize = 0.01333
-world_solver_iterations = 24
+world_solver_iterations = 18
 body_frames_auto_disable = 180
-world_erp = 0.52
-world_cfm = 0.00075
-world_linear_damping = 0.0005
-world_angular_damping = 0.001
-world_contact_surface_layer = 0.006
-world_contact_max_correcting_velocity = 25.0
-world_contact_bounce_velocity = 0.15
-world_contact_slip = 0.01
-avatar_terminal_velocity = 54
-ubode_terrain_friction = 0.64
-ubode_terrain_bounce = 0.72
-physical_prim_material_density_enabled = true
-material_stone_density = 18.0
-material_metal_density = 24.0
-material_glass_density = 9.0
-material_wood_density = 6.0
-material_flesh_density = 7.0
-material_plastic_density = 4.5
-material_rubber_density = 3.5
-material_light_density = 1.0
+world_linear_damping = 0.0002
+world_angular_damping = 0.0005
+world_contact_bounce_velocity = 0.0
+ubode_terrain_friction = 0.62
+ubode_terrain_bounce = 0.80
 material_rubber_bounce = 0.98
 boat_water_dynamics_enabled = true
 boat_wave_height_1 = 0.09
 boat_wave_drift_scale = 0.25
 physical_prim_water_dynamics_enabled = true
-physical_prim_water_smoothing_timescale = 0.85
-physical_prim_water_surface_cushion = 0.28
-physical_prim_water_lift_smoothing_timescale = 0.14
-physical_prim_water_lift_slew_rate = 50.0
-physical_prim_water_vertical_damping = 4.5
-physical_prim_water_surface_damping = 7.0
-physical_prim_water_max_rise_acceleration = 1.25
-physical_prim_water_drag = 1.35
-physical_prim_water_drift_scale = 13.5
-physical_prim_water_drift_response = 0.45
-physical_prim_water_drift_max_acceleration = 0.22
-physical_prim_water_equilibrium_enabled = true
-physical_prim_water_equilibrium_response = 0.90
-physical_prim_water_equilibrium_damping = 4.5
-physical_prim_water_equilibrium_max_velocity = 0.62
-physical_prim_water_equilibrium_max_acceleration = 5.5
-physical_prim_water_footprint_sampling_enabled = true
-physical_prim_water_footprint_sample_scale = 0.35
-physical_prim_water_footprint_min_size = 1.5
-physical_prim_water_footprint_max_offset = 6.0
-physical_prim_water_distributed_lift_enabled = true
-physical_prim_water_distributed_lift_torque = 0.18
-physical_prim_water_distributed_lift_max_torque = 9000.0
-physical_prim_water_righting_strength = 3.0
-physical_prim_water_angular_damping = 5.0
-physical_prim_water_spin_settle_enabled = true
-physical_prim_water_spin_settle_angular_speed = 1.5
-physical_prim_water_spin_settle_damping = 4.0
-physical_prim_air_dynamics_enabled = true
-physical_prim_air_linear_drag = 0.018
-physical_prim_air_angular_drag = 0.004
-physical_prim_resting_damping_enabled = true
-physical_prim_resting_linear_damping = 3.0
-physical_prim_resting_angular_damping = 2.0
-physical_prim_resting_speed = 0.08
-physical_prim_resting_angular_speed = 0.12
-physical_prim_rolling_resistance = 0.18
-physical_prim_rolling_resistance_speed = 1.25
-physical_prim_rolling_resistance_angular_speed = 2.0
-physical_prim_near_rest_sleep_enabled = true
-physical_prim_near_rest_linear_speed = 0.018
-physical_prim_near_rest_angular_speed = 0.025
-physical_prim_micro_bounce_damping_enabled = true
-physical_prim_micro_bounce_min_speed = 0.32
-physical_prim_micro_bounce_max_depth = 0.06
-physical_prim_micro_bounce_friction_boost = 1.25
-physical_prim_high_bounce_min_bounce = 0.70
-physical_prim_high_bounce_micro_bounce_min_speed = 0.12
-physical_prim_impact_softening_enabled = true
-physical_prim_impact_softening_min_speed = 3.0
-physical_prim_impact_softening_full_speed = 9.0
-physical_prim_impact_contact_erp = 0.34
-physical_prim_impact_contact_cfm = 0.0025
-physical_prim_impact_friction_scale = 0.85
-physical_prim_shape_inertia_enabled = true
-physical_prim_base_inertia_scale = 1.08
-physical_prim_thin_shape_inertia_boost = 0.45
-avatar_friction = 0.35
-avatar_physics_tuning_enabled = true
-avatar_ground_rest_damping = 0.55
-avatar_landing_damping = 0.35
-avatar_contact_settle_damping = 0.16
-avatar_air_control_scale = 0.65
-avatar_contact_normal_smoothing = 0.35
-avatar_slope_damping = 0.18
-avatar_slope_speed_damping = 0.35
-avatar_ground_traction = 0.14
-avatar_movement_smoothing_timescale = 0.12
-avatar_step_assist_strength = 0.18
-avatar_step_assist_max_velocity = 2.4
-avatar_social_physics_enabled = true
-avatar_social_default_mode = friendly
-avatar_social_friendly_nudge = 0.11
-avatar_social_playful_nudge = 0.22
-avatar_social_romantic_nudge = 0.035
-avatar_social_no_touch_nudge = 0.35
-avatar_social_nudge_full_depth = 0.12
-avatar_social_nudge_max_force = 0.28
-avatar_avatar_collision_tuning_enabled = true
-avatar_avatar_contact_erp = 0.24
-avatar_avatar_contact_cfm = 0.006
-avatar_avatar_contact_depth_scale = 0.65
-avatar_avatar_max_penetration = 0.16
-avatar_avatar_friction = 0.02
-avatar_object_collision_tuning_enabled = true
-avatar_object_contact_erp = 0.28
-avatar_object_contact_cfm = 0.004
-avatar_object_contact_depth_scale = 0.75
-avatar_object_max_penetration = 0.18
-avatar_object_friction = 0.03
-avatar_fall_damping_enabled = true
-avatar_fall_damping = 0.18
-avatar_water_dynamics_enabled = true
-avatar_water_buoyancy = 0.92
-avatar_water_drag = 0.85
-avatar_water_walk_speed_scale = 0.55
-avatar_water_surface_damping = 1.8
-avatar_water_surface_capture = 0.22
-avatar_water_smoothing_timescale = 0.45
-water_buoyancy_wood = 1.42
-water_buoyancy_metal = 0.10
+physical_prim_water_drift_scale = 12.0
+water_buoyancy_wood = 2.20
+water_buoyancy_metal = 0.15
 boat_turn_banking_enabled = true
 ```
 
 At startup ubODE writes a `Vanilla physics tuning` line to `OpenSim.log` so you
 can confirm which solver, contact and boat-water settings are active on the
-server. Materials now drive density as well as contact response unless a viewer
-or script has explicitly set a custom density: metal and stone feel heavier,
-wood/plastic/rubber feel lighter, and the same-sized objects no longer all move
-with the same weight. Rubber and plastic use a more visible bounce profile for
-inworld demos; terrain contact uses a square-root bounce blend so low terrain
-restitution does not cancel a bouncy material. Physical prims now also get
-material-based water buoyancy: wood, plastic and rubber float, while metal and
-stone mostly sink.
-Floating prims sample the water under their footprint, so larger objects feel
-the wave height under each side and get a distributed lift torque instead of one
-flat center push. That makes rafts, boxes and boat-like builds roll and settle
-with the water more naturally.
-Floating objects preload part of their lift as soon as they touch water, so wood
-and other buoyant materials do not spend too long fully submerged before rising
-back to the surface. Water drift ramps in gradually and has a small acceleration
-cap, making floating props visibly follow the current without snapping forward
-or feeling like scripted vehicles.
-Low-speed contact micro-bounce damping keeps rubber/plastic bounce at visible
-impact speeds while fading the tiny resting rebounds that make settled objects
-tremble on terrain.
-Rubber-on-wood and rubber-on-plastic contacts keep a rubber-dominant bounce
-curve, so a rubber ball keeps several diminishing rebounds on a wooden floor
-while stone/flesh contacts keep their heavier damping.
-Avatar-to-avatar contact uses Social Physics by default in `friendly` mode for
-the showroom. It is not gender based: every avatar gets the same soft personal
-space, low-friction contact and a visible but gentle shoulder-brush nudge unless
-the region owner switches `avatar_social_default_mode` to `neutral`, `playful`,
-`romantic` or `no-touch`. The nudge is applied once per avatar pair contact and
-ramps up with penetration depth, so it should be noticeable in the showroom
-without turning normal avatar movement into bumper-car physics.
+server. Rubber and plastic use a more visible bounce profile for inworld demos;
+terrain contact uses a square-root bounce blend so low terrain restitution does
+not cancel a bouncy material. Physical prims now also get material-based water
+buoyancy: wood, plastic and rubber float, while metal and stone mostly sink.
 Floating prims receive wave drift and a small water-normal tilt so simple
-inworld boat hulls can move without being scripted as vehicles first. The solver
-runs at a slightly smaller step with softer contact correction so high-bounce
-objects move smoothly instead of jittering between frames. Buoyant prims also
-low-pass their water height, immersion, wave normal and drift so floating motion
-feels heavier and more continuous instead of twitching with every tiny wave
-sample. The water response also limits maximum upward rise and applies extra
-surface damping when an object exits the water, so a wooden cube dropped from
-above settles into the surface instead of pogoing. Submerged objects now receive
-projected-area water drag, so broad faces push more water than narrow ones.
-Water lift now has a small surface-entry cushion plus frame-to-frame smoothing:
-it only starts after real immersion and then ramps in, so floating prims ease
-into buoyancy instead of getting an instant upward kick at the exact waterline.
-Buoyant materials also use a waterline equilibrium pass that targets a plausible
-submerged fraction for the material and damps toward it, reducing the repeated
-surface jumping that makes light objects look weightless.
-That equilibrium now drives lift as a damped waterline controller rather than a
-simple upward spring, so wooden and plastic prims should stop cycling fully
-underwater and back above the surface forever.
-Large floating objects sample the water across their horizontal footprint
-instead of only at their center, so long boxes and boat-like builds react to an
-averaged surface and flow rather than twitching around one wave point.
-Floating prims that are not vehicles and are not being actively torqued also get
-idle spin settling, which damps the last slow rotations of cubes and other
-nearly symmetric objects without fighting scripted boats.
-Physical prims also get light air drag and a near-rest damping pass that removes
-small residual terrain or water jitter once an object is almost still. Terrain
-contact now adds a gentle rolling resistance and a very low near-rest sleep
-threshold, so balls and boxes can settle instead of vibrating forever after the
-visible motion is gone. Faster impacts use a soft contact response that eases
-ERP/CFM and slightly relaxes friction, so heavy collisions absorb some shock
-instead of snapping through a hard correction. Shape inertia tuning adds a
-little rotational weight, especially for thin or stretched objects, so boards
-and poles do not spin like massless props. Buoyant prims use their current
-orientation and dimensions to find a stable floating face: cube-like shapes damp
-their spin, while stretched boxes right themselves so their broad face settles
-toward the water surface.
-Avatar movement also receives a conservative realism pass: softer landings,
-reduced air steering while falling, near-rest ground damping and water movement
-that slows and supports the avatar body instead of making water feel like empty
-air. Contact normals are smoothed between physics ticks, slopes add a little
-rest damping, and low prim edges get a small step assist so walking over uneven
-builds feels less twitchy. ubODE also applies the configured avatar terminal
-velocity with a gentle fall damping curve. Avatar-to-avatar contacts and
-avatar-to-object contacts use separate soft profiles, so people separate without
-hard capsule shoves and physical objects react less violently when bumped,
-without weakening feet contacts on prim floors. Avatar water immersion is
-smoothed over several physics ticks so walking into water or
-breaking the surface feels less abrupt. Movement commands are also eased over a
-short timescale, while slopes reduce push speed slightly and add lateral
-traction so turning or stopping on uneven ground feels less skittery. A small
-contact settle pass damps residual vertical bounce after gentle landings, and a
-surface-capture pass damps small waterline bobbing without disabling swimming or
-jump behavior.
+inworld boat hulls can move without being scripted as vehicles first.
 
 RegionWeb Portal And Inventory Carousels
 ----------------------------------------
@@ -370,33 +148,9 @@ http://vanilla-sim.com:9000/regionweb/
 The same URL is also advertised through the grid info service as the viewer
 login splash, economy, about, help and registration page. The generated portal
 uses Vanilla Sim branding, sticky top navigation, page-local back links, a
-back-to-top button, a GitHub link, a wallet entry, an estate admin entry and
-live estate/region stats. Money Admin is not exposed as a main navigation item;
-it appears from the wallet only after an estate owner opens the admin token
-flow.
-
-Estate owners can open the protected configuration control room at:
-
-```text
-http://vanilla-sim.com:9000/regionweb/admin
-```
-
-Request an admin token while the estate owner avatar is online, then enter that
-token in the web form. The control room scans an allowlist under `bin` only:
-`OpenSim.ini`, `OpenSimDefaults.ini`, `config-include\*.ini`,
-`Regions\*.ini`, `Estates\*.ini` and `config-profiles\**\*.ini`. It supports
-raw INI edits, structured one-setting edits, automatic timestamped backups and
-a reload button. Backups are written before every save under:
-
-```text
-ConfigBackups\RegionWebAdmin
-```
-
-Estate files can request a live estate reload for loaded regions. `[RegionWeb]`
-settings such as portal display, carousel, wallet limits and PayPal options can
-reload in memory. Startup-bound settings such as HTTP path, enabled state,
-network ports, databases, region identity and most simulator/module/physics
-options are saved safely but still require a simulator or region restart.
+back-to-top button, a GitHub link, a wallet entry and live estate/region stats.
+Money Admin is not exposed as a main navigation item; it appears from the wallet
+only after an estate owner opens the admin token flow.
 
 RegionWeb can use owner inventory images for the front page and individual
 region hero carousels. At startup it auto-creates these folders when they are
