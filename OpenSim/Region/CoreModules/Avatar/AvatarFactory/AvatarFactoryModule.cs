@@ -57,6 +57,10 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 
         private int m_savetime = 5; // seconds to wait before saving changed appearance
         private int m_sendtime = 2; // seconds to wait before sending changed appearance
+        private bool m_temporaryDefaultAppearanceFallback = true;
+        private int m_temporaryDefaultAppearanceDelaySeconds = 6;
+        private int m_temporaryDefaultAppearanceRestoreSeconds = 12;
+        private int m_temporaryDefaultAppearanceVerifySeconds = 8;
 
         private int m_checkTime = 500; // milliseconds to wait between checks for appearance updates
         private System.Timers.Timer m_updateTimer = new System.Timers.Timer();
@@ -352,6 +356,105 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
             m_updateTimer.Start();
         }
 
+        private static long SecondsFromNow(int seconds)
+        {
+            return DateTime.Now.Ticks + Convert.ToInt64(Math.Max(1, seconds) * 1000L * 10000L);
+        }
+
+        private static AvatarAppearance CreateTemporaryDefaultAppearance(AvatarAppearance realAppearance)
+        {
+            AvatarAppearance temporary = new AvatarAppearance
+            {
+                AvatarPreferencesHoverZ = realAppearance.AvatarPreferencesHoverZ,
+                Serial = realAppearance.Serial + 1
+            };
+            temporary.SetSize(realAppearance.AvatarSize);
+            return temporary;
+        }
+
+        private bool ShouldSaveAppearance(IScenePresence sp)
+        {
+            if (!m_temporaryFallbacks.TryGetValue(sp.UUID, out TemporaryAppearanceFallback fallback))
+                return true;
+
+            if (WearablesMatch(sp.Appearance.Wearables, fallback.RealAppearance.Wearables))
+            {
+                m_temporaryFallbacks.TryRemove(sp.UUID, out _);
+                m_log.InfoFormat(
+                    "[AVFACTORY]: Saved outfit restored for {0} in {1}; temporary appearance fallback is done.",
+                    sp.Name, m_scene.RegionInfo.RegionName);
+                return true;
+            }
+
+            m_log.DebugFormat(
+                "[AVFACTORY]: Skipping appearance save for {0} in {1}; temporary default fallback is active.",
+                sp.Name, m_scene.RegionInfo.RegionName);
+            return false;
+        }
+
+        private static bool WearablesMatch(AvatarWearable[] left, AvatarWearable[] right)
+        {
+            if (left == null || right == null || left.Length != right.Length)
+                return false;
+
+            for (int i = 0; i < left.Length; i++)
+            {
+                AvatarWearable leftWearable = left[i];
+                AvatarWearable rightWearable = right[i];
+
+                if (leftWearable == null || rightWearable == null)
+                {
+                    if (leftWearable != rightWearable)
+                        return false;
+                    continue;
+                }
+
+                if (leftWearable.Count != rightWearable.Count)
+                    return false;
+
+                for (int j = 0; j < leftWearable.Count; j++)
+                {
+                    WearableItem leftItem = leftWearable[j];
+                    WearableItem rightItem = rightWearable[j];
+                    if (leftItem.ItemID != rightItem.ItemID || leftItem.AssetID != rightItem.AssetID)
+                        return false;
+                }
+            }
+
+            return true;
+        }
+
+        public bool ApplyTemporaryDefaultAppearanceFallback(IScenePresence isp)
+        {
+            if (!m_temporaryDefaultAppearanceFallback || isp == null)
+                return false;
+
+            ScenePresence sp = isp as ScenePresence;
+            if (sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent || sp.ControllingClient == null)
+                return false;
+
+            UUID agentId = sp.UUID;
+            if (m_temporaryFallbacks.ContainsKey(agentId))
+                return true;
+
+            TemporaryAppearanceFallback fallback = new TemporaryAppearanceFallback
+            {
+                RealAppearance = new AvatarAppearance(sp.Appearance, true, true),
+                State = TemporaryAppearanceFallbackState.PendingCloudCheck,
+                NextAction = SecondsFromNow(m_temporaryDefaultAppearanceDelaySeconds)
+            };
+
+            m_temporaryFallbacks[agentId] = fallback;
+            RequestRebake(sp, true);
+            m_updateTimer.Start();
+
+            m_log.InfoFormat(
+                "[AVFACTORY]: Scheduled temporary default appearance fallback check for {0} in {1}; will check once in {2} seconds.",
+                sp.Name, m_scene.RegionInfo.RegionName, m_temporaryDefaultAppearanceDelaySeconds);
+
+            return true;
+        }
+
         // called on textures update
         public bool UpdateBakedTextureCache(IScenePresence sp, WearableCacheItem[] cacheItems)
         {
@@ -576,7 +679,10 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
                         {
                             wcacheidx.CacheId = UUID.Zero;
                             wcacheidx.TextureID = AppearanceManager.DEFAULT_AVATAR_TEXTURE;
-                            hits++;
+                            if (idx == 19 || i >= AvatarAppearance.BAKES_COUNT_PV7)
+                                hits++;
+                            else
+                                wearableCacheValid = false;
                             continue;
                         }
 
@@ -652,16 +758,14 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
                         {
                             int idx = AvatarAppearance.BAKE_INDICES[i];
                             var wcacheidx = wearableCache[idx];
-                            var faceTextureidx = spAppearanceTextureFaceTextures[idx];
                             if (wcacheidx.TextureAsset == null)
                             {
-                                if(idx == 19)
+                                if(idx == 19 || i >= AvatarAppearance.BAKES_COUNT_PV7)
                                 {
-                                    faceTextureidx = null;
+                                    spAppearanceTextureFaceTextures[idx] = null;
                                     hits++;
                                 }
-                                else if(faceTextureidx == null || faceTextureidx.TextureID.Equals(AppearanceManager.DEFAULT_AVATAR_TEXTURE))
-                                    hits++;
+
                                 wcacheidx.TextureID = AppearanceManager.DEFAULT_AVATAR_TEXTURE;
                                 wcacheidx.CacheId = UUID.Zero;
                                 continue;
