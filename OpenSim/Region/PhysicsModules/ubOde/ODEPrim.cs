@@ -4160,7 +4160,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             {
                 m_smoothedWaterHeight = rawWaterHeight;
                 m_smoothedWaterNormal = rawWaterNormal;
-                m_smoothedWaterFlow = rawFlow;
+                m_smoothedWaterFlow = Vector3.Zero;
                 m_smoothedWaterSubmerged = rawSubmerged;
                 m_smoothedWaterLift = 0f;
                 m_smoothedWaterDistributedTorque = distributedWaterTorque;
@@ -4272,8 +4272,16 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             }
 
             float driftResponse = m_parentScene.PhysicalPrimWaterDriftResponse * submerged;
-            fx += (m_smoothedWaterFlow.X - vel.X) * driftResponse;
-            fy += (m_smoothedWaterFlow.Y - vel.Y) * driftResponse;
+            if (driftResponse > 0f && m_parentScene.PhysicalPrimWaterDriftMaxAcceleration > 0f)
+            {
+                Vector3 waterDrift = new(
+                    (m_smoothedWaterFlow.X - vel.X) * driftResponse,
+                    (m_smoothedWaterFlow.Y - vel.Y) * driftResponse,
+                    0f);
+                waterDrift = ClampVectorMagnitude(waterDrift, m_parentScene.PhysicalPrimWaterDriftMaxAcceleration);
+                fx += waterDrift.X;
+                fy += waterDrift.Y;
+            }
 
             Vector3 angularVel = UBOdeNative.BodyGetAngularVelOMV(Body);
             bool isVehicle = m_vehicle != null && m_vehicle.Type != Vehicle.TYPE_NONE;
