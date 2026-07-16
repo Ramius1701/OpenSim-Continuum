@@ -20,6 +20,9 @@ RegionUUID = 11111111-2222-3333-4444-555555555555
 Location = 1000,1000
 InternalAddress = 0.0.0.0
 InternalPort = 9000
+; InternalPort can also be set to MATCHING, which makes the region use
+; whatever port is set as http_listener_port under [Network] in
+; OpenSim.ini, instead of a fixed port kept in sync by hand here.
 AllowAlternatePorts = False
 ExternalHostName = SYSTEMIP
 
