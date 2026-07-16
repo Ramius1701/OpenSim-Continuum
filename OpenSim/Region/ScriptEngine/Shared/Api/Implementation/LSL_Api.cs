@@ -15148,6 +15148,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     case ScriptBaseClass.PARCEL_DETAILS_GEOMETRICCENTER:
                         ret.Add(new LSL_Vector(parcel.CenterPoint.X, parcel.CenterPoint.Y, 0));
                         break;
+                    case ScriptBaseClass.PARCEL_DETAILS_GET_OBJECT_RETURN:
+                        ret.Add(new LSL_Integer(land.OtherCleanTime));
+                        break;
                     default:
                         Error("GetParcelDetails", $"Unknown parameter {io.value}");
                         return new LSL_List(0);
