@@ -70,6 +70,20 @@ namespace OpenSim.Services.Interfaces
         string Authenticate(UUID principalID, string password, int lifetime, out UUID realID);
 
         //////////////////////////////////////////////////////
+        // RSA key-based authentication (ported from Mobius)
+        //
+        // Two-phase challenge/response used as an alternative to password
+        // login: RSAAuthenticate hands back an encrypted challenge for the
+        // account's stored public key; FinishRSALogin completes the login
+        // once the viewer has decrypted and returned it.
+        //
+        bool RSAAuthenticate(UUID principalID, int lifetime, out string magic, out string key);
+        bool FinishRSALogin(UUID principalID, string data, out string token);
+        bool SetPublicKey(UUID principalID, string public_key);
+        bool EnforceRSALogin(UUID principalID, bool enforce);
+
+
+        //////////////////////////////////////////////////////
         // Verification
         //
         // Allows to verify the authenticity of a token
