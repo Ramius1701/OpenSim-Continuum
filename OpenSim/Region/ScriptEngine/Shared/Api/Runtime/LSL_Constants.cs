@@ -772,11 +772,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PARCEL_DETAILS_DWELL = 64;
         public const int PARCEL_DETAILS_GETCLAIMDATE = 65;
         public const int PARCEL_DETAILS_GEOMETRICCENTER = 66;
+        public const int PARCEL_DETAILS_GET_OBJECT_RETURN = 67;
 
         //osSetParcelDetails
         public const int PARCEL_DETAILS_ANY_AVATAR_SOUNDS = 7;
         public const int PARCEL_DETAILS_GROUP_SOUNDS = 8;
         public const int PARCEL_DETAILS_CLAIMDATE = 10;
+        public const int PARCEL_DETAILS_OBJECT_RETURN = 67;
 
         // constants for llSetClickAction
         public const int CLICK_ACTION_NONE = 0;

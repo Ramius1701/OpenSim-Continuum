@@ -1946,6 +1946,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                             newLand.GroupAVSounds = newgrpsounds;
                         }
                         break;
+
+                    case ScriptBaseClass.PARCEL_DETAILS_OBJECT_RETURN:
+                        iarg = rules.GetIntegerItem(idx++);
+                        if (iarg < 0)
+                            iarg = 0;
+                        if(newLand.OtherCleanTime != iarg)
+                        {
+                            changed = true;
+                            newLand.OtherCleanTime = iarg;
+                        }
+                        break;
                     }
             }
             if(changed)
