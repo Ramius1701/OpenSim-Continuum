@@ -45,10 +45,17 @@ namespace OpenSim.Services.Interfaces
     {
     }
 
+    // Marker base for the RSA challenge/response returned mid-handshake,
+    // ported from Mobius.
+    public abstract class RSALoginResponse : LoginResponse
+    {
+    }
+
     public interface ILoginService
     {
         LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
-            string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP);
+            string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP,
+            bool LibOMVclient = false, bool rsa_login = false, string rsa_data = "", bool agree_to_tos = false);
         Hashtable SetLevel(string firstName, string lastName, string passwd, int level, IPEndPoint clientIP);
     }
 

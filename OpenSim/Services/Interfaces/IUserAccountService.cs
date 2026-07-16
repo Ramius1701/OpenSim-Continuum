@@ -99,6 +99,11 @@ namespace OpenSim.Services.Interfaces
 
         public int Created;
 
+        // Unix timestamp of the TOS version this account last agreed to,
+        // ported from Mobius. Compared against LLLoginService's configured
+        // TOS_Date to decide whether the user needs to re-accept.
+        public int TOSDate;
+
         public string Name
         {
             get { return FirstName + " " + LastName; }
@@ -130,6 +135,8 @@ namespace OpenSim.Services.Interfaces
 
             if (kvp.TryGetValue("Created", out otmp))
                 Created = Convert.ToInt32(otmp.ToString());
+            if (kvp.TryGetValue("TOSDate", out otmp) && otmp is not null)
+                TOSDate = Convert.ToInt32(otmp.ToString());
             if (kvp.TryGetValue("ServiceURLs", out otmp) && otmp is string str)
             {
                 ServiceURLs = new Dictionary<string, object>();
@@ -156,6 +163,7 @@ namespace OpenSim.Services.Interfaces
                 ["PrincipalID"] = PrincipalID.ToString(),
                 ["ScopeID"] = ScopeID.ToString(),
                 ["Created"] = Created.ToString(),
+                ["TOSDate"] = TOSDate.ToString(),
                 ["UserLevel"] = UserLevel.ToString(),
                 ["UserFlags"] = UserFlags.ToString(),
                 ["UserTitle"] = UserTitle,
