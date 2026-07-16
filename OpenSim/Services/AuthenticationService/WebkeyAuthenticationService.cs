@@ -98,5 +98,26 @@ namespace OpenSim.Services.AuthenticationService
             }
             return String.Empty;
         }
+
+        // Webkey auth doesn't support RSA key login.
+        public bool RSAAuthenticate(UUID principalID, int lifetime, out string magic, out string key)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool FinishRSALogin(UUID principalID, string data, out string token)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SetPublicKey(UUID principalID, string public_key)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool EnforceRSALogin(UUID principalID, bool enforce)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
