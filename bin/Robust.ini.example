@@ -133,6 +133,11 @@
     ;; Uncomment if you want to have centralized estate data
     ; EstateDataService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:EstateDataRobustConnector"
 
+    ;; Uncomment if you want to have abuse reports (ported from Mobius fork).
+    ;; Also needs a [Modules] AbuseReportsService = RemoteAbuseReportsServicesConnector
+    ;; on the region side, and an [AbuseReportsService] section below.
+    ; AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
+
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
 ; * This is common for all services, it's the network setup for the entire
@@ -648,3 +653,7 @@
 
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
+
+[AbuseReportsService]
+    LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    ;; ConnectionString = "Data Source=localhost;Database=robust;User ID=robust;Password=*****;Old Guids=true;CharSet=utf8mb4;"

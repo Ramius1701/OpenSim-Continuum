@@ -835,10 +835,42 @@
     ; Disabled by default
     ; MuteListModule = MuteListModule
 
+    ; Abuse reports handler (ported from Mobius). Also requires
+    ; [Modules] AbuseReportsService and an [AbuseReportsService] section
+    ; below, plus [AbuseReports] Enabled = true.
+    ;# {AbuseReportsModule} {AbuseReportsModule:AbuseReportsModule} {} {} None
+    ; Disabled by default
+    ; AbuseReportsModule = AbuseReportsModule
+
     ;; Control whether group invites and notices are stored for offline users.
     ;; Default is true.
     ;; This applies to both core groups module.
     ; ForwardOfflineGroupMessages = true
+
+
+[Modules]
+    ;; Selects which connector AbuseReportsModule (above, under [Messaging])
+    ;; uses. For a standalone or single-region setup, use the Local
+    ;; connector; for a grid where abuse reports should be centralized on
+    ;; ROBUST, use the Remote connector instead.
+    ; AbuseReportsService = "LocalAbuseReportsServicesConnector"
+    ; AbuseReportsService = "RemoteAbuseReportsServicesConnector"
+
+[AbuseReportsService]
+    ;; Only needed if [Modules] AbuseReportsService above is set to
+    ;; LocalAbuseReportsServicesConnector.
+    ; LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    ; StorageProvider = "OpenSim.Data.MySQL.dll:MySqlAbuseReportsData"
+    ; ConnectionString = "Data Source=localhost;Database=opensim;User ID=opensim;Password=*****;Old Guids=true;CharSet=utf8mb4;"
+
+    ;; Only needed if [Modules] AbuseReportsService above is set to
+    ;; RemoteAbuseReportsServicesConnector - point this at your ROBUST
+    ;; instance's [AbuseReportsService] AbuseReportsServiceConnector.
+    ; AbuseReportsServerURI = "http://127.0.0.1:8003"
+
+[AbuseReports]
+    ;; Enables the in-viewer "Report Abuse" floater's CAPS endpoint.
+    ;Enabled = true
 
 
 [BulletSim]
