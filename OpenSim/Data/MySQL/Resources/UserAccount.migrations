@@ -39,3 +39,11 @@ ADD COLUMN `DisplayName` VARCHAR(31) NULL AFTER `active`,
 ADD COLUMN `NameChanged` INT NULL DEFAULT 0 AFTER `DisplayName`;
 
 COMMIT;
+
+:VERSION 8        # -------------------------
+
+BEGIN;
+
+ALTER TABLE `UserAccounts` ADD COLUMN `TOSDate` INT UNSIGNED NULL AFTER `NameChanged`;
+
+COMMIT;
