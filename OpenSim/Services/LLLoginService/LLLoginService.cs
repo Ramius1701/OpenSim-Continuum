@@ -91,6 +91,12 @@ namespace OpenSim.Services.LLLoginService
         protected string m_MessageUrl;
         protected string m_DSTZone;
 
+        // TOS (Terms of Service) enforcement, ported from Mobius: if
+        // TOS_URL is set, accounts whose UserAccount.TOSDate is older than
+        // TOS_Date are asked to agree before being allowed to log in.
+        protected string m_TOS_URL;
+        protected int m_TOS_Date;
+
         protected bool m_allowDuplicatePresences = false;
         protected string m_messageKey;
         protected bool m_allowLoginFallbackToAnyRegion = true;  // if login requested region if not found and there are no Default or fallback regions,
@@ -165,6 +171,9 @@ namespace OpenSim.Services.LLLoginService
 
             m_DeniedMacs = Util.GetConfigVarFromSections<string>(config, "DeniedMacs", accessControlConfigSections, string.Empty);
             m_DeniedID0s = Util.GetConfigVarFromSections<string>(config, "DeniedID0s", accessControlConfigSections, string.Empty);
+
+            m_TOS_URL = m_LoginServerConfig.GetString("TOS_URL", string.Empty);
+            m_TOS_Date = m_LoginServerConfig.GetInt("TOS_Date", 0);
 
             m_MessageUrl = m_LoginServerConfig.GetString("MessageUrl", string.Empty);
             m_WelcomeMessage = null;
@@ -330,7 +339,8 @@ namespace OpenSim.Services.LLLoginService
         }
 
         public LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
-            string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP)
+            string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP,
+            bool LibOMVclient = false, bool rsa_login = false, string rsa_data = "", bool agree_to_tos = false)
         {
             bool success;
             UUID session = UUID.Random();
@@ -450,19 +460,85 @@ namespace OpenSim.Services.LLLoginService
                 //
                 // Authenticate this user
                 //
-                if (passwd.StartsWith("$1$"))
-                    passwd = passwd[3..];
-                else
-                    passwd = Util.Md5Hash(passwd);
-
-                string token = m_AuthenticationService.Authenticate(account.PrincipalID, passwd, 30, out UUID realID);
+                UUID realID = UUID.Zero;
                 UUID secureSession = UUID.Zero;
-                if (string.IsNullOrWhiteSpace(token) || !UUID.TryParse(token, out secureSession))
+                if (rsa_login)
                 {
-                    m_log.InfoFormat(
-                        "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: authentication failed",
-                        firstName, lastName);
-                    return LLFailedLoginResponse.UserProblem;
+                    if (rsa_data == "start")
+                    {
+                        bool rsaOk = m_AuthenticationService.RSAAuthenticate(account.PrincipalID, 30, out string magic, out string key);
+                        if (!rsaOk)
+                            return LLFailedLoginResponse.NoRSALogin;
+
+                        return new OSRSALoginResponse(magic, key);
+                    }
+                    else if (!string.IsNullOrEmpty(rsa_data))
+                    {
+                        bool rsaSuccess = m_AuthenticationService.FinishRSALogin(account.PrincipalID, rsa_data, out string token);
+                        if (!rsaSuccess)
+                        {
+                            m_log.InfoFormat(
+                                "[LLOGIN SERVICE]: RSA login failed for {0} {1}, reason: rsa authentication failed",
+                                firstName, lastName);
+                            return new LLFailedLoginResponse("rsa", "RSA Authentication failed!", "false");
+                        }
+                        else if (string.IsNullOrWhiteSpace(token) || !UUID.TryParse(token, out secureSession))
+                        {
+                            m_log.InfoFormat(
+                                "[LLOGIN SERVICE]: RSA login failed for {0} {1}, reason: authentication failed",
+                                firstName, lastName);
+                            return LLFailedLoginResponse.UserProblem;
+                        }
+                    }
+                    else
+                    {
+                        // rsa_login was set but carried neither "start" nor
+                        // an actual challenge response - malformed request.
+                        return LLFailedLoginResponse.UserProblem;
+                    }
+                }
+                else
+                {
+                    if (passwd.StartsWith("$1$"))
+                        passwd = passwd[3..];
+                    else
+                        passwd = Util.Md5Hash(passwd);
+
+                    string token = m_AuthenticationService.Authenticate(account.PrincipalID, passwd, 30, out realID);
+                    if (token == "requires_rsa")
+                    {
+                        return LLFailedLoginResponse.RSALoginOnly;
+                    }
+                    else if (string.IsNullOrWhiteSpace(token) || !UUID.TryParse(token, out secureSession))
+                    {
+                        m_log.InfoFormat(
+                            "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: authentication failed",
+                            firstName, lastName);
+                        return LLFailedLoginResponse.UserProblem;
+                    }
+                }
+
+                // TOS (Terms of Service) enforcement, ported from Mobius: if
+                // configured and the account hasn't agreed to the current
+                // TOS_Date yet, ask for agreement instead of logging in.
+                if (!string.IsNullOrEmpty(m_TOS_URL) && account.TOSDate < m_TOS_Date)
+                {
+                    if (!agree_to_tos)
+                    {
+                        m_log.InfoFormat(
+                            "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: ToS has expired",
+                            firstName, lastName);
+                        return new LLFailedLoginResponse("tos", m_TOS_URL, "false");
+                    }
+                    else
+                    {
+                        m_log.InfoFormat("[LLOGIN SERVICE]: {0} {1} has agreed to the current TOS", firstName, lastName);
+                        account.TOSDate = m_TOS_Date;
+                        if (!m_UserAccountService.StoreUserAccount(account))
+                        {
+                            m_log.InfoFormat("[LLOGIN SERVICE]: Error updating UserAccount entry for {0} {1}", firstName, lastName);
+                        }
+                    }
                 }
 
                 string PrincipalIDstr = account.PrincipalID.ToString();

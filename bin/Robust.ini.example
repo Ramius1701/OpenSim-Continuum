@@ -479,6 +479,16 @@
     LibraryService = "OpenSim.Services.InventoryService.dll:LibraryService"
     FriendsService = "OpenSim.Services.FriendsService.dll:FriendsService"
 
+    ; AuthenticationService above (in [UserAccountService]) chooses the actual
+    ; auth backend for the whole grid. To offer RSA public-key login in
+    ; addition to password login, set it there to:
+    ; AuthenticationService = "OpenSim.Services.AuthenticationService.dll:RSAKeyAndPasswordAuthenticationService"
+
+    ; If set, users whose account's accepted-TOS date is older than TOS_Date
+    ; will be shown TOS_URL and asked to agree before being allowed to log in.
+    ; TOS_URL = ""
+    ; TOS_Date = 0
+
     ; The minimum user level required for a user to be able to login.  0 by default
     ; If you disable a particular user's account then you can set their login level below this number.
     ; You can also change this level from the console though these changes will not be persisted.
