@@ -36,6 +36,9 @@ namespace OpenSim.Framework
         public UUID Id;
         public string FirstName;
         public string LastName;
+        // Display Names support, ported from Mobius.
+        public string DisplayName;
+        public DateTime NameChanged = DateTime.MinValue;
         public string HomeURL;
         public Dictionary<string, object> ServerURLs;
         public bool IsUnknownUser;

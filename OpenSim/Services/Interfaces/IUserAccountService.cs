@@ -104,6 +104,10 @@ namespace OpenSim.Services.Interfaces
         // TOS_Date to decide whether the user needs to re-accept.
         public int TOSDate;
 
+        // Display Names support, ported from Mobius.
+        public string DisplayName = string.Empty;
+        public int NameChanged;
+
         public string Name
         {
             get { return FirstName + " " + LastName; }
@@ -137,6 +141,10 @@ namespace OpenSim.Services.Interfaces
                 Created = Convert.ToInt32(otmp.ToString());
             if (kvp.TryGetValue("TOSDate", out otmp) && otmp is not null)
                 TOSDate = Convert.ToInt32(otmp.ToString());
+            if (kvp.TryGetValue("DisplayName", out otmp) && otmp is not null && !string.IsNullOrWhiteSpace(otmp.ToString()))
+                DisplayName = otmp.ToString();
+            if (kvp.TryGetValue("NameChanged", out otmp) && otmp is not null)
+                NameChanged = Convert.ToInt32(otmp.ToString());
             if (kvp.TryGetValue("ServiceURLs", out otmp) && otmp is string str)
             {
                 ServiceURLs = new Dictionary<string, object>();
@@ -164,6 +172,8 @@ namespace OpenSim.Services.Interfaces
                 ["ScopeID"] = ScopeID.ToString(),
                 ["Created"] = Created.ToString(),
                 ["TOSDate"] = TOSDate.ToString(),
+                ["DisplayName"] = DisplayName,
+                ["NameChanged"] = NameChanged.ToString(),
                 ["UserLevel"] = UserLevel.ToString(),
                 ["UserFlags"] = UserFlags.ToString(),
                 ["UserTitle"] = UserTitle,
@@ -215,5 +225,11 @@ namespace OpenSim.Services.Interfaces
         bool StoreUserAccount(UserAccount data);
 
         void InvalidateCache(UUID userID);
+
+        /// <summary>
+        /// Sets the account's display name and stamps NameChanged to now.
+        /// Ported from Mobius.
+        /// </summary>
+        bool SetDisplayName(UUID userID, string displayName);
     }
 }

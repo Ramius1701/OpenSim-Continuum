@@ -48,6 +48,15 @@ namespace OpenSim.Services.Connectors
 
         private string m_ServerURI = String.Empty;
 
+        // Shared secret used to sign SetDisplayName requests sent over the
+        // wire to ROBUST's UserAccountServerPostHandler, ported from Mobius
+        // but actually made configurable (Mobius's own version hardcoded
+        // this to the literal string "password" with a "//todo: make
+        // config" comment left in - an unauthenticated remote caller could
+        // trivially forge display-name-change requests against a Mobius
+        // grid using that known default).
+        private string m_DisplayNameSecret = string.Empty;
+
         public UserAccountServicesConnector()
         {
         }
@@ -87,6 +96,15 @@ namespace OpenSim.Services.Connectors
             }
 
             m_ServerURI = tmp.URI;
+
+            m_DisplayNameSecret = assetConfig.GetString("DisplayNameSecret", string.Empty);
+            if (string.IsNullOrWhiteSpace(m_DisplayNameSecret))
+            {
+                m_log.Warn("[ACCOUNT CONNECTOR]: DisplayNameSecret is not set under [UserAccountService]. " +
+                    "SetDisplayName requests will still be sent, but without it any request reaching your " +
+                    "ROBUST instance's /accounts endpoint with a matching (blank) secret would be accepted - " +
+                    "set the same DisplayNameSecret here and in ROBUST's own [UserAccountService] section.");
+            }
 
             base.Initialise(source, "UserAccountService");
         }
@@ -426,6 +444,21 @@ namespace OpenSim.Services.Connectors
             }
 
             return false;
+        }
+
+        public bool SetDisplayName(UUID userID, string displayName)
+        {
+            Dictionary<string, object> sendData = new()
+            {
+                ["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString(),
+                ["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString(),
+                ["METHOD"] = "setdisplayname",
+                ["USERID"] = userID.ToString(),
+                ["NAME"] = displayName,
+                ["MAGIC"] = Utils.SHA256String(string.Format("{0}-{1}-{2}", userID.ToString(), displayName, m_DisplayNameSecret))
+            };
+
+            return SendAndGetBoolReply(sendData);
         }
 
     }
