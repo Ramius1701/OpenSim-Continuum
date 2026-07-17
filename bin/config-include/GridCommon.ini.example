@@ -158,6 +158,11 @@
     ;
     UserAccountServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
+    ; Only needed if using Display Names (ported from Mobius, see
+    ; [DisplayNames] in OpenSim.ini): must match DisplayNameSecret under
+    ; [UserAccountService] in this grid's Robust.ini.
+    ; DisplayNameSecret = ""
+
 [GridUserService]
     ;
     ; Change this to your grid-wide user server

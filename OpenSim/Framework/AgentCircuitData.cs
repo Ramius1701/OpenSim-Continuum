@@ -94,6 +94,11 @@ namespace OpenSim.Framework
         /// </summary>
         public string lastname;
 
+        // Display Names support, ported from Mobius. Carried across region
+        // crossings/teleports the same way firstname/lastname are, so the
+        // destination region doesn't have to re-fetch it.
+        public string displayname = string.Empty;
+
         /// <summary>
         /// Agent's full name.
         /// </summary>
@@ -207,6 +212,7 @@ namespace OpenSim.Framework
             args["circuit_code"] = OSD.FromString(circuitcode.ToString());
             args["first_name"] = OSD.FromString(firstname);
             args["last_name"] = OSD.FromString(lastname);
+            args["display_name"] = OSD.FromString(displayname);
             args["inventory_folder"] = OSD.FromUUID(InventoryFolder);
             args["secure_session_id"] = OSD.FromUUID(SecureSessionID);
             args["session_id"] = OSD.FromUUID(SessionID);
@@ -311,6 +317,8 @@ namespace OpenSim.Framework
                 firstname = tmpOSD.AsString();
             if (args.TryGetValue("last_name", out tmpOSD))
                 lastname = tmpOSD.AsString();
+            if (args.TryGetValue("display_name", out tmpOSD))
+                displayname = tmpOSD.AsString();
             if (args.TryGetValue("inventory_folder", out tmpOSD))
                 InventoryFolder = tmpOSD.AsUUID();
             if (args.TryGetValue("secure_session_id", out tmpOSD))

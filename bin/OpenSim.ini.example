@@ -872,6 +872,15 @@
     ;; Enables the in-viewer "Report Abuse" floater's CAPS endpoint.
     ;Enabled = true
 
+[DisplayNames]
+    ;; Enables Display Names support (ported from Mobius): lets users set
+    ;; a separate display name from their account name, shown in the
+    ;; viewer's nametags and profile. Also requires DisplayNameSecret to
+    ;; be set under [UserAccountService] if this region talks to a
+    ;; separate ROBUST instance over the Remote connector (not needed for
+    ;; standalone/Local).
+    ;Enabled = true
+
 
 [BulletSim]
     ;# {AvatarToAvatarCollisionsByDefault} {[Startup]physics:BulletSim} {Should avatars collide with each other?} {true false} true

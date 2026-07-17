@@ -411,6 +411,12 @@
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:UserAccountService"
     ; Realm = "UserAccounts"
 
+    ; Only needed if using Display Names (ported from Mobius): must match
+    ; DisplayNameSecret under [UserAccountService] in every region's
+    ; GridCommon.ini that connects to this grid. Authenticates
+    ; SetDisplayName requests coming in over the network from regions.
+    ; DisplayNameSecret = ""
+
     ; These are for creating new accounts by the service
     AuthenticationService = "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService"
     PresenceService = "OpenSim.Services.PresenceService.dll:PresenceService"
