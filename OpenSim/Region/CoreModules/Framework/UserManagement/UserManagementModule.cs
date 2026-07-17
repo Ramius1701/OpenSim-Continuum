@@ -442,11 +442,10 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
         /// DisplayName, GetUserDatas would see stale cache hits missing
         /// the display name.
         ///
-        /// The update_name parameter is currently a reserved no-op: in
-        /// Mobius it forces a live re-fetch of a foreign user's current
-        /// display name from their home grid. That cross-grid federation
-        /// (DisplayNameServiceConnector / GetGridUserInfo(ids, bool)) is a
-        /// separate, larger piece of work than this local-grid-only layer.
+        /// The update_name parameter, when true, forces GridUserService to
+        /// refresh a foreign user's display name from their home grid if
+        /// its cached copy has gone stale (see GridUserService.
+        /// GetGridUserInfo(ids, update_name) and DisplayNameServiceConnector).
         /// </summary>
         public virtual Dictionary<UUID, UserData> GetUserDatas(string[] ids, UUID scopeID, bool update_name = false)
         {
@@ -512,7 +511,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                 return ret;
             }
 
-            GridUserInfo[] pinfos = m_gridUserService.GetGridUserInfo(missing.ToArray());
+            GridUserInfo[] pinfos = m_gridUserService.GetGridUserInfo(missing.ToArray(), update_name);
             if (pinfos.Length > 0)
             {
                 foreach (GridUserInfo uInfo in pinfos)
@@ -544,9 +543,15 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                         userdata.HomeURL = host.URI;
                         userdata.LastName = "@" + host.HostAndPort;
                         userdata.IsLocal = false;
+
+                        // HG display name federation, ported from Mobius:
+                        // GridUserService.GetGridUserInfo(ids, update_name)
+                        // already did the actual cross-grid fetch when
+                        // update_name was true; the result just needs
+                        // carrying over here.
+                        userdata.DisplayName = uInfo.DisplayName;
+                        userdata.NameChanged = uInfo.NameCached;
                     }
-                    // Cross-grid DisplayName federation isn't wired up yet;
-                    // foreign visitors fall back to their base name for now.
                     userdata.IsUnknownUser = false;
                     userdata.HasGridUserTried = true;
                     m_userCacheByID.Add(u, userdata, 1800000);

@@ -16,8 +16,10 @@ namespace OpenSim.Region.ClientStack.Linden
     // Display Names region module, ported from Mobius (treated as a design
     // reference - see the "Display Names" commit messages). Caches NameInfo
     // per agent and backs GetDisplayNames/SetDisplayName for BunchOfCaps.
-    // Cross-grid (HG) display name federation isn't implemented yet: foreign
-    // visitors get their base name via GetUserDatas until that's added.
+    // HG visitors get their display name federated from their home grid via
+    // GetUserDatas -> GridUserService -> DisplayNameServiceConnector,
+    // refreshed periodically (see [GridUserService] FetchDisplayNames /
+    // DisplayNamesCacheExpirationInHours).
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DisplayNames")]
     public class DisplayNamesModule : ISharedRegionModule, IDisplayNamesModule
     {

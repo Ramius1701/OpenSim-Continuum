@@ -98,6 +98,7 @@ namespace OpenSim.Framework
         // crossings/teleports the same way firstname/lastname are, so the
         // destination region doesn't have to re-fetch it.
         public string displayname = string.Empty;
+        public bool hasDisplayName = false;
 
         /// <summary>
         /// Agent's full name.
@@ -318,7 +319,10 @@ namespace OpenSim.Framework
             if (args.TryGetValue("last_name", out tmpOSD))
                 lastname = tmpOSD.AsString();
             if (args.TryGetValue("display_name", out tmpOSD))
+            {
+                hasDisplayName = true;
                 displayname = tmpOSD.AsString();
+            }
             if (args.TryGetValue("inventory_folder", out tmpOSD))
                 InventoryFolder = tmpOSD.AsUUID();
             if (args.TryGetValue("secure_session_id", out tmpOSD))

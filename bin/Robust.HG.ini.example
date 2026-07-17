@@ -152,6 +152,13 @@
     InstantMessageServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:InstantMessageServerConnector"
     HGInventoryServiceConnector = "HGInventoryService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     HGAssetServiceConnector = "HGAssetService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
+
+    ;; Uncomment if you want to support Display Names (ported from Mobius)
+    ;; for HG visitors coming from grids that also support it - exposes
+    ;; get_display_names for foreign regions to query this grid's users.
+    ;; Also needs [GridUserService] FetchDisplayNames = true on any region
+    ;; that should look up *its own* HG visitors' display names.
+    ; HGGetDisplayNamesConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:HGGetDisplayNames"
     ;; Uncomment this if you want Groups V2, HG to work
     ; HGGroupsServiceConnector = "${Const|PublicPort}/OpenSim.Addons.Groups.dll:HGGroupsServiceRobustConnector"
 
@@ -490,6 +497,12 @@
 [GridUserService]
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:GridUserService"
+
+    ;; HG display name federation (ported from Mobius): fetches and caches
+    ;; HG visitors' display names from their home grid. Makes outbound
+    ;; HTTP calls to foreign grids, so it's opt-in.
+    ; FetchDisplayNames = true
+    ; DisplayNamesCacheExpirationInHours = 12
 
 
 [AgentPreferencesService]
