@@ -21197,6 +21197,75 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return new LSL_String();
         }
 
+        // llSignRSA/llVerifyRSA, ported from GuntharDeNiro/opensim - real SL
+        // LSL functions (RSA signing/verification using a PEM-encoded key).
+        private static bool TryGetRsaHashAlgorithm(string algo, out HashAlgorithmName hashAlgorithm)
+        {
+            switch (algo)
+            {
+                case "sha1":
+                    hashAlgorithm = HashAlgorithmName.SHA1;
+                    return true;
+                case "sha224":
+                    hashAlgorithm = new HashAlgorithmName("SHA224");
+                    return true;
+                case "sha256":
+                    hashAlgorithm = HashAlgorithmName.SHA256;
+                    return true;
+                case "sha384":
+                    hashAlgorithm = HashAlgorithmName.SHA384;
+                    return true;
+                case "sha512":
+                    hashAlgorithm = HashAlgorithmName.SHA512;
+                    return true;
+            }
+
+            hashAlgorithm = default;
+            return false;
+        }
+
+        public LSL_String llSignRSA(LSL_String private_key, LSL_String msg, LSL_String algorithm)
+        {
+            if (private_key.Length < 1 || msg.Length < 1)
+                return new LSL_String();
+
+            if (!TryGetRsaHashAlgorithm(algorithm.m_string, out HashAlgorithmName hashAlgorithm))
+                return new LSL_String();
+
+            try
+            {
+                using RSA rsa = RSA.Create();
+                rsa.ImportFromPem(private_key.m_string.AsSpan());
+                byte[] signature = rsa.SignData(Encoding.UTF8.GetBytes(msg.m_string), hashAlgorithm, RSASignaturePadding.Pkcs1);
+                return Convert.ToBase64String(signature);
+            }
+            catch
+            {
+                return new LSL_String();
+            }
+        }
+
+        public LSL_Integer llVerifyRSA(LSL_String public_key, LSL_String msg, LSL_String signature, LSL_String algorithm)
+        {
+            if (public_key.Length < 1 || msg.Length < 1 || signature.Length < 1)
+                return 0;
+
+            if (!TryGetRsaHashAlgorithm(algorithm.m_string, out HashAlgorithmName hashAlgorithm))
+                return 0;
+
+            try
+            {
+                using RSA rsa = RSA.Create();
+                rsa.ImportFromPem(public_key.m_string.AsSpan());
+                byte[] signatureBytes = Convert.FromBase64String(signature.m_string);
+                return rsa.VerifyData(Encoding.UTF8.GetBytes(msg.m_string), signatureBytes, hashAlgorithm, RSASignaturePadding.Pkcs1) ? 1 : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         public LSL_String llGetRenderMaterial(LSL_Integer lface )
         {
             return GetMaterial(m_host, lface.value);
