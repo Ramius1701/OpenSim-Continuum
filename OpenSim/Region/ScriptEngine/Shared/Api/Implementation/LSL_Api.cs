@@ -7655,6 +7655,44 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             part.ParentGroup.HasGroupChanged = true;
         }
 
+        // llSetSculptAnim, ported from GuntharDeNiro/opensim - a real SL
+        // function for animating a sculpt map's UV playback. OpenSim has
+        // no separate LLUDP field for sculpt-map animation, so - same as
+        // the source project - this stores the exact requested state in
+        // the part's dynamic attributes (for scripts reading it back) and
+        // mirrors it through the existing viewer-supported texture
+        // animation block as a visible fallback.
+        public void llSetSculptAnim(LSL_Integer mode, LSL_Integer sizex, LSL_Integer sizey,
+                LSL_Integer start_frame, LSL_Integer end_frame, LSL_Float rate, LSL_Integer texture_sync)
+        {
+            if (m_host?.ParentGroup is null || m_host.ParentGroup.IsDeleted)
+                return;
+
+            m_host.DynAttrs ??= new DAMap();
+            lock (m_host.DynAttrs)
+            {
+                if (!m_host.DynAttrs.TryGetStore("lsl", "sculpt_anim", out OSDMap store) || store == null)
+                    store = new OSDMap();
+
+                store["mode"] = OSD.FromInteger(mode.value);
+                store["size_x"] = OSD.FromInteger(sizex.value);
+                store["size_y"] = OSD.FromInteger(sizey.value);
+                store["start_frame"] = OSD.FromInteger(start_frame.value);
+                store["end_frame"] = OSD.FromInteger(end_frame.value);
+                store["rate"] = OSD.FromReal(rate.value);
+                store["texture_sync"] = OSD.FromBoolean(texture_sync.value != 0);
+                m_host.DynAttrs.SetStore("lsl", "sculpt_anim", store);
+            }
+
+            double length = Math.Max(0.0, end_frame.value - start_frame.value + 1.0);
+            SetTextureAnim(m_host, mode.value, ScriptBaseClass.ALL_SIDES,
+                Math.Max(1, sizex.value), Math.Max(1, sizey.value),
+                start_frame.value, length, rate.value);
+
+            m_host.SendFullUpdateToAllClients();
+            m_host.ParentGroup.HasGroupChanged = true;
+        }
+
         public void llTriggerSoundLimited(string sound, double volume, LSL_Vector top_north_east,
                                           LSL_Vector bottom_south_west)
         {
