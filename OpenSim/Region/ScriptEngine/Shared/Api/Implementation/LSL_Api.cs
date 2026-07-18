@@ -23986,6 +23986,83 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             return changed;
         }
+        public LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment)
+        {
+            if (!IsScriptExperienceTrusted())
+                return ScriptBaseClass.ENV_NOT_EXPERIENCE;
+
+            if (!UUID.TryParse(agent_id, out UUID agentID) || agentID.IsZero())
+                return ScriptBaseClass.ENV_INVALID_AGENT;
+
+            ScenePresence sp = World.GetScenePresence(agentID);
+            if (sp is null || sp.IsDeleted || sp.IsChildAgent || sp.IsNPC || sp.IsInTransit)
+                return ScriptBaseClass.ENV_INVALID_AGENT;
+
+            if (!m_item.PermsGranter.Equals(agentID) || m_item.PermsMask == 0)
+                return ScriptBaseClass.ENV_NO_EXPERIENCE_PERMISSION;
+
+            int interpolate = Math.Max(0, (int)Math.Round(transition.value));
+            if (string.IsNullOrEmpty(environment) || environment == ScriptBaseClass.NULL_KEY)
+            {
+                sp.Environment = null;
+                m_envModule?.WindlightRefreshForced(sp, interpolate);
+                return 1;
+            }
+
+            if (m_envModule is null || !TryLoadEnvironmentAsset(environment, out OSD envOSD))
+                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+            try
+            {
+                ViewerEnvironment env = m_envModule.GetRegionEnvironment().Clone();
+                if (!env.CycleFromOSD(envOSD))
+                    return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+                sp.Environment = env;
+                m_envModule.WindlightRefreshForced(sp, interpolate);
+                return 1;
+            }
+            catch
+            {
+                return ScriptBaseClass.ENV_INVALID_RULE;
+            }
+        }
+
+        public LSL_Integer llSetAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_List parameters)
+        {
+            if (!IsScriptExperienceTrusted())
+                return ScriptBaseClass.ENV_NOT_EXPERIENCE;
+
+            if (!UUID.TryParse(agent_id, out UUID agentID) || agentID.IsZero())
+                return ScriptBaseClass.ENV_INVALID_AGENT;
+
+            ScenePresence sp = World.GetScenePresence(agentID);
+            if (sp is null || sp.IsDeleted || sp.IsChildAgent || sp.IsNPC || sp.IsInTransit)
+                return ScriptBaseClass.ENV_INVALID_AGENT;
+
+            if (!m_item.PermsGranter.Equals(agentID) || m_item.PermsMask == 0)
+                return ScriptBaseClass.ENV_NO_EXPERIENCE_PERMISSION;
+
+            if (parameters is null || parameters.Length == 0)
+            {
+                sp.Environment = null;
+                m_envModule?.WindlightRefreshForced(sp, Math.Max(0, (int)Math.Round(transition.value)));
+                return 1;
+            }
+
+            if (m_envModule is null)
+                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+            ViewerEnvironment env = (sp.Environment ?? m_envModule.GetRegionEnvironment()).Clone();
+            LSL_Integer result = ApplyEnvironmentParameters(env, parameters, sp.AbsolutePosition.Z, false);
+            if (result.value != 1)
+                return result;
+
+            sp.Environment = env;
+            m_envModule.WindlightRefreshForced(sp, Math.Max(0, (int)Math.Round(transition.value)));
+            return 1;
+        }
+
 
         public LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no,
                 LSL_Integer day_length, LSL_Integer day_offset)
