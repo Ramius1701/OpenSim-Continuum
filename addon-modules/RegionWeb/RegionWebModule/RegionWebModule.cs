@@ -3940,7 +3940,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 return;
             }
 
-            if (!session != null && IsRegionWebSuperAdmin(session.AgentID))
+            if (session == null || !IsRegionWebSuperAdmin(session.AgentID))
             {
                 SendEstateAdminLogin(response, string.Empty, FormValue(form, "avatar"));
                 return;
