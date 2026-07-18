@@ -1271,6 +1271,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int FORCE_DIRECT_PATH = 1;
         public const int REQUIRE_LINE_OF_SIGHT = 2;
 
+        // Pathfinding option constants used by llGetClosestNavPoint
+        // and llPursue. Values match the LSL protocol constants.
+        public const int GCNP_RADIUS = 0;
+        public const int PURSUIT_OFFSET = 1;
+
         public const int PU_GOAL_REACHED = 0x01;
         public const int PU_FAILURE_INVALID_START = 0x02;
         public const int PU_FAILURE_INVALID_GOAL = 0x03;
