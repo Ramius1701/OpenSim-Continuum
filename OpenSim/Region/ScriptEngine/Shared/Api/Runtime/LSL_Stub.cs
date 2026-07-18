@@ -1101,6 +1101,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options)
+        {
+            return m_LSL_Functions.llGiveAgentInventory(agentID, folderName, inventory, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llGiveInventory(LSL_Key destination, LSL_String inventory)
         {
             m_LSL_Functions.llGiveInventory(destination, inventory);
