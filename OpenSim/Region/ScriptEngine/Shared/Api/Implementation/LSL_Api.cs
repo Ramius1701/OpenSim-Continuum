@@ -20457,6 +20457,138 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return asset.ToString();
         }
 
+        // SetRenderMaterial/llSetLinkRenderMaterial, ported from
+        // GuntharDeNiro/opensim - a real SL function assigning a material
+        // asset (by name or UUID) to a face's render override, built
+        // entirely on the existing IMaterialsModule.CleanMaterialOverrides/
+        // RemoveMaterialEntry API (already used elsewhere in this file for
+        // other material-setting functions) rather than new engine logic.
+        private void SetRenderMaterial(SceneObjectPart part, LSL_String materialstr, LSL_Integer lsl_face, string originFunc)
+        {
+            if(part is null || m_materialsModule is null)
+                return;
+
+            if(string.IsNullOrEmpty(materialstr.m_string))
+            {
+                Error(originFunc, "material \"\" not found");
+                return;
+            }
+
+            int face = lsl_face.value;
+            if(face < 0 && face != ScriptBaseClass.ALL_SIDES)
+                return;
+
+            bool changed;
+
+            if(UUID.ZeroString.Equals(materialstr.m_string, StringComparison.OrdinalIgnoreCase))
+            {
+                if(part.Shape.RenderMaterials is null || part.Shape.RenderMaterials.entries is null || part.Shape.RenderMaterials.entries.Length == 0)
+                    return;
+
+                changed = m_materialsModule.CleanMaterialOverrides(ref part.Shape.RenderMaterials.overrides, face);
+                if(face == ScriptBaseClass.ALL_SIDES)
+                {
+                    part.Shape.RenderMaterials.entries = null;
+                    changed = true;
+                }
+                else
+                    changed |= m_materialsModule.RemoveMaterialEntry(ref part.Shape.RenderMaterials.entries, face);
+
+                if(changed)
+                {
+                    part.ParentGroup.HasGroupChanged = true;
+                    part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+                    part.TriggerScriptChangedEvent(Changed.MATERIAL);
+                }
+                return;
+            }
+
+            UUID matID = ScriptUtils.GetAssetIdFromItemName(part, materialstr.m_string, (int)AssetType.Material);
+            if (matID.IsZero())
+            {
+                if (!UUID.TryParse(materialstr.m_string, out matID) || matID.IsZero())
+                {
+                    Error(originFunc, $"material \"{materialstr.m_string}\" not found");
+                    return;
+                }
+            }
+
+            int nsides = GetNumberOfSides(part);
+            if(face >= nsides)
+                return;
+
+            part.Shape.RenderMaterials ??= new();
+            part.Shape.RenderMaterials.entries ??= new Primitive.RenderMaterials.RenderMaterialEntry[1];
+
+            changed = m_materialsModule.CleanMaterialOverrides(ref part.Shape.RenderMaterials.overrides, face);
+            if(face == ScriptBaseClass.ALL_SIDES)
+            {
+                if(part.Shape.RenderMaterials.entries is null || part.Shape.RenderMaterials.entries.Length != nsides)
+                {
+                    part.Shape.RenderMaterials.entries = new Primitive.RenderMaterials.RenderMaterialEntry[nsides];
+                    for (int i = 0; i < part.Shape.RenderMaterials.entries.Length; i++)
+                    {
+                        part.Shape.RenderMaterials.entries[i] = new()
+                        {
+                            te_index = (byte)i,
+                            id = matID
+                        };
+                    }
+                    changed = true;
+                }
+                else
+                {
+                    for (int i = 0; i < part.Shape.RenderMaterials.entries.Length; i++)
+                    {
+                        if(matID.NotEqual(part.Shape.RenderMaterials.entries[i].id))
+                        {
+                            changed = true;
+                            part.Shape.RenderMaterials.entries[i].id = matID;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                int indx = 0;
+                for( ; indx < part.Shape.RenderMaterials.entries.Length; indx++)
+                {
+                    if (part.Shape.RenderMaterials.entries[indx].te_index == face)
+                    {
+                        if(matID.NotEqual(part.Shape.RenderMaterials.entries[indx].id))
+                        {
+                            changed = true;
+                            part.Shape.RenderMaterials.entries[indx].id = matID;
+                        }
+                        break;
+                    }
+                }
+                if(indx == part.Shape.RenderMaterials.entries.Length)
+                {
+                    Array.Resize(ref part.Shape.RenderMaterials.entries, part.Shape.RenderMaterials.entries.Length + 1);
+
+                    part.Shape.RenderMaterials.entries[indx] = new()
+                    {
+                        te_index = (byte)face,
+                        id = matID
+                    };
+                    changed = true;
+                }
+            }
+            if(changed)
+            {
+                part.ParentGroup.HasGroupChanged = true;
+                part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+                part.TriggerScriptChangedEvent(Changed.MATERIAL);
+            }
+        }
+
+        public void llSetLinkRenderMaterial(LSL_Integer linknum, LSL_String materialstr, LSL_Integer lsl_face)
+        {
+            foreach (SceneObjectPart part in GetLinkParts(linknum.value))
+                SetRenderMaterial(part, materialstr, lsl_face, "llSetLinkRenderMaterial");
+        }
+
         public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
         {
             SceneObjectPart part;
