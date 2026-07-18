@@ -552,6 +552,139 @@ namespace OpenSim.Framework
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // Ported from GuntharDeNiro/opensim - needed by llGetEnvironment.
+        // Picks the first configured water frame on the water track, or
+        // else any configured water frame, matching real SL's behavior of
+        // always returning a usable water for a given environment.
+        public WaterData GetWater()
+        {
+            if (Cycle is null)
+                return null;
+
+            if (Cycle.waterTrack.Count > 0)
+            {
+                DayCycle.TrackEntry entry = Cycle.waterTrack[0];
+                if (Cycle.waterframes.TryGetValue(entry.frameName, out WaterData water) && water is not null)
+                    return water;
+            }
+
+            foreach (WaterData water in Cycle.waterframes.Values)
+            {
+                if (water is not null)
+                    return water;
+            }
+
+            return null;
+        }
+
+        public WaterData EnsureWater()
+        {
+            Cycle ??= new DayCycle { Name = "ScriptEnvironment" };
+
+            WaterData water = GetWater();
+            if (water is not null)
+                return water;
+
+            const string frameName = "ScriptWater";
+            water = new WaterData { Name = frameName };
+            Cycle.waterframes[frameName] = water;
+            Cycle.waterTrack.Clear();
+            Cycle.waterTrack.Add(new DayCycle.TrackEntry(-1f, frameName));
+            return water;
+        }
+
+        private List<DayCycle.TrackEntry> EnsureSkyTrackForAltitude(float altitude)
+        {
+            Cycle ??= new DayCycle { Name = "ScriptEnvironment" };
+
+            if (altitude < Altitudes[0])
+                return Cycle.skyTrack0;
+
+            int trackIndex;
+            if (altitude < Altitudes[1])
+                trackIndex = 0;
+            else if (altitude < Altitudes[2])
+                trackIndex = 1;
+            else
+                trackIndex = 2;
+
+            Cycle.skyTracks[trackIndex] ??= new List<DayCycle.TrackEntry>();
+            return Cycle.skyTracks[trackIndex];
+        }
+
+        private SkyData EnsureSkyFrame(List<DayCycle.TrackEntry> track, string preferredName)
+        {
+            foreach (DayCycle.TrackEntry entry in track)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.frameName)
+                    && Cycle.skyframes.TryGetValue(entry.frameName, out SkyData existingSky)
+                    && existingSky is not null)
+                    return existingSky;
+            }
+
+            string frameName = track.Count > 0 && !string.IsNullOrWhiteSpace(track[0].frameName)
+                ? track[0].frameName
+                : preferredName;
+
+            if (Cycle.skyframes.ContainsKey(frameName))
+            {
+                string baseName = frameName;
+                int suffix = 1;
+                do
+                {
+                    frameName = baseName + suffix++;
+                }
+                while (Cycle.skyframes.ContainsKey(frameName));
+            }
+
+            SkyData sky = new() { Name = frameName };
+            Cycle.skyframes[frameName] = sky;
+            if (track.Count == 0)
+                track.Add(new DayCycle.TrackEntry(-1f, frameName));
+            else
+                track[0] = new DayCycle.TrackEntry(track[0].time, frameName);
+            return sky;
+        }
+
+        private void AddSkyTargets(List<DayCycle.TrackEntry> track, List<SkyData> targets, HashSet<string> frameNames)
+        {
+            if (track is null)
+                return;
+
+            foreach (DayCycle.TrackEntry entry in track)
+            {
+                if (string.IsNullOrWhiteSpace(entry.frameName) || !frameNames.Add(entry.frameName))
+                    continue;
+
+                if (Cycle.skyframes.TryGetValue(entry.frameName, out SkyData sky) && sky is not null)
+                    targets.Add(sky);
+            }
+        }
+
+        public List<SkyData> EnsureSkyTargets(float altitude, bool allTracks)
+        {
+            Cycle ??= new DayCycle { Name = "ScriptEnvironment" };
+
+            List<SkyData> targets = new();
+            HashSet<string> frameNames = new();
+            if (allTracks)
+            {
+                AddSkyTargets(Cycle.skyTrack0, targets, frameNames);
+                for (int i = 0; i < Cycle.skyTracks.Length; ++i)
+                    AddSkyTargets(Cycle.skyTracks[i], targets, frameNames);
+
+                if (targets.Count == 0)
+                    targets.Add(EnsureSkyFrame(Cycle.skyTrack0, "ScriptSky"));
+
+                return targets;
+            }
+
+            List<DayCycle.TrackEntry> track = EnsureSkyTrackForAltitude(altitude);
+            AddSkyTargets(track, targets, frameNames);
+            if (targets.Count == 0)
+                targets.Add(EnsureSkyFrame(track, "ScriptSky"));
+            return targets;
+        }
         public List<DayCycle.TrackEntry> FindTrack(float altitude)
         {
             if (altitude < Altitudes[0])
