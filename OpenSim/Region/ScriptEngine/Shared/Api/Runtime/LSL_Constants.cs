@@ -1190,5 +1190,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int FILTER_INCLUDE = 1;
         public const int FILTER_FLAGS = 2;
         public const int FILTER_FLAG_HUDS = 0x0001;
+
+        // llSetLinkGLTFOverrides constants, ported from GuntharDeNiro/
+        // opensim (real SL constants).
+        public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+        public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+        public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+        public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+        public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+        public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
+        public const int OVERRIDE_GLTF_EXTENSION_JSON = 1000;
     }
 }
