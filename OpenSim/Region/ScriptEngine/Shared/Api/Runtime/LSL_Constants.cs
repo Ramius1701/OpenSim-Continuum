@@ -1144,5 +1144,28 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int OBJECT_RETURN_PARCEL = 1;
         public const int OBJECT_RETURN_PARCEL_OWNER = 2;
         public const int OBJECT_RETURN_REGION = 4;
+
+        // llSetGroundTexture terrain-layer constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int TERRAIN_DETAIL_1 = 0;
+        public const int TERRAIN_DETAIL_2 = 1;
+        public const int TERRAIN_DETAIL_3 = 2;
+        public const int TERRAIN_DETAIL_4 = 3;
+        public const int TERRAIN_HEIGHT_RANGE_SW = 4;
+        public const int TERRAIN_HEIGHT_RANGE_SE = 5;
+        public const int TERRAIN_HEIGHT_RANGE_NW = 6;
+        public const int TERRAIN_HEIGHT_RANGE_NE = 7;
+        public const int TERRAIN_PBR_SCALE_1 = 8;
+        public const int TERRAIN_PBR_SCALE_2 = 9;
+        public const int TERRAIN_PBR_SCALE_3 = 10;
+        public const int TERRAIN_PBR_SCALE_4 = 11;
+        public const int TERRAIN_PBR_ROTATION_1 = 12;
+        public const int TERRAIN_PBR_ROTATION_2 = 13;
+        public const int TERRAIN_PBR_ROTATION_3 = 14;
+        public const int TERRAIN_PBR_ROTATION_4 = 15;
+        public const int TERRAIN_PBR_OFFSET_1 = 16;
+        public const int TERRAIN_PBR_OFFSET_2 = 17;
+        public const int TERRAIN_PBR_OFFSET_3 = 18;
+        public const int TERRAIN_PBR_OFFSET_4 = 19;
     }
 }
