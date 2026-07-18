@@ -61,6 +61,17 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         private int m_animTickLand;
         private int m_animTickJump;
 
+        // Movement animation resend heartbeat, ported from GuntharDeNiro/
+        // opensim - guards against a viewer missing the movement
+        // animation packet sent right after a region crossing (the
+        // client-side symptom is an avatar stuck mid-walk-cycle or
+        // sliding instead of animating). ResendMovementAnimationIfNeeded
+        // periodically re-sends WALK/RUN/FLY-family animations only,
+        // since those are the ones a viewer visibly "gets stuck" on.
+        private int m_lastMovementAnimPackTick;
+        private string m_lastMovementAnimPackName;
+        private const int MovementAnimPackHeartbeatMS = 2500;
+
         public bool isJumping;
 
         // private int m_landing = 0;
@@ -226,6 +237,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                 }
                 m_scenePresence.SendScriptChangedEventToAttachments(Changed.ANIMATION);
                 SendAnimPack();
+                NoteMovementAnimPackSent();
                 return true;
             }
 
@@ -241,9 +253,44 @@ namespace OpenSim.Region.Framework.Scenes.Animation
 
                 m_scenePresence.SendScriptChangedEventToAttachments(Changed.ANIMATION);
                 SendAnimPack();
+                NoteMovementAnimPackSent();
                 return true;
             }
             return false;
+        }
+
+        private void NoteMovementAnimPackSent()
+        {
+            m_lastMovementAnimPackTick = Util.EnvironmentTickCount();
+            m_lastMovementAnimPackName = CurrentMovementAnimation;
+        }
+
+        private static bool NeedsMovementAnimHeartbeat(string anim)
+        {
+            return anim == "WALK" || anim == "RUN" || anim == "CROUCHWALK"
+                || anim == "FEMALE_WALK" || anim == "FLY" || anim == "FLYSLOW";
+        }
+
+        // Ported from GuntharDeNiro/opensim - see the field comments
+        // above for why this exists. Called from ScenePresence after
+        // a region crossing and after SetMovementDirection, matching the
+        // two call sites the source project itself instrumented.
+        public void ResendMovementAnimationIfNeeded()
+        {
+            if (m_scenePresence.IsChildAgent || !NeedsMovementAnimHeartbeat(CurrentMovementAnimation))
+                return;
+
+            int now = Util.EnvironmentTickCount();
+
+            lock (m_animations)
+            {
+                if (m_lastMovementAnimPackName != CurrentMovementAnimation ||
+                        Util.EnvironmentTickCountSubtract(now, m_lastMovementAnimPackTick) >= MovementAnimPackHeartbeatMS)
+                {
+                    SendAnimPack();
+                    NoteMovementAnimPackSent();
+                }
+            }
         }
 
         public enum motionControlStates : byte
