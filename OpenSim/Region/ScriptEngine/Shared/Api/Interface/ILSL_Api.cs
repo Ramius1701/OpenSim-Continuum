@@ -499,6 +499,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
           LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules);
           LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no, LSL_Integer day_length, LSL_Integer day_offset);
 
+          void llRequestExperiencePermissions(string agent, string experience);
+          void llReleaseExperiencePermissions(string agent);
+          LSL_Integer llIsExperienceTrusted();
+          LSL_Integer llGetExperiencePermissions();
+          LSL_Integer llExperienceCanAutoGrant(int permissions);
+          LSL_Integer llAgentInExperience(string agent);
+          LSL_List llGetExperienceDetails(string experienceID);
+          LSL_Integer llOpenFloater(LSL_String floater_name, LSL_String url, LSL_List parameters);
+          LSL_Integer llSitOnLink(string agent, int link);
+          LSL_String llGetExperienceErrorMessage(int error);
+          LSL_Key llCreateKeyValue(string key, string value);
+          LSL_Key llReadKeyValue(string key);
+          LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue);
+          LSL_Key llDeleteKeyValue(string key);
+          LSL_Key llKeyCountKeyValue();
+          LSL_Key llKeysKeyValue(int first, int count);
+          LSL_Key llDataSizeKeyValue();
+          LSL_List llGetExperienceKeyValueStoreStats();
           void llCreateCharacter(LSL_List options);
           void llUpdateCharacter(LSL_List options);
           void llDeleteCharacter();
