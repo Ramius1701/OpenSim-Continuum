@@ -535,6 +535,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
          LSL_String llHMAC(LSL_String private_key, LSL_String message, LSL_String algo);
          LSL_String llComputeHash(LSL_String message, LSL_String algo);
          LSL_String llGetRenderMaterial(LSL_Integer face);
+         LSL_String llSignRSA(LSL_String private_key, LSL_String msg, LSL_String algorithm);
+         LSL_Integer llVerifyRSA(LSL_String public_key, LSL_String msg, LSL_String signature, LSL_String algorithm);
         LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
          LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);
                void llSetRenderMaterial(LSL_String material, LSL_Integer face);
