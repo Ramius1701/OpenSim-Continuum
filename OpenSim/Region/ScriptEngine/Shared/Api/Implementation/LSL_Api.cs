@@ -8033,6 +8033,92 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return AttachmentsList;
         }
 
+        // llGetAttachedListFiltered, ported from GuntharDeNiro/opensim - a
+        // real SL function listing an avatar's current attachments,
+        // optionally filtered to specific attachment points/HUDs.
+        public LSL_List llGetAttachedListFiltered(LSL_Key id, LSL_List options)
+        {
+            if(!UUID.TryParse(id, out UUID avID) || avID.IsZero())
+                return new LSL_List("NOT_FOUND");
+
+            ScenePresence av = World.GetScenePresence(avID);
+            if (av is null || av.IsDeleted)
+                return new LSL_List("NOT_FOUND");
+
+            if (av.IsChildAgent || av.IsInTransit)
+                return new LSL_List("NOT_ON_REGION");
+
+            int flags = 0;
+            HashSet<int> includePoints = null;
+            bool includeAnyHud = false;
+
+            for (int i = 0; i < options.Length - 1; i += 2)
+            {
+                int option;
+                try
+                {
+                    option = options.GetIntegerItem(i);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                switch (option)
+                {
+                    case ScriptBaseClass.FILTER_INCLUDE:
+                        int attachmentPoint;
+                        try
+                        {
+                            attachmentPoint = options.GetIntegerItem(i + 1);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        if (attachmentPoint == ScriptBaseClass.ATTACH_ANY_HUD)
+                        {
+                            includeAnyHud = true;
+                        }
+                        else
+                        {
+                            includePoints ??= new HashSet<int>();
+                            includePoints.Add(attachmentPoint);
+                        }
+                        break;
+
+                    case ScriptBaseClass.FILTER_FLAGS:
+                        try
+                        {
+                            flags |= options.GetIntegerItem(i + 1);
+                        }
+                        catch { }
+                        break;
+                }
+            }
+
+            bool includeHuds = (flags & ScriptBaseClass.FILTER_FLAG_HUDS) != 0 && avID.Equals(m_host.OwnerID);
+            LSL_List attachmentsList = new();
+
+            foreach (SceneObjectGroup attachment in av.GetAttachments())
+            {
+                int attachmentPoint = (int)attachment.AttachmentPoint;
+                bool isHud = attachment.HasPrivateAttachmentPoint;
+
+                if (isHud && !includeHuds)
+                    continue;
+
+                if ((includePoints is not null || includeAnyHud)
+                    && !(includePoints?.Contains(attachmentPoint) == true || (includeAnyHud && isHud)))
+                    continue;
+
+                attachmentsList.Add(new LSL_Key(attachment.UUID.ToString()));
+            }
+
+            return attachmentsList;
+        }
+
         public virtual LSL_Integer llGetFreeMemory()
         {
             // Make scripts designed for Mono happy
@@ -16291,6 +16377,30 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+        // llFindNotecardTextSync, ported from GuntharDeNiro/opensim - a
+        // real SL function regex-searching a cached notecard's text
+        // synchronously (no dataserver event round-trip needed, unlike
+        // llGetNotecardLine below).
+        public LSL_List llFindNotecardTextSync(string name, string pattern, int start, int count, LSL_List options)
+        {
+            if (!UUID.TryParse(name, out UUID assetID))
+            {
+                TaskInventoryItem item = m_host.Inventory.GetInventoryItem(name, 7);
+
+                if (item is null)
+                {
+                    Error("llFindNotecardTextSync", "Can't find notecard '" + name + "'");
+                    return new LSL_List(ScriptBaseClass.NAK);
+                }
+                assetID = item.AssetID;
+            }
+
+            if (!NotecardCache.IsCached(assetID))
+                return new LSL_List(ScriptBaseClass.NAK);
+
+            return NotecardCache.FindText(assetID, pattern, start, count);
+        }
+
         public LSL_Key llGetNotecardLine(string name, int line)
         {
             if (!UUID.TryParse(name, out UUID assetID))
@@ -20665,6 +20775,56 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (m_Notecards.TryGetValue(assetID, 30000, out string[] text))
                 return text.Length;
             return -1;
+        }
+
+        // FindText, ported from GuntharDeNiro/opensim - backs the real SL
+        // function llFindNotecardTextSync. Regex-searches a cached
+        // notecard's lines, returning (row, matchIndex, matchLength)
+        // triples, capped at 64 matches per call same as the source.
+        public static LSL_List FindText(UUID assetID, string pattern, int start, int count)
+        {
+            if (!m_Notecards.TryGetValue(assetID, 30000, out string[] text))
+                return new LSL_List(ScriptBaseClass.NAK);
+
+            LSL_List result = new();
+            if (count <= 0)
+                return result;
+
+            if (start < 0)
+                start = 0;
+
+            int maxMatches = Math.Min(count, 64);
+            Regex regex;
+            try
+            {
+                regex = new Regex(pattern);
+            }
+            catch
+            {
+                return result;
+            }
+
+            int skipped = 0;
+            int returned = 0;
+            for (int row = 0; row < text.Length && returned < maxMatches; row++)
+            {
+                foreach (Match match in regex.Matches(text[row]))
+                {
+                    if (!match.Success)
+                        continue;
+
+                    if (skipped++ < start)
+                        continue;
+
+                    result.Add(new LSL_Integer(row));
+                    result.Add(new LSL_Integer(match.Index));
+                    result.Add(new LSL_Integer(match.Length));
+                    if (++returned >= maxMatches)
+                        break;
+                }
+            }
+
+            return result;
         }
 
         /// <summary>

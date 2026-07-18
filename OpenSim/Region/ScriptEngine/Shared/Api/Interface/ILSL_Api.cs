@@ -147,6 +147,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
          LSL_Float llGetEnergy();
         LSL_String llGetEnv(LSL_String name);
         LSL_Vector llGetForce();
+       LSL_List llGetAttachedListFiltered(LSL_Key id, LSL_List options);
        LSL_Integer llGetFreeMemory();
        LSL_Integer llGetUsedMemory();
        LSL_Integer llGetFreeURLs();
@@ -178,6 +179,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
          LSL_Float llGetMassMKS();
        LSL_Integer llGetMemoryLimit();
               void llGetNextEmail(string address, string subject);
+           LSL_List llFindNotecardTextSync(string name, string pattern, int start, int count, LSL_List options);
            LSL_Key llGetNotecardLine(string name, int line);
            LSL_Key llGetNumberOfNotecardLines(string name);
         LSL_String llGetNotecardLineSync(string name, int line);
