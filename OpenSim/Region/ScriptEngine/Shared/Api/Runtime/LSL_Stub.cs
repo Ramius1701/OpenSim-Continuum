@@ -1077,6 +1077,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llTransferOwnership(LSL_Key agent_id, LSL_Integer flags, LSL_List options)
+        {
+            return m_LSL_Functions.llTransferOwnership(agent_id, flags, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llGiveInventory(LSL_Key destination, LSL_String inventory)
         {
             m_LSL_Functions.llGiveInventory(destination, inventory);
@@ -2280,6 +2286,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llStopAnimation(string anim)
         {
             m_LSL_Functions.llStopAnimation(anim);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetAgentRot(LSL_Rotation rot, LSL_Integer flags)
+        {
+            m_LSL_Functions.llSetAgentRot(rot, flags);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
