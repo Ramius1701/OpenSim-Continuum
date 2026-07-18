@@ -38,6 +38,7 @@ using System.Xml.Serialization;
 using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
@@ -255,6 +256,54 @@ namespace OpenSim.Region.Framework.Scenes
 
         // WRONG flag in libOmvPrimFlags
         private const uint primFlagVolumeDetect = (uint)PrimFlags.JointLP2P;
+
+        // Combat2 object health tracking, ported from GuntharDeNiro/opensim
+        // - backs llGetHealth/llDamage's object-targeting path and
+        // llDetectedDamage. Stored in DynAttrs (same persisted-dynamic-
+        // attribute mechanism used elsewhere, e.g. llSetSculptAnim)
+        // rather than a new first-class field, since it's an opt-in
+        // combat feature most objects never use.
+        private const string LslCombatDynAttrsNamespace = "OpenSim";
+        private const string LslCombatDynAttrsStore = "LSLCombat";
+        private const string LslCombatHealthKey = "health";
+
+        public float GetLslHealth()
+        {
+            if (DynAttrs == null)
+                return 0f;
+
+            lock (DynAttrs)
+            {
+                if (DynAttrs.TryGetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, out OSDMap store)
+                    && store != null
+                    && store.TryGetValue(LslCombatHealthKey, out OSD healthOSD))
+                {
+                    return (float)healthOSD.AsReal();
+                }
+            }
+
+            return 0f;
+        }
+
+        public void SetLslHealth(float health)
+        {
+            DynAttrs ??= new DAMap();
+
+            lock (DynAttrs)
+            {
+                if (!DynAttrs.TryGetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, out OSDMap store)
+                    || store == null)
+                {
+                    store = new OSDMap();
+                }
+
+                store[LslCombatHealthKey] = OSD.FromReal(health);
+                DynAttrs.SetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, store);
+            }
+
+            if (ParentGroup != null)
+                ParentGroup.HasGroupChanged = true;
+        }
 
         public bool VolumeDetectActive
         {
