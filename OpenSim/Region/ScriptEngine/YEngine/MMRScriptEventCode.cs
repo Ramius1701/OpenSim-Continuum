@@ -84,11 +84,13 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         //
         path_update = 40,
         linkset_data = 41,
-
         experience_permissions = 42,
         experience_permissions_denied = 43,
+        on_damage = 44,
+        final_damage = 45,
+        on_death = 46,
 
         // marks highest numbered event
-        Size = 44
+        Size = 47
     }
 }

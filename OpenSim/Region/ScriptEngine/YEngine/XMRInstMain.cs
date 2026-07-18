@@ -245,6 +245,9 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             {"linkset_data", ScriptEventCode.linkset_data},
             {"experience_permissions", ScriptEventCode.experience_permissions},
             {"experience_permissions_denied", ScriptEventCode.experience_permissions_denied},
+            {"on_damage", ScriptEventCode.on_damage},
+            {"final_damage", ScriptEventCode.final_damage},
+            {"on_death", ScriptEventCode.on_death}
         };
     }
 }

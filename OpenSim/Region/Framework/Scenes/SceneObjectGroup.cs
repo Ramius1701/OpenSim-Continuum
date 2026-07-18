@@ -90,11 +90,19 @@ namespace OpenSim.Region.Framework.Scenes
 
         path_update = 40,
         linkset_data = 41,
+        // Combat2/Experience script events, added retroactively - needed
+        // for these events (already dispatched by the Combat2/Experience
+        // functions ported earlier) to actually reach scripts, since this
+        // enum is used as a performance filter for "does this script care
+        // about this event" before dispatch.
         experience_permissions = 42,
         experience_permissions_denied = 43,
+        on_damage = 44,
+        final_damage = 45,
+        on_death = 46,
 
         // marks highest numbered event
-        Size = 44
+        Size = 47
     }
 
     // this is not the right place for this
@@ -148,6 +156,9 @@ namespace OpenSim.Region.Framework.Scenes
         linkset_data = 1UL << 41,
         experience_permissions = 1UL << 42,
         experience_permissions_denied = 1UL << 43,
+        on_damage = 1UL << 44,
+        final_damage = 1UL << 45,
+        on_death = 1UL << 46,
 
         anytouch = touch | touch_end | touch_start,
         anyTarget = at_target | not_at_target | at_rot_target | not_at_rot_target,
