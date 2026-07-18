@@ -21090,6 +21090,956 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return 1;
         }
 
+        private ViewerEnvironment GetEnvironmentAt(LSL_Vector position)
+        {
+            if (m_envModule is null)
+                return null;
+
+            if (position.x >= 0 && position.y >= 0)
+            {
+                ILandObject parcel = World.LandChannel?.GetLandObject((float)position.x, (float)position.y);
+                if (parcel?.LandData?.Environment is not null)
+                    return parcel.LandData.Environment;
+            }
+
+            return m_envModule.GetRegionEnvironment();
+        }
+
+        private double GetEnvironmentSecondsSinceMidnight(ViewerEnvironment env)
+        {
+            if (env is null || env.DayLength <= 0)
+                return 0;
+
+            double seconds = (Util.UnixTimeSinceEpochSecs() + env.DayOffset) % env.DayLength;
+            return seconds < 0 ? seconds + env.DayLength : seconds;
+        }
+
+        private bool TryGetCurrentSky(ViewerEnvironment env, float altitude, out SkyData sky, out double daySeconds)
+        {
+            sky = null;
+            daySeconds = 0;
+
+            if (env is null || env.DayLength <= 0)
+                return false;
+
+            daySeconds = GetEnvironmentSecondsSinceMidnight(env);
+            float dayFraction = (float)(daySeconds / env.DayLength);
+            List<DayCycle.TrackEntry> track = env.FindTrack(altitude);
+            if (track is null || track.Count == 0)
+                return false;
+
+            if (!env.FindSkies(track, dayFraction, out float skyFraction, out SkyData sky1, out SkyData sky2))
+                return false;
+
+            sky = sky1;
+            if (sky2 is null)
+                return sky is not null;
+
+            // Numeric interpolation for every EEP parameter is deliberately not guessed here.
+            // Pick the active lower frame, while exact sun/moon direction APIs below still interpolate rotations.
+            return sky is not null;
+        }
+
+        private static LSL_Vector ToLSLVector(Vector2 v)
+        {
+            return new LSL_Vector(v.X, v.Y, 0);
+        }
+
+        private static LSL_Vector ToLSLVector(Vector3 v)
+        {
+            return new LSL_Vector(v.X, v.Y, v.Z);
+        }
+
+        private static LSL_Vector ToLSLVector(Color4 v)
+        {
+            return new LSL_Vector(v.R, v.G, v.B);
+        }
+
+        private static LSL_Vector ToLSLVector(Vector4 v)
+        {
+            return new LSL_Vector(v.X, v.Y, v.Z);
+        }
+
+        private static Vector2 ToVector2(LSL_Vector v)
+        {
+            return new Vector2((float)v.x, (float)v.y);
+        }
+
+        private static Vector3 ToVector3(LSL_Vector v)
+        {
+            return new Vector3((float)v.x, (float)v.y, (float)v.z);
+        }
+
+        private static LSL_Rotation ToLSLRotation(Quaternion v)
+        {
+            return new LSL_Rotation(v.X, v.Y, v.Z, v.W);
+        }
+
+        private static Quaternion ToQuaternion(LSL_Rotation v)
+        {
+            Quaternion q = new((float)v.x, (float)v.y, (float)v.z, (float)v.s);
+            q.Normalize();
+            return q;
+        }
+
+        private static bool InRange(float value, float min, float max)
+        {
+            return value >= min && value <= max;
+        }
+
+        private static bool InRange(LSL_Vector value, float min, float max)
+        {
+            return InRange((float)value.x, min, max)
+                && InRange((float)value.y, min, max)
+                && InRange((float)value.z, min, max);
+        }
+
+        private static bool InRangeXY(LSL_Vector value, float min, float max)
+        {
+            return InRange((float)value.x, min, max)
+                && InRange((float)value.y, min, max);
+        }
+
+        private static bool LooksLikeVectorItem(LSL_List list, int index)
+        {
+            if (list is null || index < 0 || index >= list.Length)
+                return false;
+
+            object value = list.Data[index];
+            return value is LSL_Vector || value is Vector3;
+        }
+
+        private static bool TryReadIntegerItem(LSL_List list, int index, out int value)
+        {
+            value = 0;
+            try
+            {
+                value = list.GetLSLIntegerItem(index);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool ShouldConsumeOptionalSkyReadback(LSL_List parameters, int index)
+        {
+            return index + 4 <= parameters.Length
+                && TryReadIntegerItem(parameters, index, out int defaultFlag)
+                && (defaultFlag == 0 || defaultFlag == 1)
+                && LooksLikeVectorItem(parameters, index + 1)
+                && LooksLikeVectorItem(parameters, index + 2)
+                && LooksLikeVectorItem(parameters, index + 3);
+        }
+
+        private LSL_Integer ApplyEnvironmentParameters(ViewerEnvironment env, LSL_List parameters, float altitude, bool allSkyTracks)
+        {
+            try
+            {
+                WaterData water = null;
+                WaterData GetWaterTarget()
+                {
+                    water ??= env.EnsureWater();
+                    return water;
+                }
+
+                List<SkyData> skyTargets = null;
+                List<SkyData> GetSkyTargets()
+                {
+                    skyTargets ??= env.EnsureSkyTargets(altitude, allSkyTracks);
+                    return skyTargets;
+                }
+
+                int i = 0;
+
+                while (i < parameters.Length)
+                {
+                    int rule = parameters.GetLSLIntegerItem(i++);
+                    switch (rule)
+                    {
+                        case ScriptBaseClass.SKY_AMBIENT:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector ambient = parameters.GetVector3Item(i++);
+                            if (!InRange(ambient, 0.0f, 3.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.ambient = ToVector3(ambient);
+                            break;
+
+                        case ScriptBaseClass.SKY_BLUE:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector blueDensity = parameters.GetVector3Item(i++);
+                            LSL_Vector blueHorizon = parameters.GetVector3Item(i++);
+                            if (!InRange(blueDensity, 0.0f, 3.0f) || !InRange(blueHorizon, 0.0f, 3.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.blue_density = ToVector3(blueDensity);
+                                sky.blue_horizon = ToVector3(blueHorizon);
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_CLOUDS:
+                            if (i + 7 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector cloudColor = parameters.GetVector3Item(i++);
+                            float cloudShadow = (float)parameters.GetLSLFloatItem(i++);
+                            float cloudScale = (float)parameters.GetLSLFloatItem(i++);
+                            float cloudVariance = (float)parameters.GetLSLFloatItem(i++);
+                            LSL_Vector cloudScroll = parameters.GetVector3Item(i++);
+                            LSL_Vector cloudDensity1 = parameters.GetVector3Item(i++);
+                            LSL_Vector cloudDensity2 = parameters.GetVector3Item(i++);
+                            if (i < parameters.Length
+                                && TryReadIntegerItem(parameters, i, out int drawClassicClouds)
+                                && (drawClassicClouds == 0 || drawClassicClouds == 1)
+                                && (i == parameters.Length - 1 || !LooksLikeVectorItem(parameters, i + 1)))
+                                i++;
+                            if (!InRange(cloudColor, 0.0f, 1.0f) || !InRange(cloudShadow, 0.0f, 1.0f)
+                                || !InRange(cloudScale, 0.0f, 1.0f) || !InRange(cloudVariance, 0.0f, 1.0f)
+                                || !InRangeXY(cloudScroll, -20.0f, 20.0f)
+                                || !InRange(cloudDensity1, 0.0f, 1.0f) || !InRange(cloudDensity2, 0.0f, 1.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.cloud_color = ToVector3(cloudColor);
+                                sky.cloud_shadow = cloudShadow;
+                                sky.cloud_scale = cloudScale;
+                                sky.cloud_variance = cloudVariance;
+                                sky.cloud_scroll_rate = ToVector2(cloudScroll);
+                                sky.cloud_pos_density1 = ToVector3(cloudDensity1);
+                                sky.cloud_pos_density2 = ToVector3(cloudDensity2);
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_DOME:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float domeOffset = (float)parameters.GetLSLFloatItem(i++);
+                            float domeRadius = (float)parameters.GetLSLFloatItem(i++);
+                            float maxY = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(domeOffset, 0.0f, 1.0f) || !InRange(domeRadius, 0.0f, 100000.0f)
+                                || !InRange(maxY, 0.0f, 100000.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.dome_offset = domeOffset;
+                                sky.dome_radius = domeRadius;
+                                sky.max_y = maxY;
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_GAMMA:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float gamma = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(gamma, 0.0f, 20.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.gamma = gamma;
+                            break;
+
+                        case ScriptBaseClass.SKY_GLOW:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float glowSize = (float)parameters.GetLSLFloatItem(i++);
+                            float glowFocus = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(glowSize, -20.0f, 40.0f) || !InRange(glowFocus, -20.0f, 20.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.glow = new Vector3(glowSize, sky.glow.Y, glowFocus);
+                            break;
+
+                        case ScriptBaseClass.SKY_MOON:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            Quaternion moonRotation = ToQuaternion(parameters.GetQuaternionItem(i++));
+                            float moonScale = (float)parameters.GetLSLFloatItem(i++);
+                            float moonBrightness = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(moonScale, 0.0f, 20.0f) || !InRange(moonBrightness, 0.0f, 1.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            if (ShouldConsumeOptionalSkyReadback(parameters, i))
+                                i += 4;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.moon_rotation = moonRotation;
+                                sky.moon_scale = moonScale;
+                                sky.moon_brightness = moonBrightness;
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_PLANET:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float planetRadius = (float)parameters.GetLSLFloatItem(i++);
+                            float skyBottomRadius = (float)parameters.GetLSLFloatItem(i++);
+                            float skyTopRadius = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(planetRadius, 0.0f, 100000.0f) || !InRange(skyBottomRadius, 0.0f, 100000.0f)
+                                || !InRange(skyTopRadius, 0.0f, 100000.0f) || skyTopRadius < skyBottomRadius)
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.planet_radius = planetRadius;
+                                sky.sky_bottom_radius = skyBottomRadius;
+                                sky.sky_top_radius = skyTopRadius;
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_REFRACTION:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float moistureLevel = (float)parameters.GetLSLFloatItem(i++);
+                            float dropletRadius = (float)parameters.GetLSLFloatItem(i++);
+                            float iceLevel = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(moistureLevel, 0.0f, 1.0f) || !InRange(dropletRadius, 0.0f, 2000.0f)
+                                || !InRange(iceLevel, 0.0f, 1.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.moisture_level = moistureLevel;
+                                sky.droplet_radius = dropletRadius;
+                                sky.ice_level = iceLevel;
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_STAR_BRIGHTNESS:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float starBrightness = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(starBrightness, 0.0f, 500.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.star_brightness = starBrightness;
+                            break;
+
+                        case ScriptBaseClass.SKY_SUN:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            Quaternion sunRotation = ToQuaternion(parameters.GetQuaternionItem(i++));
+                            float sunScale = (float)parameters.GetLSLFloatItem(i++);
+                            LSL_Vector sunlightColor = parameters.GetVector3Item(i++);
+                            if (!InRange(sunScale, 0.0f, 20.0f) || !InRange(sunlightColor, 0.0f, 3.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            if (ShouldConsumeOptionalSkyReadback(parameters, i))
+                                i += 4;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.sun_rotation = sunRotation;
+                                sky.sun_scale = sunScale;
+                                sky.sunlight_color = new Vector4((float)sunlightColor.x, (float)sunlightColor.y, (float)sunlightColor.z, sky.sunlight_color.W);
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_CLOUD_TEXTURE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            UUID cloudTexture = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, parameters.GetLSLStringItem(i++), AssetType.Texture);
+                            if (cloudTexture.IsZero())
+                                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.CloudTexture = cloudTexture;
+                            break;
+
+                        case ScriptBaseClass.SKY_MOON_TEXTURE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            UUID moonTexture = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, parameters.GetLSLStringItem(i++), AssetType.Texture);
+                            if (moonTexture.IsZero())
+                                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.MoonTexture = moonTexture;
+                            break;
+
+                        case ScriptBaseClass.SKY_SUN_TEXTURE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            UUID sunTexture = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, parameters.GetLSLStringItem(i++), AssetType.Texture);
+                            if (sunTexture.IsZero())
+                                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                            foreach (SkyData sky in GetSkyTargets())
+                                sky.SunTexture = sunTexture;
+                            break;
+
+                        case ScriptBaseClass.SKY_HAZE:
+                            if (i + 4 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float hazeDensity = (float)parameters.GetLSLFloatItem(i++);
+                            float hazeHorizon = (float)parameters.GetLSLFloatItem(i++);
+                            float densityMultiplier = (float)parameters.GetLSLFloatItem(i++);
+                            float distanceMultiplier = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(hazeDensity, 0.0f, 4.0f) || !InRange(hazeHorizon, 0.0f, 4.0f)
+                                || !InRange(densityMultiplier, 0.0f, 1.0f) || !InRange(distanceMultiplier, 0.0f, 1000.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.haze_density = hazeDensity;
+                                sky.haze_horizon = hazeHorizon;
+                                sky.density_multiplier = densityMultiplier;
+                                sky.distance_multiplier = distanceMultiplier;
+                            }
+                            break;
+
+                        case ScriptBaseClass.SKY_REFLECTION_PROBE_AMBIANCE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float reflectionProbeAmbiance = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(reflectionProbeAmbiance, 0.0f, 10.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            foreach (SkyData sky in GetSkyTargets())
+                            {
+                                sky.HasRefProbe = true;
+                                sky.reflectionProbeAmbiance = reflectionProbeAmbiance;
+                            }
+                            break;
+
+                        case ScriptBaseClass.WATER_BLUR_MULTIPLIER:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float blur = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(blur, -0.5f, 0.5f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            GetWaterTarget().blurMultiplier = blur;
+                            break;
+
+                        case ScriptBaseClass.WATER_FOG:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector fogColor = parameters.GetVector3Item(i++);
+                            float fogDensity = (float)parameters.GetLSLFloatItem(i++);
+                            float underwaterMod = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(fogColor, 0.0f, 1.0f) || !InRange(fogDensity, -10.0f, 10.0f)
+                                || !InRange(underwaterMod, 0.0f, 20.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            WaterData fogWater = GetWaterTarget();
+                            fogWater.waterFogColor = new Vector3((float)fogColor.x, (float)fogColor.y, (float)fogColor.z);
+                            fogWater.waterFogDensity = fogDensity;
+                            fogWater.underWaterFogMod = underwaterMod;
+                            break;
+
+                        case ScriptBaseClass.WATER_FRESNEL:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float fresnelOffset = (float)parameters.GetLSLFloatItem(i++);
+                            float fresnelScale = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(fresnelOffset, 0.0f, 1.0f) || !InRange(fresnelScale, 0.0f, 1.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            WaterData fresnelWater = GetWaterTarget();
+                            fresnelWater.fresnelOffset = fresnelOffset;
+                            fresnelWater.fresnelScale = fresnelScale;
+                            break;
+
+                        case ScriptBaseClass.WATER_NORMAL_SCALE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector normalScale = parameters.GetVector3Item(i++);
+                            if (!InRange(normalScale, 0.0f, 10.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            GetWaterTarget().normScale = new Vector3((float)normalScale.x, (float)normalScale.y, (float)normalScale.z);
+                            break;
+
+                        case ScriptBaseClass.WATER_REFRACTION:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float scaleAbove = (float)parameters.GetLSLFloatItem(i++);
+                            float scaleBelow = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(scaleAbove, 0.0f, 3.0f) || !InRange(scaleBelow, 0.0f, 3.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            WaterData refractionWater = GetWaterTarget();
+                            refractionWater.scaleAbove = scaleAbove;
+                            refractionWater.scaleBelow = scaleBelow;
+                            break;
+
+                        case ScriptBaseClass.WATER_WAVE_DIRECTION:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            LSL_Vector bigWave = parameters.GetVector3Item(i++);
+                            LSL_Vector littleWave = parameters.GetVector3Item(i++);
+                            if (!InRangeXY(bigWave, -20.0f, 20.0f) || !InRangeXY(littleWave, -20.0f, 20.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            WaterData waveWater = GetWaterTarget();
+                            waveWater.wave2Dir = ToVector2(bigWave);
+                            waveWater.wave1Dir = ToVector2(littleWave);
+                            break;
+
+                        case ScriptBaseClass.WATER_NORMAL_TEXTURE:
+                            if (i + 1 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            UUID normalMap = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, parameters.GetLSLStringItem(i++), AssetType.Texture);
+                            if (normalMap.IsZero())
+                                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                            GetWaterTarget().normalMap = normalMap;
+                            break;
+
+                        case ScriptBaseClass.ENVIRONMENT_DAYINFO:
+                            if (i + 2 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            int dayLength = parameters.GetLSLIntegerItem(i++);
+                            int dayOffset = parameters.GetLSLIntegerItem(i++);
+                            if (dayLength <= 0)
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            env.DayLength = dayLength;
+                            env.DayOffset = dayOffset;
+                            break;
+
+                        case ScriptBaseClass.SKY_TRACKS:
+                            if (i + 3 > parameters.Length)
+                                return ScriptBaseClass.ENV_INVALID_RULE;
+                            float altitude0 = (float)parameters.GetLSLFloatItem(i++);
+                            float altitude1 = (float)parameters.GetLSLFloatItem(i++);
+                            float altitude2 = (float)parameters.GetLSLFloatItem(i++);
+                            if (!InRange(altitude0, -10000.0f, 10000.0f)
+                                || !InRange(altitude1, -10000.0f, 10000.0f)
+                                || !InRange(altitude2, -10000.0f, 10000.0f))
+                                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+                            env.Altitudes[0] = altitude0;
+                            env.Altitudes[1] = altitude1;
+                            env.Altitudes[2] = altitude2;
+                            env.SortAltitudes();
+                            break;
+
+                        case ScriptBaseClass.SKY_TEXTURE_DEFAULTS:
+                        case ScriptBaseClass.SKY_LIGHT:
+                        case ScriptBaseClass.WATER_TEXTURE_DEFAULTS:
+                            return ScriptBaseClass.ENV_INVALID_RULE;
+
+                        default:
+                            return ScriptBaseClass.ENV_INVALID_RULE;
+                    }
+                }
+
+                env.InvalidateCaches();
+                return 1;
+            }
+            catch
+            {
+                return ScriptBaseClass.ENV_INVALID_RULE;
+            }
+        }
+
+        public LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules)
+        {
+            LSL_List result = new();
+            ViewerEnvironment env = GetEnvironmentAt(position);
+            if (env is null || rules is null)
+                return result;
+
+            TryGetCurrentSky(env, (float)position.z, out SkyData sky, out double daySeconds);
+            WaterData water = env.GetWater();
+            WaterData defaultWater = null;
+
+            for (int i = 0; i < rules.Length; ++i)
+            {
+                int rule = rules.GetLSLIntegerItem(i);
+                switch (rule)
+                {
+                    case ScriptBaseClass.ENVIRONMENT_DAYINFO:
+                        result.Add(new LSL_Integer(env.DayLength));
+                        result.Add(new LSL_Integer(env.DayOffset));
+                        result.Add(new LSL_Float(daySeconds));
+                        break;
+
+                    case ScriptBaseClass.SKY_TRACKS:
+                        result.Add(new LSL_Float(env.Altitudes[0]));
+                        result.Add(new LSL_Float(env.Altitudes[1]));
+                        result.Add(new LSL_Float(env.Altitudes[2]));
+                        break;
+
+                    case ScriptBaseClass.SKY_AMBIENT:
+                        if (sky is not null)
+                            result.Add(ToLSLVector(sky.ambient));
+                        break;
+
+                    case ScriptBaseClass.SKY_TEXTURE_DEFAULTS:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Integer(sky.IsDefaultBloomTexture() ? 1 : 0));
+                            result.Add(new LSL_Integer(sky.IsDefaultCloudTexture() ? 1 : 0));
+                            result.Add(new LSL_Integer(sky.IsDefaultHaloTexture() ? 1 : 0));
+                            result.Add(new LSL_Integer(sky.IsDefaultMoonTexture() ? 1 : 0));
+                            result.Add(new LSL_Integer(sky.IsDefaultRainbowTexture() ? 1 : 0));
+                            result.Add(new LSL_Integer(sky.IsDefaultSunTexture() ? 1 : 0));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_CLOUDS:
+                        if (sky is not null)
+                        {
+                            result.Add(ToLSLVector(sky.cloud_color));
+                            result.Add(new LSL_Float(sky.cloud_shadow));
+                            result.Add(new LSL_Float(sky.cloud_scale));
+                            result.Add(new LSL_Float(sky.cloud_variance));
+                            result.Add(ToLSLVector(sky.cloud_scroll_rate));
+                            result.Add(ToLSLVector(sky.cloud_pos_density1));
+                            result.Add(ToLSLVector(sky.cloud_pos_density2));
+                            result.Add(new LSL_Integer(0));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_DOME:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Float(sky.dome_offset));
+                            result.Add(new LSL_Float(sky.dome_radius));
+                            result.Add(new LSL_Float(sky.max_y));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_GAMMA:
+                        if (sky is not null)
+                            result.Add(new LSL_Float(sky.gamma));
+                        break;
+
+                    case ScriptBaseClass.SKY_GLOW:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Float(sky.glow.X));
+                            result.Add(new LSL_Float(sky.glow.Z));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_MOON:
+                        if (sky is not null)
+                        {
+                            result.Add(ToLSLRotation(sky.moon_rotation));
+                            result.Add(new LSL_Float(sky.moon_scale));
+                            result.Add(new LSL_Float(sky.moon_brightness));
+                            result.Add(new LSL_Integer(0));
+                            result.Add(ToLSLVector(ViewerEnvironment.Xrot(sky.moon_rotation)));
+                            result.Add(ToLSLVector(sky.ambient));
+                            result.Add(ToLSLVector(sky.sunlight_color));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_STAR_BRIGHTNESS:
+                        if (sky is not null)
+                            result.Add(new LSL_Float(sky.star_brightness));
+                        break;
+
+                    case ScriptBaseClass.SKY_CLOUD_TEXTURE:
+                        if (sky is not null)
+                            result.Add(sky.CloudTexture.ToString());
+                        break;
+
+                    case ScriptBaseClass.SKY_MOON_TEXTURE:
+                        if (sky is not null)
+                            result.Add(sky.MoonTexture.ToString());
+                        break;
+
+                    case ScriptBaseClass.SKY_SUN_TEXTURE:
+                        if (sky is not null)
+                            result.Add(sky.SunTexture.ToString());
+                        break;
+
+                    case ScriptBaseClass.SKY_SUN:
+                        if (sky is not null)
+                        {
+                            result.Add(ToLSLRotation(sky.sun_rotation));
+                            result.Add(new LSL_Float(sky.sun_scale));
+                            result.Add(ToLSLVector(sky.sunlight_color));
+                            result.Add(new LSL_Integer(0));
+                            result.Add(ToLSLVector(ViewerEnvironment.Xrot(sky.sun_rotation)));
+                            result.Add(ToLSLVector(sky.ambient));
+                            result.Add(ToLSLVector(sky.sunlight_color));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_PLANET:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Float(sky.planet_radius));
+                            result.Add(new LSL_Float(sky.sky_bottom_radius));
+                            result.Add(new LSL_Float(sky.sky_top_radius));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_REFRACTION:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Float(sky.moisture_level));
+                            result.Add(new LSL_Float(sky.droplet_radius));
+                            result.Add(new LSL_Float(sky.ice_level));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_LIGHT:
+                        if (sky is not null)
+                        {
+                            result.Add(ToLSLVector(ViewerEnvironment.Xrot(sky.sun_rotation)));
+                            result.Add(ToLSLVector(sky.sunlight_color));
+                            result.Add(ToLSLVector(sky.ambient));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_BLUE:
+                        if (sky is not null)
+                        {
+                            result.Add(ToLSLVector(sky.blue_density));
+                            result.Add(ToLSLVector(sky.blue_horizon));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_HAZE:
+                        if (sky is not null)
+                        {
+                            result.Add(new LSL_Float(sky.haze_density));
+                            result.Add(new LSL_Float(sky.haze_horizon));
+                            result.Add(new LSL_Float(sky.density_multiplier));
+                            result.Add(new LSL_Float(sky.distance_multiplier));
+                        }
+                        break;
+
+                    case ScriptBaseClass.SKY_REFLECTION_PROBE_AMBIANCE:
+                        if (sky is not null)
+                            result.Add(new LSL_Float(sky.reflectionProbeAmbiance));
+                        break;
+
+                    case ScriptBaseClass.WATER_BLUR_MULTIPLIER:
+                        if (water is not null)
+                            result.Add(new LSL_Float(water.blurMultiplier));
+                        break;
+
+                    case ScriptBaseClass.WATER_FOG:
+                        if (water is not null)
+                        {
+                            result.Add(ToLSLVector(water.waterFogColor));
+                            result.Add(new LSL_Float(water.waterFogDensity));
+                            result.Add(new LSL_Float(water.underWaterFogMod));
+                        }
+                        break;
+
+                    case ScriptBaseClass.WATER_FRESNEL:
+                        if (water is not null)
+                        {
+                            result.Add(new LSL_Float(water.fresnelOffset));
+                            result.Add(new LSL_Float(water.fresnelScale));
+                        }
+                        break;
+
+                    case ScriptBaseClass.WATER_TEXTURE_DEFAULTS:
+                        if (water is not null)
+                        {
+                            defaultWater ??= new WaterData();
+                            result.Add(new LSL_Integer(water.normalMap == defaultWater.normalMap ? 1 : 0));
+                            result.Add(new LSL_Integer(water.transpTexture == defaultWater.transpTexture ? 1 : 0));
+                        }
+                        break;
+
+                    case ScriptBaseClass.WATER_NORMAL_SCALE:
+                        if (water is not null)
+                            result.Add(ToLSLVector(water.normScale));
+                        break;
+
+                    case ScriptBaseClass.WATER_REFRACTION:
+                        if (water is not null)
+                        {
+                            result.Add(new LSL_Float(water.scaleAbove));
+                            result.Add(new LSL_Float(water.scaleBelow));
+                        }
+                        break;
+
+                    case ScriptBaseClass.WATER_WAVE_DIRECTION:
+                        if (water is not null)
+                        {
+                            result.Add(ToLSLVector(water.wave2Dir));
+                            result.Add(ToLSLVector(water.wave1Dir));
+                        }
+                        break;
+
+                    case ScriptBaseClass.WATER_NORMAL_TEXTURE:
+                        if (water is not null)
+                            result.Add(water.normalMap.ToString());
+                        break;
+                }
+            }
+
+            return result;
+        }
+
+        private bool TryLoadEnvironmentAsset(LSL_String environment, out OSD envOSD)
+        {
+            envOSD = null;
+            UUID envID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, environment);
+            if (envID.IsZero())
+                return false;
+
+            AssetBase asset = World.AssetService.Get(envID.ToString());
+            if (asset is null || asset.Type != (byte)AssetType.Settings)
+                return false;
+
+            try
+            {
+                envOSD = OSDParser.Deserialize(asset.Data);
+                return envOSD is not null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool ValidateEnvironmentTime(int dayLength, int dayOffset)
+        {
+            if (dayLength >= 0 && (dayLength < 14400 || dayLength > 604800))
+                return false;
+
+            return dayOffset < 0 || dayOffset <= 86400;
+        }
+
+        private static bool ApplyEnvironmentTime(ViewerEnvironment env, int dayLength, int dayOffset)
+        {
+            bool changed = false;
+            if (dayLength >= 0 && env.DayLength != dayLength)
+            {
+                env.DayLength = dayLength;
+                changed = true;
+            }
+
+            if (dayOffset >= 0 && env.DayOffset != dayOffset)
+            {
+                env.DayOffset = dayOffset;
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        public LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no,
+                LSL_Integer day_length, LSL_Integer day_offset)
+        {
+            if (m_envModule is null)
+                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+            if (track_no.value != -1)
+                return ScriptBaseClass.ENV_INVALID_RULE;
+
+            if (!ValidateEnvironmentTime(day_length.value, day_offset.value))
+                return ScriptBaseClass.ENV_VALIDATION_FAIL;
+
+            bool wholeRegion = position.x < 0 || position.y < 0;
+            if (wholeRegion)
+            {
+                if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, true))
+                    return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+                if (string.IsNullOrEmpty(environment) || environment == ScriptBaseClass.NULL_KEY)
+                {
+                    if (day_length.value < 0 && day_offset.value < 0)
+                    {
+                        m_envModule.StoreOnRegion(null);
+                        m_envModule.WindlightRefresh(0);
+                        return 1;
+                    }
+                }
+
+                ViewerEnvironment env = m_envModule.GetRegionEnvironment().Clone();
+                if (!string.IsNullOrEmpty(environment) && environment != ScriptBaseClass.NULL_KEY)
+                {
+                    if (!TryLoadEnvironmentAsset(environment, out OSD envOSD))
+                        return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                    if (!env.CycleFromOSD(envOSD))
+                        return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                }
+
+                ApplyEnvironmentTime(env, day_length.value, day_offset.value);
+                m_envModule.StoreOnRegion(env);
+                m_envModule.WindlightRefresh(0);
+                return 1;
+            }
+
+            if (!World.RegionInfo.EstateSettings.AllowEnvironmentOverride)
+                return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+            ILandObject parcel = World.LandChannel?.GetLandObject((float)position.x, (float)position.y);
+            if (parcel is null)
+                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+            if (!World.Permissions.CanEditParcelProperties(m_host.OwnerID, parcel, GroupPowers.AllowEnvironment, true))
+                return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+            if (string.IsNullOrEmpty(environment) || environment == ScriptBaseClass.NULL_KEY)
+            {
+                if (day_length.value < 0 && day_offset.value < 0)
+                {
+                    parcel.StoreEnvironment(null);
+                    m_envModule.WindlightRefresh(0, false);
+                    return 1;
+                }
+            }
+
+            ViewerEnvironment parcelEnv = (parcel.LandData.Environment ?? m_envModule.GetRegionEnvironment()).Clone();
+            if (!string.IsNullOrEmpty(environment) && environment != ScriptBaseClass.NULL_KEY)
+            {
+                if (!TryLoadEnvironmentAsset(environment, out OSD envOSD))
+                    return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                if (!parcelEnv.CycleFromOSD(envOSD))
+                    return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+            }
+
+            ApplyEnvironmentTime(parcelEnv, day_length.value, day_offset.value);
+            parcel.StoreEnvironment(parcelEnv);
+            m_envModule.WindlightRefresh(0, false);
+            return 1;
+        }
+
+        public LSL_Integer llSetEnvironment(LSL_Vector position, LSL_List parameters)
+        {
+            bool hasParameters = parameters is not null && parameters.Length > 0;
+            bool wholeRegion = position.x < 0 || position.y < 0;
+            if (wholeRegion)
+            {
+                if (m_envModule is null)
+                    return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+                if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, true))
+                    return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+                if (hasParameters)
+                {
+                    ViewerEnvironment env = m_envModule.GetRegionEnvironment().Clone();
+                    LSL_Integer result = ApplyEnvironmentParameters(env, parameters, (float)position.z, position.z < 0);
+                    if (result.value != 1)
+                        return result;
+
+                    m_envModule.StoreOnRegion(env);
+                    m_envModule.WindlightRefresh(0);
+                    return 1;
+                }
+
+                m_envModule.StoreOnRegion(null);
+                m_envModule.WindlightRefresh(0);
+                return 1;
+            }
+
+            if (!World.RegionInfo.EstateSettings.AllowEnvironmentOverride)
+                return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+            ILandObject parcel = World.LandChannel?.GetLandObject((float)position.x, (float)position.y);
+            if (parcel is null)
+                return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+            if (!World.Permissions.CanEditParcelProperties(m_host.OwnerID, parcel, GroupPowers.AllowEnvironment, true))
+                return ScriptBaseClass.ENV_NO_PERMISSIONS;
+
+            if (hasParameters)
+            {
+                if (m_envModule is null)
+                    return ScriptBaseClass.ENV_NO_ENVIRONMENT;
+
+                ViewerEnvironment env = (parcel.LandData.Environment ?? m_envModule.GetRegionEnvironment()).Clone();
+                LSL_Integer result = ApplyEnvironmentParameters(env, parameters, (float)position.z, position.z < 0);
+                if (result.value != 1)
+                    return result;
+
+                parcel.StoreEnvironment(env);
+                m_envModule?.WindlightRefresh(0, false);
+                return 1;
+            }
+
+            parcel.StoreEnvironment(null);
+            m_envModule?.WindlightRefresh(0, false);
+            return 1;
+        }
         public LSL_List llJson2List(LSL_String json)
         {
 
