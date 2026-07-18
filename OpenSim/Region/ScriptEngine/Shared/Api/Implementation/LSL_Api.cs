@@ -5414,6 +5414,121 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return ScriptBaseClass.TRANSFER_OK;
         }
 
+        // llGiveAgentInventory, ported from GuntharDeNiro/opensim - a real
+        // SL function giving one or more items directly to an avatar's
+        // inventory (optionally into a nested folder path), reusing the
+        // same MoveTaskInventoryItems path llGiveInventory itself uses.
+        public LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options)
+        {
+            if (inventory is null || inventory.Length == 0)
+                return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+            bool transferRootSpecified = false;
+            string transferRootPath = string.Empty;
+            if (options is not null && options.Length > 0)
+            {
+                int optIndex = 0;
+                while (optIndex < options.Length)
+                {
+                    try
+                    {
+                        int option = options.GetLSLIntegerItem(optIndex++);
+                        switch (option)
+                        {
+                            case ScriptBaseClass.TRANSFER_DEST:
+                                if (optIndex >= options.Length)
+                                    return ScriptBaseClass.TRANSFER_BAD_OPTS;
+                                transferRootSpecified = true;
+                                transferRootPath = options.GetStrictLSLStringItem(optIndex++).m_string.Trim('|');
+                                break;
+
+                            case ScriptBaseClass.TRANSFER_FLAGS:
+                                if (optIndex >= options.Length)
+                                    return ScriptBaseClass.TRANSFER_BAD_OPTS;
+                                if (options.GetLSLIntegerItem(optIndex++) != 0)
+                                    return ScriptBaseClass.TRANSFER_BAD_OPTS;
+                                break;
+
+                            default:
+                                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+                        }
+                    }
+                    catch
+                    {
+                        return ScriptBaseClass.TRANSFER_BAD_OPTS;
+                    }
+                }
+            }
+
+            if (transferRootSpecified)
+            {
+                int rootSegmentCount = 0;
+                foreach (string rawSegment in transferRootPath.Split('|'))
+                {
+                    if (!string.IsNullOrWhiteSpace(rawSegment))
+                        rootSegmentCount++;
+                }
+
+                if (rootSegmentCount == 0 || rootSegmentCount > 4)
+                    return ScriptBaseClass.TRANSFER_BAD_ROOT;
+            }
+
+            if (!UUID.TryParse(agentID, out UUID destID) || destID.IsZero())
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            if (!World.TryGetScenePresence(destID, out ScenePresence sp))
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            bool isNotOwner = sp.UUID.NotEqual(m_host.OwnerID);
+            List<UUID> itemList = new(inventory.Length);
+            foreach (object item in inventory.Data)
+            {
+                string rawItemString = item.ToString();
+                TaskInventoryItem taskItem = (UUID.TryParse(rawItemString, out UUID itemID)) ?
+                    m_host.Inventory.GetInventoryItem(itemID) : m_host.Inventory.GetInventoryItem(rawItemString);
+
+                if(taskItem is null)
+                    continue;
+
+                if ((taskItem.CurrentPermissions & (uint)PermissionMask.Copy) == 0)
+                    continue;
+
+                if (isNotOwner && (taskItem.CurrentPermissions & (uint)PermissionMask.Transfer) == 0)
+                    continue;
+
+                itemList.Add(taskItem.ItemID);
+            }
+
+            if (itemList.Count == 0)
+                return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+            string destinationFolder = string.IsNullOrEmpty(transferRootPath) ?
+                    folderName : transferRootPath + "|" + folderName;
+
+            UUID folderID = m_ScriptEngine.World.MoveTaskInventoryItems(destID, destinationFolder, m_host, itemList, false);
+            if (folderID.IsZero())
+                return string.IsNullOrEmpty(transferRootPath) ?
+                        ScriptBaseClass.TRANSFER_NO_ITEMS : ScriptBaseClass.TRANSFER_BAD_ROOT;
+
+            if (m_TransferModule != null)
+            {
+                byte[] bucket = new byte[] { (byte)AssetType.Folder };
+                Vector3 pos = m_host.AbsolutePosition;
+
+                GridInstantMessage msg = new(World, m_host.OwnerID, m_host.Name, destID,
+                        (byte)InstantMessageDialog.TaskInventoryOffered,
+                        m_host.OwnerID.Equals(m_host.GroupID),
+                        string.Format("'{0}'", folderName),
+                        folderID, false, pos,
+                        bucket, false);
+
+                sp.ControllingClient.SendInstantMessage(msg);
+            }
+
+            ScriptSleep(3000);
+            return ScriptBaseClass.TRANSFER_OK;
+        }
+
         public void llGiveInventory(LSL_Key destination, LSL_String inventory)
         {
             if (!UUID.TryParse(destination, out UUID destId) || destId.IsZero())
