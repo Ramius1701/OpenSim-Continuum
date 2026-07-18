@@ -1,0 +1,28 @@
+    <Project name="OpenSim.Addons.GroupAutoInvite" path="addon-modules/GroupAutoInvite/GroupAutoInviteModule" type="Library">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="OpenMetaverseTypes"/>
+      <Reference name="OpenMetaverse"/>
+      <Reference name="OpenSim.Framework"/>
+      <Reference name="OpenSim.Region.Framework"/>
+      <Reference name="Mono.Addins"/>
+      <Reference name="Nini"/>
+      <Reference name="log4net"/>
+
+      <Files>
+        <Match pattern="*.cs" recurse="true">
+          <Exclude name="obj" pattern="obj"/>
+          <Exclude name="bin" pattern="bin"/>
+        </Match>
+      </Files>
+    </Project>
