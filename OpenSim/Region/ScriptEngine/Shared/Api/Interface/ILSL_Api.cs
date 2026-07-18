@@ -467,6 +467,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_String llToLower(string source);
         LSL_String llToUpper(string source);
               void llTriggerSound(string sound, double volume);
+              void llSetSculptAnim(LSL_Integer mode, LSL_Integer sizex, LSL_Integer sizey, LSL_Integer start_frame, LSL_Integer end_frame, LSL_Float rate, LSL_Integer texture_sync);
               void llTriggerSoundLimited(string sound, double volume, LSL_Vector top_north_east, LSL_Vector bottom_south_west);
         LSL_String llUnescapeURL(string url);
               void llUnSit(string id);

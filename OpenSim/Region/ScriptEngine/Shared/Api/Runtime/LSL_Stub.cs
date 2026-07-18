@@ -2499,6 +2499,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetSculptAnim(LSL_Integer mode, LSL_Integer sizex, LSL_Integer sizey, LSL_Integer start_frame, LSL_Integer end_frame, LSL_Float rate, LSL_Integer texture_sync)
+        {
+            m_LSL_Functions.llSetSculptAnim(mode, sizex, sizey, start_frame, end_frame, rate, texture_sync);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llTriggerSoundLimited(string sound, double volume, LSL_Vector top_north_east, LSL_Vector bottom_south_west)
         {
             m_LSL_Functions.llTriggerSoundLimited(sound, volume, top_north_east, bottom_south_west);
