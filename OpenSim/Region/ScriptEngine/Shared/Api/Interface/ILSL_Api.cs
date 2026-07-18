@@ -498,6 +498,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_String llJsonGetValue(LSL_String json, LSL_List specifiers);
           LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules);
           LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no, LSL_Integer day_length, LSL_Integer day_offset);
+
+          void llCreateCharacter(LSL_List options);
+          void llUpdateCharacter(LSL_List options);
+          void llDeleteCharacter();
+          void llExecCharacterCmd(LSL_Integer command, LSL_List options);
+          void llNavigateTo(LSL_Vector goal, LSL_List options);
+          void llWanderWithin(LSL_Vector origin, LSL_Vector distance, LSL_List options);
+          void llPatrolPoints(LSL_List patrol_points, LSL_List options);
+          void llPursue(LSL_Key target, LSL_List options);
+          void llEvade(LSL_Key target, LSL_List options);
+          void llFleeFrom(LSL_Vector source, LSL_Float distance, LSL_List options);
+          LSL_List llGetStaticPath(LSL_Vector start, LSL_Vector end, LSL_Float radius, LSL_List parameters);
+          LSL_Vector llGetClosestNavPoint(LSL_Vector point, LSL_List options);
           LSL_Integer llSetEnvironment(LSL_Vector position, LSL_List parameters);
           LSL_List llJson2List(LSL_String json);
         LSL_String llList2Json(LSL_String type, LSL_List values);
