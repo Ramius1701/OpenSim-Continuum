@@ -81,6 +81,16 @@ namespace OpenSim.Region.Framework.Scenes
             return UUID.Zero;
         }
 
+        // Ported from GuntharDeNiro/opensim - used by ScenePresence.
+        // CopyFrom when an incoming AgentData has no
+        // MovementAnimationOverRides at all (rather than an empty one),
+        // to actually clear stale overrides instead of leaving them.
+        public void Clear()
+        {
+            lock (MAOLock)
+                m_overrides.Clear();
+        }
+
         public bool TryGetOverriddenAnimation(string state, out UUID animID)
         {
             lock (MAOLock)

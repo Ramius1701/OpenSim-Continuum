@@ -72,6 +72,12 @@ namespace OpenSim.Region.Framework.Scenes.Animation
         private string m_lastMovementAnimPackName;
         private const int MovementAnimPackHeartbeatMS = 2500;
 
+        // Configurable per-sex walk animation override, ported from
+        // GuntharDeNiro/opensim (Scene.m_maleWalkAnimation/
+        // m_femaleWalkAnimation, config keys male_walk_animation/
+        // female_walk_animation under [Startup]).
+        UUID m_activeConfiguredWalkAnimation = UUID.Zero;
+
         public bool isJumping;
 
         // private int m_landing = 0;
@@ -242,11 +248,18 @@ namespace OpenSim.Region.Framework.Scenes.Animation
             }
 
             // translate sit and sitground state animations
+            UUID configuredWalkAnimation = UUID.Zero;
             if (anim.Equals("SIT") || anim.Equals("SITGROUND"))
                 anim = m_scenePresence.sitAnimation;
+            else if (anim.Equals("WALK"))
+                anim = ResolveWalkAnimation(anim, out configuredWalkAnimation);
+            else
+                StopConfiguredWalkAnimation();
 
             if (m_animations.TrySetDefaultAnimation(anim, m_scenePresence.ControllingClient.NextAnimationSequenceNumber, m_scenePresence.UUID))
             {
+                SetConfiguredWalkAnimation(configuredWalkAnimation);
+
                 //m_log.DebugFormat(
                 //    "[SCENE PRESENCE ANIMATOR]: Updating movement animation to {0} for {1}",
                 //       anim, m_scenePresence.Name);
@@ -291,6 +304,55 @@ namespace OpenSim.Region.Framework.Scenes.Animation
                     NoteMovementAnimPackSent();
                 }
             }
+        }
+
+        // ResolveWalkAnimation/SetConfiguredWalkAnimation/
+        // StopConfiguredWalkAnimation, ported from GuntharDeNiro/opensim -
+        // lets an operator override the WALK/FEMALE_WALK animation
+        // region-wide via Scene.m_maleWalkAnimation/m_femaleWalkAnimation,
+        // either by a stock animation name or a custom animation asset
+        // UUID. Falls back to the normal WALK/FEMALE_WALK animation
+        // if the configured value doesn't resolve to either.
+        private string ResolveWalkAnimation(string fallbackAnimation, out UUID configuredWalkAnimation)
+        {
+            configuredWalkAnimation = UUID.Zero;
+            string configuredAnimation;
+
+            if (m_scenePresence.Appearance != null && !m_scenePresence.Appearance.IsMale)
+                configuredAnimation = m_scenePresence.Scene.m_femaleWalkAnimation;
+            else
+                configuredAnimation = m_scenePresence.Scene.m_maleWalkAnimation;
+
+            if (DefaultAvatarAnimations.AnimsUUIDbyName.ContainsKey(configuredAnimation))
+                return configuredAnimation;
+
+            if (UUID.TryParse(configuredAnimation, out UUID configuredID) && !configuredID.IsZero())
+                configuredWalkAnimation = configuredID;
+
+            return fallbackAnimation;
+        }
+
+        private void SetConfiguredWalkAnimation(UUID animID)
+        {
+            if (m_activeConfiguredWalkAnimation.Equals(animID))
+                return;
+
+            StopConfiguredWalkAnimation();
+
+            if (animID.IsZero())
+                return;
+
+            if (m_animations.Add(animID, m_scenePresence.ControllingClient.NextAnimationSequenceNumber, UUID.Zero))
+                m_activeConfiguredWalkAnimation = animID;
+        }
+
+        private void StopConfiguredWalkAnimation()
+        {
+            if (m_activeConfiguredWalkAnimation.IsZero())
+                return;
+
+            m_animations.Remove(m_activeConfiguredWalkAnimation, true);
+            m_activeConfiguredWalkAnimation = UUID.Zero;
         }
 
         public enum motionControlStates : byte
