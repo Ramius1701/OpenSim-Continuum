@@ -99,6 +99,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
            LSL_Key llDetectedOwner(int number);
         LSL_Vector llDetectedPos(int number);
       LSL_Rotation llDetectedRot(int number);
+           LSL_Key llDetectedRezzer(int number);
+          LSL_List llDetectedDamage(LSL_Integer number);
        LSL_Integer llDetectedType(int number);
         LSL_Vector llDetectedTouchBinormal(int index);
        LSL_Integer llDetectedTouchFace(int index);
@@ -386,6 +388,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
               void llSetColor(LSL_Vector color, int face);
               void llSetContentType(LSL_Key id, LSL_Integer type);
               void llSetDamage(double damage);
+              void llDamage(LSL_Key target, LSL_Float damage, LSL_Integer damage_type);
+              void llAdjustDamage(LSL_Integer number, LSL_Float damage);
+              void llAdjustDamage(LSL_Float damage);
         LSL_Float llGetHealth(LSL_String key);
               void llSetForce(LSL_Vector force, int local);
               void llSetForceAndTorque(LSL_Vector force, LSL_Vector torque, int local);

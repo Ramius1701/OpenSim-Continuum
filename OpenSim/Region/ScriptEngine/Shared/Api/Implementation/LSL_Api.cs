@@ -129,6 +129,33 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         protected bool m_scriptConsoleChannelEnabled = false;
         protected bool m_debuggerSafe = false;
 
+        // Combat2 damage system, ported from GuntharDeNiro/opensim - backs
+        // llDamage/llAdjustDamage/llDetectedDamage. Uses a short "quiet
+        // window" transaction so multiple scripts adjusting the same
+        // damage event (via llAdjustDamage) settle before health is
+        // actually applied, matching real SL Combat2 behavior.
+        private const int CombatDamageInitialWindowMs = 80;
+        private const int CombatDamageAdjustQuietWindowMs = 50;
+        private const int CombatDamageMaxWindowMs = 750;
+
+        private sealed class CombatDamageTransaction
+        {
+            public readonly object Sync = new();
+            public readonly DetectParams[] Detects;
+            public readonly DateTime CreatedUtc = DateTime.UtcNow;
+            public DateTime LastAdjustmentUtc;
+            public bool Finalized;
+
+            public CombatDamageTransaction(DetectParams[] detects)
+            {
+                Detects = detects ?? Array.Empty<DetectParams>();
+                LastAdjustmentUtc = CreatedUtc;
+            }
+        }
+
+        private static readonly object m_combatDamageLock = new();
+        private static readonly Dictionary<DetectParams, CombatDamageTransaction> m_combatDamageTransactions = new();
+
         protected AsyncCommandManager m_AsyncCommands = null;
         protected IUrlModule m_UrlModule = null;
         protected IMaterialsModule m_materialsModule = null;
@@ -1423,6 +1450,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, number);
             return detectedParams is null ? LSL_String.Empty : detectedParams.Owner.ToString();
+        }
+
+        // Real SL function, ported from GuntharDeNiro/opensim - but wired
+        // up for real here. The source project's own DetectParams
+        // construction path never actually set the Rezzer field (always
+        // left at UUID.Zero), so this always returned empty there; fixed
+        // by populating it from SceneObjectGroup.RezzerID, which current
+        // core already tracks (see Helpers.cs DetectParams.Populate).
+        public LSL_Key llDetectedRezzer(int number)
+        {
+            DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, number);
+            return detectedParams is null ? LSL_String.Empty : detectedParams.Rezzer.ToString();
         }
 
         public LSL_Integer llDetectedType(int number)
@@ -5825,6 +5864,302 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             m_host.ParentGroup.Damage = (float)damage;
         }
 
+        // Combat2 helper chain, ported from GuntharDeNiro/opensim.
+        private bool AllowsDamageAt(Vector3 position)
+        {
+            if (World.RegionInfo.RegionSettings.AllowDamage)
+                return true;
+
+            LandData land = World.GetLandData(position);
+            return land is not null && (land.Flags & (uint)ParcelFlags.AllowDamage) != 0;
+        }
+
+        private DetectParams[] CreateDamageDetectParams(float damage, int damageType)
+        {
+            DetectParams detect = new()
+            {
+                Key = m_host.UUID,
+                Damage = damage,
+                OriginalDamage = damage,
+                DamageType = damageType
+            };
+            detect.Populate(World);
+            return new[] { detect };
+        }
+
+        private CombatDamageTransaction BeginCombatDamageTransaction(DetectParams[] detects)
+        {
+            CombatDamageTransaction transaction = new(detects);
+
+            lock (m_combatDamageLock)
+            {
+                foreach (DetectParams detect in transaction.Detects)
+                {
+                    if (detect != null)
+                        m_combatDamageTransactions[detect] = transaction;
+                }
+            }
+
+            return transaction;
+        }
+
+        private static void EndCombatDamageTransaction(CombatDamageTransaction transaction)
+        {
+            if (transaction is null)
+                return;
+
+            lock (transaction.Sync)
+            {
+                transaction.Finalized = true;
+            }
+
+            lock (m_combatDamageLock)
+            {
+                foreach (DetectParams detect in transaction.Detects)
+                {
+                    if (detect != null && m_combatDamageTransactions.TryGetValue(detect, out CombatDamageTransaction stored)
+                        && ReferenceEquals(stored, transaction))
+                    {
+                        m_combatDamageTransactions.Remove(detect);
+                    }
+                }
+            }
+        }
+
+        private static bool TryAdjustCombatDamage(DetectParams detect, double damage)
+        {
+            if (detect is null)
+                return false;
+
+            CombatDamageTransaction transaction;
+            lock (m_combatDamageLock)
+            {
+                if (!m_combatDamageTransactions.TryGetValue(detect, out transaction))
+                    return false;
+            }
+
+            lock (transaction.Sync)
+            {
+                if (transaction.Finalized)
+                    return false;
+
+                detect.Damage = damage;
+                transaction.LastAdjustmentUtc = DateTime.UtcNow;
+                return true;
+            }
+        }
+
+        private static float WaitForFinalCombatDamage(CombatDamageTransaction transaction)
+        {
+            if (transaction is null || transaction.Detects.Length == 0 || transaction.Detects[0] is null)
+                return 0f;
+
+            DateTime earliest = transaction.CreatedUtc.AddMilliseconds(CombatDamageInitialWindowMs);
+            DateTime deadline = transaction.CreatedUtc.AddMilliseconds(CombatDamageMaxWindowMs);
+
+            while (true)
+            {
+                DateTime now = DateTime.UtcNow;
+                DateTime quietUntil;
+                lock (transaction.Sync)
+                {
+                    quietUntil = transaction.LastAdjustmentUtc.AddMilliseconds(CombatDamageAdjustQuietWindowMs);
+                }
+
+                DateTime waitUntil = earliest > quietUntil ? earliest : quietUntil;
+                if (now >= waitUntil || now >= deadline)
+                    break;
+
+                TimeSpan wait = waitUntil - now;
+                int sleepMs = Math.Clamp((int)wait.TotalMilliseconds, 5, 50);
+                Thread.Sleep(sleepMs);
+            }
+
+            lock (transaction.Sync)
+            {
+                return Math.Max(0f, (float)transaction.Detects[0].Damage);
+            }
+        }
+
+        private void PostCombatEventToObject(uint localID, string eventName, DetectParams[] detects)
+        {
+            object[] args = eventName == "on_death"
+                ? Array.Empty<object>()
+                : new object[] { detects?.Length ?? 0 };
+
+            m_ScriptEngine.PostObjectEvent(localID, new EventParams(
+                eventName,
+                args,
+                detects ?? Array.Empty<DetectParams>()));
+        }
+
+        private void PostCombatEventToPresence(ScenePresence presence, string eventName, DetectParams[] detects)
+        {
+            if (presence is null || !presence.HasAttachments())
+                return;
+
+            foreach (SceneObjectGroup attachment in presence.GetAttachments())
+            {
+                SceneObjectPart root = attachment?.RootPart;
+                if (root != null)
+                    PostCombatEventToObject(root.LocalId, eventName, detects);
+            }
+        }
+
+        private void ApplyDamageToPresence(ScenePresence presence, float damage, int damageType)
+        {
+            DetectParams[] detects = CreateDamageDetectParams(damage, damageType);
+            CombatDamageTransaction transaction = BeginCombatDamageTransaction(detects);
+            PostCombatEventToPresence(presence, "on_damage", detects);
+
+            UUID presenceID = presence.UUID;
+            ThreadPool.QueueUserWorkItem(_ => CompleteDamageToPresence(presenceID, transaction));
+        }
+
+        private void CompleteDamageToPresence(UUID presenceID, CombatDamageTransaction transaction)
+        {
+            try
+            {
+                DetectParams[] detects = transaction?.Detects ?? Array.Empty<DetectParams>();
+                float finalDamage = WaitForFinalCombatDamage(transaction);
+                EndCombatDamageTransaction(transaction);
+
+                ScenePresence presence = World.GetScenePresence(presenceID);
+                if (presence is null || presence.IsDeleted || presence.IsChildAgent || presence.IsInTransit)
+                    return;
+
+                float health = presence.Health - finalDamage;
+                if (health > 100f)
+                    health = 100f;
+
+                presence.setHealthWithUpdate(health);
+
+                if (detects != null && detects.Length > 0)
+                    detects[0].Damage = finalDamage;
+                PostCombatEventToPresence(presence, "final_damage", detects);
+
+                if (health > 0)
+                    return;
+
+                PostCombatEventToPresence(presence, "on_death", Array.Empty<DetectParams>());
+
+                if (presence.IsNPC)
+                {
+                    INPCModule npcModule = World.RequestModuleInterface<INPCModule>();
+                    npcModule?.DeleteNPC(presence.UUID, World);
+                    return;
+                }
+
+                presence.ControllingClient.SendAgentAlertMessage("You died!", true);
+                presence.setHealthWithUpdate(100f);
+                presence.Scene.TeleportClientHome(presence.UUID, presence.ControllingClient);
+            }
+            catch (Exception e)
+            {
+                EndCombatDamageTransaction(transaction);
+                m_log.WarnFormat("[LSL]: Combat2 damage completion failed for avatar {0}: {1}", presenceID, e.Message);
+            }
+        }
+
+        private void ApplyDamageToObject(SceneObjectPart target, float damage, int damageType)
+        {
+            SceneObjectPart root = target.ParentGroup?.RootPart ?? target;
+            DetectParams[] detects = CreateDamageDetectParams(damage, damageType);
+            CombatDamageTransaction transaction = BeginCombatDamageTransaction(detects);
+
+            PostCombatEventToObject(root.LocalId, "on_damage", detects);
+
+            UUID rootID = root.UUID;
+            ThreadPool.QueueUserWorkItem(_ => CompleteDamageToObject(rootID, transaction));
+        }
+
+        private void CompleteDamageToObject(UUID rootID, CombatDamageTransaction transaction)
+        {
+            try
+            {
+                DetectParams[] detects = transaction?.Detects ?? Array.Empty<DetectParams>();
+                float finalDamage = WaitForFinalCombatDamage(transaction);
+                EndCombatDamageTransaction(transaction);
+
+                SceneObjectPart root = World.GetSceneObjectPart(rootID);
+                if (root is null || root.ParentGroup is null || root.ParentGroup.IsDeleted)
+                    return;
+
+                float health = root.GetLslHealth();
+                bool hadHealth = health > 0f;
+                if (hadHealth)
+                {
+                    health -= finalDamage;
+                    if (health < 0f)
+                        health = 0f;
+                    root.SetLslHealth(health);
+                }
+
+                if (detects != null && detects.Length > 0)
+                    detects[0].Damage = finalDamage;
+                PostCombatEventToObject(root.LocalId, "final_damage", detects);
+
+                if (hadHealth && health <= 0f)
+                    PostCombatEventToObject(root.LocalId, "on_death", Array.Empty<DetectParams>());
+            }
+            catch (Exception e)
+            {
+                EndCombatDamageTransaction(transaction);
+                m_log.WarnFormat("[LSL]: Combat2 damage completion failed for object {0}: {1}", rootID, e.Message);
+            }
+        }
+
+        // llDamage/llAdjustDamage/llDetectedDamage, ported from
+        // GuntharDeNiro/opensim - real SL Combat2 functions.
+        public void llDamage(LSL_Key target, LSL_Float damage, LSL_Integer damage_type)
+        {
+            if (!UUID.TryParse(target, out UUID targetID) || targetID.IsZero())
+                return;
+
+            ScenePresence presence = World.GetScenePresence(targetID);
+            if (presence is null || presence.IsDeleted || presence.IsChildAgent || presence.IsInTransit)
+            {
+                SceneObjectPart targetPart = World.GetSceneObjectPart(targetID);
+                if (targetPart != null && !targetPart.ParentGroup.IsDeleted)
+                    ApplyDamageToObject(targetPart, (float)damage, damage_type.value);
+                return;
+            }
+
+            if (!AllowsDamageAt(presence.AbsolutePosition))
+                return;
+
+            ApplyDamageToPresence(presence, (float)damage, damage_type.value);
+        }
+
+        public void llAdjustDamage(LSL_Integer number, LSL_Float damage)
+        {
+            DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, number);
+            if (detectedParams != null && !TryAdjustCombatDamage(detectedParams, damage))
+                detectedParams.Damage = damage;
+        }
+
+        public void llAdjustDamage(LSL_Float damage)
+        {
+            llAdjustDamage(0, damage);
+        }
+
+        public LSL_List llDetectedDamage(LSL_Integer number)
+        {
+            DetectParams detectedParams = m_ScriptEngine.GetDetectParams(m_item.ItemID, number);
+            if (detectedParams is null)
+                return new LSL_List();
+
+            return new LSL_List(new object[]
+            {
+                new LSL_Float(detectedParams.Damage),
+                new LSL_Integer(detectedParams.DamageType),
+                new LSL_Float(detectedParams.OriginalDamage),
+                new LSL_Key(detectedParams.Key.ToString()),
+                detectedParams.Position,
+                new LSL_Key(detectedParams.Owner.ToString())
+            });
+        }
+
         public LSL_Float llGetHealth(LSL_String key)
         {
             if (UUID.TryParse(key, out UUID agent))
@@ -5832,6 +6167,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 ScenePresence user = World.GetScenePresence(agent);
                 if (user is not null)
                     return user.Health;
+
+                // Extended, ported from GuntharDeNiro/opensim: also check
+                // for an object's Combat2 health when the key isn't an
+                // avatar, rather than only ever supporting presences.
+                SceneObjectPart part = World.GetSceneObjectPart(agent);
+                if (part is not null)
+                    return part.ParentGroup?.RootPart?.GetLslHealth() ?? part.GetLslHealth();
             }
             return new LSL_Float(-1.0);
         }
