@@ -465,6 +465,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReturnObjectsByID(LSL_List objects)
+        {
+            return m_LSL_Functions.llReturnObjectsByID(objects);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReturnObjectsByOwner(LSL_Key owner, LSL_Integer scope)
+        {
+            return m_LSL_Functions.llReturnObjectsByOwner(owner, scope);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Vector llGetAgentSize(LSL_Key id)
         {
             return m_LSL_Functions.llGetAgentSize(id);
