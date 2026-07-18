@@ -233,6 +233,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_Vector llGetVel();
          LSL_Float llGetWallclock();
               LSL_Integer llTransferOwnership(LSL_Key agent_id, LSL_Integer flags, LSL_List options);
+              LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options);
               void llGiveInventory(LSL_Key destination, LSL_String inventory);
               void llGiveInventoryList(LSL_Key destination, LSL_String folderName, LSL_List inventory);
        LSL_Integer llGiveMoney(LSL_Key destination, LSL_Integer amount);
