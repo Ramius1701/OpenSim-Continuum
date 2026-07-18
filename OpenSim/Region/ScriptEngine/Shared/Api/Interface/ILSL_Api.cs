@@ -549,6 +549,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
          LSL_String llGetRenderMaterial(LSL_Integer face);
          LSL_String llSignRSA(LSL_String private_key, LSL_String msg, LSL_String algorithm);
          LSL_Integer llVerifyRSA(LSL_String public_key, LSL_String msg, LSL_String signature, LSL_String algorithm);
+        void llSetLinkGLTFOverrides(LSL_Integer linknum, LSL_Integer lsl_face, LSL_List overrides);
         void llSetLinkRenderMaterial(LSL_Integer linknum, LSL_String materialstr, LSL_Integer lsl_face);
         LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
          LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);

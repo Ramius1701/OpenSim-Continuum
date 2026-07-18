@@ -22245,6 +22245,1229 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 SetRenderMaterial(part, materialstr, lsl_face, "llSetLinkRenderMaterial");
         }
 
+        // llSetLinkGLTFOverrides and its helpers, ported from
+        // GuntharDeNiro/opensim - a real SL function letting a script set
+        // per-face GLTF PBR material overrides (base color/alpha/metallic/
+        // roughness/emissive/double-sided/extension JSON) without
+        // replacing the whole material asset. Overrides are stored as a
+        // compact LLSD-notation-encoded string on the existing
+        // RenderMaterialOverrideEntry.data field (same OSDParser.
+        // SerializeLLSDNotation-based storage approach current core's own
+        // MaterialsModule.cs already uses elsewhere), rather than
+        // introducing a new storage mechanism.
+        public void llSetLinkGLTFOverrides(LSL_Integer linknum, LSL_Integer lsl_face, LSL_List overrides)
+        {
+            if (overrides is null)
+                return;
+
+            foreach (SceneObjectPart part in GetLinkParts(linknum.value))
+            {
+                int face = lsl_face.value;
+                if (face == ScriptBaseClass.ALL_SIDES)
+                {
+                    int nsides = GetNumberOfSides(part);
+                    for (int side = 0; side < nsides; ++side)
+                        ApplyGltfOverrides(part, side, overrides);
+                }
+                else
+                    ApplyGltfOverrides(part, face, overrides);
+            }
+        }
+
+        private bool ApplyGltfOverrides(SceneObjectPart part, int face, LSL_List overrides)
+        {
+            if (part is null || face < 0 || face >= GetNumberOfSides(part))
+                return false;
+
+            string data = GetMaterialOverrideData(part, face);
+            bool changed = false;
+            bool touched = false;
+            string assetData = GetGltfMaterialAssetData(part, face);
+            double[] baseColor = ReadCompactNumberArray(data, "bc", 4)
+                ?? ReadCompactNumberArray(assetData, "bc", 4)
+                ?? [1.0, 1.0, 1.0, 1.0];
+            bool clearBaseColor = false;
+
+            int idx = 0;
+            while (idx < overrides.Length)
+            {
+                int op = overrides.GetLSLIntegerItem(idx++);
+                if (idx >= overrides.Length)
+                    break;
+
+                object rawValue = overrides.Data[idx];
+                bool clear = IsEmptyString(rawValue);
+
+                switch (op)
+                {
+                    case ScriptBaseClass.OVERRIDE_GLTF_BASE_COLOR_FACTOR:
+                        touched = true;
+                        if (clear)
+                        {
+                            idx++;
+                            clearBaseColor = true;
+                        }
+                        else
+                        {
+                            LSL_Vector color = overrides.GetVector3Item(idx++);
+                            baseColor[0] = color.x;
+                            baseColor[1] = color.y;
+                            baseColor[2] = color.z;
+                        }
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA:
+                        touched = true;
+                        if (clear)
+                        {
+                            idx++;
+                            clearBaseColor = true;
+                        }
+                        else
+                            baseColor[3] = overrides.GetStrictFloatItem(idx++);
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA_MODE:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "am") : SetCompactKey(data, "am", new OSDInteger(overrides.GetLSLIntegerItem(idx)));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA_MASK:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "ac") : SetCompactKey(data, "ac", new OSDReal(overrides.GetStrictFloatItem(idx)));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_BASE_DOUBLE_SIDED:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "ds") : SetCompactKey(data, "ds", OSD.FromBoolean(overrides.GetLSLIntegerItem(idx) != 0));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_METALLIC_FACTOR:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "mf") : SetCompactKey(data, "mf", new OSDReal(overrides.GetStrictFloatItem(idx)));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_ROUGHNESS_FACTOR:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "rf") : SetCompactKey(data, "rf", new OSDReal(overrides.GetStrictFloatItem(idx)));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_EMISSIVE_FACTOR:
+                        touched = true;
+                        if (clear)
+                        {
+                            data = RemoveCompactKey(data, "ec");
+                            idx++;
+                        }
+                        else
+                        {
+                            LSL_Vector color = overrides.GetVector3Item(idx++);
+                            data = SetCompactKey(data, "ec", CompactVector(color, 3));
+                        }
+                        changed = true;
+                        break;
+
+                    case ScriptBaseClass.OVERRIDE_GLTF_EXTENSION_JSON:
+                        touched = true;
+                        data = clear ? RemoveCompactKey(data, "xj") : SetCompactKey(data, "xj", OSD.FromString(rawValue?.ToString() ?? string.Empty));
+                        idx++;
+                        changed = true;
+                        break;
+
+                    default:
+                        idx++;
+                        break;
+                }
+            }
+
+            if (!touched)
+                return false;
+
+            if (clearBaseColor)
+            {
+                data = RemoveCompactKey(data, "bc");
+                changed = true;
+            }
+            else if (ReadCompactNumberArray(data, "bc", 4) is not null ||
+                ContainsOverride(overrides, ScriptBaseClass.OVERRIDE_GLTF_BASE_COLOR_FACTOR) ||
+                ContainsOverride(overrides, ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA))
+            {
+                data = SetCompactKey(data, "bc", CompactVector(baseColor));
+                changed = true;
+            }
+
+            if (!HasRenderMaterial(part, face) && HasCompactOverrideData(data))
+                return false;
+
+            if (changed && SetMaterialOverrideData(part, face, data))
+            {
+                part.ParentGroup.HasGroupChanged = true;
+                part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+                part.TriggerScriptChangedEvent(Changed.MATERIAL);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool ApplyGltfPrimitiveParams(SceneObjectPart part, int code, LSL_List values, string originFunc)
+        {
+            if (part is null || values is null || values.Length < 1)
+                return false;
+
+            int face = values.GetIntegerItem(0);
+            if (face == ScriptBaseClass.ALL_SIDES)
+            {
+                bool changed = false;
+                int nsides = GetNumberOfSides(part);
+                for (int side = 0; side < nsides; ++side)
+                    changed |= ApplyGltfPrimitiveParamsToFace(part, code, side, values, originFunc);
+                return changed;
+            }
+
+            return ApplyGltfPrimitiveParamsToFace(part, code, face, values, originFunc);
+        }
+
+        private bool ApplyGltfPrimitiveParamsToFace(SceneObjectPart part, int code, int face, LSL_List values, string originFunc)
+        {
+            if (part is null || face < 0 || face >= GetNumberOfSides(part))
+                return false;
+
+            string oldData = GetMaterialOverrideData(part, face);
+            string data = oldData;
+            int textureIndex = GltfTextureIndex(code);
+
+            if (!ApplyGltfTextureParam(part, ref data, textureIndex, values.Data[1], originFunc))
+                return false;
+
+            data = ApplyGltfTextureTransformParams(data, textureIndex, values);
+
+            switch (code)
+            {
+                case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                    data = ApplyGltfBaseColorParams(data, values);
+                    break;
+
+                case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                    data = ApplyCompactFloatParam(data, "mf", values, 5);
+                    data = ApplyCompactFloatParam(data, "rf", values, 6);
+                    break;
+
+                case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                    data = ApplyCompactVectorParam(data, "ec", values, 5, 3);
+                    break;
+            }
+
+            if (!HasRenderMaterial(part, face) && HasCompactOverrideData(data))
+                return false;
+
+            if (data == oldData || !SetMaterialOverrideData(part, face, data))
+                return false;
+
+            part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
+            part.TriggerScriptChangedEvent(Changed.MATERIAL);
+            return true;
+        }
+
+        private static int GltfTextureIndex(int code)
+        {
+            return code switch
+            {
+                ScriptBaseClass.PRIM_GLTF_NORMAL => 1,
+                ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS => 2,
+                ScriptBaseClass.PRIM_GLTF_EMISSIVE => 3,
+                _ => 0
+            };
+        }
+
+        private bool ApplyGltfTextureParam(SceneObjectPart part, ref string data, int textureIndex, object rawValue, string originFunc)
+        {
+            string textureName = rawValue?.ToString() ?? string.Empty;
+            if (textureName.Length == 0 || UUID.ZeroString.Equals(textureName, StringComparison.OrdinalIgnoreCase))
+            {
+                data = SetCompactUuidArrayItem(data, "tex", textureIndex, UUID.Zero);
+                return true;
+            }
+
+            UUID textureID = ScriptUtils.GetAssetIdFromItemName(part, textureName, (int)AssetType.Texture);
+            if (textureID.IsZero() && (!UUID.TryParse(textureName, out textureID) || textureID.IsZero()))
+            {
+                Error(originFunc, $"texture \"{textureName}\" not found");
+                return false;
+            }
+
+            data = SetCompactUuidArrayItem(data, "tex", textureIndex, textureID);
+            return true;
+        }
+
+        private static string ApplyGltfTextureTransformParams(string data, int textureIndex, LSL_List values)
+        {
+            OSDMap[] transforms = ReadCompactTransformMaps(data, textureIndex + 1);
+            OSDMap transform = transforms[textureIndex];
+
+            if (IsEmptyString(values.Data[2]))
+                transform.Remove("s");
+            else
+            {
+                LSL_Vector repeats = values.GetVector3Item(2);
+                transform["s"] = CompactVector2(repeats);
+            }
+
+            if (IsEmptyString(values.Data[3]))
+                transform.Remove("o");
+            else
+            {
+                LSL_Vector offsets = values.GetVector3Item(3);
+                transform["o"] = CompactVector2(offsets);
+            }
+
+            if (IsEmptyString(values.Data[4]))
+                transform.Remove("r");
+            else
+                transform["r"] = new OSDReal(Math.Round(values.GetStrictFloatItem(4), 4));
+
+            return SetCompactTransformArray(data, transforms);
+        }
+
+        private static string ApplyGltfBaseColorParams(string data, LSL_List values)
+        {
+            bool clearColor = IsEmptyString(values.Data[5]);
+            bool clearAlpha = IsEmptyString(values.Data[6]);
+            if (clearColor && clearAlpha)
+            {
+                data = RemoveCompactKey(data, "bc");
+            }
+            else
+            {
+                double[] baseColor = [1.0, 1.0, 1.0, 1.0];
+                if (!clearColor)
+                {
+                    LSL_Vector color = values.GetVector3Item(5);
+                    baseColor[0] = color.x;
+                    baseColor[1] = color.y;
+                    baseColor[2] = color.z;
+                }
+
+                if (!clearAlpha)
+                    baseColor[3] = values.GetStrictFloatItem(6);
+
+                data = SetCompactKey(data, "bc", CompactVector(baseColor));
+            }
+
+            data = ApplyCompactIntegerParam(data, "am", values, 7);
+            data = ApplyCompactFloatParam(data, "ac", values, 8);
+            data = ApplyCompactBoolParam(data, "ds", values, 9);
+            return data;
+        }
+
+        private static string ApplyCompactIntegerParam(string data, string key, LSL_List values, int index)
+        {
+            return IsEmptyString(values.Data[index]) ?
+                    RemoveCompactKey(data, key) :
+                    SetCompactKey(data, key, new OSDInteger(values.GetLSLIntegerItem(index)));
+        }
+
+        private static string ApplyCompactFloatParam(string data, string key, LSL_List values, int index)
+        {
+            return IsEmptyString(values.Data[index]) ?
+                    RemoveCompactKey(data, key) :
+                    SetCompactKey(data, key, new OSDReal(Math.Round(values.GetStrictFloatItem(index), 4)));
+        }
+
+        private static string ApplyCompactBoolParam(string data, string key, LSL_List values, int index)
+        {
+            return IsEmptyString(values.Data[index]) ?
+                    RemoveCompactKey(data, key) :
+                    SetCompactKey(data, key, OSD.FromBoolean(values.GetLSLIntegerItem(index) != 0));
+        }
+
+        private static string ApplyCompactVectorParam(string data, string key, LSL_List values, int index, int components)
+        {
+            return IsEmptyString(values.Data[index]) ?
+                    RemoveCompactKey(data, key) :
+                    SetCompactKey(data, key, CompactVector(values.GetVector3Item(index), components));
+        }
+
+        private static bool IsEmptyString(object value)
+        {
+            return value is not null && value.ToString().Length == 0;
+        }
+
+        private static bool ContainsOverride(LSL_List overrides, int wanted)
+        {
+            for (int i = 0; i < overrides.Length; i += 2)
+            {
+                if (overrides.GetLSLIntegerItem(i) == wanted)
+                    return true;
+            }
+            return false;
+        }
+
+        private static OSDArray CompactVector(LSL_Vector value, int components = 4)
+        {
+            OSDArray array = new()
+            {
+                Math.Round(value.x, 4),
+                Math.Round(value.y, 4),
+                Math.Round(value.z, 4)
+            };
+
+            if (components > 3)
+                array.Add(1.0);
+
+            return array;
+        }
+
+        private static OSDArray CompactVector2(LSL_Vector value)
+        {
+            return new OSDArray
+            {
+                Math.Round(value.x, 4),
+                Math.Round(value.y, 4)
+            };
+        }
+
+        private static OSDArray CompactVector(double[] values)
+        {
+            OSDArray array = new(values.Length);
+            for (int i = 0; i < values.Length; ++i)
+                array.Add(Math.Round(values[i], 4));
+            return array;
+        }
+
+        private static bool HasRenderMaterial(SceneObjectPart part, int face)
+        {
+            if (part.Shape.RenderMaterials?.entries is null)
+                return false;
+
+            foreach (Primitive.RenderMaterials.RenderMaterialEntry entry in part.Shape.RenderMaterials.entries)
+            {
+                if (entry.te_index == face && entry.id.IsNotZero())
+                    return true;
+            }
+            return false;
+        }
+
+        private static string GetMaterialOverrideData(SceneObjectPart part, int face)
+        {
+            if (part.Shape.RenderMaterials?.overrides is null)
+                return "{}";
+
+            foreach (Primitive.RenderMaterials.RenderMaterialOverrideEntry entry in part.Shape.RenderMaterials.overrides)
+            {
+                if (entry.te_index == face && !string.IsNullOrEmpty(entry.data))
+                    return entry.data;
+            }
+            return "{}";
+        }
+
+        private static bool SetMaterialOverrideData(SceneObjectPart part, int face, string data)
+        {
+            part.Shape.RenderMaterials ??= new();
+            bool hasData = HasCompactOverrideData(data);
+            Primitive.RenderMaterials.RenderMaterialOverrideEntry[] entries = part.Shape.RenderMaterials.overrides;
+
+            if (entries is null || entries.Length == 0)
+            {
+                if (!hasData)
+                    return false;
+
+                part.Shape.RenderMaterials.overrides =
+                [
+                    new Primitive.RenderMaterials.RenderMaterialOverrideEntry
+                    {
+                        te_index = (byte)face,
+                        data = data
+                    }
+                ];
+                return true;
+            }
+
+            for (int i = 0; i < entries.Length; ++i)
+            {
+                if (entries[i].te_index != face)
+                    continue;
+
+                if (!hasData)
+                {
+                    if (entries.Length == 1)
+                        part.Shape.RenderMaterials.overrides = null;
+                    else
+                    {
+                        Primitive.RenderMaterials.RenderMaterialOverrideEntry[] replacement = new Primitive.RenderMaterials.RenderMaterialOverrideEntry[entries.Length - 1];
+                        if (i > 0)
+                            Array.Copy(entries, replacement, i);
+                        if (i + 1 < entries.Length)
+                            Array.Copy(entries, i + 1, replacement, i, entries.Length - i - 1);
+                        part.Shape.RenderMaterials.overrides = replacement;
+                    }
+                    return true;
+                }
+
+                if (entries[i].data == data)
+                    return false;
+
+                entries[i].data = data;
+                return true;
+            }
+
+            if (!hasData)
+                return false;
+
+            Array.Resize(ref entries, entries.Length + 1);
+            entries[^1] = new Primitive.RenderMaterials.RenderMaterialOverrideEntry
+            {
+                te_index = (byte)face,
+                data = data
+            };
+            part.Shape.RenderMaterials.overrides = entries;
+            return true;
+        }
+
+        private static bool HasCompactOverrideData(string data)
+        {
+            return !string.IsNullOrEmpty(data) && data.Trim() != "{}";
+        }
+
+        private static string CompactEntry(string key, OSD value)
+        {
+            string serialized = OSDParser.SerializeLLSDNotation(new OSDMap { [key] = value });
+            if (serialized.Length >= 2 && serialized[0] == '{' && serialized[^1] == '}')
+                return serialized[1..^1];
+            return $"'{key}':{serialized}";
+        }
+
+        private static string MergeCompactGltfData(string assetData, string overrideData)
+        {
+            string result = string.IsNullOrWhiteSpace(assetData) ? "{}" : assetData;
+            if (!HasCompactOverrideData(overrideData))
+                return result;
+
+            foreach (string key in s_gltfCompactKeys)
+            {
+                if (FindCompactKeyRange(overrideData, key, out int start, out int end))
+                {
+                    int colon = overrideData.IndexOf(':', start);
+                    if (colon > start && colon < end)
+                        result = SetCompactRawKey(result, key, overrideData[(colon + 1)..end].Trim());
+                }
+            }
+
+            return result;
+        }
+
+        private static readonly string[] s_gltfCompactKeys =
+        [
+            "tex", "ti", "bc", "am", "ac", "ds", "mf", "rf", "ec", "xj"
+        ];
+
+        private static string SetCompactKey(string data, string key, OSD value)
+        {
+            data = RemoveCompactKey(data, key);
+            string entry = CompactEntry(key, value);
+            return AddCompactEntry(data, entry);
+        }
+
+        private static string SetCompactRawKey(string data, string key, string rawValue)
+        {
+            data = RemoveCompactKey(data, key);
+            return AddCompactEntry(data, $"'{key}':{rawValue}");
+        }
+
+        private static string AddCompactEntry(string data, string entry)
+        {
+            string trimmed = string.IsNullOrWhiteSpace(data) ? "{}" : data.Trim();
+            if (trimmed == "{}")
+                return "{" + entry + "}";
+
+            int insert = trimmed.LastIndexOf('}');
+            if (insert < 0)
+                return "{" + entry + "}";
+
+            string prefix = trimmed[..insert].TrimEnd();
+            if (prefix.Length > 1 && prefix[^1] != '{')
+                prefix += ",";
+            return prefix + entry + trimmed[insert..];
+        }
+
+        private static string RemoveCompactKey(string data, string key)
+        {
+            if (!FindCompactKeyRange(data, key, out int start, out int end))
+                return string.IsNullOrWhiteSpace(data) ? "{}" : data;
+
+            int removeStart = start;
+            int removeEnd = end;
+            while (removeStart > 0 && char.IsWhiteSpace(data[removeStart - 1]))
+                removeStart--;
+
+            if (removeEnd < data.Length && data[removeEnd] == ',')
+                removeEnd++;
+            else
+            {
+                int comma = removeStart - 1;
+                while (comma >= 0 && char.IsWhiteSpace(data[comma]))
+                    comma--;
+                if (comma >= 0 && data[comma] == ',')
+                    removeStart = comma;
+            }
+
+            string result = (data[..removeStart] + data[removeEnd..]).Trim();
+            return result == "{" || result == "{}" ? "{}" : result;
+        }
+
+        private static bool FindCompactKeyRange(string data, string key, out int start, out int end)
+        {
+            start = -1;
+            end = -1;
+            if (string.IsNullOrEmpty(data))
+                return false;
+
+            string needle = "'" + key + "'";
+            int pos = 0;
+            while ((pos = data.IndexOf(needle, pos, StringComparison.Ordinal)) >= 0)
+            {
+                int i = pos + needle.Length;
+                while (i < data.Length && char.IsWhiteSpace(data[i]))
+                    i++;
+                if (i >= data.Length || data[i] != ':')
+                {
+                    pos += needle.Length;
+                    continue;
+                }
+
+                start = pos;
+                i++;
+                int depth = 0;
+                bool inString = false;
+                for (; i < data.Length; ++i)
+                {
+                    char c = data[i];
+                    if (c == '\'')
+                        inString = !inString;
+                    else if (!inString)
+                    {
+                        if (c == '[' || c == '{')
+                            depth++;
+                        else if (c == ']' || c == '}')
+                        {
+                            if (depth == 0 && c == '}')
+                                break;
+                            depth--;
+                        }
+                        else if (c == ',' && depth == 0)
+                            break;
+                    }
+                }
+                end = i;
+                return true;
+            }
+            return false;
+        }
+
+        private static string[] ReadCompactArrayItems(string data, string key)
+        {
+            if (!FindCompactKeyRange(data, key, out int start, out int end))
+                return Array.Empty<string>();
+
+            int valueStart = data.IndexOf('[', start);
+            if (valueStart < 0 || valueStart > end)
+                return Array.Empty<string>();
+
+            int valueEnd = FindMatchingCompactBracket(data, valueStart, '[', ']');
+            if (valueEnd < 0 || valueEnd > end)
+                return Array.Empty<string>();
+
+            List<string> items = new();
+            int itemStart = valueStart + 1;
+            int depth = 0;
+            bool inString = false;
+
+            for (int i = itemStart; i < valueEnd; ++i)
+            {
+                char c = data[i];
+                if (c == '\'')
+                {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString)
+                    continue;
+
+                if (c == '[' || c == '{')
+                    depth++;
+                else if (c == ']' || c == '}')
+                    depth--;
+                else if (c == ',' && depth == 0)
+                {
+                    items.Add(data[itemStart..i].Trim());
+                    itemStart = i + 1;
+                }
+            }
+
+            if (itemStart <= valueEnd)
+                items.Add(data[itemStart..valueEnd].Trim());
+
+            return items.ToArray();
+        }
+
+        private static int FindMatchingCompactBracket(string data, int start, char open, char close)
+        {
+            if (start < 0 || start >= data.Length || data[start] != open)
+                return -1;
+
+            int depth = 0;
+            bool inString = false;
+            for (int i = start; i < data.Length; ++i)
+            {
+                char c = data[i];
+                if (c == '\'')
+                {
+                    inString = !inString;
+                    continue;
+                }
+
+                if (inString)
+                    continue;
+
+                if (c == open)
+                    depth++;
+                else if (c == close && --depth == 0)
+                    return i;
+            }
+
+            return -1;
+        }
+
+        private static UUID ReadCompactUuidArrayItem(string data, string key, int index)
+        {
+            string[] items = ReadCompactArrayItems(data, key);
+            if (index < 0 || index >= items.Length)
+                return UUID.Zero;
+
+            Match match = Regex.Match(items[index],
+                    @"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+            if (match.Success && UUID.TryParse(match.Value, out UUID id))
+                return id;
+
+            return UUID.Zero;
+        }
+
+        private static string SetCompactUuidArrayItem(string data, string key, int index, UUID value)
+        {
+            int count = Math.Max(index + 1, Math.Max(4, ReadCompactArrayItems(data, key).Length));
+            UUID[] values = new UUID[count];
+            for (int i = 0; i < values.Length; ++i)
+                values[i] = ReadCompactUuidArrayItem(data, key, i);
+
+            values[index] = value;
+
+            int last = values.Length - 1;
+            while (last >= 0 && values[last].IsZero())
+                last--;
+
+            if (last < 0)
+                return RemoveCompactKey(data, key);
+
+            OSDArray array = new(last + 1);
+            for (int i = 0; i <= last; ++i)
+                array.Add(OSD.FromUUID(values[i]));
+
+            return SetCompactKey(data, key, array);
+        }
+
+        private static OSDMap[] ReadCompactTransformMaps(string data, int minimumCount)
+        {
+            string[] items = ReadCompactArrayItems(data, "ti");
+            OSDMap[] transforms = new OSDMap[Math.Max(minimumCount, Math.Max(4, items.Length))];
+
+            for (int i = 0; i < transforms.Length; ++i)
+                transforms[i] = i < items.Length ? ReadCompactTransformMap(items[i]) : new OSDMap();
+
+            return transforms;
+        }
+
+        private static OSDMap ReadCompactTransformMap(string data)
+        {
+            OSDMap map = new();
+            if (string.IsNullOrWhiteSpace(data))
+                return map;
+
+            double[] scale = ReadCompactNumberArray(data, "s", 2);
+            if (scale is not null)
+                map["s"] = new OSDArray { Math.Round(scale[0], 4), Math.Round(scale[1], 4) };
+
+            double[] offset = ReadCompactNumberArray(data, "o", 2);
+            if (offset is not null)
+                map["o"] = new OSDArray { Math.Round(offset[0], 4), Math.Round(offset[1], 4) };
+
+            if (ReadCompactDouble(data, "r", out double rotation))
+                map["r"] = new OSDReal(Math.Round(rotation, 4));
+
+            return map;
+        }
+
+        private static string SetCompactTransformArray(string data, OSDMap[] transforms)
+        {
+            int last = transforms.Length - 1;
+            while (last >= 0 && transforms[last].Count == 0)
+                last--;
+
+            if (last < 0)
+                return RemoveCompactKey(data, "ti");
+
+            OSDArray array = new(last + 1);
+            for (int i = 0; i <= last; ++i)
+                array.Add(transforms[i].Count == 0 ? new OSDMap() : transforms[i]);
+
+            return SetCompactKey(data, "ti", array);
+        }
+
+        private static bool ReadCompactDouble(string data, string key, out double value)
+        {
+            value = 0.0;
+            if (!FindCompactKeyRange(data, key, out int start, out int end))
+                return false;
+
+            int colon = data.IndexOf(':', start);
+            if (colon < 0 || colon >= end)
+                return false;
+
+            Match match = Regex.Match(data[(colon + 1)..end],
+                    @"[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?");
+            return match.Success && double.TryParse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static bool ReadCompactBool(string data, string key, out bool value)
+        {
+            value = false;
+            if (!FindCompactKeyRange(data, key, out int start, out int end))
+                return false;
+
+            int colon = data.IndexOf(':', start);
+            if (colon < 0 || colon >= end)
+                return false;
+
+            string token = data[(colon + 1)..end].Trim();
+            if (token.StartsWith("true", StringComparison.OrdinalIgnoreCase))
+            {
+                value = true;
+                return true;
+            }
+            if (token.StartsWith("false", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (ReadCompactDouble(data, key, out double numeric))
+            {
+                value = Math.Abs(numeric) > double.Epsilon;
+                return true;
+            }
+            return false;
+        }
+
+        private static double[] ReadCompactNumberArray(string data, string key, int expected)
+        {
+            if (!FindCompactKeyRange(data, key, out _, out int end))
+                return null;
+
+            int keyStart = data.LastIndexOf('\'', end);
+            int valueStart = data.IndexOf('[', keyStart >= 0 ? keyStart : 0);
+            if (valueStart < 0 || valueStart > end)
+                return null;
+
+            int valueEnd = data.IndexOf(']', valueStart);
+            if (valueEnd < 0 || valueEnd > end)
+                return null;
+
+            MatchCollection matches = Regex.Matches(data[valueStart..valueEnd], @"[-+]?(?:\d+\.\d+|\d+|\.\d+)(?:[eE][-+]?\d+)?");
+            if (matches.Count < expected)
+                return null;
+
+            double[] values = new double[expected];
+            for (int i = 0; i < expected; ++i)
+            {
+                if (!double.TryParse(matches[i].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]))
+                    return null;
+            }
+            return values;
+        }
+
+        private string GetGltfMaterialAssetData(SceneObjectPart part, int face)
+        {
+            UUID materialID = GetRenderMaterialID(part, face);
+            if (materialID.IsZero())
+                return "{}";
+
+            AssetBase asset = World.AssetService?.Get(materialID.ToString());
+            if (asset is null || asset.Data is null || asset.Data.Length == 0)
+                return "{}";
+
+            return TryExtractGltfJson(asset.Data, out string json)
+                && TryCompactGltfMaterialJson(json, out string data) ? data : "{}";
+        }
+
+        private static UUID GetRenderMaterialID(SceneObjectPart part, int face)
+        {
+            if (part?.Shape?.RenderMaterials?.entries is null)
+                return UUID.Zero;
+
+            foreach (Primitive.RenderMaterials.RenderMaterialEntry entry in part.Shape.RenderMaterials.entries)
+            {
+                if (entry.te_index == face)
+                    return entry.id;
+            }
+            return UUID.Zero;
+        }
+
+        private static bool TryExtractGltfJson(byte[] data, out string json)
+        {
+            json = null;
+            if (data is null || data.Length == 0)
+                return false;
+
+            string text = Encoding.UTF8.GetString(data).Trim();
+            if (text.StartsWith("{", StringComparison.Ordinal) && text.Contains("\"materials\"", StringComparison.Ordinal))
+            {
+                json = text;
+                return true;
+            }
+
+            try
+            {
+                if (TryExtractGltfJson(OSDParser.DeserializeLLSDXml(data), out json))
+                    return true;
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                return TryExtractGltfJson(OSDParser.DeserializeJson(text), out json);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryExtractGltfJson(OSD osd, out string json)
+        {
+            json = null;
+            if (osd is not OSDMap map)
+                return false;
+
+            if (map.TryGetValue("gltf_json", out OSD gltfJson))
+            {
+                json = gltfJson.AsString();
+                return !string.IsNullOrWhiteSpace(json);
+            }
+
+            if (map.ContainsKey("materials"))
+            {
+                json = OSDParser.SerializeJsonString(map);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetGltfExtensionTransform(OSDMap inMap, out OSDMap outMap)
+        {
+            outMap = null;
+            if (inMap is null || !inMap.TryGetValue("extensions", out OSD extOSD) || extOSD is not OSDMap extMap)
+                return false;
+
+            if (!extMap.TryGetValue("KHR_texture_transform", out OSD trOSD) || trOSD is not OSDMap trMap)
+                return false;
+
+            OSDMap result = new();
+            if (trMap.TryGetValue("offset", out OSD offsetOSD) && offsetOSD is OSDArray offset && offset.Count >= 2)
+            {
+                result["o"] = new OSDArray
+                {
+                    Math.Round((double)offset[0], 4),
+                    Math.Round((double)offset[1], 4)
+                };
+            }
+
+            if (trMap.TryGetValue("rotation", out OSD rotationOSD))
+                result["r"] = Math.Round(rotationOSD.AsReal(), 6);
+
+            if (trMap.TryGetValue("scale", out OSD scaleOSD) && scaleOSD is OSDArray scale && scale.Count >= 2)
+            {
+                result["s"] = new OSDArray
+                {
+                    Math.Round((double)scale[0], 4),
+                    Math.Round((double)scale[1], 4)
+                };
+            }
+
+            outMap = result;
+            return result.Count > 0;
+        }
+
+        private static bool TryCompactGltfMaterialJson(string json, out string data)
+        {
+            data = "{}";
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            try
+            {
+                if (OSDParser.DeserializeJson(json) is not OSDMap mainMap)
+                    return false;
+
+                if (!mainMap.TryGetValue("materials", out OSD materialsOSD) ||
+                    materialsOSD is not OSDArray materialsArray ||
+                    materialsArray.Count < 1 ||
+                    materialsArray[0] is not OSDMap material)
+                    return false;
+
+                UUID[] textureURIs = ReadGltfTextureUris(mainMap);
+                bool hasTextureUris = textureURIs is not null;
+                OSDMap compact = new();
+                OSDArray transforms = new(4);
+                UUID[] textureIDs = new UUID[4];
+                bool[] textureChanged = new bool[4];
+                bool texturesChanged = false;
+
+                void SetTextureFromIndex(OSDMap textureMap, int compactIndex)
+                {
+                    if (!hasTextureUris || textureMap is null ||
+                        !textureMap.TryGetValue("index", out OSD indexOSD))
+                        return;
+
+                    int sourceIndex = indexOSD.AsInteger();
+                    if (sourceIndex >= 0 && sourceIndex < textureURIs.Length)
+                    {
+                        textureIDs[compactIndex] = textureURIs[sourceIndex];
+                        textureChanged[compactIndex] = true;
+                        texturesChanged = true;
+                    }
+                }
+
+                void SetTransform(OSDMap textureMap, int compactIndex)
+                {
+                    if (!TryGetGltfExtensionTransform(textureMap, out OSDMap transform))
+                        return;
+
+                    while (transforms.Count < compactIndex)
+                        transforms.Add(new OSDMap());
+
+                    if (transforms.Count == compactIndex)
+                        transforms.Add(transform);
+                    else
+                        transforms[compactIndex] = transform;
+                }
+
+                if (material.TryGetValue("pbrMetallicRoughness", out OSD pmrOSD) && pmrOSD is OSDMap pmrMap)
+                {
+                    if (pmrMap.TryGetValue("baseColorTexture", out OSD baseTextureOSD) && baseTextureOSD is OSDMap baseTexture)
+                    {
+                        SetTextureFromIndex(baseTexture, 0);
+                        SetTransform(baseTexture, 0);
+                    }
+
+                    if (pmrMap.TryGetValue("metallicRoughnessTexture", out OSD mrTextureOSD) && mrTextureOSD is OSDMap mrTexture)
+                    {
+                        SetTextureFromIndex(mrTexture, 2);
+                        SetTransform(mrTexture, 2);
+                    }
+
+                    if (pmrMap.TryGetValue("baseColorFactor", out OSD baseColorOSD) && baseColorOSD is OSDArray baseColor && baseColor.Count >= 4)
+                    {
+                        compact["bc"] = new OSDArray
+                        {
+                            Math.Round(baseColor[0].AsReal(), 4),
+                            Math.Round(baseColor[1].AsReal(), 4),
+                            Math.Round(baseColor[2].AsReal(), 4),
+                            Math.Round(baseColor[3].AsReal(), 4)
+                        };
+                    }
+
+                    if (pmrMap.TryGetValue("metallicFactor", out OSD metallicFactor))
+                        compact["mf"] = Math.Round(metallicFactor.AsReal(), 4);
+
+                    if (pmrMap.TryGetValue("roughnessFactor", out OSD roughnessFactor))
+                        compact["rf"] = Math.Round(roughnessFactor.AsReal(), 4);
+                }
+
+                if (material.TryGetValue("normalTexture", out OSD normalOSD) && normalOSD is OSDMap normalTexture)
+                {
+                    SetTextureFromIndex(normalTexture, 1);
+                    SetTransform(normalTexture, 1);
+                }
+
+                if (material.TryGetValue("occlusionTexture", out OSD occlusionOSD) && occlusionOSD is OSDMap occlusionTexture)
+                {
+                    SetTextureFromIndex(occlusionTexture, 2);
+                    SetTransform(occlusionTexture, 2);
+                }
+
+                if (material.TryGetValue("emissiveTexture", out OSD emissiveOSD) && emissiveOSD is OSDMap emissiveTexture)
+                {
+                    SetTextureFromIndex(emissiveTexture, 3);
+                    SetTransform(emissiveTexture, 3);
+                }
+
+                if (material.TryGetValue("alphaMode", out OSD alphaMode))
+                {
+                    compact["am"] = alphaMode.AsString() switch
+                    {
+                        "BLEND" => 1,
+                        "MASK" => 2,
+                        _ => 0
+                    };
+                }
+
+                if (material.TryGetValue("alphaCutoff", out OSD alphaCutoff))
+                    compact["ac"] = Math.Round(alphaCutoff.AsReal(), 4);
+
+                if (material.TryGetValue("emissiveFactor", out OSD emissiveFactorOSD) && emissiveFactorOSD is OSDArray emissiveFactor && emissiveFactor.Count >= 3)
+                {
+                    compact["ec"] = new OSDArray
+                    {
+                        Math.Round(emissiveFactor[0].AsReal(), 4),
+                        Math.Round(emissiveFactor[1].AsReal(), 4),
+                        Math.Round(emissiveFactor[2].AsReal(), 4)
+                    };
+                }
+
+                if (material.TryGetValue("doubleSided", out OSD doubleSided))
+                    compact["ds"] = OSD.FromBoolean(doubleSided.AsBoolean());
+
+                if (texturesChanged)
+                {
+                    OSDArray tex = new(textureIDs.Length);
+                    for (int i = 0; i < textureIDs.Length; ++i)
+                        tex.Add(textureChanged[i] ? OSD.FromUUID(textureIDs[i]) : new OSD());
+                    compact["tex"] = tex;
+                }
+
+                if (transforms.Count > 0)
+                    compact["ti"] = transforms;
+
+                if (compact.Count == 0)
+                    return false;
+
+                data = OSDParser.SerializeLLSDNotation(compact);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static UUID[] ReadGltfTextureUris(OSDMap mainMap)
+        {
+            if (!mainMap.TryGetValue("images", out OSD imagesOSD) ||
+                imagesOSD is not OSDArray imagesArray ||
+                imagesArray.Count == 0 ||
+                imagesArray.Count >= 16 ||
+                !mainMap.TryGetValue("textures", out OSD texturesOSD) ||
+                texturesOSD is not OSDArray texturesArray ||
+                texturesArray.Count == 0 ||
+                texturesArray.Count >= 16)
+                return null;
+
+            UUID[] imageUris = new UUID[imagesArray.Count];
+            for (int i = 0; i < imagesArray.Count; ++i)
+            {
+                if (imagesArray[i] is OSDMap imageMap &&
+                    imageMap.TryGetValue("uri", out OSD uriOSD) &&
+                    UUID.TryParse(uriOSD.AsString(), out UUID textureID))
+                    imageUris[i] = textureID;
+            }
+
+            UUID[] textureUris = new UUID[texturesArray.Count];
+            for (int i = 0; i < texturesArray.Count; ++i)
+            {
+                if (texturesArray[i] is OSDMap textureMap &&
+                    textureMap.TryGetValue("source", out OSD sourceOSD))
+                {
+                    int imageIndex = sourceOSD.AsInteger();
+                    if (imageIndex >= 0 && imageIndex < imageUris.Length)
+                        textureUris[i] = imageUris[imageIndex];
+                }
+            }
+            return textureUris;
+        }
+
+        private void AddGltfTextureTransformParams(ref LSL_List res, SceneObjectPart part, string data, int textureIndex)
+        {
+            UUID texture = ReadCompactUuidArrayItem(data, "tex", textureIndex);
+            if (texture.IsZero())
+                AddUnsetGltfValue(ref res);
+            else
+                res.Add(new LSL_String(GetMaterialTextureUUIDbyRights(texture, part)));
+
+            LSL_Vector repeats = new(1.0, 1.0, 0.0);
+            LSL_Vector offsets = new(0.0, 0.0, 0.0);
+            double rotation = 0.0;
+
+            string[] transforms = ReadCompactArrayItems(data, "ti");
+            if (textureIndex < transforms.Length)
+            {
+                string transform = transforms[textureIndex];
+                double[] scale = ReadCompactNumberArray(transform, "s", 2);
+                if (scale is not null)
+                    repeats = new LSL_Vector(scale[0], scale[1], 0.0);
+
+                double[] offset = ReadCompactNumberArray(transform, "o", 2);
+                if (offset is not null)
+                    offsets = new LSL_Vector(offset[0], offset[1], 0.0);
+
+                if (ReadCompactDouble(transform, "r", out double rot))
+                    rotation = rot;
+            }
+
+            res.Add(repeats);
+            res.Add(offsets);
+            res.Add(new LSL_Float(rotation));
+        }
+
+        private static void AddUnsetGltfValue(ref LSL_List res)
+        {
+            res.Add(new LSL_String(string.Empty));
+        }
+
+        private static void AddCompactIntegerOrUnset(ref LSL_List res, string data, string key)
+        {
+            if (ReadCompactDouble(data, key, out double value))
+                res.Add(new LSL_Integer((int)value));
+            else
+                AddUnsetGltfValue(ref res);
+        }
+
+        private static void AddCompactFloatOrUnset(ref LSL_List res, string data, string key)
+        {
+            if (ReadCompactDouble(data, key, out double value))
+                res.Add(new LSL_Float(value));
+            else
+                AddUnsetGltfValue(ref res);
+        }
+
+        private static void AddCompactBoolOrUnset(ref LSL_List res, string data, string key)
+        {
+            if (ReadCompactBool(data, key, out bool value))
+                res.Add(new LSL_Integer(value ? 1 : 0));
+            else
+                AddUnsetGltfValue(ref res);
+        }
+
         public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
         {
             SceneObjectPart part;
