@@ -97,6 +97,14 @@ namespace OpenSim.Region.Framework.Interfaces
         void EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID EjecteeID);
         void InviteGroupRequest(IClientAPI remoteClient, UUID GroupID, UUID InviteeID, UUID RoleID);
         void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID);
+
+        /// <summary>
+        /// As above, but with a custom invite IM message. Ported from
+        /// GuntharDeNiro/opensim (used by the GroupAutoInvite addon-module).
+        /// message may contain {InviterName}/{GroupName} placeholders; a
+        /// null or empty message falls back to the default invite text.
+        /// </summary>
+        void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID, string message);
         void NotifyChange(UUID GroupID);
 
         ulong GetFullGroupPowers(UUID agentID, UUID groupID);
