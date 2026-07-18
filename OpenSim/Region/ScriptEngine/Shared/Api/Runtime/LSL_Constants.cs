@@ -1121,5 +1121,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int BEACON_MAP  = 0x1;
         public const int BEACON_SHOW_MAP  = 0x1;
         public const int BEACON_FOCUS_MAP = 0x2;
+
+        // llTransferOwnership constants, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int TRANSFER_FLAG_RESERVED = 0x0001;
+        public const int TRANSFER_FLAG_TAKE = 0x0002;
+        public const int TRANSFER_FLAG_COPY = 0x0004;
+        public const int TRANSFER_DEST = 0;
+        public const int TRANSFER_FLAGS = 1;
+
+        public const int TRANSFER_OK = 0;
+        public const int TRANSFER_BAD_OPTS = -1;
+        public const int TRANSFER_NO_TARGET = -2;
+        public const int TRANSFER_THROTTLE = -3;
+        public const int TRANSFER_NO_ITEMS = -4;
+        public const int TRANSFER_BAD_ROOT = -5;
+        public const int TRANSFER_NO_PERMS = -6;
+        public const int TRANSFER_NO_ATTACHMENT = -7;
     }
 }
