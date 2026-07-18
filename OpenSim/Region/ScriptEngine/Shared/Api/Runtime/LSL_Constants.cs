@@ -1181,5 +1181,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PARCEL_SALE_ERROR_IN_ESCROW = 3;
         public const int PARCEL_SALE_ERROR_INVALID_PRICE = 4;
         public const int PARCEL_SALE_ERROR_BAD_PARAMS = 5;
+
+        // llGetAttachedListFiltered constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int ATTACH_ANY_HUD = -1;
+        public const int FILTER_INCLUDE = 1;
+        public const int FILTER_FLAGS = 2;
+        public const int FILTER_FLAG_HUDS = 0x0001;
     }
 }

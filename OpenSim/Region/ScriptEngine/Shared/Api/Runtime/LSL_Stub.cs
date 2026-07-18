@@ -597,6 +597,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetAttachedListFiltered(LSL_Key id, LSL_List options)
+        {
+            return m_LSL_Functions.llGetAttachedListFiltered(id, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Integer llGetFreeMemory()
         {
             return m_LSL_Functions.llGetFreeMemory();
@@ -768,6 +774,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llGetNextEmail(string address, string subject)
         {
             m_LSL_Functions.llGetNextEmail(address, subject);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llFindNotecardTextSync(string name, string pattern, int start, int count, LSL_List options)
+        {
+            return m_LSL_Functions.llFindNotecardTextSync(name, pattern, start, count, options);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
