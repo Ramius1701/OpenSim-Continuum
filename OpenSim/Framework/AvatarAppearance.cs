@@ -118,6 +118,18 @@ namespace OpenSim.Framework
             set { m_wearables = value; }
         }
 
+        // Used by ScenePresenceAnimator.ResolveWalkAnimation to select the
+        // configured male or female walk-animation override.
+        public bool IsMale
+        {
+            get
+            {
+                return m_visualparams != null
+                    && m_visualparams.Length > (int)VPElement.SHAPE_MALE
+                    && m_visualparams[(int)VPElement.SHAPE_MALE] != 0;
+            }
+        }
+
         public float AvatarHeight
         {
             get { return m_avatarHeight; }
