@@ -2697,6 +2697,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules)
+        {
+            return m_LSL_Functions.llGetEnvironment(position, rules);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no, LSL_Integer day_length, LSL_Integer day_offset)
+        {
+            return m_LSL_Functions.llReplaceEnvironment(position, environment, track_no, day_length, day_offset);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetEnvironment(LSL_Vector position, LSL_List parameters)
+        {
+            return m_LSL_Functions.llSetEnvironment(position, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_List llJson2List(LSL_String json)
         {
             return m_LSL_Functions.llJson2List(json);
