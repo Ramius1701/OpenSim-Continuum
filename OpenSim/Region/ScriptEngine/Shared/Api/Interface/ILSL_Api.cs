@@ -127,6 +127,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
           LSL_List llGetAgentList(LSL_Integer scope, LSL_List options);
         LSL_Integer llReturnObjectsByID(LSL_List objects);
         LSL_Integer llReturnObjectsByOwner(LSL_Key owner, LSL_Integer scope);
+        LSL_Integer llSetGroundTexture(LSL_List changes);
         LSL_Vector llGetAgentSize(LSL_Key id);
          LSL_Float llGetAlpha(int face);
          LSL_Float llGetAndResetTime();

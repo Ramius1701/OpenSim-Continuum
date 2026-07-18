@@ -59,6 +59,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
+using FrameworkRegionSettings = OpenSim.Framework.RegionSettings;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -5167,6 +5168,114 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         // SetOwner/PropagatePermissions/ApplyNextOwnerPermissions path
         // used elsewhere in core for ownership changes (e.g. BuySellModule),
         // rather than inventing new permission-transfer logic.
+        // llSetGroundTexture and helpers, ported from GuntharDeNiro/opensim
+        // - a real SL function letting an estate owner/manager script set
+        // terrain layer textures and per-corner height ranges via
+        // IEstateModule, the same interface the estate GUI itself uses.
+        private static UUID DefaultGroundTextureID(int layer)
+        {
+            return layer switch
+            {
+                0 => FrameworkRegionSettings.DEFAULT_TERRAIN_TEXTURE_1,
+                1 => FrameworkRegionSettings.DEFAULT_TERRAIN_TEXTURE_2,
+                2 => FrameworkRegionSettings.DEFAULT_TERRAIN_TEXTURE_3,
+                3 => FrameworkRegionSettings.DEFAULT_TERRAIN_TEXTURE_4,
+                _ => UUID.Zero
+            };
+        }
+
+        private UUID ResolveGroundTextureID(string texture, int layer)
+        {
+            if (string.IsNullOrEmpty(texture) || texture == ScriptBaseClass.NULL_KEY)
+                return DefaultGroundTextureID(layer);
+
+            UUID textureID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, texture);
+            return textureID;
+        }
+
+        public LSL_Integer llSetGroundTexture(LSL_List changes)
+        {
+            if (changes is null || changes.Length == 0)
+                return 0;
+
+            if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false))
+            {
+                Error("llSetGroundTexture", "Script owner must be estate owner or estate manager");
+                return 0;
+            }
+
+            IEstateModule estate = World.RequestModuleInterface<IEstateModule>();
+            if (estate is null)
+                return 0;
+
+            List<UUID> terrainIDs = new()
+            {
+                World.RegionInfo.RegionSettings.TerrainTexture1,
+                World.RegionInfo.RegionSettings.TerrainTexture2,
+                World.RegionInfo.RegionSettings.TerrainTexture3,
+                World.RegionInfo.RegionSettings.TerrainTexture4
+            };
+
+            bool textureChanged = false;
+            int i = 0;
+            while (i < changes.Length)
+            {
+                int op = changes.GetLSLIntegerItem(i++);
+                if (op >= ScriptBaseClass.TERRAIN_DETAIL_1 && op <= ScriptBaseClass.TERRAIN_DETAIL_4)
+                {
+                    if (i >= changes.Length)
+                        break;
+
+                    UUID textureID = ResolveGroundTextureID(changes.GetStrictLSLStringItem(i++), op);
+                    terrainIDs[op] = textureID;
+                    textureChanged = true;
+                    continue;
+                }
+
+                int corner = -1;
+                switch (op)
+                {
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_SW:
+                        corner = 0;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_SE:
+                        corner = 2;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_NW:
+                        corner = 1;
+                        break;
+                    case ScriptBaseClass.TERRAIN_HEIGHT_RANGE_NE:
+                        corner = 3;
+                        break;
+                }
+
+                if (corner >= 0)
+                {
+                    if (i + 1 >= changes.Length)
+                        break;
+
+                    float low = (float)changes.GetLSLFloatItem(i++);
+                    float high = (float)changes.GetLSLFloatItem(i++);
+                    estate.setEstateTerrainTextureHeights(corner, low, high);
+                    continue;
+                }
+
+                if (op >= ScriptBaseClass.TERRAIN_PBR_SCALE_1 && op <= ScriptBaseClass.TERRAIN_PBR_OFFSET_4)
+                {
+                    // OpenSim's current terrain settings persist PBR material IDs, but not per-layer UV transforms.
+                    i++;
+                    continue;
+                }
+
+                break;
+            }
+
+            if (textureChanged)
+                estate.SetEstateTerrainTextures(terrainIDs, 2);
+
+            return 0;
+        }
+
         private static void RemoveTaskInventoryWithoutPermission(SceneObjectGroup group, PermissionMask requiredPermission)
         {
             if (group is null)
