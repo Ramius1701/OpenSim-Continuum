@@ -4539,6 +4539,26 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+        // Real SL function, ported from GuntharDeNiro/opensim. Sets the
+        // rotation of an agent who has granted PERMISSION_TRIGGER_ANIMATION
+        // to this script (the same permission llSetAgentRot uses in SL).
+        public void llSetAgentRot(LSL_Rotation rot, LSL_Integer flags)
+        {
+            if (m_item.PermsGranter.IsZero())
+                return;
+
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_TRIGGER_ANIMATION) == 0)
+                return;
+
+            ScenePresence presence = World.GetScenePresence(m_item.PermsGranter);
+            if (presence is null || presence.IsChildAgent || presence.ParentPart is not null)
+                return;
+
+            double yaw = llRot2Euler(rot).z;
+            presence.Rotation = llEuler2Rot(new LSL_Vector(0, 0, yaw));
+            presence.SendAvatarDataToAllAgents();
+        }
+
         public void llStartObjectAnimation(string anim)
         {
             // Do NOT try to parse UUID, animations cannot be triggered by ID
@@ -5138,6 +5158,151 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             // TODO: figure out real energy value
             return 1.0f;
+        }
+
+        // llTransferOwnership and its helpers, ported from GuntharDeNiro/
+        // opensim - a real SL function that gives/transfers an object's
+        // ownership directly to a target avatar (optionally copying or
+        // taking it into their inventory), following the same
+        // SetOwner/PropagatePermissions/ApplyNextOwnerPermissions path
+        // used elsewhere in core for ownership changes (e.g. BuySellModule),
+        // rather than inventing new permission-transfer logic.
+        private static void RemoveTaskInventoryWithoutPermission(SceneObjectGroup group, PermissionMask requiredPermission)
+        {
+            if (group is null)
+                return;
+
+            foreach (SceneObjectPart part in group.Parts)
+            {
+                List<UUID> remove = new();
+                foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+                {
+                    if ((item.CurrentPermissions & (uint)requiredPermission) == 0)
+                        remove.Add(item.ItemID);
+                }
+
+                foreach (UUID itemID in remove)
+                    part.Inventory.RemoveInventoryItem(itemID);
+            }
+        }
+
+        private void ApplyTransferredOwner(SceneObjectGroup group, ScenePresence target, bool preserveHostScriptPermissions, UUID previousOwner)
+        {
+            UUID permsGranter = UUID.Zero;
+            int permsMask = 0;
+            if (preserveHostScriptPermissions)
+            {
+                permsGranter = m_item.PermsGranter;
+                permsMask = m_item.PermsMask;
+            }
+
+            if (previousOwner.NotEqual(target.UUID))
+                RemoveTaskInventoryWithoutPermission(group, PermissionMask.Transfer);
+
+            group.SetOwner(target.UUID, target.ControllingClient.ActiveGroupId);
+
+            if (World.Permissions.PropagatePermissions())
+            {
+                foreach (SceneObjectPart child in group.Parts)
+                {
+                    child.Inventory.ChangeInventoryOwner(target.UUID);
+                    child.TriggerScriptChangedEvent(Changed.OWNER);
+                    child.ApplyNextOwnerPermissions();
+                }
+                group.InvalidateEffectivePerms();
+            }
+
+            if (preserveHostScriptPermissions)
+            {
+                m_item.PermsMask = permsMask;
+                m_item.PermsGranter = permsGranter;
+            }
+        }
+
+        public LSL_Integer llTransferOwnership(LSL_Key agent_id, LSL_Integer flags, LSL_List options)
+        {
+            if (options is not null && options.Length > 0)
+                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+
+            int knownFlags = ScriptBaseClass.TRANSFER_FLAG_RESERVED |
+                    ScriptBaseClass.TRANSFER_FLAG_TAKE |
+                    ScriptBaseClass.TRANSFER_FLAG_COPY;
+
+            if ((flags.value & ~knownFlags) != 0 || (flags.value & ScriptBaseClass.TRANSFER_FLAG_RESERVED) != 0)
+                return ScriptBaseClass.TRANSFER_BAD_OPTS;
+
+            if (!UUID.TryParse(agent_id, out UUID agentID) || agentID.IsZero())
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            if (!World.TryGetScenePresence(agentID, out ScenePresence target) || target.IsChildAgent || target.ControllingClient is null)
+                return ScriptBaseClass.TRANSFER_NO_TARGET;
+
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group is null || group.IsDeleted)
+                return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+            if (group.IsAttachment)
+                return ScriptBaseClass.TRANSFER_NO_ATTACHMENT;
+
+            uint effectivePerms = group.EffectiveOwnerPerms;
+            if ((effectivePerms & (uint)PermissionMask.Transfer) == 0)
+                return ScriptBaseClass.TRANSFER_NO_PERMS;
+
+            bool copyToInventory = (flags.value & ScriptBaseClass.TRANSFER_FLAG_COPY) != 0;
+            bool takeToInventory = (flags.value & ScriptBaseClass.TRANSFER_FLAG_TAKE) != 0;
+            if (copyToInventory && (effectivePerms & (uint)PermissionMask.Copy) == 0)
+                return ScriptBaseClass.TRANSFER_NO_PERMS;
+
+            if (!copyToInventory && !takeToInventory && target.UUID.Equals(group.OwnerID))
+                return ScriptBaseClass.TRANSFER_OK;
+
+            if (copyToInventory || takeToInventory)
+            {
+                IInventoryAccessModule invAccess = World.RequestModuleInterface<IInventoryAccessModule>();
+                if (invAccess is null)
+                    return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+                if (copyToInventory)
+                {
+                    SceneObjectGroup copy = group.Copy(true);
+                    UUID originalOwner = group.OwnerID;
+                    ApplyTransferredOwner(copy, target, false, originalOwner);
+
+                    List<InventoryItemBase> copiedItems = invAccess.CopyToInventory(
+                            DeRezAction.TakeCopy,
+                            UUID.Zero,
+                            new List<SceneObjectGroup> { copy },
+                            target.ControllingClient,
+                            false);
+
+                    if (copiedItems is null || copiedItems.Count == 0 || copiedItems[0] is null)
+                        return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+                    if (target.UUID.NotEqual(originalOwner))
+                        RemoveTaskInventoryWithoutPermission(group, PermissionMask.Copy);
+
+                    if (!takeToInventory)
+                        return ScriptBaseClass.TRANSFER_OK;
+                }
+
+                SceneObjectGroup takeCopy = group.Copy(true);
+                ApplyTransferredOwner(takeCopy, target, false, group.OwnerID);
+                List<InventoryItemBase> takenItems = invAccess.CopyToInventory(
+                        DeRezAction.Take,
+                        UUID.Zero,
+                        new List<SceneObjectGroup> { takeCopy },
+                        target.ControllingClient,
+                        false);
+
+                if (takenItems is null || takenItems.Count == 0 || takenItems[0] is null)
+                    return ScriptBaseClass.TRANSFER_NO_ITEMS;
+
+                World.DeleteSceneObject(group, false);
+                return ScriptBaseClass.TRANSFER_OK;
+            }
+
+            ApplyTransferredOwner(group, target, true, group.OwnerID);
+            return ScriptBaseClass.TRANSFER_OK;
         }
 
         public void llGiveInventory(LSL_Key destination, LSL_String inventory)
