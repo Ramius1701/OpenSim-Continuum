@@ -2973,6 +2973,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetLinkGLTFOverrides(LSL_Integer linknum, LSL_Integer lsl_face, LSL_List overrides)
+        {
+            m_LSL_Functions.llSetLinkGLTFOverrides(linknum, lsl_face, overrides);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llSetLinkRenderMaterial(LSL_Integer linknum, LSL_String materialstr, LSL_Integer lsl_face)
         {
             m_LSL_Functions.llSetLinkRenderMaterial(linknum, materialstr, lsl_face);
