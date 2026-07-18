@@ -315,6 +315,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDetectedRezzer(int number)
+        {
+            return m_LSL_Functions.llDetectedRezzer(number);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llDetectedDamage(LSL_Integer number)
+        {
+            return m_LSL_Functions.llDetectedDamage(number);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Integer llDetectedType(int number)
         {
             return m_LSL_Functions.llDetectedType(number);
@@ -2016,6 +2028,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llSetDamage(double damage)
         {
             m_LSL_Functions.llSetDamage(damage);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llDamage(LSL_Key target, LSL_Float damage, LSL_Integer damage_type)
+        {
+            m_LSL_Functions.llDamage(target, damage, damage_type);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llAdjustDamage(LSL_Integer number, LSL_Float damage)
+        {
+            m_LSL_Functions.llAdjustDamage(number, damage);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llAdjustDamage(LSL_Float damage)
+        {
+            m_LSL_Functions.llAdjustDamage(damage);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
