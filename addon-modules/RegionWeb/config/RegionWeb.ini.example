@@ -1,0 +1,49 @@
+; RegionWeb - per-region homepage/blog/LSL-docs, ported from
+; GuntharDeNiro/opensim as a standalone addon-module.
+;
+; The Currency/PayPal wallet system that originally lived inside this same
+; module has been split out into a separate RegionCurrency addon-module
+; (own login, own config) - see addon-modules/RegionCurrency/ instead.
+;
+; Picked up automatically via the addon-modules Include-modules glob in
+; OpenSimDefaults.ini.
+
+[RegionWeb]
+    ; Master switch. Off by default.
+    Enabled = false
+
+    ; Public HTTP path this module serves on.
+    PublicPath = /regionweb
+
+    ; Folder (relative to the bin/ directory, or absolute) holding
+    ; per-region content: profile.ini, posts, media images.
+    ContentDirectory = RegionWeb
+
+    ; Auto-generate a starter profile.ini/first blog post for each region
+    ; and the top-level estate page if they don't exist yet.
+    AutoCreateContent = true
+
+    ; Estate-level page display options.
+    ShowMap = true
+    ShowStats = true
+    ShowParcels = true
+    PostsPerPage = 5
+
+    ; Estate title shown in the nav bar and page titles.
+    EstateTitle = My OpenSim Estate
+
+    ; Optional: if you've also deployed the separate RegionCurrency
+    ; addon-module (its own login, own config - see
+    ; addon-modules/RegionCurrency/), point this at its public path so the
+    ; region economy stats section shows an "Open avatar wallet" link.
+    ; Left blank (no link shown) by default since RegionWeb has no way to
+    ; know whether RegionCurrency is installed.
+    ; CurrencyPortalUrl = /currency/
+
+    ; Inventory-backed image carousel (region owners drop snapshots into an
+    ; in-world inventory folder; they show up as a homepage carousel).
+    InventoryCarouselEnabled = true
+    InventoryCarouselFolder = RegionWeb Carousel
+    RegionInventoryCarouselFolderTemplate = RegionWeb {RegionName} Carousel
+    InventoryCarouselLimit = 12
+    InventoryCarouselCacheSeconds = 300
