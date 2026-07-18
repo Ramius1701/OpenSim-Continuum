@@ -477,6 +477,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetGroundTexture(LSL_List changes)
+        {
+            return m_LSL_Functions.llSetGroundTexture(changes);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Vector llGetAgentSize(LSL_Key id)
         {
             return m_LSL_Functions.llGetAgentSize(id);
