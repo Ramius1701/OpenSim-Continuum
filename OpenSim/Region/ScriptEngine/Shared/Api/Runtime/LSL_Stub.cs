@@ -2709,6 +2709,114 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llRequestExperiencePermissions(string agent, string experience)
+        {
+            m_LSL_Functions.llRequestExperiencePermissions(agent, experience);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llReleaseExperiencePermissions(string agent)
+        {
+            m_LSL_Functions.llReleaseExperiencePermissions(agent);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llIsExperienceTrusted()
+        {
+            return m_LSL_Functions.llIsExperienceTrusted();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llGetExperiencePermissions()
+        {
+            return m_LSL_Functions.llGetExperiencePermissions();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llExperienceCanAutoGrant(int permissions)
+        {
+            return m_LSL_Functions.llExperienceCanAutoGrant(permissions);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llAgentInExperience(string agent)
+        {
+            return m_LSL_Functions.llAgentInExperience(agent);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetExperienceDetails(string experienceID)
+        {
+            return m_LSL_Functions.llGetExperienceDetails(experienceID);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llOpenFloater(LSL_String floater_name, LSL_String url, LSL_List parameters)
+        {
+            return m_LSL_Functions.llOpenFloater(floater_name, url, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSitOnLink(string agent, int link)
+        {
+            return m_LSL_Functions.llSitOnLink(agent, link);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_String llGetExperienceErrorMessage(int error)
+        {
+            return m_LSL_Functions.llGetExperienceErrorMessage(error);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llCreateKeyValue(string key, string value)
+        {
+            return m_LSL_Functions.llCreateKeyValue(key, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llReadKeyValue(string key)
+        {
+            return m_LSL_Functions.llReadKeyValue(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue)
+        {
+            return m_LSL_Functions.llUpdateKeyValue(key, value, checkedUpdate, originalValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDeleteKeyValue(string key)
+        {
+            return m_LSL_Functions.llDeleteKeyValue(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llKeyCountKeyValue()
+        {
+            return m_LSL_Functions.llKeyCountKeyValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llKeysKeyValue(int first, int count)
+        {
+            return m_LSL_Functions.llKeysKeyValue(first, count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDataSizeKeyValue()
+        {
+            return m_LSL_Functions.llDataSizeKeyValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetExperienceKeyValueStoreStats()
+        {
+            return m_LSL_Functions.llGetExperienceKeyValueStoreStats();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llCreateCharacter(LSL_List options)
         {
             m_LSL_Functions.llCreateCharacter(options);
