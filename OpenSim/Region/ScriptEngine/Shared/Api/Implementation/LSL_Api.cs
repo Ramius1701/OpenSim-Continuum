@@ -2807,6 +2807,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return DateTime.Now.TimeOfDay.TotalSeconds;
         }
 
+        // Real SL function, ported from GuntharDeNiro/opensim. Returns the
+        // in-world time of day (seconds since midnight region time),
+        // driven by the EEP environment module's day-cycle length when
+        // available, falling back to llGetTimeOfDay's older sun-position
+        // based calculation otherwise.
+        public LSL_Float llGetRegionTimeOfDay()
+        {
+            if (m_envModule != null)
+                return m_envModule.GetRegionDayFractionTime() * m_envModule.GetRegionDayLength();
+
+            return llGetTimeOfDay();
+        }
+
         public LSL_Float llGetTime()
         {
             double ScriptTime = Util.GetTimeStamp() - m_timer;
