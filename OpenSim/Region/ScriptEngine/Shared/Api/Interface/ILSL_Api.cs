@@ -497,6 +497,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_String llGetAnimationOverride(LSL_String anim_state);
         LSL_String llJsonGetValue(LSL_String json, LSL_List specifiers);
           LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules);
+          LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment);
+          LSL_Integer llSetAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_List parameters);
           LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no, LSL_Integer day_length, LSL_Integer day_offset);
 
           void llRequestExperiencePermissions(string agent, string experience);
