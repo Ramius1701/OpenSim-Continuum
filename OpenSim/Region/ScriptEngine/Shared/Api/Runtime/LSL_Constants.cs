@@ -1167,5 +1167,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int TERRAIN_PBR_OFFSET_2 = 17;
         public const int TERRAIN_PBR_OFFSET_3 = 18;
         public const int TERRAIN_PBR_OFFSET_4 = 19;
+
+        // llSetParcelForSale constants, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int PERMISSION_PRIVILEGED_LAND_ACCESS = 0x80000;
+        public const int PARCEL_SALE_PRICE = 1;
+        public const int PARCEL_SALE_AGENT = 2;
+        public const int PARCEL_SALE_OBJECTS = 3;
+
+        public const int PARCEL_SALE_OK = 0;
+        public const int PARCEL_SALE_ERROR_NO_PARCEL = 1;
+        public const int PARCEL_SALE_ERROR_NO_PERMISSIONS = 2;
+        public const int PARCEL_SALE_ERROR_IN_ESCROW = 3;
+        public const int PARCEL_SALE_ERROR_INVALID_PRICE = 4;
+        public const int PARCEL_SALE_ERROR_BAD_PARAMS = 5;
     }
 }

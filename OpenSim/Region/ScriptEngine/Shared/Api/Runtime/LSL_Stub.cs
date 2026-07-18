@@ -873,6 +873,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetParcelForSale(LSL_Integer forSale, LSL_List options)
+        {
+            return m_LSL_Functions.llSetParcelForSale(forSale, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_String llGetParcelMusicURL()
         {
             return m_LSL_Functions.llGetParcelMusicURL();
@@ -1500,6 +1506,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llMoveToTarget(LSL_Vector target, double tau)
         {
             m_LSL_Functions.llMoveToTarget(target, tau);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llMatchGroup(LSL_Key avatar, LSL_List group_keys)
+        {
+            return m_LSL_Functions.llMatchGroup(avatar, group_keys);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
