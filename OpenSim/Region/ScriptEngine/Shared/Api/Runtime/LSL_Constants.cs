@@ -1311,5 +1311,41 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int WATER_REFRACTION = 105;
         public const int WATER_WAVE_DIRECTION = 106;
         public const int WATER_NORMAL_TEXTURE = 107;
+
+        // Pathfinding constants, ported from GuntharDeNiro/opensim (real
+        // SL constants).
+        public const int CHARACTER_TYPE_A = 0;
+        public const int CHARACTER_DESIRED_SPEED = 1;
+        public const int CHARACTER_RADIUS = 2;
+        public const int CHARACTER_LENGTH = 3;
+        public const int CHARACTER_AVOIDANCE_MODE = 5;
+        public const int CHARACTER_TYPE = 6;
+        public const int CHARACTER_MAX_ACCEL = 8;
+        public const int CHARACTER_MAX_DECEL = 9;
+        public const int CHARACTER_MAX_TURN_RADIUS = 10;
+        public const int CHARACTER_DESIRED_TURN_SPEED = 12;
+        public const int CHARACTER_MAX_SPEED = 13;
+        public const int CHARACTER_ACCOUNT_FOR_SKIPPED_FRAMES = 14;
+        public const int CHARACTER_STAY_WITHIN_PARCEL = 15;
+
+        public const int CHARACTER_CMD_STOP = 0x00;
+        public const int CHARACTER_CMD_JUMP = 0x01;
+        public const int CHARACTER_CMD_SMOOTH_STOP = 0x02;
+
+        public const int AVOID_CHARACTERS = 1;
+        public const int AVOID_DYNAMIC_OBSTACLES = 2;
+
+        public const int FORCE_DIRECT_PATH = 1;
+        public const int REQUIRE_LINE_OF_SIGHT = 2;
+
+        public const int PU_GOAL_REACHED = 0x01;
+        public const int PU_FAILURE_INVALID_START = 0x02;
+        public const int PU_FAILURE_INVALID_GOAL = 0x03;
+        public const int PU_FAILURE_UNREACHABLE = 0x04;
+        public const int PU_FAILURE_TARGET_GONE = 0x05;
+        public const int PU_FAILURE_NO_VALID_DESTINATION = 0x06;
+        public const int PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED = 0x0A;
+        public const int PU_FAILURE_PARCEL_UNREACHABLE = 0x0B;
+        public const int PU_FAILURE_OTHER = 0xF4240;
     }
 }

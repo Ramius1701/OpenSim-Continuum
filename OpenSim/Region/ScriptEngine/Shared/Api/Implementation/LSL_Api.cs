@@ -21618,6 +21618,1355 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+        // Pathfinding subsystem, ported from GuntharDeNiro/opensim - real
+        // SL pathfinding functions (character objects navigating via a
+        // baked-per-region navmesh grid + A* search + simple axis-aligned
+        // obstacle avoidance, not a full 3D navmesh library). Built
+        // entirely on existing terrain/scene query APIs (GetGroundHeight,
+        // ForEachSOG, ForEachRootScenePresence, GetAxisAlignedBoundingBoxRaw)
+        // rather than requiring new physics-engine integration.
+        private const float NavCellSize = 2.0f;
+        private const float NavMaxStepHeight = 1.75f;
+        private const int NavMaxVisitedCells = 18000;
+        private const double NavBakeMaxAgeSeconds = 30.0;
+        private static readonly object m_characterNavLock = new();
+        private static readonly Dictionary<UUID, CharacterNavState> m_characterNavStates = new();
+        private static readonly object m_bakedNavMeshLock = new();
+        private static readonly Dictionary<UUID, BakedNavMesh> m_bakedNavMeshes = new();
+
+        private struct NavObstacle
+        {
+            public float MinX;
+            public float MaxX;
+            public float MinY;
+            public float MaxY;
+        }
+
+        private struct NavRequestOptions
+        {
+            public bool ForceDirectPath;
+            public bool RequireLineOfSight;
+        }
+
+        private sealed class BakedNavMesh
+        {
+            public UUID RegionID;
+            public float RegionSizeX;
+            public float RegionSizeY;
+            public float CellSize;
+            public int Width;
+            public int Height;
+            public float MaxX;
+            public float MaxY;
+            public long TerrainSignature;
+            public double BakeTime;
+            public float[] Ground;
+            public bool[] Walkable;
+            public float[] Cost;
+
+            public int TotalCells => Width * Height;
+
+            public int CellX(float x)
+            {
+                return Math.Clamp((int)(Math.Clamp(x, 0f, MaxX) / CellSize), 0, Width - 1);
+            }
+
+            public int CellY(float y)
+            {
+                return Math.Clamp((int)(Math.Clamp(y, 0f, MaxY) / CellSize), 0, Height - 1);
+            }
+
+            public int CellIndex(int cx, int cy)
+            {
+                return cy * Width + cx;
+            }
+
+            public int IndexX(int index)
+            {
+                return index % Width;
+            }
+
+            public int IndexY(int index)
+            {
+                return index / Width;
+            }
+
+            public float CellWorldX(int cx)
+            {
+                return Math.Clamp(cx * CellSize + CellSize * 0.5f, 0f, MaxX);
+            }
+
+            public float CellWorldY(int cy)
+            {
+                return Math.Clamp(cy * CellSize + CellSize * 0.5f, 0f, MaxY);
+            }
+
+            public Vector3 CellPoint(int index, float radius)
+            {
+                float x = CellWorldX(IndexX(index));
+                float y = CellWorldY(IndexY(index));
+                return new Vector3(x, y, Ground[index] + Math.Max(radius, 0.05f));
+            }
+
+            public bool IsWalkable(int cx, int cy)
+            {
+                return cx >= 0 && cy >= 0 && cx < Width && cy < Height && Walkable[CellIndex(cx, cy)];
+            }
+        }
+
+        private sealed class CharacterNavState
+        {
+            public readonly object Sync = new();
+            public bool Created;
+            public float DesiredSpeed = 3f;
+            public float MaxSpeed = 3f;
+            public float Radius = 0.5f;
+            public float Length = 2f;
+            public float MaxAccel = 20f;
+            public float MaxDecel = 20f;
+            public float MaxTurnRadius = 0f;
+            public float DesiredTurnSpeed = 5f;
+            public int AvoidanceMode = ScriptBaseClass.AVOID_DYNAMIC_OBSTACLES;
+            public int CharacterType = ScriptBaseClass.CHARACTER_TYPE_A;
+            public bool AccountForSkippedFrames = true;
+            public bool StayWithinParcel;
+            public UUID MotionID = UUID.Zero;
+            public double LastUpdated = Util.GetTimeStamp();
+        }
+        private bool TryGetDirectNavPoint(LSL_Vector point, float radius, bool clamp, out Vector3 result)
+        {
+            result = Vector3.Zero;
+
+            if (double.IsNaN(point.x) || double.IsNaN(point.y) || double.IsNaN(point.z)
+                || double.IsInfinity(point.x) || double.IsInfinity(point.y) || double.IsInfinity(point.z))
+            {
+                return false;
+            }
+
+            float maxX = Math.Max(0f, World.RegionInfo.RegionSizeX - 0.001f);
+            float maxY = Math.Max(0f, World.RegionInfo.RegionSizeY - 0.001f);
+            float x = (float)point.x;
+            float y = (float)point.y;
+
+            if (!clamp && (x < 0f || y < 0f || x > maxX || y > maxY))
+                return false;
+
+            x = Math.Clamp(x, 0f, maxX);
+            y = Math.Clamp(y, 0f, maxY);
+
+            float terrain = World.GetGroundHeight(x, y);
+            float z = (float)point.z;
+            float groundZ = terrain + Math.Max(radius, 0.05f);
+            if (z < groundZ)
+                z = groundZ;
+
+            result = new Vector3(x, y, z);
+            return true;
+        }
+
+        private static LSL_Vector ToPathLSLVector(Vector3 vector)
+        {
+            return new LSL_Vector(vector.X, vector.Y, vector.Z);
+        }
+
+        private static bool IsIntegerBooleanOptionValue(object value)
+        {
+            if (value is LSL_Integer lslInteger)
+                return lslInteger.value == 0 || lslInteger.value == 1;
+            if (value is int integer)
+                return integer == 0 || integer == 1;
+            return false;
+        }
+
+        private static bool TryGetOptionFloatValue(object value, out float result)
+        {
+            switch (value)
+            {
+                case LSL_Float lslFloat:
+                    result = (float)lslFloat.value;
+                    return true;
+                case LSL_Integer lslInteger:
+                    result = lslInteger.value;
+                    return true;
+                case int integer:
+                    result = integer;
+                    return true;
+                case float single:
+                    result = single;
+                    return true;
+                case double dbl:
+                    result = (float)dbl;
+                    return true;
+                case LSL_String lslString when float.TryParse(lslString.m_string, NumberStyles.Float, CultureInfo.InvariantCulture, out result):
+                    return true;
+                case string str when float.TryParse(str, NumberStyles.Float, CultureInfo.InvariantCulture, out result):
+                    return true;
+                default:
+                    result = 0f;
+                    return false;
+            }
+        }
+
+        private static bool TryGetOptionIntegerValue(object value, out int result)
+        {
+            switch (value)
+            {
+                case LSL_Integer lslInteger:
+                    result = lslInteger.value;
+                    return true;
+                case int integer:
+                    result = integer;
+                    return true;
+                case LSL_Float lslFloat:
+                    result = (int)lslFloat.value;
+                    return true;
+                case float single:
+                    result = (int)single;
+                    return true;
+                case double dbl:
+                    result = (int)dbl;
+                    return true;
+                case LSL_String lslString when int.TryParse(lslString.m_string, NumberStyles.Integer, CultureInfo.InvariantCulture, out result):
+                    return true;
+                case string str when int.TryParse(str, NumberStyles.Integer, CultureInfo.InvariantCulture, out result):
+                    return true;
+                default:
+                    result = 0;
+                    return false;
+            }
+        }
+
+        private CharacterNavState GetCharacterState(bool create)
+        {
+            SceneObjectGroup group = m_host?.ParentGroup;
+            SceneObjectPart root = group?.RootPart;
+            if (root == null)
+                return null;
+
+            lock (m_characterNavLock)
+            {
+                if (!m_characterNavStates.TryGetValue(root.UUID, out CharacterNavState state) && create)
+                {
+                    state = new CharacterNavState();
+                    m_characterNavStates[root.UUID] = state;
+                }
+                return state;
+            }
+        }
+
+        private void RemoveCharacterState()
+        {
+            SceneObjectPart root = m_host?.ParentGroup?.RootPart;
+            if (root == null)
+                return;
+
+            lock (m_characterNavLock)
+                m_characterNavStates.Remove(root.UUID);
+        }
+
+        private static void ApplyCharacterOptions(CharacterNavState state, LSL_List options)
+        {
+            if (state == null || options == null)
+                return;
+
+            lock (state.Sync)
+            {
+                int idx = 0;
+                while (idx < options.Length)
+                {
+                    int option = options.GetIntegerItem(idx++);
+                    if (idx >= options.Length)
+                        break;
+
+                    object value = options.Data[idx++];
+                    switch (option)
+                    {
+                        case ScriptBaseClass.CHARACTER_DESIRED_SPEED:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float desiredSpeed))
+                                state.DesiredSpeed = Math.Max(0.1f, desiredSpeed);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_MAX_SPEED:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float maxSpeed))
+                                state.MaxSpeed = Math.Max(0.1f, maxSpeed);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_RADIUS:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float radius))
+                                state.Radius = Math.Clamp(radius, 0.05f, 32f);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_LENGTH:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float length))
+                                state.Length = Math.Clamp(length, 0.05f, 64f);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_MAX_ACCEL:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float accel))
+                                state.MaxAccel = Math.Max(0.1f, accel);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_MAX_DECEL:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float decel))
+                                state.MaxDecel = Math.Max(0.1f, decel);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_MAX_TURN_RADIUS:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float turnRadius))
+                                state.MaxTurnRadius = Math.Max(0f, turnRadius);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_DESIRED_TURN_SPEED:
+                            if (!IsIntegerBooleanOptionValue(value) && TryGetOptionFloatValue(value, out float turnSpeed))
+                                state.DesiredTurnSpeed = Math.Max(0.1f, turnSpeed);
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_AVOIDANCE_MODE:
+                            if (TryGetOptionIntegerValue(value, out int avoidanceMode))
+                                state.AvoidanceMode = avoidanceMode;
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_TYPE:
+                            if (TryGetOptionIntegerValue(value, out int characterType))
+                                state.CharacterType = characterType;
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_ACCOUNT_FOR_SKIPPED_FRAMES:
+                            if (TryGetOptionIntegerValue(value, out int skippedFrames))
+                                state.AccountForSkippedFrames = skippedFrames != 0;
+                            break;
+
+                        case ScriptBaseClass.CHARACTER_STAY_WITHIN_PARCEL:
+                            if (TryGetOptionIntegerValue(value, out int stayWithinParcel))
+                                state.StayWithinParcel = stayWithinParcel != 0;
+                            break;
+                    }
+                }
+
+                state.Created = true;
+                state.LastUpdated = Util.GetTimeStamp();
+            }
+        }
+
+        private static NavRequestOptions GetNavRequestOptions(LSL_List options)
+        {
+            NavRequestOptions request = new();
+            if (options == null)
+                return request;
+
+            int idx = 0;
+            while (idx < options.Length)
+            {
+                int option = options.GetIntegerItem(idx++);
+                if (idx >= options.Length)
+                    break;
+
+                object value = options.Data[idx++];
+                switch (option)
+                {
+                    case ScriptBaseClass.FORCE_DIRECT_PATH:
+                        if (IsIntegerBooleanOptionValue(value) && TryGetOptionIntegerValue(value, out int forceDirect))
+                            request.ForceDirectPath = forceDirect != 0;
+                        break;
+
+                    case ScriptBaseClass.REQUIRE_LINE_OF_SIGHT:
+                        if (IsIntegerBooleanOptionValue(value) && TryGetOptionIntegerValue(value, out int requireLineOfSight))
+                            request.RequireLineOfSight = requireLineOfSight != 0;
+                        break;
+                }
+            }
+
+            return request;
+        }
+
+        private float GetCharacterSpeed(LSL_List options)
+        {
+            return GetCharacterSpeed(options, GetCharacterState(false));
+        }
+
+        private float GetCharacterSpeed(LSL_List options, CharacterNavState state)
+        {
+            float speed = state != null ? state.DesiredSpeed : 3f;
+            float maxSpeed = state != null ? state.MaxSpeed : speed;
+            int idx = 0;
+
+            while (options != null && idx < options.Length)
+            {
+                int option = options.GetIntegerItem(idx++);
+                if (idx >= options.Length)
+                    break;
+
+                switch (option)
+                {
+                    case ScriptBaseClass.CHARACTER_DESIRED_SPEED:
+                        object speedValue = options.Data[idx++];
+                        if (!IsIntegerBooleanOptionValue(speedValue)
+                            && TryGetOptionFloatValue(speedValue, out float parsedSpeed))
+                        {
+                            speed = Math.Max(0.1f, parsedSpeed);
+                        }
+                        break;
+
+                    case ScriptBaseClass.CHARACTER_MAX_SPEED:
+                        object maxSpeedValue = options.Data[idx++];
+                        if (!IsIntegerBooleanOptionValue(maxSpeedValue)
+                            && TryGetOptionFloatValue(maxSpeedValue, out float parsedMaxSpeed))
+                        {
+                            maxSpeed = Math.Max(0.1f, parsedMaxSpeed);
+                        }
+                        break;
+
+                    default:
+                        idx++;
+                        break;
+                }
+            }
+
+            return Math.Max(0.1f, Math.Min(speed, Math.Max(0.1f, maxSpeed)));
+        }
+
+        private float GetCharacterRadius(LSL_List options)
+        {
+            return GetCharacterRadius(options, GetCharacterState(false));
+        }
+
+        private float GetCharacterRadius(LSL_List options, CharacterNavState state)
+        {
+            float radius = state != null ? state.Radius : 0.5f;
+            int idx = 0;
+
+            while (options != null && idx < options.Length)
+            {
+                int option = options.GetIntegerItem(idx++);
+                if (idx >= options.Length)
+                    break;
+
+                switch (option)
+                {
+                    case ScriptBaseClass.CHARACTER_RADIUS:
+                    case ScriptBaseClass.GCNP_RADIUS:
+                        object radiusValue = options.Data[idx++];
+                        if (!IsIntegerBooleanOptionValue(radiusValue)
+                            && TryGetOptionFloatValue(radiusValue, out float parsedRadius))
+                        {
+                            radius = Math.Max(0.05f, parsedRadius);
+                        }
+                        break;
+
+                    default:
+                        idx++;
+                        break;
+                }
+            }
+
+            return radius;
+        }
+
+        private void PostPathUpdate(LSL_Integer status, LSL_List data)
+        {
+            PostPathUpdate(m_host.LocalId, status, data);
+        }
+
+        private void PostPathUpdate(uint localID, LSL_Integer status, LSL_List data)
+        {
+            m_ScriptEngine.PostObjectEvent(localID, new EventParams(
+                "path_update",
+                new object[]
+                {
+                    status,
+                    data ?? new LSL_List()
+                },
+                Array.Empty<DetectParams>()));
+        }
+
+        private void PostPathFailure(int status)
+        {
+            PostPathUpdate(new LSL_Integer(status), new LSL_List());
+        }
+
+        private List<NavObstacle> BuildNavObstacles(SceneObjectGroup actor, float radius, CharacterNavState state)
+        {
+            List<NavObstacle> obstacles = new();
+            float clearance = Math.Max(radius, 0.15f);
+            int avoidanceMode = state != null ? state.AvoidanceMode : ScriptBaseClass.AVOID_DYNAMIC_OBSTACLES;
+
+            World.ForEachSOG(group =>
+            {
+                if (group == null || group == actor || group.IsDeleted || group.IsAttachment || group.RootPart == null)
+                    return;
+
+                group.GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out float minY, out float maxY, out float minZ, out float maxZ);
+                Vector3 pos = group.AbsolutePosition;
+                float centerX = Math.Clamp(pos.X + (minX + maxX) * 0.5f, 0f, World.RegionInfo.RegionSizeX - 0.001f);
+                float centerY = Math.Clamp(pos.Y + (minY + maxY) * 0.5f, 0f, World.RegionInfo.RegionSizeY - 0.001f);
+                float ground = World.GetGroundHeight(centerX, centerY);
+
+                float absMinZ = pos.Z + minZ;
+                float absMaxZ = pos.Z + maxZ;
+                if (absMaxZ < ground + 0.2f || absMinZ > ground + 3.0f)
+                    return;
+
+                obstacles.Add(new NavObstacle
+                {
+                    MinX = pos.X + minX - clearance,
+                    MaxX = pos.X + maxX + clearance,
+                    MinY = pos.Y + minY - clearance,
+                    MaxY = pos.Y + maxY + clearance
+                });
+            });
+
+            if ((avoidanceMode & ScriptBaseClass.AVOID_CHARACTERS) != 0)
+            {
+                World.ForEachRootScenePresence(presence =>
+                {
+                    if (presence == null || presence.IsDeleted || presence.IsChildAgent || presence.IsInTransit)
+                        return;
+
+                    Vector3 pos = presence.AbsolutePosition;
+                    float agentClearance = Math.Max(clearance, 0.75f);
+                    obstacles.Add(new NavObstacle
+                    {
+                        MinX = pos.X - agentClearance,
+                        MaxX = pos.X + agentClearance,
+                        MinY = pos.Y - agentClearance,
+                        MaxY = pos.Y + agentClearance
+                    });
+                });
+            }
+
+            return obstacles;
+        }
+
+        private bool IsNavPointBlocked(float x, float y, List<NavObstacle> obstacles)
+        {
+            if (x < 0f || y < 0f || x >= World.RegionInfo.RegionSizeX || y >= World.RegionInfo.RegionSizeY)
+                return true;
+
+            foreach (NavObstacle obstacle in obstacles)
+            {
+                if (x >= obstacle.MinX && x <= obstacle.MaxX && y >= obstacle.MinY && y <= obstacle.MaxY)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool HasNavLineOfSight(Vector3 start, Vector3 goal, float radius, List<NavObstacle> obstacles)
+        {
+            Vector3 delta = goal - start;
+            float distance = delta.Length();
+            int steps = Math.Max(1, (int)Math.Ceiling(distance / Math.Max(0.5f, NavCellSize * 0.5f)));
+            float previousGround = World.GetGroundHeight(start.X, start.Y);
+
+            for (int i = 0; i <= steps; ++i)
+            {
+                float t = i / (float)steps;
+                float x = start.X + delta.X * t;
+                float y = start.Y + delta.Y * t;
+                if (IsNavPointBlocked(x, y, obstacles))
+                    return false;
+
+                float ground = World.GetGroundHeight(x, y);
+                if (i > 0 && Math.Abs(ground - previousGround) > NavMaxStepHeight)
+                    return false;
+                previousGround = ground;
+            }
+
+            return true;
+        }
+
+        private List<Vector3> SimplifyNavPath(List<Vector3> rawPath, float radius, List<NavObstacle> obstacles, Func<Vector3, Vector3, bool> hasLineOfSight = null)
+        {
+            if (rawPath.Count <= 2)
+                return rawPath;
+
+            if (hasLineOfSight == null)
+                hasLineOfSight = (a, b) => HasNavLineOfSight(a, b, radius, obstacles);
+
+            List<Vector3> simplified = new();
+            int anchor = 0;
+            simplified.Add(rawPath[0]);
+
+            while (anchor < rawPath.Count - 1)
+            {
+                int next = rawPath.Count - 1;
+                while (next > anchor + 1 && !hasLineOfSight(rawPath[anchor], rawPath[next]))
+                    --next;
+
+                simplified.Add(rawPath[next]);
+                anchor = next;
+            }
+
+            return simplified;
+        }
+
+        private bool TryBuildNavPath(Vector3 start, Vector3 goal, float radius, out List<Vector3> path)
+        {
+            return TryBuildNavPath(start, goal, radius, GetCharacterState(false), new NavRequestOptions(), out path);
+        }
+
+        private long ComputeNavTerrainSignature()
+        {
+            unchecked
+            {
+                long hash = 1469598103934665603L;
+                float sizeX = Math.Max(1f, World.RegionInfo.RegionSizeX);
+                float sizeY = Math.Max(1f, World.RegionInfo.RegionSizeY);
+                int samples = 16;
+
+                hash = (hash * 1099511628211L) ^ World.RegionInfo.RegionID.GetHashCode();
+                hash = (hash * 1099511628211L) ^ (int)Math.Round(sizeX * 10f);
+                hash = (hash * 1099511628211L) ^ (int)Math.Round(sizeY * 10f);
+
+                for (int sy = 0; sy <= samples; ++sy)
+                {
+                    float y = Math.Clamp(sizeY * sy / samples, 0f, sizeY - 0.001f);
+                    for (int sx = 0; sx <= samples; ++sx)
+                    {
+                        float x = Math.Clamp(sizeX * sx / samples, 0f, sizeX - 0.001f);
+                        int quantizedHeight = (int)Math.Round(World.GetGroundHeight(x, y) * 100f);
+                        hash = (hash * 1099511628211L) ^ quantizedHeight;
+                    }
+                }
+
+                return hash;
+            }
+        }
+
+        private BakedNavMesh GetBakedNavMesh()
+        {
+            UUID regionID = World.RegionInfo.RegionID;
+            float regionSizeX = World.RegionInfo.RegionSizeX;
+            float regionSizeY = World.RegionInfo.RegionSizeY;
+            long terrainSignature = ComputeNavTerrainSignature();
+            double now = Util.GetTimeStamp();
+
+            lock (m_bakedNavMeshLock)
+            {
+                if (m_bakedNavMeshes.TryGetValue(regionID, out BakedNavMesh cached)
+                    && cached.RegionSizeX == regionSizeX
+                    && cached.RegionSizeY == regionSizeY
+                    && cached.CellSize == NavCellSize
+                    && cached.TerrainSignature == terrainSignature
+                    && now - cached.BakeTime <= NavBakeMaxAgeSeconds)
+                {
+                    return cached;
+                }
+            }
+
+            BakedNavMesh baked = BakeNavMesh(regionID, regionSizeX, regionSizeY, terrainSignature);
+
+            lock (m_bakedNavMeshLock)
+                m_bakedNavMeshes[regionID] = baked;
+
+            return baked;
+        }
+
+        private BakedNavMesh BakeNavMesh(UUID regionID, float regionSizeX, float regionSizeY, long terrainSignature)
+        {
+            BakedNavMesh mesh = new BakedNavMesh
+            {
+                RegionID = regionID,
+                RegionSizeX = regionSizeX,
+                RegionSizeY = regionSizeY,
+                CellSize = NavCellSize,
+                Width = Math.Max(1, (int)Math.Ceiling(regionSizeX / NavCellSize)),
+                Height = Math.Max(1, (int)Math.Ceiling(regionSizeY / NavCellSize)),
+                MaxX = Math.Max(0f, regionSizeX - 0.001f),
+                MaxY = Math.Max(0f, regionSizeY - 0.001f),
+                TerrainSignature = terrainSignature,
+                BakeTime = Util.GetTimeStamp()
+            };
+
+            int total = mesh.TotalCells;
+            mesh.Ground = new float[total];
+            mesh.Walkable = new bool[total];
+            mesh.Cost = new float[total];
+
+            for (int cy = 0; cy < mesh.Height; ++cy)
+            {
+                for (int cx = 0; cx < mesh.Width; ++cx)
+                {
+                    int index = mesh.CellIndex(cx, cy);
+                    mesh.Ground[index] = World.GetGroundHeight(mesh.CellWorldX(cx), mesh.CellWorldY(cy));
+                    mesh.Walkable[index] = !float.IsNaN(mesh.Ground[index]) && !float.IsInfinity(mesh.Ground[index]);
+                    mesh.Cost[index] = 1f;
+                }
+            }
+
+            for (int cy = 0; cy < mesh.Height; ++cy)
+            {
+                for (int cx = 0; cx < mesh.Width; ++cx)
+                {
+                    int index = mesh.CellIndex(cx, cy);
+                    if (!mesh.Walkable[index])
+                        continue;
+
+                    float maxDelta = 0f;
+                    for (int oy = -1; oy <= 1; ++oy)
+                    {
+                        for (int ox = -1; ox <= 1; ++ox)
+                        {
+                            if (ox == 0 && oy == 0)
+                                continue;
+
+                            int nx = cx + ox;
+                            int ny = cy + oy;
+                            if (nx < 0 || ny < 0 || nx >= mesh.Width || ny >= mesh.Height)
+                                continue;
+
+                            int neighbor = mesh.CellIndex(nx, ny);
+                            if (!mesh.Walkable[neighbor])
+                                continue;
+
+                            maxDelta = Math.Max(maxDelta, Math.Abs(mesh.Ground[index] - mesh.Ground[neighbor]));
+                        }
+                    }
+
+                    mesh.Cost[index] = 1f + Math.Min(6f, maxDelta / Math.Max(0.1f, NavMaxStepHeight));
+                }
+            }
+
+            return mesh;
+        }
+
+        private bool TryBuildNavPath(Vector3 start, Vector3 goal, float radius, CharacterNavState state, NavRequestOptions request, out List<Vector3> path)
+        {
+            path = new List<Vector3>();
+            BakedNavMesh navMesh = GetBakedNavMesh();
+            List<NavObstacle> obstacles = BuildNavObstacles(m_host.ParentGroup, radius, state);
+            float maxStepHeight = NavMaxStepHeight;
+            bool stayWithinParcel = false;
+            ILandObject sourceParcel = null;
+
+            if (state != null)
+            {
+                lock (state.Sync)
+                    stayWithinParcel = state.StayWithinParcel;
+
+                if (stayWithinParcel)
+                    sourceParcel = World.LandChannel?.GetLandObject(start.X, start.Y);
+            }
+
+            bool IsAllowedParcel(float x, float y)
+            {
+                if (!stayWithinParcel || sourceParcel == null)
+                    return true;
+
+                ILandObject parcel = World.LandChannel?.GetLandObject(x, y);
+                return parcel != null && parcel.LocalID == sourceParcel.LocalID;
+            }
+
+            bool IsWalkable(int cx, int cy)
+            {
+                if (!navMesh.IsWalkable(cx, cy))
+                    return false;
+
+                float x = navMesh.CellWorldX(cx);
+                float y = navMesh.CellWorldY(cy);
+                return IsAllowedParcel(x, y) && !IsNavPointBlocked(x, y, obstacles);
+            }
+
+            bool HasAllowedLineOfSight(Vector3 lineStart, Vector3 lineGoal)
+            {
+                if (!HasNavLineOfSight(lineStart, lineGoal, radius, obstacles))
+                    return false;
+
+                if (!stayWithinParcel || sourceParcel == null)
+                    return true;
+
+                Vector3 delta = lineGoal - lineStart;
+                int steps = Math.Max(1, (int)Math.Ceiling(delta.Length() / Math.Max(0.5f, NavCellSize * 0.5f)));
+                for (int i = 0; i <= steps; ++i)
+                {
+                    float t = i / (float)steps;
+                    if (!IsAllowedParcel(lineStart.X + delta.X * t, lineStart.Y + delta.Y * t))
+                        return false;
+                }
+
+                return true;
+            }
+
+            bool TryFindNearestWalkableCell(int cx, int cy, int maxRadius, out int index)
+            {
+                if (IsWalkable(cx, cy))
+                {
+                    index = navMesh.CellIndex(cx, cy);
+                    return true;
+                }
+
+                for (int r = 1; r <= maxRadius; ++r)
+                {
+                    for (int y = cy - r; y <= cy + r; ++y)
+                    {
+                        for (int x = cx - r; x <= cx + r; ++x)
+                        {
+                            if (Math.Abs(x - cx) != r && Math.Abs(y - cy) != r)
+                                continue;
+
+                            if (IsWalkable(x, y))
+                            {
+                                index = navMesh.CellIndex(x, y);
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                index = -1;
+                return false;
+            }
+
+            Vector3 CellPoint(int index)
+            {
+                return navMesh.CellPoint(index, radius);
+            }
+
+            int startCx = navMesh.CellX(start.X);
+            int startCy = navMesh.CellY(start.Y);
+            int goalCx = navMesh.CellX(goal.X);
+            int goalCy = navMesh.CellY(goal.Y);
+
+            if (!TryFindNearestWalkableCell(startCx, startCy, 2, out int startIndex))
+                return false;
+
+            if (!TryFindNearestWalkableCell(goalCx, goalCy, 12, out int goalIndex))
+                return false;
+
+            if (startIndex != navMesh.CellIndex(startCx, startCy))
+                start = CellPoint(startIndex);
+            if (goalIndex != navMesh.CellIndex(goalCx, goalCy))
+                goal = CellPoint(goalIndex);
+
+            bool directLineOfSight = HasAllowedLineOfSight(start, goal);
+            if ((request.ForceDirectPath || request.RequireLineOfSight) && !directLineOfSight)
+                return false;
+
+            if (directLineOfSight)
+            {
+                path.Add(start);
+                path.Add(goal);
+                return true;
+            }
+
+            int total = navMesh.TotalCells;
+            float[] gScore = new float[total];
+            float[] fScore = new float[total];
+            int[] cameFrom = new int[total];
+            bool[] closed = new bool[total];
+            bool[] openSet = new bool[total];
+            List<int> open = new();
+
+            for (int i = 0; i < total; ++i)
+            {
+                gScore[i] = float.MaxValue;
+                fScore[i] = float.MaxValue;
+                cameFrom[i] = -1;
+            }
+
+            float Heuristic(int index)
+            {
+                int dx = navMesh.IndexX(index) - navMesh.IndexX(goalIndex);
+                int dy = navMesh.IndexY(index) - navMesh.IndexY(goalIndex);
+                return MathF.Sqrt(dx * dx + dy * dy) * NavCellSize;
+            }
+
+            gScore[startIndex] = 0f;
+            fScore[startIndex] = Heuristic(startIndex);
+            open.Add(startIndex);
+            openSet[startIndex] = true;
+
+            int[] offsets =
+            {
+                -1, 0, 1, 0, 0, -1, 0, 1,
+                -1, -1, 1, -1, -1, 1, 1, 1
+            };
+
+            int visited = 0;
+            while (open.Count > 0 && visited++ < NavMaxVisitedCells)
+            {
+                int openSlot = 0;
+                int current = open[0];
+                float best = fScore[current];
+                for (int i = 1; i < open.Count; ++i)
+                {
+                    int candidate = open[i];
+                    if (fScore[candidate] < best)
+                    {
+                        current = candidate;
+                        best = fScore[candidate];
+                        openSlot = i;
+                    }
+                }
+
+                open.RemoveAt(openSlot);
+                openSet[current] = false;
+
+                if (current == goalIndex)
+                {
+                    List<Vector3> rawPath = new();
+                    int walk = current;
+                    while (walk >= 0)
+                    {
+                        rawPath.Add(CellPoint(walk));
+                        walk = cameFrom[walk];
+                    }
+                    rawPath.Reverse();
+                    rawPath[0] = start;
+                    rawPath[rawPath.Count - 1] = goal;
+                    path = SimplifyNavPath(rawPath, radius, obstacles, HasAllowedLineOfSight);
+                    return true;
+                }
+
+                closed[current] = true;
+                int currentX = navMesh.IndexX(current);
+                int currentY = navMesh.IndexY(current);
+                float currentGround = navMesh.Ground[current];
+
+                for (int i = 0; i < offsets.Length; i += 2)
+                {
+                    int nx = currentX + offsets[i];
+                    int ny = currentY + offsets[i + 1];
+                    if (!IsWalkable(nx, ny))
+                        continue;
+
+                    int neighbor = navMesh.CellIndex(nx, ny);
+                    if (closed[neighbor])
+                        continue;
+
+                    float neighborGround = navMesh.Ground[neighbor];
+                    float heightDelta = Math.Abs(neighborGround - currentGround);
+                    if (heightDelta > maxStepHeight)
+                        continue;
+
+                    bool diagonal = offsets[i] != 0 && offsets[i + 1] != 0;
+                    float stepCost = diagonal ? NavCellSize * 1.41421356f : NavCellSize;
+                    stepCost *= navMesh.Cost[neighbor];
+                    float tentative = gScore[current] + stepCost + heightDelta * 0.35f;
+                    if (tentative >= gScore[neighbor])
+                        continue;
+
+                    cameFrom[neighbor] = current;
+                    gScore[neighbor] = tentative;
+                    fScore[neighbor] = tentative + Heuristic(neighbor);
+                    if (!openSet[neighbor])
+                    {
+                        open.Add(neighbor);
+                        openSet[neighbor] = true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryGetObstacleFreeNavPoint(LSL_Vector point, float radius, bool clamp, out Vector3 result)
+        {
+            if (!TryGetDirectNavPoint(point, radius, clamp, out result))
+                return false;
+
+            BakedNavMesh navMesh = GetBakedNavMesh();
+            List<NavObstacle> obstacles = BuildNavObstacles(m_host.ParentGroup, radius, GetCharacterState(false));
+            int centerX = navMesh.CellX(result.X);
+            int centerY = navMesh.CellY(result.Y);
+            if (navMesh.IsWalkable(centerX, centerY) && !IsNavPointBlocked(result.X, result.Y, obstacles))
+                return true;
+
+            for (int ring = 1; ring <= 12; ++ring)
+            {
+                for (int cy = centerY - ring; cy <= centerY + ring; ++cy)
+                {
+                    for (int cx = centerX - ring; cx <= centerX + ring; ++cx)
+                    {
+                        if (Math.Abs(cx - centerX) < ring && Math.Abs(cy - centerY) < ring)
+                            continue;
+                        if (!navMesh.IsWalkable(cx, cy))
+                            continue;
+
+                        float sx = navMesh.CellWorldX(cx);
+                        float sy = navMesh.CellWorldY(cy);
+                        if (IsNavPointBlocked(sx, sy, obstacles))
+                            continue;
+
+                        result = navMesh.CellPoint(navMesh.CellIndex(cx, cy), radius);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private bool StartPathMotion(List<Vector3> path, LSL_List options)
+        {
+            CharacterNavState state = GetCharacterState(true);
+            SceneObjectGroup group = m_host.ParentGroup;
+
+            if (group.IsAttachment)
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_NO_VALID_DESTINATION);
+                return false;
+            }
+
+            if (group.RootPart.PhysActor != null && group.RootPart.PhysActor.IsPhysical)
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED);
+                return false;
+            }
+
+            Vector3 current = group.AbsolutePosition;
+            if (path == null || path.Count == 0)
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_NO_VALID_DESTINATION);
+                return false;
+            }
+
+            float speed = GetCharacterSpeed(options, state);
+            List<KeyframeMotion.Keyframe> frames = new();
+            Vector3 finalGoal = path[path.Count - 1];
+            int totalTimeMS = 0;
+
+            for (int i = 1; i < path.Count; ++i)
+            {
+                Vector3 delta = path[i] - current;
+                float distance = delta.Length();
+                if (distance <= 0.05f)
+                {
+                    current = path[i];
+                    continue;
+                }
+
+                frames.Add(new KeyframeMotion.Keyframe
+                {
+                    Position = delta,
+                    Rotation = null,
+                    TimeMS = (int)(Math.Max(0.2f, distance / speed) * 1000f)
+                });
+                totalTimeMS += frames[frames.Count - 1].TimeMS;
+                current = path[i];
+            }
+
+            if (frames.Count == 0)
+            {
+                PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List(ToPathLSLVector(finalGoal)));
+                return true;
+            }
+
+            group.RootPart.KeyframeMotion?.Delete();
+            group.RootPart.KeyframeMotion = new KeyframeMotion(group, KeyframeMotion.PlayMode.Forward, KeyframeMotion.DataFormat.Translation);
+            group.RootPart.KeyframeMotion.SetKeyframes(frames.ToArray());
+            group.RootPart.KeyframeMotion.Start();
+
+            LSL_List route = new(ToPathLSLVector(finalGoal));
+            for (int i = 1; i < path.Count - 1 && i < 12; ++i)
+                route.Add(ToPathLSLVector(path[i]));
+
+            UUID motionID = UUID.Random();
+            lock (state.Sync)
+            {
+                state.MotionID = motionID;
+                state.LastUpdated = Util.GetTimeStamp();
+            }
+
+            QueuePathCompletion(group.RootPart.LocalId, state, motionID, totalTimeMS, route);
+            return true;
+        }
+
+        private void QueuePathCompletion(uint localID, CharacterNavState state, UUID motionID, int totalTimeMS, LSL_List route)
+        {
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    Thread.Sleep(Math.Max(50, totalTimeMS + 50));
+
+                    lock (state.Sync)
+                    {
+                        if (state.MotionID != motionID)
+                            return;
+
+                        state.MotionID = UUID.Zero;
+                        state.LastUpdated = Util.GetTimeStamp();
+                    }
+
+                    PostPathUpdate(localID, new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), route);
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[LSL]: Pathfinding completion event failed for localID {0}: {1}", localID, e.Message);
+                }
+            });
+        }
+
+        public void llCreateCharacter(LSL_List options)
+        {
+            CharacterNavState state = GetCharacterState(true);
+            ApplyCharacterOptions(state, options);
+            PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List());
+        }
+
+        public void llUpdateCharacter(LSL_List options)
+        {
+            CharacterNavState state = GetCharacterState(true);
+            ApplyCharacterOptions(state, options);
+            PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List());
+        }
+
+        public void llDeleteCharacter()
+        {
+            m_host.ParentGroup.RootPart.KeyframeMotion?.Stop();
+            CharacterNavState state = GetCharacterState(false);
+            if (state != null)
+            {
+                lock (state.Sync)
+                    state.MotionID = UUID.Random();
+            }
+            RemoveCharacterState();
+            PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List());
+        }
+
+        public void llExecCharacterCmd(LSL_Integer command, LSL_List options)
+        {
+            SceneObjectGroup group = m_host.ParentGroup;
+            switch (command.value)
+            {
+                case ScriptBaseClass.CHARACTER_CMD_STOP:
+                case ScriptBaseClass.CHARACTER_CMD_SMOOTH_STOP:
+                    group.RootPart.KeyframeMotion?.Stop();
+                    CharacterNavState state = GetCharacterState(false);
+                    if (state != null)
+                    {
+                        lock (state.Sync)
+                        {
+                            state.MotionID = UUID.Random();
+                            state.LastUpdated = Util.GetTimeStamp();
+                        }
+                    }
+                    PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List());
+                    break;
+
+                case ScriptBaseClass.CHARACTER_CMD_JUMP:
+                    if (!group.IsAttachment && (group.RootPart.PhysActor == null || !group.RootPart.PhysActor.IsPhysical))
+                    {
+                        Vector3 pos = group.AbsolutePosition + new Vector3(0f, 0f, 2f);
+                        group.UpdateGroupPosition(pos);
+                        PostPathUpdate(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED), new LSL_List(ToPathLSLVector(pos)));
+                    }
+                    else
+                    {
+                        PostPathFailure(ScriptBaseClass.PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED);
+                    }
+                    break;
+
+                default:
+                    PostPathFailure(ScriptBaseClass.PU_FAILURE_OTHER);
+                    break;
+            }
+        }
+
+        public void llNavigateTo(LSL_Vector goal, LSL_List options)
+        {
+            CharacterNavState state = GetCharacterState(true);
+            float radius = GetCharacterRadius(options, state);
+            if (!TryGetDirectNavPoint(goal, radius, false, out Vector3 navPoint))
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_INVALID_GOAL);
+                return;
+            }
+
+            bool stayWithinParcel = false;
+            lock (state.Sync)
+                stayWithinParcel = state.StayWithinParcel;
+
+            if (stayWithinParcel)
+            {
+                ILandObject startParcel = World.LandChannel?.GetLandObject(m_host.ParentGroup.AbsolutePosition.X, m_host.ParentGroup.AbsolutePosition.Y);
+                ILandObject goalParcel = World.LandChannel?.GetLandObject(navPoint.X, navPoint.Y);
+                if (startParcel != null && goalParcel != null && startParcel.LocalID != goalParcel.LocalID)
+                {
+                    PostPathFailure(ScriptBaseClass.PU_FAILURE_PARCEL_UNREACHABLE);
+                    return;
+                }
+            }
+
+            if (!TryBuildNavPath(m_host.ParentGroup.AbsolutePosition, navPoint, radius, state, GetNavRequestOptions(options), out List<Vector3> path))
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_UNREACHABLE);
+                return;
+            }
+
+            StartPathMotion(path, options);
+        }
+
+        public void llWanderWithin(LSL_Vector origin, LSL_Vector distance, LSL_List options)
+        {
+            double rx = (Util.RandomClass.NextDouble() * 2.0 - 1.0) * Math.Abs(distance.x);
+            double ry = (Util.RandomClass.NextDouble() * 2.0 - 1.0) * Math.Abs(distance.y);
+            LSL_Vector goal = new(origin.x + rx, origin.y + ry, origin.z);
+            llNavigateTo(goal, options);
+        }
+
+        public void llPatrolPoints(LSL_List patrol_points, LSL_List options)
+        {
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group.IsAttachment || (group.RootPart.PhysActor != null && group.RootPart.PhysActor.IsPhysical))
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED);
+                return;
+            }
+
+            Vector3 current = group.AbsolutePosition;
+            float radius = GetCharacterRadius(options, GetCharacterState(true));
+            List<Vector3> patrolPath = new() { current };
+
+            for (int i = 0; i < patrol_points.Length; ++i)
+            {
+                object item = patrol_points.Data[i];
+                LSL_Vector point;
+                try
+                {
+                    point = item is LSL_Vector v ? v : patrol_points.GetVector3Item(i);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (!TryGetDirectNavPoint(point, radius, false, out Vector3 goal))
+                    continue;
+
+                if (!TryBuildNavPath(current, goal, radius, out List<Vector3> leg) || leg.Count < 2)
+                    continue;
+
+                for (int j = 1; j < leg.Count; ++j)
+                    patrolPath.Add(leg[j]);
+
+                current = goal;
+            }
+
+            if (patrolPath.Count <= 1)
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_NO_VALID_DESTINATION);
+                return;
+            }
+
+            StartPathMotion(patrolPath, options);
+        }
+
+        public void llPursue(LSL_Key target, LSL_List options)
+        {
+            if (!UUID.TryParse(target, out UUID targetID))
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_TARGET_GONE);
+                return;
+            }
+
+            Vector3 targetPos;
+            ScenePresence presence = World.GetScenePresence(targetID);
+            if (presence != null && !presence.IsDeleted)
+            {
+                targetPos = presence.AbsolutePosition;
+            }
+            else
+            {
+                SceneObjectPart part = World.GetSceneObjectPart(targetID);
+                if (part == null || part.ParentGroup.IsDeleted)
+                {
+                    PostPathFailure(ScriptBaseClass.PU_FAILURE_TARGET_GONE);
+                    return;
+                }
+                targetPos = part.AbsolutePosition;
+            }
+
+            int idx = 0;
+            while (idx < options.Length)
+            {
+                int option = options.GetIntegerItem(idx++);
+                if (idx >= options.Length)
+                    break;
+
+                if (option == ScriptBaseClass.PURSUIT_OFFSET)
+                {
+                    LSL_Vector offset = options.GetVector3Item(idx++);
+                    targetPos += new Vector3((float)offset.x, (float)offset.y, (float)offset.z);
+                }
+                else
+                {
+                    idx++;
+                }
+            }
+
+            llNavigateTo(ToPathLSLVector(targetPos), options);
+        }
+
+        public void llEvade(LSL_Key target, LSL_List options)
+        {
+            if (!UUID.TryParse(target, out UUID targetID))
+            {
+                PostPathFailure(ScriptBaseClass.PU_FAILURE_TARGET_GONE);
+                return;
+            }
+
+            ScenePresence presence = World.GetScenePresence(targetID);
+            Vector3 source;
+            if (presence != null && !presence.IsDeleted)
+            {
+                source = presence.AbsolutePosition;
+            }
+            else
+            {
+                SceneObjectPart part = World.GetSceneObjectPart(targetID);
+                if (part == null || part.ParentGroup.IsDeleted)
+                {
+                    PostPathFailure(ScriptBaseClass.PU_FAILURE_TARGET_GONE);
+                    return;
+                }
+                source = part.AbsolutePosition;
+            }
+
+            llFleeFrom(ToPathLSLVector(source), 10.0, options);
+        }
+
+        public void llFleeFrom(LSL_Vector source, LSL_Float distance, LSL_List options)
+        {
+            Vector3 current = m_host.ParentGroup.AbsolutePosition;
+            Vector3 sourceVec = new((float)source.x, (float)source.y, (float)source.z);
+            Vector3 away = current - sourceVec;
+            if (away.LengthSquared() < 0.001f)
+                away = new Vector3(1f, 0f, 0f);
+            away.Normalize();
+
+            Vector3 goal = current + away * (float)Math.Max(0.1, distance);
+            goal.X = Math.Clamp(goal.X, 0f, Math.Max(0f, World.RegionInfo.RegionSizeX - 0.001f));
+            goal.Y = Math.Clamp(goal.Y, 0f, Math.Max(0f, World.RegionInfo.RegionSizeY - 0.001f));
+            llNavigateTo(ToPathLSLVector(goal), options);
+        }
+
+        public LSL_List llGetStaticPath(LSL_Vector start, LSL_Vector end, LSL_Float radius, LSL_List parameters)
+        {
+            float navRadius = (float)radius;
+            if (!TryGetDirectNavPoint(start, navRadius, false, out Vector3 startPoint))
+                return new LSL_List(new LSL_Integer(ScriptBaseClass.PU_FAILURE_INVALID_START));
+
+            if (!TryGetDirectNavPoint(end, navRadius, false, out Vector3 endPoint))
+                return new LSL_List(new LSL_Integer(ScriptBaseClass.PU_FAILURE_INVALID_GOAL));
+
+            if (!TryBuildNavPath(startPoint, endPoint, navRadius, out List<Vector3> path))
+                return new LSL_List(new LSL_Integer(ScriptBaseClass.PU_FAILURE_UNREACHABLE));
+
+            LSL_List result = new(new LSL_Integer(ScriptBaseClass.PU_GOAL_REACHED));
+            foreach (Vector3 point in path)
+                result.Add(ToPathLSLVector(point));
+
+            return result;
+        }
+
+        public LSL_Vector llGetClosestNavPoint(LSL_Vector point, LSL_List options)
+        {
+            return TryGetObstacleFreeNavPoint(point, GetCharacterRadius(options), true, out Vector3 navPoint)
+                ? ToPathLSLVector(navPoint)
+                : LSL_Vector.Zero;
+        }
         public LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules)
         {
             LSL_List result = new();
