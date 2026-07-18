@@ -7467,6 +7467,34 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return LSL_String.Empty;
         }
 
+        // Real SL function, ported from GuntharDeNiro/opensim. Checks
+        // whether an avatar's currently-active group matches one of a
+        // list of group keys.
+        public LSL_Integer llMatchGroup(LSL_Key avatar, LSL_List group_keys)
+        {
+            if (!UUID.TryParse(avatar, out UUID avatarID) || avatarID.IsZero() ||
+                group_keys is null || group_keys.Length == 0)
+                return 0;
+
+            ScenePresence presence = World.GetScenePresence(avatarID);
+            if (presence is null || presence.IsDeleted || presence.IsChildAgent ||
+                presence.ControllingClient is null)
+                return 0;
+
+            UUID activeGroupID = presence.ControllingClient.ActiveGroupId;
+            if (activeGroupID.IsZero())
+                return 0;
+
+            for (int i = 0; i < group_keys.Length; ++i)
+            {
+                if (UUID.TryParse(group_keys.GetStringItem(i), out UUID groupID) &&
+                    groupID.Equals(activeGroupID))
+                    return 1;
+            }
+
+            return 0;
+        }
+
         public LSL_Key llName2Key(LSL_String name)
         {
             if(string.IsNullOrWhiteSpace(name))
@@ -11896,6 +11924,106 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             land.SetMusicUrl(url);
 
             ScriptSleep(m_sleepMsOnSetParcelMusicURL);
+        }
+
+        // llSetParcelForSale, ported from GuntharDeNiro/opensim - a real SL
+        // function letting a script (with the same PERMISSION_PRIVILEGED_
+        // LAND_ACCESS permission the estate tools require) put a parcel up
+        // for sale or cancel a sale, using the same LandChannel.
+        // UpdateLandObject path the parcel-sale GUI itself uses.
+        public LSL_Integer llSetParcelForSale(LSL_Integer forSale, LSL_List options)
+        {
+            ILandObject parcel = World.LandChannel.GetLandObject(m_host.AbsolutePosition);
+            if (parcel is null)
+                return ScriptBaseClass.PARCEL_SALE_ERROR_NO_PARCEL;
+
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_PRIVILEGED_LAND_ACCESS) == 0 ||
+                !m_item.PermsGranter.Equals(m_host.OwnerID))
+                return ScriptBaseClass.PARCEL_SALE_ERROR_NO_PERMISSIONS;
+
+            LandData land = parcel.LandData.Copy();
+            bool ownsParcel = land.OwnerID.Equals(m_host.OwnerID);
+            if (!ownsParcel && land.IsGroupOwned)
+            {
+                ownsParcel = land.GroupID.IsNotZero() &&
+                    (land.GroupID.Equals(m_host.OwnerID) || land.GroupID.Equals(m_host.GroupID));
+            }
+
+            if (!ownsParcel && !World.Permissions.IsGod(m_host.OwnerID))
+                return ScriptBaseClass.PARCEL_SALE_ERROR_NO_PERMISSIONS;
+
+            if (!World.Permissions.CanSellParcel(m_host.OwnerID, parcel))
+                return ScriptBaseClass.PARCEL_SALE_ERROR_NO_PERMISSIONS;
+
+            if (forSale == 0)
+            {
+                land.SalePrice = 0;
+                land.AuthBuyerID = UUID.Zero;
+                land.Flags &= ~(uint)(ParcelFlags.ForSale | ParcelFlags.ForSaleObjects | ParcelFlags.SellParcelObjects);
+                World.LandChannel.UpdateLandObject(land.LocalID, land);
+                parcel.SendLandUpdateToAvatars();
+                return ScriptBaseClass.PARCEL_SALE_OK;
+            }
+
+            if (options is null)
+                return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+
+            bool hasPrice = false;
+            int salePrice = 0;
+            UUID authBuyer = UUID.Zero;
+            bool includeObjects = false;
+
+            try
+            {
+                for (int i = 0; i < options.Length;)
+                {
+                    int option = options.GetIntegerItem(i++);
+                    if (i >= options.Length)
+                        return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+
+                    switch (option)
+                    {
+                        case ScriptBaseClass.PARCEL_SALE_PRICE:
+                            salePrice = options.GetIntegerItem(i++);
+                            hasPrice = true;
+                            break;
+
+                        case ScriptBaseClass.PARCEL_SALE_AGENT:
+                            if (!UUID.TryParse(options.GetStringItem(i++), out authBuyer))
+                                return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+                            break;
+
+                        case ScriptBaseClass.PARCEL_SALE_OBJECTS:
+                            includeObjects = options.GetIntegerItem(i++) != 0;
+                            break;
+
+                        default:
+                            return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+                    }
+                }
+            }
+            catch
+            {
+                return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+            }
+
+            if (!hasPrice)
+                return ScriptBaseClass.PARCEL_SALE_ERROR_BAD_PARAMS;
+
+            if (salePrice <= 0)
+                return ScriptBaseClass.PARCEL_SALE_ERROR_INVALID_PRICE;
+
+            land.SalePrice = salePrice;
+            land.AuthBuyerID = authBuyer;
+            land.Flags |= (uint)ParcelFlags.ForSale;
+            if (includeObjects)
+                land.Flags |= (uint)(ParcelFlags.ForSaleObjects | ParcelFlags.SellParcelObjects);
+            else
+                land.Flags &= ~(uint)(ParcelFlags.ForSaleObjects | ParcelFlags.SellParcelObjects);
+
+            World.LandChannel.UpdateLandObject(land.LocalID, land);
+            parcel.SendLandUpdateToAvatars();
+            return ScriptBaseClass.PARCEL_SALE_OK;
         }
 
         public LSL_String llGetParcelMusicURL()

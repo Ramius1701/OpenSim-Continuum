@@ -195,6 +195,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
           LSL_List llGetParcelDetails(LSL_Vector pos, LSL_List param);
        LSL_Integer llGetParcelFlags(LSL_Vector pos);
        LSL_Integer llGetParcelMaxPrims(LSL_Vector pos, int sim_wide);
+        LSL_Integer llSetParcelForSale(LSL_Integer forSale, LSL_List options);
         LSL_String llGetParcelMusicURL();
        LSL_Integer llGetParcelPrimCount(LSL_Vector pos, int category, int sim_wide);
           LSL_List llGetParcelPrimOwners(LSL_Vector pos);
@@ -300,6 +301,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
               void llModifyLand(int action, int brush);
        LSL_Integer llModPow(int a, int b, int c);
               void llMoveToTarget(LSL_Vector target, double tau);
+           LSL_Integer llMatchGroup(LSL_Key avatar, LSL_List group_keys);
            LSL_Key llName2Key(LSL_String name);
               void llOffsetTexture(double u, double v, int face);
               void llOpenRemoteDataChannel();
