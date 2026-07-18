@@ -1280,5 +1280,34 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED = 0x0A;
         public const int PU_FAILURE_PARCEL_UNREACHABLE = 0x0B;
         public const int PU_FAILURE_OTHER = 0xF4240;
+
+        // llSitOnLink additional status codes and llOpenFloater status
+        // codes, ported from GuntharDeNiro/opensim (real SL constants;
+        // SIT_FLAG_* already existed in current core, only the
+        // llSitOnLink-specific error codes below were missing).
+        public const int SIT_NOT_EXPERIENCE = -1;
+        public const int SIT_NO_EXPERIENCE_PERMISSION = -2;
+        public const int SIT_NO_SIT_TARGET = -3;
+        public const int SIT_INVALID_AGENT = -4;
+        public const int SIT_INVALID_LINK = -5;
+        public const int SIT_NO_ACCESS = -6;
+        public const int SIT_INVALID_OBJECT = -7;
+
+        public const int NOT_EXPERIENCE = -1;
+        public const int NOT_ATTACHMENT = -2;
+        public const int BAD_AGENT = -3;
+
+        // Experience system error codes, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int XP_ERROR_NONE = 0;
+        public const int XP_ERROR_EXPERIENCE_DISABLED = 1;
+        public const int XP_ERROR_EXPERIENCE_NOT_TRUSTED = 2;
+        public const int XP_ERROR_AGENT_NOT_FOUND = 3;
+        public const int XP_ERROR_INVALID_PARAMETERS = 4;
+        public const int XP_ERROR_QUOTA_EXCEEDED = 11;
+        public const int XP_ERROR_STORE_DISABLED = 12;
+        public const int XP_ERROR_STORAGE_EXCEPTION = 13;
+        public const int XP_ERROR_KEY_NOT_FOUND = 14;
+        public const int XP_ERROR_RETRY_UPDATE = 15;
     }
 }
