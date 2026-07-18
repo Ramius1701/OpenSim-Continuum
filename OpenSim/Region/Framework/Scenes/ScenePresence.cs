@@ -2451,11 +2451,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     if (m_attachments.Count > 0)
                     {
-                        foreach (SceneObjectGroup sog in m_attachments)
-                        {
-                            sog.RootPart.ParentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource());
-                            sog.ResumeScripts();
-                        }
+                        QueueRestartAttachmentScripts();
 
                         foreach (ScenePresence p in allpresences)
                         {
@@ -5062,16 +5058,16 @@ namespace OpenSim.Region.Framework.Scenes
             else
                  cAgent.CrossingFlags = 0;
 
-            if(isCrossUpdate)
-            {
-                //cAgent.agentCOF = COF;
-                cAgent.ActiveGroupID = ControllingClient.ActiveGroupId;
-                cAgent.ActiveGroupName = ControllingClient.ActiveGroupName;
-                if(Grouptitle == null)
-                    cAgent.ActiveGroupTitle = String.Empty;
-                else
-                    cAgent.ActiveGroupTitle = Grouptitle;
-            }
+            // Always carry active group display metadata. Hypergrid teleports use
+            // non-crossing AgentData too, and remote regions can only preserve
+            // the title if we send it with the transfer.
+            //cAgent.agentCOF = COF;
+            cAgent.ActiveGroupID = ControllingClient.ActiveGroupId;
+            cAgent.ActiveGroupName = ControllingClient.ActiveGroupName;
+            if(Grouptitle == null)
+                cAgent.ActiveGroupTitle = String.Empty;
+            else
+                cAgent.ActiveGroupTitle = Grouptitle;
 
             IFriendsModule friendsModule = m_scene.RequestModuleInterface<IFriendsModule>();
             if (friendsModule != null)
@@ -5082,6 +5078,9 @@ namespace OpenSim.Region.Framework.Scenes
 
         private void CopyFrom(AgentData cAgent)
         {
+            if (IsDeleted || cAgent == null)
+                return;
+
             m_callbackURI = cAgent.CallbackURI;
             m_newCallbackURI = cAgent.NewCallbackURI;
             //m_log.DebugFormat(
@@ -5124,7 +5123,8 @@ namespace OpenSim.Region.Framework.Scenes
 
             SetAlwaysRun = cAgent.AlwaysRun;
 
-            Appearance = new AvatarAppearance(cAgent.Appearance, true, true);
+            if (cAgent.Appearance != null)
+                Appearance = new AvatarAppearance(cAgent.Appearance, true, true);
 
             /*
             bool isFlying = ((m_AgentControlFlags & ACFlags.AGENT_CONTROL_FLY) != 0);
@@ -5138,15 +5138,18 @@ namespace OpenSim.Region.Framework.Scenes
 
             Scene.AttachmentsModule?.CopyAttachments(cAgent, this);
 
+            if (IsDeleted)
+                return;
+
             try
             {
                 lock (scriptedcontrols)
                 {
+                    scriptedcontrols.Clear();
+                    IgnoredControls = ScriptControlled.CONTROL_ZERO;
+
                     if (cAgent.Controllers != null)
                     {
-                        scriptedcontrols.Clear();
-                        IgnoredControls = ScriptControlled.CONTROL_ZERO;
-
                         foreach (ControllerData c in cAgent.Controllers)
                         {
                             ScriptControllers sc = new()
@@ -5171,7 +5174,14 @@ namespace OpenSim.Region.Framework.Scenes
             else
                 Animator.ResetAnimations();
 
-            Overrides.CopyAOPairsFrom(cAgent.MovementAnimationOverRides);
+            if (cAgent.MovementAnimationOverRides != null)
+                Overrides.CopyAOPairsFrom(cAgent.MovementAnimationOverRides);
+            else
+                Overrides.Clear();
+
+            if (ControllingClient == null)
+                return;
+
             int nanim = ControllingClient.NextAnimationSequenceNumber;
             // FIXME: Why is this null check necessary?  Where are the cases where we get a null Anims object?
             if (cAgent.DefaultAnim != null)
@@ -5201,12 +5211,19 @@ namespace OpenSim.Region.Framework.Scenes
             m_gotCrossUpdate = (m_crossingFlags != 0);
             if(m_gotCrossUpdate)
             {
+                m_AgentControlFlags &= unchecked((ACFlags)~CROSSING_TRANSIENT_MOVEMENT_MASK);
+                MovementFlags = 0;
+
+                if (ParentID == 0 && ParentUUID.IsZero() && (m_AgentControlFlags & ACFlags.AGENT_CONTROL_FLY) == 0)
+                    Animator.currentControlState = ScenePresenceAnimator.motionControlStates.onsurface;
+
                 LastCommands &= ~(ScriptControlled.CONTROL_LBUTTON | ScriptControlled.CONTROL_ML_LBUTTON);
                 if((cAgent.CrossExtraFlags & 1) != 0)
                     LastCommands |= ScriptControlled.CONTROL_LBUTTON;
                 if((cAgent.CrossExtraFlags & 2) != 0)
                     LastCommands |= ScriptControlled.CONTROL_ML_LBUTTON;
                 MouseDown = (cAgent.CrossExtraFlags & 3) != 0;
+                m_forceMovementAnimationUpdateAfterCrossing = true;
             }
 
             m_haveGroupInformation = false;
@@ -5225,9 +5242,22 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
-                    // we got a unknown active group so get what groups thinks about us
-                    IGroupsModule gm = m_scene.RequestModuleInterface<IGroupsModule>();
-                    gm?.SendAgentGroupDataUpdate(ControllingClient);
+                    if (m_showForeignActiveGroupTitles && cAgent.ActiveGroupID.NotEqual(UUID.Zero) &&
+                            !String.IsNullOrEmpty(cAgent.ActiveGroupTitle))
+                    {
+                        // Hypergrid visitors may arrive with a valid home-grid
+                        // title for a group this region cannot verify. Preserve
+                        // only the visible title; do not add membership or grant
+                        // powers on the local grid.
+                        ControllingClient.ActiveGroupPowers = 0;
+                        Grouptitle = cAgent.ActiveGroupTitle;
+                    }
+                    else
+                    {
+                        // we got a unknown active group so get what groups thinks about us
+                        IGroupsModule gm = m_scene.RequestModuleInterface<IGroupsModule>();
+                        gm?.SendAgentGroupDataUpdate(ControllingClient);
+                    }
                 }
             }
 

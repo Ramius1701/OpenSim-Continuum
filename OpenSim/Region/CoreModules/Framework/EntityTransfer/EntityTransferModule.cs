@@ -102,6 +102,36 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
         public bool DisableInterRegionTeleportCancellation { get; set; }
 
         /// <summary>
+        /// If true, region crossing sends the avatar's horizontal velocity to the destination viewer handoff.
+        /// </summary>
+        /// <remarks>
+        /// Sending zero velocity on normal avatar crossings makes the viewer visibly stall at the border before the
+        /// destination region resumes movement.  Vehicle crossings already preserve velocity through crossing flags.
+        /// </remarks>
+        public bool PreserveVelocityOnRegionCrossing { get; set; } = true;
+
+        public float MaxRegionCrossingVelocity { get; set; } = 30.0f;
+
+        /// <summary>
+        /// Small grace period after sending CrossRegion before the source scene removes the root avatar.
+        /// </summary>
+        /// <remarks>
+        /// This gives the viewer a short window to attach to the destination child/root agent and reduces the visible
+        /// border flash without changing the destination handoff order.
+        /// </remarks>
+        public int RegionCrossingSourceCleanupDelayMS { get; set; } = 250;
+
+        /// <summary>
+        /// Delays deleting source-region attachments after a neighbour crossing.
+        /// </summary>
+        /// <remarks>
+        /// Immediate attachment deletion on the source region can reach the viewer while the destination region is
+        /// still reattaching the same items, which shows up as a short detach/reattach flash.
+        /// </remarks>
+        public int RegionCrossingAttachmentCleanupDelayMS { get; set; } = 2500;
+
+
+        /// <summary>
         /// Number of times inter-region teleport was attempted.
         /// </summary>
         private Stat m_interRegionTeleportAttempts;
@@ -272,6 +302,18 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 
                 WaitForAgentArrivedAtDestination
                     = transferConfig.GetBoolean("wait_for_callback", WaitForAgentArrivedAtDestination);
+
+                PreserveVelocityOnRegionCrossing
+                    = transferConfig.GetBoolean("PreserveVelocityOnRegionCrossing", PreserveVelocityOnRegionCrossing);
+
+                MaxRegionCrossingVelocity
+                    = Math.Max(0.0f, transferConfig.GetFloat("MaxRegionCrossingVelocity", MaxRegionCrossingVelocity));
+
+                RegionCrossingSourceCleanupDelayMS
+                    = Math.Max(0, transferConfig.GetInt("RegionCrossingSourceCleanupDelayMS", RegionCrossingSourceCleanupDelayMS));
+
+                RegionCrossingAttachmentCleanupDelayMS
+                    = Math.Max(0, transferConfig.GetInt("RegionCrossingAttachmentCleanupDelayMS", RegionCrossingAttachmentCleanupDelayMS));
             }
 
             m_entityTransferStateMachine = new EntityTransferStateMachine(this);
@@ -1623,6 +1665,7 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
             ScenePresence ag = agent;
             ag.IsInLocalTransit = true;
             ag.IsInTransit = true;
+            ag.CancelQueuedAttachmentScriptRestart();
             WorkManager.RunInThreadPool(delegate
             {
                 CrossAsync(ag, isFlying);
@@ -1865,21 +1908,19 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 
             m_log.DebugFormat("[ENTITY TRANSFER MODULE]: Sending new CAPS seed url {0} to client {1}", capsPath, agent.UUID);
 
-            Vector3 vel2 = Vector3.Zero;
-            if((agent.m_crossingFlags & 2) != 0)
-                vel2 = new Vector3(agent.Velocity.X, agent.Velocity.Y, 0);
+            Vector3 crossingVelocity = GetRegionCrossingVelocity(agent);
 
             if (m_eqModule != null)
             {
                 m_eqModule.CrossRegion(
-                    neighbourRegion.RegionHandle, pos, vel2 /* agent.Velocity */,
+                    neighbourRegion.RegionHandle, pos, crossingVelocity,
                     endpoint, capsPath, agentUUID, agent.ControllingClient.SessionId,
                     neighbourRegion.RegionSizeX, neighbourRegion.RegionSizeY);
             }
             else
             {
                 m_log.ErrorFormat("{0} Using old CrossRegion packet. Varregion will not work!!", LogHeader);
-                agent.ControllingClient.CrossRegion(neighbourRegion.RegionHandle, pos, agent.Velocity,
+                agent.ControllingClient.CrossRegion(neighbourRegion.RegionHandle, pos, crossingVelocity,
                         endpoint,capsPath);
             }
 
@@ -1889,21 +1930,70 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
             // Unlike a teleport, here we do not wait for the destination region to confirm the receipt.
             m_entityTransferStateMachine.UpdateInTransit(agentUUID, AgentTransferState.CleaningUp);
 
+            if (RegionCrossingSourceCleanupDelayMS > 0)
+                Thread.Sleep(RegionCrossingSourceCleanupDelayMS);
+
             if(childRegionsToClose != null)
                 agent.CloseChildAgents(childRegionsToClose);
 
             if((agent.m_crossingFlags & 8) == 0)
                 agent.ClearControls(); // don't let attachments delete (called in HasMovedAway) disturb taken controls on viewers
 
-            agent.HasMovedAway((agent.m_crossingFlags & 8) == 0);
+            bool nearRegionCrossing = (agent.m_crossingFlags & 8) == 0;
+            bool delayAttachmentCleanup = nearRegionCrossing && RegionCrossingAttachmentCleanupDelayMS > 0;
+            agent.HasMovedAway(nearRegionCrossing, !delayAttachmentCleanup);
 
             agent.MakeChildAgent(neighbourRegion.RegionHandle);
+
+            if (delayAttachmentCleanup)
+                DelaySourceAttachmentCleanup(agent, RegionCrossingAttachmentCleanupDelayMS);
 
             // FIXME: Possibly this should occur lower down after other commands to close other agents,
             // but not sure yet what the side effects would be.
             m_entityTransferStateMachine.ResetFromTransit(agentUUID);
 
             return true;
+        }
+
+        // Delayed attachment cleanup + region-crossing velocity helpers,
+        // ported from GuntharDeNiro/opensim.
+        private void DelaySourceAttachmentCleanup(ScenePresence agent, int delayMS)
+        {
+            ScenePresence sourceAgent = agent;
+
+            Util.FireAndForget(
+                o =>
+                {
+                    Thread.Sleep(delayMS);
+
+                    if (sourceAgent.IsDeleted || !sourceAgent.IsChildAgent)
+                        return;
+
+                    sourceAgent.Scene.AttachmentsModule?.DeleteAttachmentsFromScene(sourceAgent, true);
+                },
+                null,
+                "AgentCrossingAttachmentCleanup-" + sourceAgent.UUID);
+        }
+
+        private Vector3 GetRegionCrossingVelocity(ScenePresence agent)
+        {
+            if (!PreserveVelocityOnRegionCrossing && (agent.m_crossingFlags & 2) == 0)
+                return Vector3.Zero;
+
+            Vector3 velocity = new(agent.Velocity.X, agent.Velocity.Y, 0.0f);
+            float speedSq = velocity.LengthSquared();
+
+            if (MaxRegionCrossingVelocity > 0.0f)
+            {
+                float maxSpeedSq = MaxRegionCrossingVelocity * MaxRegionCrossingVelocity;
+                if (speedSq > maxSpeedSq)
+                {
+                    velocity.Normalize();
+                    velocity *= MaxRegionCrossingVelocity;
+                }
+            }
+
+            return velocity;
         }
 
         private void CrossAgentToNewRegionCompleted(IAsyncResult iar)
@@ -2742,9 +2832,23 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                 {
                     if (i < sp.InTransitScriptStates.Count)
                     {
-                        sog.SetState(sp.InTransitScriptStates[i++], sp.Scene);
-                        sog.CreateScriptInstances(0, false, sp.Scene.DefaultScriptEngine, -1);
-                        sog.ResumeScripts();
+                        string scriptState = sp.InTransitScriptStates[i++];
+                        SceneObjectGroup parentGroup = sog?.RootPart?.ParentGroup;
+                        if (parentGroup == null)
+                            continue;
+
+                        try
+                        {
+                            sog.SetState(scriptState, sp.Scene);
+                            parentGroup.CreateScriptInstances(0, false, sp.Scene.DefaultScriptEngine, -1);
+                            sog.ResumeScripts();
+                        }
+                        catch (Exception e)
+                        {
+                            m_log.WarnFormat(
+                                "[ENTITY TRANSFER MODULE]: Failed reinstantiating attachment scripts for {0} in {1}: {2}",
+                                sp.Name, m_sceneName, e.Message);
+                        }
                     }
                     else
                         m_log.ErrorFormat(
@@ -2839,15 +2943,43 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                 return false;
             }
 
+            List<SceneObjectGroup> failedAttachments = null;
             foreach(SceneObjectGroup so in attachments)
             {
-                if (!m_scene.AddSceneObject(so))
+                if (so == null)
                 {
-                    m_log.DebugFormat(
-                        "[ENTITY TRANSFER MODULE]: Problem adding attachment {0} {1} into {2} ",
-                        so.Name, so.UUID, m_sceneName);
+                    failedAttachments ??= new List<SceneObjectGroup>();
+                    failedAttachments.Add(so);
                     continue;
                 }
+
+                if (!m_scene.AddSceneObject(so))
+                {
+                    SceneObjectGroup oldAttachment = m_scene.GetSceneObjectGroup(so.UUID);
+                    if (oldAttachment != null && oldAttachment.OwnerID.Equals(sp.UUID) && oldAttachment.IsAttachmentCheckFull())
+                    {
+                        m_log.DebugFormat(
+                            "[ENTITY TRANSFER MODULE]: Replacing stale attachment {0} {1} for {2} in {3}",
+                            so.Name, so.UUID, sp.Name, m_sceneName);
+
+                        m_scene.DeleteSceneObject(oldAttachment, true);
+                        if (m_scene.AddSceneObject(so))
+                            continue;
+                    }
+
+                    m_log.DebugFormat(
+                        "[ENTITY TRANSFER MODULE]: Problem adding attachment {0} {1} into {2}",
+                        so.Name, so.UUID, m_sceneName);
+
+                    failedAttachments ??= new List<SceneObjectGroup>();
+                    failedAttachments.Add(so);
+                }
+            }
+
+            if (failedAttachments != null)
+            {
+                foreach (SceneObjectGroup failedAttachment in failedAttachments)
+                    attachments.Remove(failedAttachment);
             }
 
             sp.GotAttachmentsData = true;
