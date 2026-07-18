@@ -21507,7 +21507,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (!hasAvailableSitTarget)
                 return ScriptBaseClass.SIT_NO_SIT_TARGET;
 
-            presence.HandleAgentRequestSit(presence.ControllingClient, agentID, targetPart.UUID, Vector3.Zero);
+            presence.HandleAgentRequestSit(presence.ControllingClient, agentID, targetPart.UUID, Vector3.Zero, true);
             return 1;
         }
 
@@ -23712,15 +23712,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return new LSL_Integer(0);
         }
 
+        // llSetLinkSitFlags, ported from GuntharDeNiro/opensim - was
+        // previously a documented no-op; now backed by
+        // SceneObjectPart.SetLslSitFlags (see the region-crossing/
+        // attachment fixes commit for the storage side).
         public void llSetLinkSitFlags(LSL_Integer linknum, LSL_Integer flags)
         {
-            // does nothing since we do not have any of the flags
-            /*
             SceneObjectPart part = linknum == ScriptBaseClass.LINK_THIS ? m_host : m_host.ParentGroup.GetLinkNumPart(linknum);
-            if (part is not null)
-            {
-            }
-            */
+            part?.SetLslSitFlags(flags);
         }
 
         public LSL_String llComputeHash(LSL_String message, LSL_String algo)
