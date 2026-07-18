@@ -1140,5 +1140,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int TRANSFER_BAD_ROOT = -5;
         public const int TRANSFER_NO_PERMS = -6;
         public const int TRANSFER_NO_ATTACHMENT = -7;
+
+        // llReturnObjectsByOwner scope constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int OBJECT_RETURN_PARCEL = 1;
+        public const int OBJECT_RETURN_PARCEL_OWNER = 2;
+        public const int OBJECT_RETURN_REGION = 4;
     }
 }

@@ -7474,6 +7474,121 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return land.LandData.OwnerID.ToString();
         }
 
+        // llReturnObjectsByID/llReturnObjectsByOwner and helpers, ported
+        // from GuntharDeNiro/opensim - real SL functions letting a script
+        // (with PERMISSION_RETURN_OBJECTS granted) return objects to their
+        // owners' inventory the same way an estate manager's UI does,
+        // built on the existing Permissions.CanReturnObjects/
+        // Scene.returnObjects path rather than new permission logic.
+        private bool TryGetReturnPermissionClient(out IClientAPI client)
+        {
+            client = null;
+            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_RETURN_OBJECTS) == 0)
+                return false;
+
+            ScenePresence granter = World.GetScenePresence(m_item.PermsGranter);
+            if (granter is null || granter.IsDeleted || granter.IsChildAgent)
+                return false;
+
+            client = granter.ControllingClient;
+            return client is not null;
+        }
+
+        private static bool SameParcel(ILandObject parcel, SceneObjectGroup group)
+        {
+            if (parcel is null || group is null)
+                return false;
+
+            Vector3 pos = group.AbsolutePosition;
+            return parcel.ContainsPoint((int)pos.X, (int)pos.Y);
+        }
+
+        private LSL_Integer ReturnSceneObjects(List<SceneObjectGroup> groups, IClientAPI client, ILandObject parcel)
+        {
+            if (groups.Count == 0)
+                return 0;
+
+            List<SceneObjectGroup> allowed = new(groups);
+            if (!World.Permissions.CanReturnObjects(parcel, client, allowed) || allowed.Count == 0)
+                return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+
+            World.returnObjects(allowed.ToArray(), client);
+            return allowed.Count;
+        }
+
+        public LSL_Integer llReturnObjectsByID(LSL_List objects)
+        {
+            if (!TryGetReturnPermissionClient(out IClientAPI client))
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+
+            if (objects is null || objects.Length == 0)
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            List<SceneObjectGroup> groups = new();
+            HashSet<UUID> seen = new();
+            foreach (object entry in objects.Data)
+            {
+                if (!UUID.TryParse(entry.ToString(), out UUID objectID) || objectID.IsZero())
+                    return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+                SceneObjectGroup group = World.GetSceneObjectGroup(objectID);
+                if (group is null || group.IsDeleted || group.IsAttachment || !seen.Add(group.UUID))
+                    continue;
+
+                groups.Add(group);
+            }
+
+            return ReturnSceneObjects(groups, client, null);
+        }
+
+        public LSL_Integer llReturnObjectsByOwner(LSL_Key owner, LSL_Integer scope)
+        {
+            if (!TryGetReturnPermissionClient(out IClientAPI client))
+                return ScriptBaseClass.ERR_RUNTIME_PERMISSIONS;
+
+            if (!UUID.TryParse(owner, out UUID ownerID) || ownerID.IsZero())
+                return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+
+            ILandObject scriptParcel = World.LandChannel?.GetLandObject(m_host.GetWorldPosition());
+            if (scriptParcel is null)
+                return ScriptBaseClass.ERR_PARCEL_PERMISSIONS;
+
+            List<SceneObjectGroup> groups = new();
+            foreach (SceneObjectGroup group in World.GetSceneObjectGroups())
+            {
+                if (group is null || group.IsDeleted || group.IsAttachment || group.OwnerID.NotEqual(ownerID))
+                    continue;
+
+                Vector3 pos = group.AbsolutePosition;
+                ILandObject objectParcel = World.LandChannel?.GetLandObject(pos.X, pos.Y);
+                if (objectParcel is null)
+                    continue;
+
+                switch (scope.value)
+                {
+                    case ScriptBaseClass.OBJECT_RETURN_PARCEL:
+                        if (SameParcel(scriptParcel, group))
+                            groups.Add(group);
+                        break;
+
+                    case ScriptBaseClass.OBJECT_RETURN_PARCEL_OWNER:
+                        if (objectParcel.LandData.OwnerID.Equals(m_host.OwnerID))
+                            groups.Add(group);
+                        break;
+
+                    case ScriptBaseClass.OBJECT_RETURN_REGION:
+                        groups.Add(group);
+                        break;
+
+                    default:
+                        return ScriptBaseClass.ERR_MALFORMED_PARAMS;
+                }
+            }
+
+            ILandObject permissionParcel = scope.value == ScriptBaseClass.OBJECT_RETURN_PARCEL ? scriptParcel : null;
+            return ReturnSceneObjects(groups, client, permissionParcel);
+        }
+
         /// <summary>
         /// According to http://lslwiki.net/lslwiki/wakka.php?wakka=llGetAgentSize
         /// only the height of avatars vary and that says:
