@@ -1,7 +1,6 @@
 using log4net;
 using Mono.Addins;
 using Nini.Config;
-using Nwc.XmlRpc;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
