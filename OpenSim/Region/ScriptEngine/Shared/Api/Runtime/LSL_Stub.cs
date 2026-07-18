@@ -2709,6 +2709,78 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llCreateCharacter(LSL_List options)
+        {
+            m_LSL_Functions.llCreateCharacter(options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llUpdateCharacter(LSL_List options)
+        {
+            m_LSL_Functions.llUpdateCharacter(options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llDeleteCharacter()
+        {
+            m_LSL_Functions.llDeleteCharacter();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llExecCharacterCmd(LSL_Integer command, LSL_List options)
+        {
+            m_LSL_Functions.llExecCharacterCmd(command, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llNavigateTo(LSL_Vector goal, LSL_List options)
+        {
+            m_LSL_Functions.llNavigateTo(goal, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llWanderWithin(LSL_Vector origin, LSL_Vector distance, LSL_List options)
+        {
+            m_LSL_Functions.llWanderWithin(origin, distance, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llPatrolPoints(LSL_List patrol_points, LSL_List options)
+        {
+            m_LSL_Functions.llPatrolPoints(patrol_points, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llPursue(LSL_Key target, LSL_List options)
+        {
+            m_LSL_Functions.llPursue(target, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llEvade(LSL_Key target, LSL_List options)
+        {
+            m_LSL_Functions.llEvade(target, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llFleeFrom(LSL_Vector source, LSL_Float distance, LSL_List options)
+        {
+            m_LSL_Functions.llFleeFrom(source, distance, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetStaticPath(LSL_Vector start, LSL_Vector end, LSL_Float radius, LSL_List parameters)
+        {
+            return m_LSL_Functions.llGetStaticPath(start, end, radius, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Vector llGetClosestNavPoint(LSL_Vector point, LSL_List options)
+        {
+            return m_LSL_Functions.llGetClosestNavPoint(point, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Integer llSetEnvironment(LSL_Vector position, LSL_List parameters)
         {
             return m_LSL_Functions.llSetEnvironment(position, parameters);
