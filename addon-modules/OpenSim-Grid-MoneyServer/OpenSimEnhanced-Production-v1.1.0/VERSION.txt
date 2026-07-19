@@ -1,0 +1,3 @@
+Casperia MoneyServer Production Fix v1.1.0
+Generated: 2026-07-19
+Baseline: ManfredAabye/opensimcurrencyserver-dotnet main (clean source obtained by installer)

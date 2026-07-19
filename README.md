@@ -280,6 +280,23 @@ configuration.
 Real-money processing requires a separate security, accounting,
 failure-recovery, and legal review.
 
+## MoneyServer production enhancements
+
+- Complete grid MoneyServer, region currency module, and MySQL money-data wrapper.
+- Viewer currency purchases without an external currency.php helper.
+- Configurable successful-purchase limits through TotalDay, TotalWeek, and TotalMonth.
+- Purchase-limit accounting restricted to successful BuyMoney transactions.
+- UTC calendar periods with Monday-based weekly accounting.
+- Atomic balance credit and transaction-ledger recording.
+- Idempotent viewer confirmation UUID handling to prevent duplicate credits.
+- CurrencyMaximum enforcement before changing the balance.
+- Existing group, email-lock, banker, transfer, object-payment, upload-charge, and land-sale controls retained.
+- OpenSim console-appender registration so background diagnostics move and redraw the MoneyServer # prompt correctly.
+- Focused production validation and SQL verification documents included with the module.
+
+The source integration does not alter a live in\MoneyServer.ini. Operators
+must review the included example and validation documents before activating or
+replacing a production MoneyServer.
 ## Important limitations
 
 - New enhanced database migrations are currently MySQL-only unless equivalent

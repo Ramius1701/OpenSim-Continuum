@@ -1,0 +1,13 @@
+[MoneyServer]
+; Viewer currency purchases must be enabled explicitly.
+CurrencyOnOff = on
+
+; Maximum successful viewer currency purchases in UTC calendar periods.
+; A value of 0 disables that individual period limit.
+TotalDay = 100
+TotalWeek = 250
+TotalMonth = 500
+
+; A viewer purchase that would exceed this balance is rejected.
+; Existing balances are not reduced by the purchase/quote path.
+CurrencyMaximum = 10000
