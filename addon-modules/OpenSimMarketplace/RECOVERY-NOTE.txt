@@ -1,4 +1,4 @@
-CASPERIA MARKETPLACE V2 RECOVERY / DESIGN NOTE
+OPENSIM MARKETPLACE V2 RECOVERY / DESIGN NOTE
 ================================================
 
 Historical donor:
@@ -22,16 +22,16 @@ Rejected historical architecture:
 - PHP 4-era mysql_* design.
 - Rezzed Marketplace warehouse objects.
 
-Casperia v2 decision:
-- Marketplace remains addon-modules/Casperia.Marketplace.
+Marketplace v2 portability decision:
+- Marketplace remains addon-modules/OpenSimMarketplace.
 - Current OpenSim inventory services are the extension seam.
-- Seller inventory uses Casperia Marketplace/Merchant Outbox.
+- Seller inventory uses OpenSim Marketplace/Merchant Outbox.
 - One top-level Outbox folder equals one product source.
 - Publication creates an immutable service-account inventory snapshot.
 - Each listing has an immutable inventory version.
 - Source and stored snapshot receive SHA-256 tree fingerprints.
 - Delivery verifies the expected snapshot fingerprint.
-- Recipient folder is Casperia Marketplace/Received Items.
+- Recipient folder is OpenSim Marketplace/Received Items.
 - Delivery IDs and inventory node UUIDs are deterministic/idempotent.
 - Original delivery, redelivery and test delivery are separate receipt types.
 - Current-owner Copy + Transfer is required for source reliability.

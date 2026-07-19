@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mp_flash(
                 'success',
-                'Test delivery sent to your Casperia Marketplace / Received Items folder.'
+                'Test delivery sent to your OpenSim Marketplace / Received Items folder.'
             );
         }
 
@@ -86,7 +86,7 @@ mp_page_top('Merchant Center', $user);
         <input type="hidden" name="csrf" value="<?= mp_h(mp_csrf_token()) ?>">
         <input type="hidden" name="action" value="apply">
 
-        <h2>Apply to sell on Casperia Marketplace</h2>
+        <h2>Apply to sell on OpenSim Marketplace</h2>
 
         <label>
             Store name
@@ -144,7 +144,7 @@ mp_page_top('Merchant Center', $user);
             <h2>Merchant Outbox</h2>
             <p>
                 In your viewer inventory, use
-                <strong>Casperia Marketplace / Merchant Outbox</strong>.
+                <strong>OpenSim Marketplace / Merchant Outbox</strong>.
                 Each top-level product folder is one Marketplace product source.
             </p>
 

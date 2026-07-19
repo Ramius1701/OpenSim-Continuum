@@ -122,7 +122,7 @@ mp_page_top('Sales & Earnings', $user);
             <strong><?= mp_h($review['listing_title']) ?> — <?= mp_h($review['title']) ?></strong>
             <span><?= (int)$review['rating'] ?> / 5</span>
         </div>
-        <p class="mp-muted"><?= mp_h($review['buyer_name'] ?: 'Casperia Resident') ?></p>
+        <p class="mp-muted"><?= mp_h($review['buyer_name'] ?: 'Grid Resident') ?></p>
         <div style="white-space:pre-wrap"><?= mp_h($review['body']) ?></div>
 
         <?php if (!empty($review['seller_response'])): ?>

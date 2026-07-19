@@ -7,28 +7,55 @@ $siteRoot = dirname(__DIR__);
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
-
-require_once $siteRoot . '/include/config.php';
-
 $marketEnv = $siteRoot . '/include/marketplace_env.php';
 
 if (!is_file($marketEnv)) {
     http_response_code(503);
     exit(
-        'Casperia Marketplace is not configured. ' .
+        'OpenSim Marketplace is not configured. ' .
         'Copy include/marketplace_env.example.php to include/marketplace_env.php and edit it.'
     );
 }
 
 require_once $marketEnv;
 
+$hostAdapter = defined('MP_HOST_ADAPTER_FILE')
+    ? (string)MP_HOST_ADAPTER_FILE
+    : $siteRoot . '/include/marketplace_host.php';
+
+if (!is_file($hostAdapter)) {
+    http_response_code(503);
+    exit(
+        'OpenSim Marketplace host integration is not configured. ' .
+        'Copy include/marketplace_host.example.php to include/marketplace_host.php and adapt it to the host website.'
+    );
+}
+
+require_once $hostAdapter;
+
+$requiredHostFunctions = [
+    'mp_host_db',
+    'mp_host_current_user_id',
+    'mp_host_current_user',
+    'mp_host_login_url',
+    'mp_host_is_admin',
+];
+
+foreach ($requiredHostFunctions as $requiredHostFunction) {
+    if (!function_exists($requiredHostFunction)) {
+        throw new RuntimeException(
+            'Marketplace host adapter must define ' . $requiredHostFunction . '().'
+        );
+    }
+}
+
 function mp_db(): mysqli
 {
-    $conn = db();
+    $conn = mp_host_db();
 
     if (!$conn instanceof mysqli) {
         throw new RuntimeException(
-            'Marketplace database connection failed.'
+            'Marketplace host adapter did not return a mysqli connection.'
         );
     }
 
@@ -138,28 +165,11 @@ function mp_redirect(string $path): never
 
 function mp_session_user_candidate(): string
 {
-    $values = [
-        $_SESSION['user']['PrincipalID'] ?? null,
-        $_SESSION['user']['principal_id'] ?? null,
-        $_SESSION['user']['UUID'] ?? null,
-        $_SESSION['user']['uuid'] ?? null,
-        $_SESSION['PrincipalID'] ?? null,
-        $_SESSION['principal_id'] ?? null,
-        $_SESSION['user_uuid'] ?? null,
-        $_SESSION['uuid'] ?? null,
-    ];
+    $candidate = strtolower(
+        trim((string)mp_host_current_user_id())
+    );
 
-    foreach ($values as $value) {
-        $candidate = strtolower(
-            trim((string)$value)
-        );
-
-        if (mp_uuid($candidate)) {
-            return $candidate;
-        }
-    }
-
-    return '';
+    return mp_uuid($candidate) ? $candidate : '';
 }
 
 function mp_stmt_rows(
@@ -222,21 +232,27 @@ function mp_stmt_exec(
 
 function mp_current_user(mysqli $db): ?array
 {
-    $id = mp_session_user_candidate();
+    $user = mp_host_current_user($db);
 
-    if ($id === '') {
+    if ($user === null) {
         return null;
     }
 
-    return mp_stmt_row(
-        $db,
-        'SELECT PrincipalID, FirstName, LastName, UserLevel
-         FROM UserAccounts
-         WHERE PrincipalID = ?
-         LIMIT 1',
-        's',
-        [$id]
-    );
+    foreach (['PrincipalID', 'FirstName', 'LastName', 'UserLevel'] as $requiredKey) {
+        if (!array_key_exists($requiredKey, $user)) {
+            throw new RuntimeException(
+                'Marketplace host adapter user record is missing ' . $requiredKey . '.'
+            );
+        }
+    }
+
+    if (!mp_uuid((string)$user['PrincipalID'])) {
+        throw new RuntimeException(
+            'Marketplace host adapter returned an invalid PrincipalID.'
+        );
+    }
+
+    return $user;
 }
 
 function mp_require_user(mysqli $db): array
@@ -244,15 +260,11 @@ function mp_require_user(mysqli $db): array
     $user = mp_current_user($db);
 
     if (!$user) {
-        mp_redirect(
-            '/login.php?redirect=' .
-            rawurlencode(
-                (string)(
-                    $_SERVER['REQUEST_URI'] ??
-                    '/marketplace/'
-                )
-            )
+        $returnUrl = (string)(
+            $_SERVER['REQUEST_URI'] ??
+            '/marketplace/'
         );
+        mp_redirect(mp_host_login_url($returnUrl));
     }
 
     return $user;
@@ -260,11 +272,7 @@ function mp_require_user(mysqli $db): array
 
 function mp_is_admin(array $user): bool
 {
-    $minimum = defined('ADMIN_USERLEVEL_MIN')
-        ? (int)ADMIN_USERLEVEL_MIN
-        : 200;
-
-    return (int)($user['UserLevel'] ?? 0) >= $minimum;
+    return mp_host_is_admin($user);
 }
 
 function mp_require_admin(mysqli $db): array
@@ -373,7 +381,7 @@ final class MarketplaceOpenSimClient
         string $action = 'list'
     ): array {
         return $this->post(
-            '/casperia/marketplace/v2/inventory',
+            (string)MP_OPENSIM_INVENTORY_PATH,
             [
                 'action' => $action,
                 'seller_id' => $sellerId,
@@ -386,7 +394,7 @@ final class MarketplaceOpenSimClient
         string $sourceFolderId
     ): array {
         return $this->post(
-            '/casperia/marketplace/v2/inspect',
+            (string)MP_OPENSIM_INSPECT_PATH,
             [
                 'seller_id' => $sellerId,
                 'source_folder_id' => $sourceFolderId,
@@ -400,7 +408,7 @@ final class MarketplaceOpenSimClient
         string $sourceFolderId
     ): array {
         return $this->post(
-            '/casperia/marketplace/v2/snapshot',
+            (string)MP_OPENSIM_SNAPSHOT_PATH,
             [
                 'version_key' => $versionKey,
                 'seller_id' => $sellerId,
@@ -417,7 +425,7 @@ final class MarketplaceOpenSimClient
         string $recipientId
     ): array {
         return $this->post(
-            '/casperia/marketplace/v2/deliver',
+            (string)MP_OPENSIM_DELIVERY_PATH,
             [
                 'delivery_id' => $deliveryId,
                 'seller_id' => $sellerId,
@@ -484,7 +492,7 @@ final class MarketplaceOpenSimClient
                     'Accept: application/json',
                 ],
                 CURLOPT_USERAGENT =>
-                    'CasperiaMarketplacePortal/2.0.0',
+                    'OpenSimMarketplacePortal/2.1.0',
                 CURLOPT_SSL_VERIFYPEER => true,
                 CURLOPT_SSL_VERIFYHOST => 2,
             ]
@@ -1776,7 +1784,7 @@ final class MarketplaceService
 
             if (!$recipient) {
                 throw new RuntimeException(
-                    'The gift recipient was not found as a local Casperia account.'
+                    'The gift recipient was not found as a local grid account.'
                 );
             }
 

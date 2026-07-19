@@ -1,6 +1,6 @@
-# Casperia.Marketplace v2.0.0
+# OpenSimMarketplace v2.1.0
 
-Direct Delivery marketplace add-on for current OpenSimulator Dev/Casperia.
+Direct Delivery marketplace add-on for current OpenSimulator development builds.
 
 ## Purpose
 
@@ -9,7 +9,7 @@ This module is intentionally an add-on module.
 Marketplace is a grid/website feature that can use current OpenSim inventory and account
 services without changing OpenSim core protocols or adding a new Robust core service.
 
-The module provides protected server-side inventory operations. The Casperia PHP portal
+The module provides protected server-side inventory operations. The bundled PHP portal
 provides catalogue, seller, order, review, payment-state and administrative workflows.
 
 ## Architecture
@@ -18,7 +18,7 @@ provides catalogue, seller, order, review, payment-state and administrative work
 Merchant viewer inventory
         |
         v
-Casperia Marketplace
+OpenSim Marketplace
 └── Merchant Outbox
     ├── Product Folder A
     ├── Product Folder B
@@ -50,7 +50,7 @@ Approved/free order
         |
         v
 Recipient inventory
-└── Casperia Marketplace
+└── OpenSim Marketplace
     └── Received Items
         └── Product Folder
 ```
@@ -60,7 +60,7 @@ lookup, or LSL delivery server.
 
 ## Service account
 
-`ServiceAccountUUID` must identify a normal local Casperia account with a valid inventory.
+`ServiceAccountUUID` must identify a normal local grid account with a valid inventory.
 
 The service account owns immutable published Marketplace snapshots.
 
@@ -81,7 +81,7 @@ customer deliveries.
 The module creates:
 
 ```text
-Casperia Marketplace
+OpenSim Marketplace
 └── Merchant Outbox
 ```
 
@@ -115,7 +115,7 @@ Publication creates a new version UUID.
 Snapshot folder/item UUIDs are deterministic from:
 
 ```text
-Casperia.Marketplace.v2
+OpenSimMarketplace.v2
 operation purpose
 version UUID
 source inventory node UUID
@@ -145,10 +145,10 @@ All endpoints are POST-only JSON and protected by OpenSim
 `BasicHttpAuthentication`.
 
 ```text
-POST /casperia/marketplace/v2/inventory
-POST /casperia/marketplace/v2/inspect
-POST /casperia/marketplace/v2/snapshot
-POST /casperia/marketplace/v2/deliver
+POST /opensim/marketplace/v2/inventory
+POST /opensim/marketplace/v2/inspect
+POST /opensim/marketplace/v2/snapshot
+POST /opensim/marketplace/v2/deliver
 ```
 
 ### Inventory
@@ -191,7 +191,7 @@ market-<order UUID>-<order item ID>
 The module writes:
 
 ```text
-Data/Casperia/marketplace-deliveries-v2.jsonl
+Data/OpenSimMarketplace/marketplace-deliveries-v2.jsonl
 ```
 
 The durable JSON Lines receipt binds:
@@ -227,7 +227,7 @@ Marketplace v2.0 delivers only to local grid accounts.
 Hypergrid inventory delivery is deliberately out of scope for this version because
 foreign inventory/asset routing has different ownership and asset-transfer boundaries.
 
-Gifts therefore require a local Casperia recipient. Checkout accepts an exact local avatar name or account UUID.
+Gifts therefore require a local grid recipient. Checkout accepts an exact local avatar name or account UUID.
 
 ## Website workflow
 
@@ -319,7 +319,7 @@ No public payment webhook is shipped in v2.0. A provider endpoint will be added 
 Import explicitly:
 
 ```text
-website/database/20260715_casperia_marketplace_v2.sql
+website/database/20260715_opensim_marketplace_v2.sql
 ```
 
 The migration refuses to run over the unpublished v1 warehouse-object prototype schema
@@ -371,7 +371,7 @@ The historical Exchange:
 - could fall back to script email delivery;
 - directly changed PHP account balance fields with old SQL code.
 
-Casperia Marketplace v2 retains the useful commerce workflow ideas and replaces the
+OpenSim Marketplace v2 retains the useful commerce workflow ideas and replaces the
 Magic Box/payment core with protected OpenSim inventory service operations, immutable
 listing snapshots, idempotent delivery receipts and an explicit payment-provider
 boundary.
@@ -396,7 +396,7 @@ foundation.
 
 Before merge:
 
-1. compile the module against the Casperia OpenSim checkpoint;
+1. compile the module against the target OpenSimulator build;
 2. create a dedicated local Marketplace service account;
 3. configure one stable Marketplace service region process;
 4. enable Basic authentication with a long random secret;

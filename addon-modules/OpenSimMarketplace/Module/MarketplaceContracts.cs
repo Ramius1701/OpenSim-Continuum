@@ -1,13 +1,13 @@
 /*
- * Casperia Marketplace
- * Version 2.0.0
+ * OpenSim Marketplace
+ * Version 2.1.0
  *
  * Protected Direct Delivery HTTP contracts.
  */
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace Casperia.Addons.Marketplace;
+namespace OpenSim.Addons.Marketplace;
 
 internal sealed class InventoryRequest
 {
