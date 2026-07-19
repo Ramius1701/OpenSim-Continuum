@@ -1,0 +1,83 @@
+<?xml version="1.0" ?>
+
+<!-- Gloebit Money Module -->
+<Project name="Gloebit" path="addon-modules/Gloebit/GloebitMoneyModule" type="Library" frameworkVersion="net8_0">
+  <Configuration name="Debug">
+	<Options>
+	  <OutputPath>../../../bin/</OutputPath>
+	</Options>
+  </Configuration>
+  <Configuration name="Release">
+	<Options>
+	  <OutputPath>../../../bin/</OutputPath>
+	</Options>
+  </Configuration>
+
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="log4net"/>
+  <Reference name="Mono.Addins"/>
+  <Reference name="MySql.Data"/>
+  <Reference name="Nini"/>
+  <Reference name="Npgsql"/>
+  <Reference name="OpenMetaverse"/>
+  <Reference name="OpenMetaverse.StructuredData"/>
+  <Reference name="OpenMetaverseTypes"/>
+  <Reference name="XMLRPC"/>
+  <Reference name="OpenSim.Data"/>
+  <Reference name="OpenSim.Data.MySQL"/>
+  <Reference name="OpenSim.Data.PGSQL"/>
+  <Reference name="OpenSim.Data.SQLite"/>
+  <Reference name="OpenSim.Framework"/>
+  <Reference name="OpenSim.Framework.Servers"/>
+  <Reference name="OpenSim.Framework.Servers.HttpServer"/>
+  <Reference name="OpenSim.Region.CoreModules"/>
+  <Reference name="OpenSim.Region.Framework"/>
+  <Reference name="OpenSim.Region.OptionalModules"/>
+  <Reference name="OpenSim.Region.ScriptEngine.Shared"/>
+  <Reference name="OpenSim.Region.ScriptEngine.Shared.Api.Runtime"/>
+  <Reference name="OpenSim.Server.Base"/>
+  <Reference name="OpenSim.Services.Interfaces"/>
+
+  <Files>
+	<Match pattern="*.cs" recurse="false"/>
+  </Files>
+
+  <EmbeddedResources>
+	<EmbeddedResource>
+	  <File>Resources\GloebitSubscriptionsMySQL.migrations</File>
+	  <LogicalName>GloebitSubscriptionsMySQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitSubscriptionsPGSQL.migrations</File>
+	  <LogicalName>GloebitSubscriptionsPGSQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitSubscriptionsSQLite.migrations</File>
+	  <LogicalName>GloebitSubscriptionsSQLite.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitTransactionsMySQL.migrations</File>
+	  <LogicalName>GloebitTransactionsMySQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitTransactionsPGSQL.migrations</File>
+	  <LogicalName>GloebitTransactionsPGSQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitTransactionsSQLite.migrations</File>
+	  <LogicalName>GloebitTransactionsSQLite.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitUsersMySQL.migrations</File>
+	  <LogicalName>GloebitUsersMySQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitUsersPGSQL.migrations</File>
+	  <LogicalName>GloebitUsersPGSQL.migrations</LogicalName>
+	</EmbeddedResource>
+	<EmbeddedResource>
+	  <File>Resources\GloebitUsersSQLite.migrations</File>
+	  <LogicalName>GloebitUsersSQLite.migrations</LogicalName>
+	</EmbeddedResource>
+  </EmbeddedResources>
+</Project>

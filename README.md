@@ -363,3 +363,18 @@ Historical source provenance remains available in the Git commit history.
 Report problems caused by enhanced features to this repository. Problems that
 are reproducible on an unmodified official OpenSim build should be reported to
 the official OpenSimulator project.
+
+## Additional grid add-on modules
+
+The following optional add-on modules are included under `addon-modules` and
+are generated into the OpenSim Enhanced solution by `runprebuild.bat`:
+
+- **Gloebit** — optional Gloebit economy integration.
+- **OpenSimMutelist** — external mute-list service integration.
+- **OpenSimProfile** — external profile, picks, classifieds, notes and interests integration.
+- **OpenSimSearch** — external viewer search service integration.
+- **OpenSimTide** — configurable per-region tide and water-level simulation.
+
+These modules are not enabled automatically. Their supplied configuration
+examples must be reviewed and merged into the appropriate Robust, GridCommon,
+or region configuration before runtime activation.
