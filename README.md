@@ -313,6 +313,65 @@ replacing a production MoneyServer.
 - A feature appearing in this README does not mean it is enabled in a
   production configuration.
 
+## Casperia Marketplace v2.0.0
+
+Casperia Marketplace is included as a complete Direct Delivery system rather
+than only an OpenSimulator DLL.
+
+### Included components
+
+- OpenSimulator add-on module source and `prebuild.xml`;
+- disabled regular configuration and matching `.ini.example`;
+- public PHP catalogue and product pages;
+- shopping cart, ordering, gifting, reviews and order history;
+- seller application, inventory synchronization and listing management;
+- Marketplace administration pages;
+- explicit Marketplace v2 MySQL schema;
+- PHP environment configuration template;
+- website and runtime deployment helper;
+- immutable service-account publication snapshots;
+- source and snapshot SHA-256 fingerprint validation;
+- idempotent original delivery and controlled redelivery;
+- durable JSON Lines delivery receipts.
+
+All Marketplace files are stored together under:
+
+`addon-modules/Casperia.Marketplace`
+
+Important paths:
+
+- OpenSim configuration:
+  `addon-modules/Casperia.Marketplace/config/Casperia.Marketplace.ini`
+- Website source:
+  `addon-modules/Casperia.Marketplace/website`
+- SQL migration:
+  `addon-modules/Casperia.Marketplace/website/database/20260715_casperia_marketplace_v2.sql`
+- PHP environment template:
+  `addon-modules/Casperia.Marketplace/website/include/marketplace_env.example.php`
+- Deployment helper:
+  `addon-modules/Casperia.Marketplace/Deploy-CasperiaMarketplace.ps1`
+- Detailed documentation:
+  `addon-modules/Casperia.Marketplace/README.md`
+
+The module is disabled by default. Configure a stable service-region UUID, a
+dedicated local Marketplace service-account UUID, matching server-side Basic
+authentication credentials, the website environment file, and the Marketplace
+database before enabling it.
+
+Example website deployment:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File .\addon-modules\Casperia.Marketplace\Deploy-CasperiaMarketplace.ps1 `
+    -WebsiteRoot "C:\path\to\casperia-website"
+
+The absence of LSL is intentional: v2 explicitly replaces the historical Magic Box and LSL delivery-server approach. :contentReference[oaicite:2]{index=2}
+
+## 4. Validate the PHP files
+
+```bat
+powershell -NoProfile -Command "Get-ChildItem 'addon-modules\Casperia.Marketplace\website' -Recurse -Filter '*.php' | ForEach-Object { & php -l $_.FullName; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }"
+
 ## Branch model
 
 | Branch | Purpose |
