@@ -150,6 +150,12 @@ namespace OpenSim.Grid.MoneyServer
 
         private bool m_forceTransfer = false;
         private string m_bankerAvatar = "";
+        // IP addresses allowed to call the AddBankerMoney admin endpoint. Defaults to
+        // localhost-only so this uncapped, un-rate-limited money-grant call can't be
+        // reached by anyone who merely learns/guesses the BankerAvatar UUID over the
+        // open network. Widen only to specific, trusted caller IPs if this needs to
+        // be reachable from elsewhere.
+        private List<string> m_bankerAllowedIPs = new List<string> { "127.0.0.1", "::1" };
 
         // Testbereich
         // Maximum pro Tag:
@@ -266,6 +272,7 @@ namespace OpenSim.Grid.MoneyServer
             m_defaultBalance = serverConfig.GetInt("DefaultBalance", m_defaultBalance);
             m_forceTransfer = serverConfig.GetBoolean("EnableForceTransfer", m_forceTransfer);
             m_bankerAvatar = serverConfig.GetString("BankerAvatar", m_bankerAvatar).ToLower();
+            m_bankerAllowedIPs = ParseAllowedIPs(serverConfig.GetString("BankerAllowedIPs", string.Join(",", m_bankerAllowedIPs)));
 
             m_moneyDBService = moneyDBService;
             m_moneyCore = moneyCore;
@@ -291,6 +298,7 @@ namespace OpenSim.Grid.MoneyServer
 
             string banker = m_server_config.GetString("BankerAvatar", m_bankerAvatar);
             m_bankerAvatar = banker.ToLower();
+            m_bankerAllowedIPs = ParseAllowedIPs(m_server_config.GetString("BankerAllowedIPs", string.Join(",", m_bankerAllowedIPs)));
 
             m_enableAmountZero = m_server_config.GetBoolean("EnableAmountZero", m_enableAmountZero);
             m_scriptSendMoney = m_server_config.GetBoolean("EnableScriptSendMoney", m_scriptSendMoney);
@@ -2390,6 +2398,21 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
+        private static List<string> ParseAllowedIPs(string raw)
+        {
+            List<string> result = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw))
+                return result;
+
+            foreach (string part in raw.Split(','))
+            {
+                string trimmed = part.Trim();
+                if (trimmed.Length > 0)
+                    result.Add(trimmed);
+            }
+            return result;
+        }
+
         public XmlRpcResponse handleAddBankerMoney(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             GetSSLCommonName(request);
@@ -2416,6 +2439,19 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+
+            // Check caller IP first. bankerID alone is not a secret (avatar UUIDs are
+            // discoverable in-world), so this endpoint must also be restricted to
+            // known, trusted caller addresses - see BankerAllowedIPs in MoneyServer.ini.
+            string callerAddress = remoteClient?.Address?.ToString() ?? string.Empty;
+            if (!m_bankerAllowedIPs.Contains(callerAddress))
+            {
+                m_log.ErrorFormat("[MONEY XMLRPC]: handleAddBankerMoney: Rejected call from disallowed address {0}", callerAddress);
+                m_log.Error("[MONEY XMLRPC]: handleAddBankerMoney: Add the caller's IP to BankerAllowedIPs at [MoneyServer] in MoneyServer.ini if this call should be trusted");
+                responseData["message"] = "not allowed add money to avatar!";
+                responseData["banker"] = false;
+                return response;
+            }
 
             // Check Banker Avatar
             if (m_bankerAvatar != UUID.Zero.ToString() && m_bankerAvatar != bankerID)
