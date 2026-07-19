@@ -147,7 +147,7 @@ mp_page_top('Cart', $user);
 
     <?php if (!$user): ?>
         <div class="mp-note" style="margin-top:1rem">
-            Sign in to your Casperia account to complete checkout.
+            Sign in to your grid account to complete checkout.
         </div>
     <?php else: ?>
         <form method="post" class="mp-card mp-form" style="margin-top:1rem">
@@ -174,7 +174,7 @@ mp_page_top('Cart', $user);
             </label>
 
             <div class="mp-note">
-                Gift delivery currently supports local Casperia accounts only. Exact avatar names and UUIDs are accepted.
+                Gift delivery currently supports local grid accounts only. Exact avatar names and UUIDs are accepted.
                 Hypergrid inventory delivery is not enabled in Marketplace v2.0.
             </div>
 

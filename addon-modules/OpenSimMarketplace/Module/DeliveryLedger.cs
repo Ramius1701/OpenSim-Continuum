@@ -1,6 +1,8 @@
+#nullable enable annotations
+
 /*
- * Casperia Marketplace
- * Version 2.0.0
+ * OpenSim Marketplace
+ * Version 2.1.0
  *
  * Append-only delivery receipt ledger.
  */
@@ -10,7 +12,7 @@ using System.IO;
 using System.Text.Json;
 using log4net;
 
-namespace Casperia.Addons.Marketplace;
+namespace OpenSim.Addons.Marketplace;
 
 internal sealed class DeliveryLedger
 {
@@ -76,7 +78,7 @@ internal sealed class DeliveryLedger
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[CASPERIA MARKETPLACE]: Delivery ledger write failed: {0}", ex);
+                m_log.ErrorFormat("[OPENSIM MARKETPLACE]: Delivery ledger write failed: {0}", ex);
                 error = ex.Message;
                 return false;
             }
@@ -105,7 +107,7 @@ internal sealed class DeliveryLedger
             catch (Exception ex)
             {
                 m_log.WarnFormat(
-                    "[CASPERIA MARKETPLACE]: Ignoring invalid ledger line {0}: {1}",
+                    "[OPENSIM MARKETPLACE]: Ignoring invalid ledger line {0}: {1}",
                     lineNumber,
                     ex.Message);
             }

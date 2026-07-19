@@ -83,7 +83,7 @@ mp_page_top($listing ? 'Edit Listing' : 'Create Listing', $user);
 
 <div class="mp-note">
     A listing source is one top-level folder in
-    <strong>Casperia Marketplace / Merchant Outbox</strong>.
+    <strong>OpenSim Marketplace / Merchant Outbox</strong>.
     Every inventory item in that product tree must currently be Copy + Transfer so the Marketplace can create and preserve an immutable published snapshot.
     Buyer permissions are still derived from each item's next-owner permissions.
 </div>

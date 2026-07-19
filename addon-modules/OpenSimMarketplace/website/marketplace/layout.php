@@ -8,7 +8,7 @@ function mp_page_top(
     global $siteRoot;
 
     $pageTitle =
-        $title . ' - Casperia Marketplace';
+        $title . ' - OpenSim Marketplace';
 
     require $siteRoot . '/include/header.php';
 
@@ -20,7 +20,7 @@ function mp_page_top(
     echo '<div class="mp-shell">';
     echo '<header class="mp-head">';
     echo '<div>';
-    echo '<a class="mp-brand" href="/marketplace/">Casperia Marketplace</a>';
+    echo '<a class="mp-brand" href="/marketplace/">OpenSim Marketplace</a>';
     echo '<div class="mp-kicker">Creator goods delivered directly to your OpenSim inventory.</div>';
     echo '</div>';
     echo '<nav class="mp-nav">';

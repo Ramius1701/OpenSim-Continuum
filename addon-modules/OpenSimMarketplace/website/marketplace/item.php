@@ -100,7 +100,7 @@ mp_page_top((string)$listing['title'], $user);
 
         <div class="mp-note" style="margin-top:1rem">
             This product is delivered as an inventory folder to
-            <strong>Casperia Marketplace / Received Items</strong>.
+            <strong>OpenSim Marketplace / Received Items</strong>.
             <?= !empty($listing['redelivery_enabled']) ? 'Buyer redelivery is enabled.' : 'Buyer redelivery is disabled for this listing.' ?>
         </div>
     </section>
@@ -130,7 +130,7 @@ mp_page_top((string)$listing['title'], $user);
                 <span><?= (int)$review['rating'] ?> / 5</span>
             </div>
             <p class="mp-muted">
-                <?= mp_h($review['buyer_name'] ?: 'Casperia Resident') ?> ·
+                <?= mp_h($review['buyer_name'] ?: 'Grid Resident') ?> ·
                 <?= mp_h($review['created_at']) ?>
             </p>
             <div style="white-space:pre-wrap"><?= mp_h($review['body']) ?></div>
