@@ -1,0 +1,34 @@
+; Casperia.Marketplace v2.0.0
+;
+; Direct Delivery marketplace add-on.
+;
+; Install on the OpenSim process hosting ServiceRegionUUID. The process must
+; have normal grid access to UserAccountService and InventoryService.
+
+[CasperiaMarketplace]
+    Enabled = true
+
+    ; Dedicated stable region/process used only as the HTTP service host.
+    ServiceRegionUUID = "00000000-0000-0000-0000-000000000000"
+
+    ; Dedicated LOCAL account whose inventory stores immutable published
+    ; Marketplace listing snapshots. Create this account normally before use.
+    ServiceAccountUUID = "00000000-0000-0000-0000-000000000000"
+
+    InventoryEndpointPath = "/casperia/marketplace/v2/inventory"
+    InspectEndpointPath = "/casperia/marketplace/v2/inspect"
+    SnapshotEndpointPath = "/casperia/marketplace/v2/snapshot"
+    DeliveryEndpointPath = "/casperia/marketplace/v2/deliver"
+
+    AuthType = "BasicHttpAuthentication"
+    HttpAuthUsername = "casperia-marketplace"
+    HttpAuthPassword = "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET"
+
+    ; false is acceptable only for loopback/private server-to-server transport.
+    RequireHttps = false
+    NotifyLocalUser = true
+
+    MaxRequestBodyBytes = 32768
+    MaxInventoryNodes = 5000
+
+    LedgerPath = "Data/Casperia/marketplace-deliveries-v2.jsonl"
