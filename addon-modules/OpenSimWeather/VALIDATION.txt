@@ -1,0 +1,64 @@
+OpenSimWeather 0.3.2 validation
+Date: 2026-07-19
+
+PASS - C# source parsed with tree-sitter C# grammar; no ERROR or missing nodes.
+PASS - prebuild.xml parsed as XML.
+PASS - Module/OpenSimWeather.Module.csproj parsed as XML.
+PASS - config/OpenSimWeather.autocycle.ini.example parsed and contains [Weather].
+PASS - config/OpenSimWeather.environment.ini.example parsed and contains [Weather].
+PASS - config/OpenSimWeather.ini.example parsed and contains [Weather].
+PASS - config/OpenSimWeather.manual.ini.example parsed and contains [Weather].
+PASS - config/OpenSimWeather.surface.ini.example parsed and contains [Weather].
+PASS - Complete reference contains all 76 canonical [Weather] keys; AdjustClouds is retained only as an undocumented legacy alias.
+PASS - Weather.Environment.Sunny contains all 22 environment fields changed by source.
+PASS - Weather.Environment.Rain contains all 22 environment fields changed by source.
+PASS - Weather.Environment.Storm contains all 22 environment fields changed by source.
+PASS - Weather.Environment.Snow contains all 22 environment fields changed by source.
+PASS - No developer-specific absolute source/build paths remain.
+PASS - No private/generated IDE or binary build artifacts are included.
+PASS - Var-region-aware spacing and global emitter ceiling are present.
+PASS - Configurable rain, storm, snow, lightning, puddle, and snow-surface textures are present.
+PASS - Environment profile sections and persistence acknowledgement are present.
+PASS - Multi-probe cover suppression and named exclusion volumes are present.
+PASS - Generated objects use non-backup insertion plus temporary flags.
+PASS - Failure rollback drains the complete tracked emitter set.
+PASS - Surface effects are capped, terrain-filtered, and optional.
+PASS - Current official-source API check: Scene.AddNewSceneObject(..., attachToBackup).
+PASS - Current official-source API check: Scene filtered physics ray support.
+PASS - Current official-source API check: Scene root-agent iteration.
+PASS - Current official-source API check: Scene object enumeration.
+PASS - Current official-source API check: SceneObjectGroup temporary instance marker.
+PASS - Current official-source API check: SceneObjectGroup backup state.
+PASS - Current official-source API check: SceneObjectGroup axis-aligned bounds.
+PASS - Current official-source API check: Physics non-phantom/all-prim filters.
+PASS - Current official-source API check: Particle system insertion.
+PASS - Current official-source API check: Primitive sphere factory.
+PASS - Current official-source API check: Primitive cylinder factory.
+
+PASS - Final distributable ZIP is checked with unzip -t after packaging.
+
+Not performed in this workspace:
+- A full OpenSim binary build. This workspace has no .NET SDK and no complete
+  OpenSim source checkout. Run runprebuild.bat and a clean build in the target
+  OpenSim repository before replacing the production module DLL.
+- Live viewer/physics testing. Cover suppression, particle appearance, EEP
+  restoration, var-region load, and surface effects require a controlled test
+  region on the target grid.
+
+0.3.2 add-on packaging checks
+-----------------------------
+PASS: archive top-level directory is OpenSimWeather/
+PASS: destination is addon-modules/OpenSimWeather/
+PASS: root prebuild.xml has Project as its document element
+PASS: root prebuild.xml contains no XML declaration
+PASS: root prebuild.xml contains no Prebuild, Solution, or top-level Configuration wrapper
+PASS: project path is addon-modules/OpenSimWeather/Module
+PASS: output/reference paths resolve repository-relatively to bin/
+
+0.3.2 OpenSim Enhanced packaging checks
+---------------------------------------
+PASS - public documentation uses capability-focused OpenSim Enhanced wording.
+PASS - migration removes addon-modules/Weather before installing OpenSimWeather.
+PASS - stale OpenSim.Addons.Weather.dll removal is documented.
+PASS - generated OpenSimWeather.Module.csproj is omitted from the source package.
+PASS - unused OpenMetaverse.StructuredData prebuild reference is removed.
