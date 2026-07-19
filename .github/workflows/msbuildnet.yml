@@ -2,7 +2,11 @@ name: .msbuildnet6
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "enhanced/integration", "feature/*" ]
+    paths:
+      - '**.cs'
+  pull_request:
+    branches: [ "enhanced/integration" ]
     paths:
       - '**.cs'
   workflow_dispatch:
@@ -10,7 +14,6 @@ on:
 jobs:
   build:
 
-    if: github.repository == 'opensim/opensim'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -29,10 +32,10 @@ jobs:
       run: dotnet build --configuration Release OpenSim.sln
 
     - name: release
-      if: success()
+      if: success() && github.event_name != 'pull_request'
       run: zip -r LastDotNetBuild.zip bin ThirdPartyLicenses README.md CONTRIBUTORS.txt LICENSE.txt 
     - uses: softprops/action-gh-release@v1
-      if: success()
+      if: success() && github.event_name != 'pull_request'
       with:
           tag_name: r${{ steps.vars.outputs.sha_short }}
           name: LastDotNetAutoBuild
