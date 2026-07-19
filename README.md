@@ -17,7 +17,7 @@ can continue to be merged, reviewed, built, and tested.
 | Region, scripting, and simulator enhancements | Integrated |
 | Combined development branch | `enhanced/integration` |
 | Integration date | 2026-07-19 |
-| Build checkpoints | Annotated tags named `opensim-enhanced-build-clean-*` |
+| Build checkpoints | Annotated component and build-clean tags |
 
 A successful compile is the first checkpoint. New services, database
 migrations, viewer CAPS, Hypergrid behavior, and optional modules still require
@@ -294,9 +294,10 @@ failure-recovery, and legal review.
 - OpenSim console-appender registration so background diagnostics move and redraw the MoneyServer # prompt correctly.
 - Focused production validation and SQL verification documents included with the module.
 
-The source integration does not alter a live in\MoneyServer.ini. Operators
+The source integration does not alter a live `bin/MoneyServer.ini`. Operators
 must review the included example and validation documents before activating or
 replacing a production MoneyServer.
+
 ## Important limitations
 
 - New enhanced database migrations are currently MySQL-only unless equivalent
@@ -313,64 +314,87 @@ replacing a production MoneyServer.
 - A feature appearing in this README does not mean it is enabled in a
   production configuration.
 
-## Casperia Marketplace v2.0.0
+## OpenSim Marketplace v2.1.0
 
-Casperia Marketplace is included as a complete Direct Delivery system rather
-than only an OpenSimulator DLL.
+OpenSim Marketplace is included as a complete, portable Direct Delivery system
+rather than only an OpenSimulator DLL. It was originally developed for Casperia,
+but the packaged implementation no longer hardcodes a grid name, website root,
+hostname, region UUID, service-account UUID, database credentials, or deployment
+path.
 
 ### Included components
 
 - OpenSimulator add-on module source and `prebuild.xml`;
 - disabled regular configuration and matching `.ini.example`;
 - public PHP catalogue and product pages;
-- shopping cart, ordering, gifting, reviews and order history;
-- seller application, inventory synchronization and listing management;
+- shopping cart, ordering, gifting, reviews, and order history;
+- seller application, inventory synchronization, and listing management;
 - Marketplace administration pages;
 - explicit Marketplace v2 MySQL schema;
 - PHP environment configuration template;
-- website and runtime deployment helper;
+- PHP host-integration adapter template;
 - immutable service-account publication snapshots;
 - source and snapshot SHA-256 fingerprint validation;
 - idempotent original delivery and controlled redelivery;
 - durable JSON Lines delivery receipts.
 
-All Marketplace files are stored together under:
+All Marketplace source files are stored together under:
 
-`addon-modules/Casperia.Marketplace`
+`addon-modules/OpenSimMarketplace`
 
 Important paths:
 
 - OpenSim configuration:
-  `addon-modules/Casperia.Marketplace/config/Casperia.Marketplace.ini`
+  `addon-modules/OpenSimMarketplace/config/OpenSimMarketplace.ini`
+- Matching configuration example:
+  `addon-modules/OpenSimMarketplace/config/OpenSimMarketplace.ini.example`
 - Website source:
-  `addon-modules/Casperia.Marketplace/website`
+  `addon-modules/OpenSimMarketplace/website`
 - SQL migration:
-  `addon-modules/Casperia.Marketplace/website/database/20260715_casperia_marketplace_v2.sql`
+  `addon-modules/OpenSimMarketplace/website/database/20260715_opensim_marketplace_v2.sql`
 - PHP environment template:
-  `addon-modules/Casperia.Marketplace/website/include/marketplace_env.example.php`
-- Deployment helper:
-  `addon-modules/Casperia.Marketplace/Deploy-CasperiaMarketplace.ps1`
+  `addon-modules/OpenSimMarketplace/website/include/marketplace_env.example.php`
+- PHP host-adapter template:
+  `addon-modules/OpenSimMarketplace/website/include/marketplace_host.example.php`
 - Detailed documentation:
-  `addon-modules/Casperia.Marketplace/README.md`
+  `addon-modules/OpenSimMarketplace/README.md`
 
-The module is disabled by default. Configure a stable service-region UUID, a
-dedicated local Marketplace service-account UUID, matching server-side Basic
-authentication credentials, the website environment file, and the Marketplace
-database before enabling it.
+The module is disabled by default. Both supplied INI files contain zero UUID
+placeholders. Each operator must provide a stable service-region UUID, a dedicated
+local Marketplace service-account UUID, matching server-side Basic authentication
+credentials, website environment settings, host-site integration callbacks, image
+storage outside the document root, and the Marketplace database before enabling
+the system.
 
-Example website deployment:
+The default protected service paths are configurable and use the neutral prefix:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
-    -File .\addon-modules\Casperia.Marketplace\Deploy-CasperiaMarketplace.ps1 `
-    -WebsiteRoot "C:\path\to\casperia-website"
+```text
+/opensim/marketplace/v2/inventory
+/opensim/marketplace/v2/inspect
+/opensim/marketplace/v2/snapshot
+/opensim/marketplace/v2/deliver
+```
 
-The absence of LSL is intentional: v2 explicitly replaces the historical Magic Box and LSL delivery-server approach. :contentReference[oaicite:2]{index=2}
+The PHP portal does not assume one website layout. Copy the website overlay into a
+compatible PHP site, copy both example integration files without the `.example`
+portion of their names, and adapt `marketplace_host.php` to the host site's database,
+session, login, user-account, and administrator APIs. Real credentials and local
+paths must remain outside version control.
 
-## 4. Validate the PHP files
+Validate the bundled PHP source before deployment:
 
 ```bat
-powershell -NoProfile -Command "Get-ChildItem 'addon-modules\Casperia.Marketplace\website' -Recurse -Filter '*.php' | ForEach-Object { & php -l $_.FullName; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }"
+powershell -NoProfile -Command "$failed=$false; Get-ChildItem 'addon-modules\OpenSimMarketplace\website' -Recurse -Filter '*.php' -File | ForEach-Object { & php -l $_.FullName; if($LASTEXITCODE -ne 0){$failed=$true} }; if($failed){exit 1}"
+```
+
+The absence of LSL is intentional. Marketplace v2 replaces the historical Magic
+Box and scripted delivery-server approach with protected server-side inventory
+operations. The legacy deterministic UUID namespace is retained internally so
+existing v2 inventory-folder identifiers remain stable.
+
+Build-clean portability checkpoint:
+
+`opensim-enhanced-marketplace-v2.1.0-portable`
 
 ## Branch model
 
