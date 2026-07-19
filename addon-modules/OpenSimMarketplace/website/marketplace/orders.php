@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mp_flash(
                 'success',
-                'Marketplace item redelivered to Casperia Marketplace / Received Items.'
+                'Marketplace item redelivered to OpenSim Marketplace / Received Items.'
             );
         }
 

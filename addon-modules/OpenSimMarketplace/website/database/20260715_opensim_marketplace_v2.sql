@@ -1,4 +1,4 @@
--- Casperia Marketplace v2.0.0
+-- OpenSim Marketplace v2.1.0
 -- Direct Delivery marketplace schema.
 -- Import explicitly. Runtime PHP never creates or alters tables.
 
@@ -19,7 +19,7 @@ BEGIN
           AND COLUMN_NAME = 'object_id'
     ) THEN
         SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Casperia Marketplace v1 prototype tables detected. Back up and remove the v1 ws_market_* tables before importing Marketplace v2.';
+            SET MESSAGE_TEXT = 'OpenSim Marketplace v1 prototype tables detected. Back up and remove the v1 ws_market_* tables before importing Marketplace v2.';
     END IF;
 END$$
 DELIMITER ;
@@ -276,7 +276,7 @@ ON DUPLICATE KEY UPDATE
     active = VALUES(active);
 
 INSERT INTO ws_market_schema (component, schema_version, applied_at)
-VALUES ('casperia_marketplace', 2, NOW())
+VALUES ('opensim_marketplace', 2, NOW())
 ON DUPLICATE KEY UPDATE
     schema_version = VALUES(schema_version),
     applied_at = VALUES(applied_at);

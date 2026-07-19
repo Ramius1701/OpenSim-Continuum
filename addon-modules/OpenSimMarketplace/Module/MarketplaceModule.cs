@@ -1,6 +1,8 @@
+#nullable enable annotations
+
 /*
- * Casperia Marketplace
- * Version 2.0.0
+ * OpenSim Marketplace
+ * Version 2.1.0
  *
  * Protected Direct Delivery inventory, snapshot, and fulfilment endpoints.
  */
@@ -23,16 +25,16 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-[assembly: Addin("Casperia.Marketplace", "2.0.0")]
-[assembly: AddinDescription("Casperia Direct Delivery marketplace inventory and fulfilment")]
+[assembly: Addin("OpenSimMarketplace", "2.1.0")]
+[assembly: AddinDescription("OpenSim Direct Delivery marketplace inventory and fulfilment")]
 [assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
 
-namespace Casperia.Addons.Marketplace;
+namespace OpenSim.Addons.Marketplace;
 
-[Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "CasperiaMarketplaceModule")]
+[Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "OpenSimMarketplaceModule")]
 public sealed class MarketplaceModule : ISharedRegionModule
 {
-    private const string ConfigSection = "CasperiaMarketplace";
+    private const string ConfigSection = "OpenSimMarketplace";
     private static readonly ILog Log = LogManager.GetLogger(MethodBase.GetCurrentMethod()?.DeclaringType);
     private static readonly Regex OperationIdPattern = new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex FingerprintPattern = new("^[0-9a-fA-F]{64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -49,15 +51,15 @@ public sealed class MarketplaceModule : ISharedRegionModule
     private int m_maxInventoryNodes = 5000;
     private UUID m_serviceRegionId = UUID.Zero;
     private UUID m_serviceAccountId = UUID.Zero;
-    private string m_inventoryPath = "/casperia/marketplace/v2/inventory";
-    private string m_inspectPath = "/casperia/marketplace/v2/inspect";
-    private string m_snapshotPath = "/casperia/marketplace/v2/snapshot";
-    private string m_deliveryPath = "/casperia/marketplace/v2/deliver";
+    private string m_inventoryPath = "/opensim/marketplace/v2/inventory";
+    private string m_inspectPath = "/opensim/marketplace/v2/inspect";
+    private string m_snapshotPath = "/opensim/marketplace/v2/snapshot";
+    private string m_deliveryPath = "/opensim/marketplace/v2/deliver";
     private Scene? m_serviceScene;
     private IServiceAuth? m_auth;
     private DeliveryLedger? m_ledger;
 
-    public string Name => "Casperia Marketplace";
+    public string Name => "OpenSim Marketplace";
     public Type ReplaceableInterface => null!;
 
     public void PostInitialise()
@@ -73,9 +75,9 @@ public sealed class MarketplaceModule : ISharedRegionModule
         m_enabled = true;
 
         if (!UUID.TryParse(config.GetString("ServiceRegionUUID", string.Empty).Trim(), out m_serviceRegionId) || m_serviceRegionId == UUID.Zero)
-            throw new Exception("[CasperiaMarketplace] ServiceRegionUUID must be a non-zero region UUID.");
+            throw new Exception("[OpenSimMarketplace] ServiceRegionUUID must be a non-zero region UUID.");
         if (!UUID.TryParse(config.GetString("ServiceAccountUUID", string.Empty).Trim(), out m_serviceAccountId) || m_serviceAccountId == UUID.Zero)
-            throw new Exception("[CasperiaMarketplace] ServiceAccountUUID must be a non-zero local account UUID.");
+            throw new Exception("[OpenSimMarketplace] ServiceAccountUUID must be a non-zero local account UUID.");
 
         m_inventoryPath = NormalizePath(config.GetString("InventoryEndpointPath", m_inventoryPath));
         m_inspectPath = NormalizePath(config.GetString("InspectEndpointPath", m_inspectPath));
@@ -83,7 +85,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
         m_deliveryPath = NormalizePath(config.GetString("DeliveryEndpointPath", m_deliveryPath));
 
         if (new[] { m_inventoryPath, m_inspectPath, m_snapshotPath, m_deliveryPath }.Distinct(StringComparer.Ordinal).Count() != 4)
-            throw new Exception("[CasperiaMarketplace] Marketplace endpoint paths must be unique.");
+            throw new Exception("[OpenSimMarketplace] Marketplace endpoint paths must be unique.");
 
         m_requireHttps = config.GetBoolean("RequireHttps", false);
         m_notifyLocalUser = config.GetBoolean("NotifyLocalUser", true);
@@ -91,26 +93,26 @@ public sealed class MarketplaceModule : ISharedRegionModule
         m_maxInventoryNodes = Math.Clamp(config.GetInt("MaxInventoryNodes", 5000), 10, 100000);
 
         if (!string.Equals(config.GetString("AuthType", string.Empty).Trim(), "BasicHttpAuthentication", StringComparison.Ordinal))
-            throw new Exception("[CasperiaMarketplace] AuthType must be BasicHttpAuthentication.");
+            throw new Exception("[OpenSimMarketplace] AuthType must be BasicHttpAuthentication.");
         if (string.IsNullOrWhiteSpace(config.GetString("HttpAuthUsername", string.Empty)) || string.IsNullOrEmpty(config.GetString("HttpAuthPassword", string.Empty)))
-            throw new Exception("[CasperiaMarketplace] HttpAuthUsername and HttpAuthPassword are required.");
+            throw new Exception("[OpenSimMarketplace] HttpAuthUsername and HttpAuthPassword are required.");
 
         m_auth = ServiceAuth.Create(source, ConfigSection)
-            ?? throw new Exception("[CasperiaMarketplace] OpenSim service authentication could not be created.");
+            ?? throw new Exception("[OpenSimMarketplace] OpenSim service authentication could not be created.");
 
-        string ledgerPath = config.GetString("LedgerPath", "Data/Casperia/marketplace-deliveries-v2.jsonl").Trim();
+        string ledgerPath = config.GetString("LedgerPath", "Data/OpenSimMarketplace/marketplace-deliveries-v2.jsonl").Trim();
         if (string.IsNullOrWhiteSpace(ledgerPath))
-            throw new Exception("[CasperiaMarketplace] LedgerPath is required.");
+            throw new Exception("[OpenSimMarketplace] LedgerPath is required.");
         m_ledger = new DeliveryLedger(ledgerPath, Log);
 
         Log.InfoFormat(
-            "[CASPERIA MARKETPLACE]: Direct Delivery enabled; service region={0}, service account={1}, ledger={2}",
+            "[OPENSIM MARKETPLACE]: Direct Delivery enabled; service region={0}, service account={1}, ledger={2}",
             m_serviceRegionId,
             m_serviceAccountId,
             m_ledger.PathName);
 
         if (!m_requireHttps)
-            Log.Warn("[CASPERIA MARKETPLACE]: RequireHttps is false. Keep the service endpoint on loopback/private transport or behind HTTPS.");
+            Log.Warn("[OPENSIM MARKETPLACE]: RequireHttps is false. Keep the service endpoint on loopback/private transport or behind HTTPS.");
     }
 
     public void AddRegion(Scene scene)
@@ -121,13 +123,13 @@ public sealed class MarketplaceModule : ISharedRegionModule
         lock (m_sceneSync)
         {
             if (m_serviceScene != null && !ReferenceEquals(m_serviceScene, scene))
-                throw new Exception("[CasperiaMarketplace] More than one scene matched ServiceRegionUUID.");
+                throw new Exception("[OpenSimMarketplace] More than one scene matched ServiceRegionUUID.");
 
             m_serviceScene = scene;
             if (m_registered)
                 return;
             if (m_auth == null || m_ledger == null)
-                throw new Exception("[CasperiaMarketplace] Module was not initialized correctly.");
+                throw new Exception("[OpenSimMarketplace] Module was not initialized correctly.");
 
             MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler(m_inventoryPath, m_auth, HandleInventoryRequest, Name + ".inventory"));
             MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler(m_inspectPath, m_auth, HandleInspectRequest, Name + ".inspect"));
@@ -135,7 +137,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
             MainServer.Instance.AddSimpleStreamHandler(new SimpleStreamHandler(m_deliveryPath, m_auth, HandleDeliveryRequest, Name + ".deliver"));
             m_registered = true;
 
-            Log.InfoFormat("[CASPERIA MARKETPLACE]: Registered Direct Delivery endpoints on region process hosting {0}.", scene.RegionInfo.RegionName);
+            Log.InfoFormat("[OPENSIM MARKETPLACE]: Registered Direct Delivery endpoints on region process hosting {0}.", scene.RegionInfo.RegionName);
         }
     }
 
@@ -196,7 +198,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
         }
         catch (Exception ex)
         {
-            Log.ErrorFormat("[CASPERIA MARKETPLACE]: Inventory request failed: {0}", ex);
+            Log.ErrorFormat("[OPENSIM MARKETPLACE]: Inventory request failed: {0}", ex);
             Write(response, 500, new { ok = false, message = "Inventory request failed." });
         }
     }
@@ -240,7 +242,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
         }
         catch (Exception ex)
         {
-            Log.ErrorFormat("[CASPERIA MARKETPLACE]: Inspect request failed: {0}", ex);
+            Log.ErrorFormat("[OPENSIM MARKETPLACE]: Inspect request failed: {0}", ex);
             Write(response, 500, new { ok = false, message = "Inspect request failed." });
         }
     }
@@ -307,7 +309,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
         }
         catch (Exception ex)
         {
-            Log.ErrorFormat("[CASPERIA MARKETPLACE]: Snapshot request failed for {0}: {1}", versionKey, ex);
+            Log.ErrorFormat("[OPENSIM MARKETPLACE]: Snapshot request failed for {0}: {1}", versionKey, ex);
             Write(response, 500, new { ok = false, version_key = versionKey, retryable = true, message = "Snapshot request failed." });
         }
     }
@@ -396,7 +398,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
         }
         catch (Exception ex)
         {
-            Log.ErrorFormat("[CASPERIA MARKETPLACE]: Delivery request failed for {0}: {1}", deliveryId, ex);
+            Log.ErrorFormat("[OPENSIM MARKETPLACE]: Delivery request failed for {0}: {1}", deliveryId, ex);
             Write(response, 500, DeliveryResponse.Error(deliveryId, "Delivery request failed.", true));
         }
     }
@@ -475,13 +477,13 @@ public sealed class MarketplaceModule : ISharedRegionModule
     private static string NormalizePath(string value)
     {
         string path = string.IsNullOrWhiteSpace(value)
-            ? throw new Exception("[CasperiaMarketplace] Endpoint path is required.")
+            ? throw new Exception("[OpenSimMarketplace] Endpoint path is required.")
             : value.Trim();
         if (!path.StartsWith('/'))
             path = "/" + path;
         path = Util.TrimEndSlash(path);
         if (path == "/")
-            throw new Exception("[CasperiaMarketplace] Endpoint path must not be HTTP root.");
+            throw new Exception("[OpenSimMarketplace] Endpoint path must not be HTTP root.");
         return path;
     }
 

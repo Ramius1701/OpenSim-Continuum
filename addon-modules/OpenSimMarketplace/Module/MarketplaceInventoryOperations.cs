@@ -1,6 +1,8 @@
+#nullable enable annotations
+
 /*
- * Casperia Marketplace
- * Version 2.0.0
+ * OpenSim Marketplace
+ * Version 2.1.0
  *
  * Direct Delivery inventory operations.
  *
@@ -22,11 +24,11 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
-namespace Casperia.Addons.Marketplace;
+namespace OpenSim.Addons.Marketplace;
 
 internal static class MarketplaceInventoryOperations
 {
-    private const string MarketplaceFolderName = "Casperia Marketplace";
+    private const string MarketplaceFolderName = "OpenSim Marketplace";
     private const string MerchantOutboxFolderName = "Merchant Outbox";
     private const string ServiceInventoryFolderName = "Marketplace Inventory";
     private const string ReceivedItemsFolderName = "Received Items";
@@ -289,7 +291,7 @@ internal static class MarketplaceInventoryOperations
                 NotifyRecipient(scene, inventory, recipientId, destination, snapshot.Items.Count);
 
             log.InfoFormat(
-                "[CASPERIA MARKETPLACE]: Delivered snapshot {0} to {1}; delivery={2}, destination={3}",
+                "[OPENSIM MARKETPLACE]: Delivered snapshot {0} to {1}; delivery={2}, destination={3}",
                 snapshotFolderId,
                 recipientId,
                 deliveryId,
@@ -303,7 +305,7 @@ internal static class MarketplaceInventoryOperations
         }
         catch (Exception ex)
         {
-            log.ErrorFormat("[CASPERIA MARKETPLACE]: Delivery {0} failed: {1}", deliveryId, ex);
+            log.ErrorFormat("[OPENSIM MARKETPLACE]: Delivery {0} failed: {1}", deliveryId, ex);
             return DeliveryResponse.Error(deliveryId, "Direct Delivery failed.", true);
         }
     }
@@ -611,6 +613,7 @@ internal static class MarketplaceInventoryOperations
 
     private static UUID CreateDeterministicUuid(string purpose, string value)
     {
+        // Retained as the v2 compatibility namespace so existing inventory folder UUIDs remain stable.
         byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes("Casperia.Marketplace.v2|" + purpose + "|" + value));
         byte[] uuid = new byte[16];
         Array.Copy(bytes, uuid, 16);
