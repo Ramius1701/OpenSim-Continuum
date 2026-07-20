@@ -454,7 +454,6 @@ are generated into the OpenSim Enhanced solution by `runprebuild.bat`:
 
 - **Gloebit** — optional Gloebit economy integration.
 - **OpenSimMutelist** — external mute-list service integration.
-- **OpenSimProfile** — external profile, picks, classifieds, notes and interests integration.
 - **OpenSimSearch** — external viewer search service integration.
 - **OpenSimTide** — configurable per-region tide and water-level simulation.
 
