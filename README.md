@@ -453,6 +453,7 @@ The following optional add-on modules are included under `addon-modules` and
 are generated into the OpenSim Enhanced solution by `runprebuild.bat`:
 
 - **Gloebit** — optional Gloebit economy integration.
+- **HoloPhysicsGuard** — reduces idle physics load by putting selected physical objects (e.g. bowling pins, vehicles, props) to sleep when a region becomes empty, then waking them again when an avatar enters. Reversible, database-tracked, with a report-only/dry-run mode.
 - **OpenSimMutelist** — external mute-list service integration.
 - **OpenSimSearch** — external viewer search service integration.
 - **OpenSimTide** — configurable per-region tide and water-level simulation.
