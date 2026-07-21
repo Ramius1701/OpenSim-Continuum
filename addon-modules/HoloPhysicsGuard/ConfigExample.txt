@@ -1,0 +1,42 @@
+put in bin/OpenSim.ini or bin/addon-modules/HoloPhysicsGuard.ini
+
+[HoloPhysicsGuard]
+Enabled = true
+Mode = PersistSleep
+DryRun = false
+
+ConnectionString = "Server=localhost;Port=3306;Database=opensim;User ID=opensim;Password=sss;SslMode=None;Pooling=true;Max Pool Size=300;Protocol=tcp;OldGuids=True;"
+AutoCreateTable = true
+
+SleepWhenEmpty = true
+WakeOnStart = false
+WakeOnAvatarEnter = true
+
+CheckIntervalSeconds = 5
+EmptyDelaySeconds = 10
+
+ZeroVelocities = true
+Verbose = true
+
+AlwaysSleepNameContains =
+NeverSleepNameContains =
+
+
+
+SQL Schema
+
+CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
+    region_uuid CHAR(36) NOT NULL,
+    object_uuid CHAR(36) NOT NULL,
+    scene_group_id CHAR(36) NOT NULL,
+    object_name VARCHAR(255) NOT NULL DEFAULT '',
+    original_object_flags BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    slept_at INT UNSIGNED NOT NULL,
+    slept_by VARCHAR(64) NOT NULL DEFAULT 'HoloPhysicsGuard',
+
+    PRIMARY KEY (region_uuid, object_uuid),
+    KEY idx_region_uuid (region_uuid),
+    KEY idx_scene_group_id (scene_group_id),
+    KEY idx_slept_at (slept_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
