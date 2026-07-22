@@ -1020,6 +1020,7 @@
       <Reference name="log4net"/>
       <Reference name="DotNetOpenId"/>
       <Reference name="Mono.Addins"/>
+      <Reference name="System.Drawing.Common"/>
 
       <Files>
         <Match pattern="*.cs" recurse="true">
