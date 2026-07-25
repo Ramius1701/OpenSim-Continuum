@@ -102,6 +102,19 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     private uint m_moneyServerPort = 8008;         // 8008 is default server port
     private Timer checkTimer;
 
+    // --- Casperia Prime addition: Stipends ---
+    // Reuses the exact same Timer pattern as checkTimer above, and the same
+    // proven addTransaction/DoTransfer/UpdateBalance path used by
+    // handleScriptTransaction in MoneyXmlRpcModule.cs - no new balance-moving
+    // logic, just a scheduled trigger for the existing, working mechanism.
+    private Timer m_stipendTimer;
+    private bool m_stipendEnabled = false;
+    private int m_stipendAmount = 0;
+    private int m_stipendIntervalDays = 7;
+    private string m_stipendDescription = "Weekly stipend";
+    private List<string> m_stipendEligibleAvatars = new List<string>();
+    private readonly string m_stipendStateFile = "stipend_lastrun.txt";
+
     private string m_certFilename = "";
     private string m_certPassword = "";
     private string m_cacertFilename = "";
@@ -183,10 +196,25 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         // Add event handler to check transactions
         checkTimer.Elapsed += CheckTransaction;
 
+        // --- Casperia Prime addition: Stipends ---
+        // Checks hourly whether enough time has passed since the last grant,
+        // rather than trying to schedule for an exact future moment - simpler,
+        // and tolerant of server restarts (won't forget or double-grant).
+        if (m_stipendEnabled)
+        {
+            m_stipendTimer = new Timer
+            {
+                Interval = 60 * 60 * 1000, // check hourly
+                Enabled = true
+            };
+            m_stipendTimer.Elapsed += CheckStipends;
+        }
+
         try
         {
             // Start the timer
             checkTimer.Start();
+            if (m_stipendEnabled) m_stipendTimer.Start();
 
             // Run the console prompt loop
             while (true)
@@ -206,6 +234,11 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
             {
                 checkTimer.Stop();
                 checkTimer.Dispose();
+            }
+            if (m_stipendTimer != null && m_stipendTimer.Enabled)
+            {
+                m_stipendTimer.Stop();
+                m_stipendTimer.Dispose();
             }
         }
     }
@@ -233,6 +266,55 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         catch (Exception ex)
         {
             m_log.ErrorFormat("[CHECK TRANSACTION]: Error in CheckTransaction: {0}", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Casperia Prime addition: checks hourly whether enough time has passed
+    /// since the last stipend grant, and if so, grants stipends to every
+    /// configured eligible avatar via MoneyXmlRpcModule.GrantStipends(),
+    /// which reuses the same proven addTransaction/DoTransfer/UpdateBalance
+    /// path handleScriptTransaction already uses - no new balance-moving
+    /// logic here, just scheduling.
+    /// </summary>
+    private void CheckStipends(object sender, ElapsedEventArgs e)
+    {
+        if (!m_stipendEnabled || m_moneyXmlRpcModule == null)
+        {
+            return;
+        }
+        if (m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0)
+        {
+            return; // already warned about this at startup, don't spam the log every hour
+        }
+
+        try
+        {
+            DateTime lastRun = DateTime.MinValue;
+            if (File.Exists(m_stipendStateFile))
+            {
+                string raw = File.ReadAllText(m_stipendStateFile).Trim();
+                DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.RoundtripKind, out lastRun);
+            }
+
+            if (DateTime.UtcNow - lastRun < TimeSpan.FromDays(m_stipendIntervalDays))
+            {
+                return; // not due yet
+            }
+
+            m_log.InfoFormat("[STIPEND]: Granting {0} to {1} avatar(s)", m_stipendAmount, m_stipendEligibleAvatars.Count);
+            m_moneyXmlRpcModule.GrantStipends(m_stipendAmount, m_stipendDescription, m_stipendEligibleAvatars);
+
+            // Record this run BEFORE the next check, regardless of individual
+            // per-avatar failures inside GrantStipends (those are logged
+            // there) - we don't want a single bad avatar entry to cause the
+            // whole grant to be retried repeatedly every hour.
+            File.WriteAllText(m_stipendStateFile, DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        catch (Exception ex)
+        {
+            m_log.ErrorFormat("[STIPEND]: Error in CheckStipends: {0}", ex.Message);
         }
     }
 
@@ -331,6 +413,35 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
             m_CurrencyOnOff = m_server_config.GetString("CurrencyOnOff", m_CurrencyOnOff);
             m_CurrencyGroupOnly = m_server_config.GetBoolean("CurrencyGroupOnly", m_CurrencyGroupOnly);
             m_CurrencyGroupName = m_server_config.GetString("CurrencyGroupName", m_CurrencyGroupName);
+
+            //
+            // [Stipend] - Casperia Prime addition, off by default.
+            IConfig stipend_config = moneyConfig.m_config.Configs["Stipend"];
+            if (stipend_config != null)
+            {
+                m_stipendEnabled = stipend_config.GetBoolean("Enabled", false);
+                m_stipendAmount = stipend_config.GetInt("Amount", 0);
+                m_stipendIntervalDays = stipend_config.GetInt("IntervalDays", 7);
+                m_stipendDescription = stipend_config.GetString("Description", "Weekly stipend");
+
+                string avatarList = stipend_config.GetString("EligibleAvatars", "");
+                m_stipendEligibleAvatars = new List<string>();
+                foreach (string uuid in avatarList.Split(','))
+                {
+                    string trimmed = uuid.Trim();
+                    if (trimmed.Length > 0) m_stipendEligibleAvatars.Add(trimmed);
+                }
+
+                if (m_stipendEnabled && (m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0))
+                {
+                    m_log.Warn("[MONEY SERVER]: [Stipend] Enabled=true but Amount is 0 or EligibleAvatars is empty - stipends will not actually grant anything until both are set.");
+                }
+                else if (m_stipendEnabled)
+                {
+                    m_log.InfoFormat("[MONEY SERVER]: Stipends enabled: {0} every {1} day(s) for {2} avatar(s)",
+                        m_stipendAmount, m_stipendIntervalDays, m_stipendEligibleAvatars.Count);
+                }
+            }
 
 
             //

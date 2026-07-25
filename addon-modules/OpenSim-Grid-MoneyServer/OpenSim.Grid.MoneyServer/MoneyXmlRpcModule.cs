@@ -2413,6 +2413,97 @@ namespace OpenSim.Grid.MoneyServer
             return result;
         }
 
+        /// <summary>
+        /// Casperia Prime addition: grants a stipend to each avatar in
+        /// eligibleAvatars. Called on a schedule from MoneyServerBase's
+        /// CheckStipends(), not via an incoming XML-RPC request - there is
+        /// no external caller to authenticate here, unlike
+        /// handleScriptTransaction, since this is triggered internally by
+        /// the server's own timer.
+        ///
+        /// Reuses the exact same addTransaction/DoTransfer/FetchTransaction/
+        /// UpdateBalance sequence handleScriptTransaction uses for SendMoney -
+        /// no new balance-moving logic, just applied to a list of avatars
+        /// instead of one XML-RPC caller's request.
+        /// </summary>
+        public void GrantStipends(int amount, string description, List<string> eligibleAvatars)
+        {
+            if (amount <= 0 || eligibleAvatars == null || eligibleAvatars.Count == 0)
+            {
+                return;
+            }
+
+            string senderID = UUID.Zero.ToString(); // system-generated money, same convention as elsewhere
+
+            foreach (string receiverID in eligibleAvatars)
+            {
+                if (!UUID.TryParse(receiverID, out UUID parsedReceiver) || parsedReceiver == UUID.Zero)
+                {
+                    m_log.ErrorFormat("[STIPEND]: Skipping invalid avatar UUID in EligibleAvatars: {0}", receiverID);
+                    continue;
+                }
+
+                try
+                {
+                    UserInfo receiverInfo = m_moneyDBService.FetchUserInfo(receiverID);
+                    if (receiverInfo == null)
+                    {
+                        m_log.ErrorFormat("[STIPEND]: Avatar {0} not found in DB, skipping.", receiverID);
+                        continue;
+                    }
+
+                    UUID transactionUUID = UUID.Random();
+                    int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
+
+                    TransactionData transaction = new TransactionData();
+                    transaction.TransUUID = transactionUUID;
+                    transaction.Sender = senderID;
+                    transaction.Receiver = receiverID;
+                    transaction.Amount = amount;
+                    transaction.ObjectUUID = UUID.Zero.ToString();
+                    transaction.RegionHandle = "0";
+                    transaction.Type = 0;
+                    transaction.Time = time;
+                    transaction.SecureCode = UUID.Random().ToString();
+                    transaction.Status = (int)Status.PENDING_STATUS;
+                    transaction.CommonName = GetSSLCommonName();
+                    transaction.Description = description + " " + DateTime.UtcNow.ToString();
+
+                    bool result = m_moneyDBService.addTransaction(transaction);
+                    if (!result)
+                    {
+                        m_log.ErrorFormat("[STIPEND]: addTransaction failed for avatar {0}", receiverID);
+                        continue;
+                    }
+
+                    if (m_moneyDBService.DoTransfer(transactionUUID))
+                    {
+                        transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                        if (transaction != null && transaction.Status == (int)Status.SUCCESS_STATUS)
+                        {
+                            string message = string.Format(m_BalanceMessageReceiveMoney, amount, "SYSTEM", "");
+                            UpdateBalance(receiverID, message);
+                            m_log.InfoFormat("[STIPEND]: Granted {0} to {1}", amount, receiverID);
+                        }
+                        else
+                        {
+                            m_log.ErrorFormat("[STIPEND]: Transfer did not complete successfully for avatar {0}", receiverID);
+                        }
+                    }
+                    else
+                    {
+                        m_log.ErrorFormat("[STIPEND]: DoTransfer failed for avatar {0}", receiverID);
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.ErrorFormat("[STIPEND]: Exception granting stipend to {0}: {1}", receiverID, e.ToString());
+                    // Continue to the next avatar rather than aborting the whole
+                    // batch over one avatar's failure.
+                }
+            }
+        }
+
         public XmlRpcResponse handleAddBankerMoney(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             GetSSLCommonName(request);
