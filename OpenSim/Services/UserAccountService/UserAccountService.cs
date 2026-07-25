@@ -199,6 +199,12 @@ namespace OpenSim.Services.UserAccountService
             else
                 u.Email = string.Empty;
             u.Created = Convert.ToInt32(d.Data["Created"].ToString());
+            if (d.Data.TryGetValue("TOSDate", out string valuetos) && valuetos != null)
+                Int32.TryParse(valuetos, out u.TOSDate);
+            if (d.Data.TryGetValue("DisplayName", out string valuedn) && !string.IsNullOrWhiteSpace(valuedn))
+                u.DisplayName = valuedn;
+            if (d.Data.TryGetValue("NameChanged", out string valuenc) && valuenc != null)
+                Int32.TryParse(valuenc, out u.NameChanged);
             if (d.Data.TryGetValue("UserTitle", out string valueut) && valueut != null)
                 u.UserTitle = valueut;
             else
@@ -311,7 +317,10 @@ namespace OpenSim.Services.UserAccountService
                     ["Email"] = data.Email,
                     ["Created"] = data.Created.ToString(),
                     ["UserLevel"] = data.UserLevel.ToString(),
-                    ["UserFlags"] = data.UserFlags.ToString()
+                    ["UserFlags"] = data.UserFlags.ToString(),
+                    ["TOSDate"] = data.TOSDate.ToString(),
+                    ["DisplayName"] = data.DisplayName ?? string.Empty,
+                    ["NameChanged"] = data.NameChanged.ToString()
                 }
             };
             if (!string.IsNullOrEmpty(data.UserTitle))
@@ -338,6 +347,38 @@ namespace OpenSim.Services.UserAccountService
 
             return m_Database.Store(d);
         }
+
+        /// <summary>
+        /// Sets an account's display name, ported from Mobius. Enforces the
+        /// same 7-day cooldown between changes as the real SL display name
+        /// feature (an empty displayName resets to the default name and
+        /// isn't rate-limited). This is the one place the actual logic
+        /// lives: both LocalUserAccountServicesConnector (in-process) and
+        /// the ROBUST-side UserAccountServerPostHandler (over the network,
+        /// once its MAGIC signature check passes) call through to this
+        /// rather than each re-implementing the rate-limit/reset rules.
+        /// </summary>
+        public bool SetDisplayName(UUID userID, string displayName)
+        {
+            UserAccount account = GetUserAccount(UUID.Zero, userID);
+            if (account is null)
+                return false;
+
+            bool resetting = string.IsNullOrWhiteSpace(displayName);
+            if (string.IsNullOrWhiteSpace(account.DisplayName) && resetting)
+                return false;
+
+            DateTime lastChanged = Util.ToDateTime(account.NameChanged);
+            int nowUnix = Util.UnixTimeSinceEpoch();
+            if (!resetting && lastChanged.AddDays(7) > Util.ToDateTime(nowUnix))
+                return false;
+
+            account.DisplayName = resetting ? string.Empty : displayName;
+            account.NameChanged = nowUnix;
+
+            return StoreUserAccount(account);
+        }
+
 
         public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
         {

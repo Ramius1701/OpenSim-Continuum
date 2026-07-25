@@ -174,6 +174,20 @@ namespace OpenSim.Region.Framework.Scenes
         /// </remarks>
         private readonly object m_completeMovementLock = new();
 
+        // Region-crossing/attachment fixes, ported from GuntharDeNiro/
+        // opensim. AttachmentScriptRestartDelayMS/m_attachmentScriptRestartGeneration
+        // debounce attachment script restarts so a rapid sequence of
+        // region crossings doesn't restart the same attachment's scripts
+        // over and over; m_forceMovementAnimationUpdateAfterCrossing/
+        // m_transferAgentUpdateWaitMS/m_showForeignActiveGroupTitles back
+        // the animation-resend, configurable-transfer-timeout, and HG
+        // foreign-group-title fixes further down in this file.
+        private const int AttachmentScriptRestartDelayMS = 2000;
+        private int m_attachmentScriptRestartGeneration;
+        private bool m_forceMovementAnimationUpdateAfterCrossing;
+        private int m_transferAgentUpdateWaitMS = 30000;
+        private bool m_showForeignActiveGroupTitles = true;
+
         /// <summary>
         /// Experimentally determined "fudge factor" to make sit-target positions
         /// the same as in SecondLife. Fudge factor was tested for 36 different
@@ -432,6 +446,15 @@ namespace OpenSim.Region.Framework.Scenes
                                                 ACFlags.AGENT_CONTROL_NUDGE_LEFT_NEG |
                                                 ACFlags.AGENT_CONTROL_NUDGE_UP_POS |
                                                 ACFlags.AGENT_CONTROL_NUDGE_UP_NEG);
+
+        // Used to clear transient movement control bits after a region
+        // crossing, ported from GuntharDeNiro/opensim, so leftover
+        // pre-crossing movement input doesn't bleed into the destination
+        // region's first movement update.
+        const uint CROSSING_TRANSIENT_MOVEMENT_MASK = CONTROL_FLAG_NORM_MASK |
+                                                CONTROL_FLAG_NUDGE_MASK |
+                                                (uint)ACFlags.AGENT_CONTROL_FAST_AT |
+                                                (uint)ACFlags.AGENT_CONTROL_FAST_UP;
 
         protected int  m_reprioritizationLastTime;
         protected bool m_reprioritizationBusy;
@@ -1184,7 +1207,15 @@ namespace OpenSim.Region.Framework.Scenes
                 string lpb = sconfig.GetString("LandingPointBehavior", "LandingPointBehavior_OS");
                 if (lpb == "LandingPointBehavior_SL")
                     m_LandingPointBehavior = LandingPointBehavior.SL;
+
+                m_transferAgentUpdateWaitMS = Math.Max(
+                    10000,
+                    sconfig.GetInt("TransferAgentUpdateWaitMS", m_transferAgentUpdateWaitMS));
             }
+
+            IConfig groupsConfig = m_scene.Config.Configs["Groups"];
+            if (groupsConfig != null)
+                m_showForeignActiveGroupTitles = groupsConfig.GetBoolean("ShowForeignActiveGroupTitles", m_showForeignActiveGroupTitles);
 
             ControllingClient.RefreshGroupMembership();
         }
@@ -1590,10 +1621,50 @@ namespace OpenSim.Region.Framework.Scenes
             // Resume scripts
             foreach (SceneObjectGroup sog in attachments)
             {
-                sog.RootPart.ParentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource());
-                sog.ResumeScripts();
-                sog.ScheduleGroupForFullUpdate();
+                try
+                {
+                    SceneObjectGroup parentGroup = sog?.RootPart?.ParentGroup;
+                    if (parentGroup == null)
+                        continue;
+
+                    parentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource());
+                    sog.ResumeScripts();
+                    sog.ScheduleGroupForFullUpdate();
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat(
+                        "[SCENE PRESENCE]: Failed restarting attachment scripts for {0} in {1}: {2}",
+                        Name, Scene.Name, e.Message);
+                }
             }
+        }
+
+        // Debounced attachment script restart, ported from GuntharDeNiro/
+        // opensim: a rapid sequence of region crossings (e.g. clipping
+        // back and forth across a border) would otherwise restart the
+        // same attachment's scripts once per crossing. Each call bumps a
+        // generation counter; only the last queued restart within the
+        // delay window actually runs.
+        private void QueueRestartAttachmentScripts()
+        {
+            int restartGeneration = Interlocked.Increment(ref m_attachmentScriptRestartGeneration);
+
+            Util.FireAndForget(x =>
+            {
+                if (AttachmentScriptRestartDelayMS > 0)
+                    Thread.Sleep(AttachmentScriptRestartDelayMS);
+
+                if (restartGeneration != m_attachmentScriptRestartGeneration || IsDeleted || IsChildAgent || IsInTransit)
+                    return;
+
+                RestartAttachmentScripts();
+            }, null, "ScenePresence.RestartAttachmentScripts");
+        }
+
+        public void CancelQueuedAttachmentScriptRestart()
+        {
+            Interlocked.Increment(ref m_attachmentScriptRestartGeneration);
         }
 
         private static bool IsRealLogin(TeleportFlags teleportFlags)
@@ -2108,7 +2179,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             try
             {
-                if(m_updateAgentReceivedAfterTransferEvent.WaitOne(10000))
+                if(m_updateAgentReceivedAfterTransferEvent.WaitOne(m_transferAgentUpdateWaitMS))
                 {
                     UUID originID = UUID.Zero;
 
@@ -2124,7 +2195,9 @@ namespace OpenSim.Region.Framework.Scenes
                }
                else
                {
-                   m_log.WarnFormat("[SCENE PRESENCE]: Update agent {0} at {1} did not receive agent update ", client.Name, Scene.Name);
+                   m_log.WarnFormat(
+                       "[SCENE PRESENCE]: Update agent {0} at {1} did not receive agent update after {2}ms",
+                       client.Name, Scene.Name, m_transferAgentUpdateWaitMS);
                    return false;
                }
             }
@@ -2254,6 +2327,12 @@ namespace OpenSim.Region.Framework.Scenes
                 ParcelDwellTickMS = Util.GetTimeStampMS();
 
                 m_inTransit = false;
+                if (m_forceMovementAnimationUpdateAfterCrossing)
+                {
+                    m_forceMovementAnimationUpdateAfterCrossing = false;
+                    Animator.ForceUpdateMovementAnimations();
+                }
+
                 ILandChannel landch = m_scene.LandChannel;
                 if (landch != null)
                 {
@@ -2372,11 +2451,7 @@ namespace OpenSim.Region.Framework.Scenes
                 {
                     if (m_attachments.Count > 0)
                     {
-                        foreach (SceneObjectGroup sog in m_attachments)
-                        {
-                            sog.RootPart.ParentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource());
-                            sog.ResumeScripts();
-                        }
+                        QueueRestartAttachmentScripts();
 
                         foreach (ScenePresence p in allpresences)
                         {
@@ -2827,6 +2902,8 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else if((flags & ACFlags.AGENT_CONTROL_FINISH_ANIM) != 0)
                     Animator.UpdateMovementAnimations();
+                else if (MovementFlags != 0)
+                    Animator.ResendMovementAnimationIfNeeded();
                 SendControlsToScripts((uint)allFlags);
             }
         }
@@ -3244,14 +3321,23 @@ namespace OpenSim.Region.Framework.Scenes
             TriggerScenePresenceUpdated();
         }
 
-        private SceneObjectPart FindNextAvailableSitTarget(UUID targetID)
+        // Ported from GuntharDeNiro/opensim - consults the SIT_FLAG_SCRIPTED_ONLY
+        // flag (SceneObjectPart.SetLslSitFlags/llSetLinkSitFlags), which was
+        // previously stored but never actually enforced anywhere.
+        private static bool CanUseSitTarget(SceneObjectPart part, bool scriptedSit)
+        {
+            return scriptedSit || !part.HasLslSitFlag(SceneObjectPart.LslSitFlagScriptedOnly);
+        }
+
+        private SceneObjectPart FindNextAvailableSitTarget(UUID targetID, bool scriptedSit)
         {
             SceneObjectPart targetPart = m_scene.GetSceneObjectPart(targetID);
             if (targetPart == null)
                 return null;
 
             // If the primitive the player clicked on has a sit target and that sit target is not full, that sit target is used.
-            if (targetPart.IsSitTargetSet && targetPart.SitTargetAvatar.IsZero() && targetPart.SitActiveRange >= 0)
+            if (targetPart.IsSitTargetSet && targetPart.SitTargetAvatar.IsZero() && targetPart.SitActiveRange >= 0
+                && CanUseSitTarget(targetPart, scriptedSit))
                 return targetPart;
 
             // If the primitive the player clicked on has no sit target, and one or more other linked objects
@@ -3265,7 +3351,8 @@ namespace OpenSim.Region.Framework.Scenes
             //look for prims with explicit sit targets that are available
             foreach (SceneObjectPart part in partArray)
             {
-                if (part.IsSitTargetSet && part.SitTargetAvatar.IsZero() && part.SitActiveRange >= 0)
+                if (part.IsSitTargetSet && part.SitTargetAvatar.IsZero() && part.SitActiveRange >= 0
+                    && CanUseSitTarget(part, scriptedSit))
                 {
                     if(lastPart == null)
                     {
@@ -3282,12 +3369,15 @@ namespace OpenSim.Region.Framework.Scenes
             }
 
             // no explicit sit target found - use original target
-            return lastPart ?? targetPart;
+            if (lastPart != null)
+                return lastPart;
+
+            return CanUseSitTarget(targetPart, scriptedSit) ? targetPart : null;
         }
 
-        private void SendSitResponse(UUID targetID, Vector3 offset, Quaternion sitOrientation)
+        private void SendSitResponse(UUID targetID, Vector3 offset, Quaternion sitOrientation, bool scriptedSit)
         {
-            SceneObjectPart part = FindNextAvailableSitTarget(targetID);
+            SceneObjectPart part = FindNextAvailableSitTarget(targetID, scriptedSit);
             if (part == null)
                 return;
 
@@ -3373,6 +3463,15 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void HandleAgentRequestSit(IClientAPI remoteClient, UUID agentID, UUID targetID, Vector3 offset)
         {
+            HandleAgentRequestSit(remoteClient, agentID, targetID, offset, false);
+        }
+
+        // Overload with a scriptedSit flag, ported from GuntharDeNiro/
+        // opensim - lets llSitOnLink bypass SIT_FLAG_SCRIPTED_ONLY (a
+        // sit target an avatar can't click themselves, only a script can
+        // seat them on) while regular click-to-sit still respects it.
+        public void HandleAgentRequestSit(IClientAPI remoteClient, UUID agentID, UUID targetID, Vector3 offset, bool scriptedSit)
+        {
             if (IsChildAgent)
                 return;
 
@@ -3385,7 +3484,7 @@ namespace OpenSim.Region.Framework.Scenes
             else if (SitGround)
                 StandUp();
 
-            SendSitResponse(targetID, offset, Quaternion.Identity);
+            SendSitResponse(targetID, offset, Quaternion.Identity, scriptedSit);
         }
 
         // returns  false if does not suport so older sit can be tried
@@ -3776,6 +3875,7 @@ namespace OpenSim.Region.Framework.Scenes
 
             TargetVelocity = direc;
             Animator.UpdateMovementAnimations();
+            Animator.ResendMovementAnimationIfNeeded();
         }
 
         #endregion
@@ -4905,16 +5005,16 @@ namespace OpenSim.Region.Framework.Scenes
             else
                  cAgent.CrossingFlags = 0;
 
-            if(isCrossUpdate)
-            {
-                //cAgent.agentCOF = COF;
-                cAgent.ActiveGroupID = ControllingClient.ActiveGroupId;
-                cAgent.ActiveGroupName = ControllingClient.ActiveGroupName;
-                if(Grouptitle == null)
-                    cAgent.ActiveGroupTitle = String.Empty;
-                else
-                    cAgent.ActiveGroupTitle = Grouptitle;
-            }
+            // Always carry active group display metadata. Hypergrid teleports use
+            // non-crossing AgentData too, and remote regions can only preserve
+            // the title if we send it with the transfer.
+            //cAgent.agentCOF = COF;
+            cAgent.ActiveGroupID = ControllingClient.ActiveGroupId;
+            cAgent.ActiveGroupName = ControllingClient.ActiveGroupName;
+            if(Grouptitle == null)
+                cAgent.ActiveGroupTitle = String.Empty;
+            else
+                cAgent.ActiveGroupTitle = Grouptitle;
 
             IFriendsModule friendsModule = m_scene.RequestModuleInterface<IFriendsModule>();
             if (friendsModule != null)
@@ -4925,6 +5025,9 @@ namespace OpenSim.Region.Framework.Scenes
 
         private void CopyFrom(AgentData cAgent)
         {
+            if (IsDeleted || cAgent == null)
+                return;
+
             m_callbackURI = cAgent.CallbackURI;
             m_newCallbackURI = cAgent.NewCallbackURI;
             //m_log.DebugFormat(
@@ -4967,7 +5070,8 @@ namespace OpenSim.Region.Framework.Scenes
 
             SetAlwaysRun = cAgent.AlwaysRun;
 
-            Appearance = new AvatarAppearance(cAgent.Appearance, true, true);
+            if (cAgent.Appearance != null)
+                Appearance = new AvatarAppearance(cAgent.Appearance, true, true);
 
             /*
             bool isFlying = ((m_AgentControlFlags & ACFlags.AGENT_CONTROL_FLY) != 0);
@@ -4981,15 +5085,18 @@ namespace OpenSim.Region.Framework.Scenes
 
             Scene.AttachmentsModule?.CopyAttachments(cAgent, this);
 
+            if (IsDeleted)
+                return;
+
             try
             {
                 lock (scriptedcontrols)
                 {
+                    scriptedcontrols.Clear();
+                    IgnoredControls = ScriptControlled.CONTROL_ZERO;
+
                     if (cAgent.Controllers != null)
                     {
-                        scriptedcontrols.Clear();
-                        IgnoredControls = ScriptControlled.CONTROL_ZERO;
-
                         foreach (ControllerData c in cAgent.Controllers)
                         {
                             ScriptControllers sc = new()
@@ -5014,7 +5121,14 @@ namespace OpenSim.Region.Framework.Scenes
             else
                 Animator.ResetAnimations();
 
-            Overrides.CopyAOPairsFrom(cAgent.MovementAnimationOverRides);
+            if (cAgent.MovementAnimationOverRides != null)
+                Overrides.CopyAOPairsFrom(cAgent.MovementAnimationOverRides);
+            else
+                Overrides.Clear();
+
+            if (ControllingClient == null)
+                return;
+
             int nanim = ControllingClient.NextAnimationSequenceNumber;
             // FIXME: Why is this null check necessary?  Where are the cases where we get a null Anims object?
             if (cAgent.DefaultAnim != null)
@@ -5044,12 +5158,19 @@ namespace OpenSim.Region.Framework.Scenes
             m_gotCrossUpdate = (m_crossingFlags != 0);
             if(m_gotCrossUpdate)
             {
+                m_AgentControlFlags &= unchecked((ACFlags)~CROSSING_TRANSIENT_MOVEMENT_MASK);
+                MovementFlags = 0;
+
+                if (ParentID == 0 && ParentUUID.IsZero() && (m_AgentControlFlags & ACFlags.AGENT_CONTROL_FLY) == 0)
+                    Animator.currentControlState = ScenePresenceAnimator.motionControlStates.onsurface;
+
                 LastCommands &= ~(ScriptControlled.CONTROL_LBUTTON | ScriptControlled.CONTROL_ML_LBUTTON);
                 if((cAgent.CrossExtraFlags & 1) != 0)
                     LastCommands |= ScriptControlled.CONTROL_LBUTTON;
                 if((cAgent.CrossExtraFlags & 2) != 0)
                     LastCommands |= ScriptControlled.CONTROL_ML_LBUTTON;
                 MouseDown = (cAgent.CrossExtraFlags & 3) != 0;
+                m_forceMovementAnimationUpdateAfterCrossing = true;
             }
 
             m_haveGroupInformation = false;
@@ -5068,9 +5189,22 @@ namespace OpenSim.Region.Framework.Scenes
                 }
                 else
                 {
-                    // we got a unknown active group so get what groups thinks about us
-                    IGroupsModule gm = m_scene.RequestModuleInterface<IGroupsModule>();
-                    gm?.SendAgentGroupDataUpdate(ControllingClient);
+                    if (m_showForeignActiveGroupTitles && cAgent.ActiveGroupID.NotEqual(UUID.Zero) &&
+                            !String.IsNullOrEmpty(cAgent.ActiveGroupTitle))
+                    {
+                        // Hypergrid visitors may arrive with a valid home-grid
+                        // title for a group this region cannot verify. Preserve
+                        // only the visible title; do not add membership or grant
+                        // powers on the local grid.
+                        ControllingClient.ActiveGroupPowers = 0;
+                        Grouptitle = cAgent.ActiveGroupTitle;
+                    }
+                    else
+                    {
+                        // we got a unknown active group so get what groups thinks about us
+                        IGroupsModule gm = m_scene.RequestModuleInterface<IGroupsModule>();
+                        gm?.SendAgentGroupDataUpdate(ControllingClient);
+                    }
                 }
             }
 
@@ -6805,9 +6939,22 @@ namespace OpenSim.Region.Framework.Scenes
 
         public void HasMovedAway(bool nearRegion)
         {
+            HasMovedAway(nearRegion, true);
+        }
+
+        // Overload with deleteAttachments control, ported from
+        // GuntharDeNiro/opensim - lets EntityTransferModule defer
+        // attachment cleanup on the source region briefly during a
+        // neighbour crossing, reducing a visible detach/reattach flash
+        // when the destination region is still reattaching the same
+        // items. The 1-arg overload above preserves the old behavior
+        // (always deletes immediately) for every other existing caller.
+        public void HasMovedAway(bool nearRegion, bool deleteAttachments)
+        {
             if (nearRegion)
             {
-                Scene.AttachmentsModule?.DeleteAttachmentsFromScene(this, true);
+                if (deleteAttachments)
+                    Scene.AttachmentsModule?.DeleteAttachmentsFromScene(this, true);
 
                 if (!ParcelHideThisAvatar || IsViewerUIGod)
                     return;

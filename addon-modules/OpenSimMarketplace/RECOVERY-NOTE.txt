@@ -1,0 +1,44 @@
+OPENSIM MARKETPLACE V2 RECOVERY / DESIGN NOTE
+================================================
+
+Historical donor:
+TASIA Marketplace plus Skidz Parts Exchange 1.0 reference archive.
+
+TASIA Marketplace result:
+The original donor was only a small protected delivery endpoint and did not supply a
+complete Marketplace product.
+
+Skidz Parts Exchange result:
+The old Exchange was a feature-rich historical XStreet/SLE-style site with merchant
+inventory, Magic Boxes, listing association, gifting, quantity, reviews, wishlists,
+commissions and sales reporting.
+
+Rejected historical architecture:
+- Magic Box object delivery.
+- Volatile simulator/object HTTP URLs.
+- Product-name LIKE matching.
+- LSL HTTP/email delivery fallback.
+- Direct website balance SQL.
+- PHP 4-era mysql_* design.
+- Rezzed Marketplace warehouse objects.
+
+Marketplace v2 portability decision:
+- Marketplace remains addon-modules/OpenSimMarketplace.
+- Current OpenSim inventory services are the extension seam.
+- Seller inventory uses OpenSim Marketplace/Merchant Outbox.
+- One top-level Outbox folder equals one product source.
+- Publication creates an immutable service-account inventory snapshot.
+- Each listing has an immutable inventory version.
+- Source and stored snapshot receive SHA-256 tree fingerprints.
+- Delivery verifies the expected snapshot fingerprint.
+- Recipient folder is OpenSim Marketplace/Received Items.
+- Delivery IDs and inventory node UUIDs are deterministic/idempotent.
+- Original delivery, redelivery and test delivery are separate receipt types.
+- Current-owner Copy + Transfer is required for source reliability.
+- Recipient permissions apply next-owner propagation.
+- Local accounts only for v2 delivery/gifts.
+- Website adds catalogue, cart, gifting, seller workflow, images, quantity, maturity,
+  order history, redelivery, verified-purchase reviews, merchant statements and admin
+  review.
+- Paid orders use a payment-provider boundary; manual approval is the safe default.
+- No direct balance-table updates are performed.

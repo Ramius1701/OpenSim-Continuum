@@ -129,6 +129,19 @@ namespace OpenSim.Region.ScriptEngine.Shared
         public UUID Group;
         public string Name;
         public UUID Owner;
+
+        // Backs llDetectedRezzer, ported from GuntharDeNiro/opensim. Unlike
+        // the source project (which always left this at UUID.Zero - its
+        // own construction path never actually populated it), this is
+        // wired up for real below using SceneObjectGroup.RezzerID, which
+        // current core already tracks.
+        public UUID Rezzer;
+
+        // Combat2 damage fields, ported from GuntharDeNiro/opensim - back
+        // llDetectedDamage/llAdjustDamage.
+        public double Damage;
+        public double OriginalDamage;
+        public int DamageType;
         public LSL_Types.Vector3 Position;
         public LSL_Types.Quaternion Rotation;
         public int Type;
@@ -224,6 +237,7 @@ namespace OpenSim.Region.ScriptEngine.Shared
             Group = part.GroupID;
             Name = part.Name;
             Owner = part.OwnerID;
+            Rezzer = part.ParentGroup.RezzerID;
             if (part.Velocity.IsZero())
                 Type = PASSIVE;
             else
@@ -291,6 +305,7 @@ namespace OpenSim.Region.ScriptEngine.Shared
                 Type = 2;
 
             part = part.ParentGroup.RootPart;
+            Rezzer = part.ParentGroup.RezzerID;
             foreach (SceneObjectPart p in part.ParentGroup.Parts)
             {
                 if (p.Inventory.ContainsScripts())

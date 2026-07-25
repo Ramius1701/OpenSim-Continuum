@@ -50,6 +50,12 @@ namespace OpenSim.Services.Interfaces
         public DateTime Login;
         public DateTime Logout;
 
+        // HG display name federation, ported from Mobius. Only meaningful
+        // for foreign (HG) visitors: caches the last known display name
+        // fetched from their home grid, and when it was last refreshed.
+        public string DisplayName = string.Empty;
+        public DateTime NameCached = DateTime.MinValue;
+
         public GridUserInfo() {}
 
         public GridUserInfo(Dictionary<string, object> kvp)
@@ -77,6 +83,11 @@ namespace OpenSim.Services.Interfaces
                 DateTime.TryParse(kvp["Logout"].ToString(), out Logout);
             if (kvp.ContainsKey("Online"))
                 Boolean.TryParse(kvp["Online"].ToString(), out Online);
+            if (kvp.ContainsKey("DisplayName") && kvp["DisplayName"] is not null)
+                DisplayName = kvp["DisplayName"].ToString();
+            if (kvp.ContainsKey("NameCached") && kvp["NameCached"] is not null
+                    && !string.IsNullOrWhiteSpace(kvp["NameCached"].ToString()))
+                DateTime.TryParse(kvp["NameCached"].ToString(), out NameCached);
 
         }
 
@@ -96,6 +107,8 @@ namespace OpenSim.Services.Interfaces
             result["Online"] = Online.ToString();
             result["Login"] = Login.ToString();
             result["Logout"] = Logout.ToString();
+            result["DisplayName"] = DisplayName;
+            result["NameCached"] = NameCached.ToString();
 
             return result;
         }
@@ -131,5 +144,19 @@ namespace OpenSim.Services.Interfaces
 
         GridUserInfo GetGridUserInfo(string userID);
         GridUserInfo[] GetGridUserInfo(string[] userID);
+
+        /// <summary>
+        /// Batch lookup with HG display-name federation, ported from Mobius.
+        /// When update_name is true, any foreign (HG) user's cached display
+        /// name that has gone stale is refreshed from their home grid's
+        /// get_display_names endpoint before being returned.
+        /// </summary>
+        GridUserInfo[] GetGridUserInfo(string[] userID, bool update_name);
+
+        /// <summary>
+        /// Caches a foreign visitor's display name, as reported by their
+        /// own home grid/viewer on arrival. Ported from Mobius.
+        /// </summary>
+        bool SetDisplayName(string userID, string displayName);
     }
 }

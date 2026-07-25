@@ -104,6 +104,10 @@
 
 [ServiceList]
     AssetServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
+    ; Casperia Prime addition (not upstream OpenSim): lets an external web
+    ; front end fetch avatar/snapshot textures as plain PNG, no separate
+    ; OpenJPEG install needed - see [TexturePngService] below.
+    TexturePngServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:TexturePngServiceConnector"
     InventoryInConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     ;; Uncomment if you have set up Freeswitch (see [FreeswitchService] below)
     ;VoiceConnector = "8004/OpenSim.Server.Handlers.dll:FreeswitchServerConnector"
@@ -132,6 +136,11 @@
 
     ;; Uncomment if you want to have centralized estate data
     ; EstateDataService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:EstateDataRobustConnector"
+
+    ;; Uncomment if you want to have abuse reports (ported from Mobius fork).
+    ;; Also needs a [Modules] AbuseReportsService = RemoteAbuseReportsServicesConnector
+    ;; on the region side, and an [AbuseReportsService] section below.
+    ; AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
 
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
@@ -283,6 +292,30 @@
     AllowRemoteDeleteAllTypes = false
 
 
+; * Casperia Prime addition (not upstream OpenSim).
+; *
+; * Lets an external web front end (a PHP site, for example) fetch avatar/
+; * snapshot textures as plain PNG over a stable, session-independent HTTP
+; * endpoint - no separate OpenJPEG install or exec() call needed. Reuses
+; * the same managed OpenMetaverse.Imaging.OpenJPEG decoder OpenSim's own
+; * GetTexture capability and map tile renderer already use internally.
+; *
+; * Usage: GET http://this-host:${Const|PublicPort}/texture_png?id=<uuid>
+; *   200 + image/png  -> decoded PNG bytes
+; *   400 / 404 / 415   -> bad id / asset not found / not a JPEG2000 texture
+; *
+[TexturePngService]
+    Enabled = true
+
+    ; Must match your [AssetService] LocalServiceModule above exactly.
+    LocalServiceModule = "OpenSim.Services.AssetService.dll:AssetService"
+
+    ; No ConnectionString needed here if [DatabaseService] below already has
+    ; your DB connection string - this falls back to that shared connection,
+    ; same as [AssetService] does. Only set this if you want a different DB.
+    ; ConnectionString = "Data Source=...;"
+
+
 ; * This configuration loads the inventory server modules. It duplicates
 ; * the function of the legacy inventory server
 ; *
@@ -406,6 +439,12 @@
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:UserAccountService"
     ; Realm = "UserAccounts"
 
+    ; Only needed if using Display Names (ported from Mobius): must match
+    ; DisplayNameSecret under [UserAccountService] in every region's
+    ; GridCommon.ini that connects to this grid. Authenticates
+    ; SetDisplayName requests coming in over the network from regions.
+    ; DisplayNameSecret = ""
+
     ; These are for creating new accounts by the service
     AuthenticationService = "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService"
     PresenceService = "OpenSim.Services.PresenceService.dll:PresenceService"
@@ -473,6 +512,16 @@
     SimulationService ="OpenSim.Services.Connectors.dll:SimulationServiceConnector"
     LibraryService = "OpenSim.Services.InventoryService.dll:LibraryService"
     FriendsService = "OpenSim.Services.FriendsService.dll:FriendsService"
+
+    ; AuthenticationService above (in [UserAccountService]) chooses the actual
+    ; auth backend for the whole grid. To offer RSA public-key login in
+    ; addition to password login, set it there to:
+    ; AuthenticationService = "OpenSim.Services.AuthenticationService.dll:RSAKeyAndPasswordAuthenticationService"
+
+    ; If set, users whose account's accepted-TOS date is older than TOS_Date
+    ; will be shown TOS_URL and asked to agree before being allowed to log in.
+    ; TOS_URL = ""
+    ; TOS_Date = 0
 
     ; The minimum user level required for a user to be able to login.  0 by default
     ; If you disable a particular user's account then you can set their login level below this number.
@@ -638,3 +687,7 @@
 
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
+
+[AbuseReportsService]
+    LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    ;; ConnectionString = "Data Source=localhost;Database=robust;User ID=robust;Password=*****;Old Guids=true;CharSet=utf8mb4;"

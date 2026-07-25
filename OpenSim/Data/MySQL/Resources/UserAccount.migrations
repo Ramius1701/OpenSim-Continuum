@@ -29,3 +29,21 @@ BEGIN;
 ALTER TABLE `UserAccounts` ADD `active` INT NOT NULL DEFAULT '1';
 
 COMMIT;
+
+:VERSION 7		# -------------------------
+
+BEGIN;
+
+ALTER TABLE `UserAccounts` ADD COLUMN `TOSDate` INT UNSIGNED NULL;
+
+COMMIT;
+
+:VERSION 8		# -------------------------
+
+BEGIN;
+
+ALTER TABLE `UserAccounts`
+	ADD COLUMN `DisplayName` VARCHAR(255) NOT NULL DEFAULT '',
+	ADD COLUMN `NameChanged` INT UNSIGNED NOT NULL DEFAULT '0';
+
+COMMIT;

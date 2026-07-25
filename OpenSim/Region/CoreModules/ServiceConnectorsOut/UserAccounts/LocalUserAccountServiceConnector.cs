@@ -248,6 +248,17 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
             m_Cache.Invalidate(userID);
         }
 
+        // In-process call - no network boundary to protect, so this goes
+        // straight to UserAccountService.SetDisplayName rather than through
+        // a MAGIC-signed request like the Remote connector needs to.
+        public bool SetDisplayName(UUID userID, string displayName)
+        {
+            bool ret = UserAccountService.SetDisplayName(userID, displayName);
+            if (ret)
+                m_Cache.Invalidate(userID);
+            return ret;
+        }
+
         #endregion
     }
 }

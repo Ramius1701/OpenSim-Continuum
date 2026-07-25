@@ -239,6 +239,10 @@ namespace OpenSim.Region.Framework.Scenes
         public bool DisableObjectTransfer { get; set; }
 
         public bool m_useFlySlow;
+        // Configurable per-sex walk animation, ported from GuntharDeNiro/
+        // opensim - see ScenePresenceAnimator.ResolveWalkAnimation.
+        public string m_maleWalkAnimation = "WALK";
+        public string m_femaleWalkAnimation = "FEMALE_WALK";
         public bool m_useTrashOnDelete = true;
 
          protected float m_defaultDrawDistance = 255f;
@@ -474,6 +478,21 @@ namespace OpenSim.Region.Framework.Scenes
 
         private readonly Timer m_mapGenerationTimer = new();
         private readonly bool m_generateMaptiles;
+        // Background maptile generation, ported from GuntharDeNiro/opensim
+        // - defers the (potentially expensive) map tile render so it
+        // doesn't block region startup/grid registration, optionally
+        // waiting for a startup delay and/or for all avatars to leave
+        // before rendering.
+        private readonly bool m_generateMaptilesInBackground;
+        private readonly int m_backgroundMaptileStartupDelaySeconds;
+        private readonly int m_backgroundMaptileThreadStackSizeKB;
+        private readonly bool m_backgroundMaptileDeferWithAgents;
+        private readonly bool m_mapGenerationForceGC;
+        private readonly bool m_mapGenerationTimerEnabled;
+        private volatile bool m_backgroundMaptileGenerationRunning;
+        private volatile bool m_gridRegistrationCompleted;
+        private volatile bool m_primsLoadedForMaptile;
+        private static readonly SemaphoreSlim s_backgroundMaptileGenerationSemaphore = new(1, 1);
 
         protected int m_lastHealth = -1;
         protected int m_lastUsers = -1;
@@ -928,6 +947,8 @@ namespace OpenSim.Region.Framework.Scenes
 
                 //Animation states
                 m_useFlySlow = startupConfig.GetBoolean("enableflyslow", false);
+                m_maleWalkAnimation = startupConfig.GetString("male_walk_animation", m_maleWalkAnimation);
+                m_femaleWalkAnimation = startupConfig.GetString("female_walk_animation", m_femaleWalkAnimation);
 
                 SeeIntoRegion = startupConfig.GetBoolean("see_into_region", SeeIntoRegion);
 
@@ -1010,6 +1031,16 @@ namespace OpenSim.Region.Framework.Scenes
 
                 m_generateMaptiles
                     = Util.GetConfigVarFromSections<bool>(config, "GenerateMaptiles", possibleMapConfigSections, true);
+                m_generateMaptilesInBackground
+                    = Util.GetConfigVarFromSections<bool>(config, "GenerateMaptilesInBackground", possibleMapConfigSections, true);
+                m_backgroundMaptileStartupDelaySeconds = Math.Max(0,
+                    Util.GetConfigVarFromSections<int>(config, "MaptileStartupDelaySeconds", possibleMapConfigSections, 180));
+                m_backgroundMaptileThreadStackSizeKB = Math.Max(1024,
+                    Util.GetConfigVarFromSections<int>(config, "MaptileThreadStackSizeKB", possibleMapConfigSections, 8192));
+                m_backgroundMaptileDeferWithAgents
+                    = Util.GetConfigVarFromSections<bool>(config, "MaptileDeferIfAgentsPresent", possibleMapConfigSections, true);
+                m_mapGenerationForceGC
+                    = Util.GetConfigVarFromSections<bool>(config, "MaptileForceGC", possibleMapConfigSections, false);
 
                 if (m_generateMaptiles)
                 {
@@ -1017,6 +1048,7 @@ namespace OpenSim.Region.Framework.Scenes
                     m_log.InfoFormat("[SCENE]: Region {0}, WORLD MAP refresh time set to {1} seconds", RegionInfo.RegionName, maptileRefresh);
                     if (maptileRefresh != 0)
                     {
+                        m_mapGenerationTimerEnabled = true;
                         m_mapGenerationTimer.Interval = maptileRefresh * 1000;
                         m_mapGenerationTimer.Elapsed += RegenerateMaptileAndReregister;
                         m_mapGenerationTimer.AutoReset = false;
@@ -2267,11 +2299,11 @@ namespace OpenSim.Region.Framework.Scenes
         {
             m_sceneGridService.SetScene(this);
 
-            //// Unfortunately this needs to be here and it can't be async.
-            //// The map tile image is stored in RegionSettings, but it also needs to be
-            //// stored in the GridService, because that's what the world map module uses
-            //// to send the map image UUIDs (of other regions) to the viewer...
-            if (m_generateMaptiles)
+            //// Historically this was synchronous because the generated image UUID is stored
+            //// in RegionSettings before being propagated to the grid.  High-quality map
+            //// rendering can be expensive, so the default is now to register immediately
+            //// and regenerate/reregister the finished maptile in the background.
+            if (m_generateMaptiles && !m_generateMaptilesInBackground)
                 RegenerateMaptile();
 
             GridRegion region = new(RegionInfo);
@@ -2284,6 +2316,11 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (error != String.Empty)
                 throw new Exception(error);
+
+            m_gridRegistrationCompleted = true;
+
+            if (m_generateMaptiles && m_generateMaptilesInBackground && m_primsLoadedForMaptile)
+                RegenerateMaptileAndReregisterInBackground();
         }
 
         #endregion
@@ -2345,7 +2382,11 @@ namespace OpenSim.Region.Framework.Scenes
             }
 
             LoadingPrims = false;
+            m_primsLoadedForMaptile = true;
             EventManager.TriggerPrimsLoaded(this);
+
+            if (m_generateMaptiles && m_generateMaptilesInBackground && m_gridRegistrationCompleted)
+                RegenerateMaptileAndReregisterInBackground();
         }
 
         public bool SupportsRayCastFiltered()
@@ -5973,19 +6014,89 @@ Environment.Exit(1);
         {
             RegenerateMaptile();
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
+            if (m_mapGenerationForceGC)
+            {
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
+            }
 
             // We need to propagate the new image UUID to the grid service
             // so that all simulators can retrieve it
             string error = GridService.RegisterRegion(RegionInfo.ScopeID, new GridRegion(RegionInfo));
             if (error != string.Empty)
                 throw new Exception(error);
-            if(m_generateMaptiles)
+            if(m_generateMaptiles && m_mapGenerationTimerEnabled)
                 m_mapGenerationTimer.Start();
+        }
+
+        // Background maptile generation, ported from GuntharDeNiro/opensim.
+        // Runs on its own low-priority thread (given its own configurable
+        // stack size since map rendering can be recursion-heavy on large
+        // scenes), optionally waiting for a startup delay and/or for all
+        // avatars to leave the whole simulator process before rendering,
+        // so a busy region doesn't stall to re-render its map tile.
+        public void RegenerateMaptileAndReregisterInBackground()
+        {
+            if (m_backgroundMaptileGenerationRunning)
+                return;
+
+            m_backgroundMaptileGenerationRunning = true;
+
+            WorkManager.StartThread(delegate
+            {
+                try
+                {
+                    if (m_backgroundMaptileStartupDelaySeconds > 0)
+                    {
+                        m_log.InfoFormat("[SCENE]: Delaying background maptile generation for {0} by {1} seconds",
+                            RegionInfo.RegionName, m_backgroundMaptileStartupDelaySeconds);
+                        for (int i = 0; i < m_backgroundMaptileStartupDelaySeconds; i++)
+                            Thread.Sleep(1000);
+                    }
+
+                    if (m_backgroundMaptileDeferWithAgents && AnyRootAgentsInInstance())
+                    {
+                        m_log.InfoFormat("[SCENE]: Delaying background maptile generation for {0} until avatars leave the simulator",
+                            RegionInfo.RegionName);
+                        while (AnyRootAgentsInInstance())
+                            Thread.Sleep(10000);
+                    }
+
+                    s_backgroundMaptileGenerationSemaphore.Wait();
+                    try
+                    {
+                        RegenerateMaptileAndReregister(null, null);
+                    }
+                    finally
+                    {
+                        s_backgroundMaptileGenerationSemaphore.Release();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    m_log.WarnFormat("[SCENE]: Background maptile generation for {0} failed: {1}",
+                        RegionInfo.RegionName, ex.Message);
+                }
+                finally
+                {
+                    m_backgroundMaptileGenerationRunning = false;
+                }
+            }, $"MaptileGeneration-({Name.Replace(" ", "_")})", ThreadPriority.Lowest,
+                m_backgroundMaptileThreadStackSizeKB * 1024, false);
+        }
+
+        private static bool AnyRootAgentsInInstance()
+        {
+            foreach (Scene scene in SceneManager.Instance.Scenes)
+            {
+                if (scene != null && scene.GetRootAgentCount() > 0)
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>

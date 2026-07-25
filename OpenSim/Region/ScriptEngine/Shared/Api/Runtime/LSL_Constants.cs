@@ -772,11 +772,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PARCEL_DETAILS_DWELL = 64;
         public const int PARCEL_DETAILS_GETCLAIMDATE = 65;
         public const int PARCEL_DETAILS_GEOMETRICCENTER = 66;
+        public const int PARCEL_DETAILS_GET_OBJECT_RETURN = 67;
 
         //osSetParcelDetails
         public const int PARCEL_DETAILS_ANY_AVATAR_SOUNDS = 7;
         public const int PARCEL_DETAILS_GROUP_SOUNDS = 8;
         public const int PARCEL_DETAILS_CLAIMDATE = 10;
+        public const int PARCEL_DETAILS_OBJECT_RETURN = 67;
 
         // constants for llSetClickAction
         public const int CLICK_ACTION_NONE = 0;
@@ -1121,5 +1123,196 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int BEACON_MAP  = 0x1;
         public const int BEACON_SHOW_MAP  = 0x1;
         public const int BEACON_FOCUS_MAP = 0x2;
+
+        // llTransferOwnership constants, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int TRANSFER_FLAG_RESERVED = 0x0001;
+        public const int TRANSFER_FLAG_TAKE = 0x0002;
+        public const int TRANSFER_FLAG_COPY = 0x0004;
+        public const int TRANSFER_DEST = 0;
+        public const int TRANSFER_FLAGS = 1;
+
+        public const int TRANSFER_OK = 0;
+        public const int TRANSFER_BAD_OPTS = -1;
+        public const int TRANSFER_NO_TARGET = -2;
+        public const int TRANSFER_THROTTLE = -3;
+        public const int TRANSFER_NO_ITEMS = -4;
+        public const int TRANSFER_BAD_ROOT = -5;
+        public const int TRANSFER_NO_PERMS = -6;
+        public const int TRANSFER_NO_ATTACHMENT = -7;
+
+        // llReturnObjectsByOwner scope constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int OBJECT_RETURN_PARCEL = 1;
+        public const int OBJECT_RETURN_PARCEL_OWNER = 2;
+        public const int OBJECT_RETURN_REGION = 4;
+
+        // llSetGroundTexture terrain-layer constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int TERRAIN_DETAIL_1 = 0;
+        public const int TERRAIN_DETAIL_2 = 1;
+        public const int TERRAIN_DETAIL_3 = 2;
+        public const int TERRAIN_DETAIL_4 = 3;
+        public const int TERRAIN_HEIGHT_RANGE_SW = 4;
+        public const int TERRAIN_HEIGHT_RANGE_SE = 5;
+        public const int TERRAIN_HEIGHT_RANGE_NW = 6;
+        public const int TERRAIN_HEIGHT_RANGE_NE = 7;
+        public const int TERRAIN_PBR_SCALE_1 = 8;
+        public const int TERRAIN_PBR_SCALE_2 = 9;
+        public const int TERRAIN_PBR_SCALE_3 = 10;
+        public const int TERRAIN_PBR_SCALE_4 = 11;
+        public const int TERRAIN_PBR_ROTATION_1 = 12;
+        public const int TERRAIN_PBR_ROTATION_2 = 13;
+        public const int TERRAIN_PBR_ROTATION_3 = 14;
+        public const int TERRAIN_PBR_ROTATION_4 = 15;
+        public const int TERRAIN_PBR_OFFSET_1 = 16;
+        public const int TERRAIN_PBR_OFFSET_2 = 17;
+        public const int TERRAIN_PBR_OFFSET_3 = 18;
+        public const int TERRAIN_PBR_OFFSET_4 = 19;
+
+        // llSetParcelForSale constants, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int PERMISSION_PRIVILEGED_LAND_ACCESS = 0x80000;
+        public const int PARCEL_SALE_PRICE = 1;
+        public const int PARCEL_SALE_AGENT = 2;
+        public const int PARCEL_SALE_OBJECTS = 3;
+
+        public const int PARCEL_SALE_OK = 0;
+        public const int PARCEL_SALE_ERROR_NO_PARCEL = 1;
+        public const int PARCEL_SALE_ERROR_NO_PERMISSIONS = 2;
+        public const int PARCEL_SALE_ERROR_IN_ESCROW = 3;
+        public const int PARCEL_SALE_ERROR_INVALID_PRICE = 4;
+        public const int PARCEL_SALE_ERROR_BAD_PARAMS = 5;
+
+        // llGetAttachedListFiltered constants, ported from
+        // GuntharDeNiro/opensim (real SL constants).
+        public const int ATTACH_ANY_HUD = -1;
+        public const int FILTER_INCLUDE = 1;
+        public const int FILTER_FLAGS = 2;
+        public const int FILTER_FLAG_HUDS = 0x0001;
+
+        // llSetLinkGLTFOverrides constants, ported from GuntharDeNiro/
+        // opensim (real SL constants).
+        public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+        public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+        public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+        public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+        public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+        public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
+        public const int OVERRIDE_GLTF_EXTENSION_JSON = 1000;
+
+        // llGetEnvironment/llSetEnvironment/llReplaceEnvironment/
+        // llSetAgentEnvironment/llReplaceAgentEnvironment constants,
+        // ported from GuntharDeNiro/opensim (real SL constants).
+        public const int ENV_NOT_EXPERIENCE = -1;
+        public const int ENV_NO_EXPERIENCE_PERMISSION = -2;
+        public const int ENV_NO_ENVIRONMENT = -3;
+        public const int ENV_INVALID_AGENT = -4;
+        public const int ENV_INVALID_RULE = -5;
+        public const int ENV_VALIDATION_FAIL = -6;
+        public const int ENV_NO_EXPERIENCE_LAND = -7;
+        public const int ENV_THROTTLE = -8;
+        public const int ENV_NO_PERMISSIONS = -9;
+
+        public const int ENVIRONMENT_DAYINFO = 200;
+        public const int SKY_TEXTURE_DEFAULTS = 1;
+        public const int SKY_AMBIENT = 0;
+        public const int SKY_CLOUDS = 2;
+        public const int SKY_DOME = 4;
+        public const int SKY_GAMMA = 5;
+        public const int SKY_GLOW = 6;
+        public const int SKY_LIGHT = 8;
+        public const int SKY_MOON = 9;
+        public const int SKY_PLANET = 10;
+        public const int SKY_REFRACTION = 11;
+        public const int SKY_STAR_BRIGHTNESS = 13;
+        public const int SKY_SUN = 14;
+        public const int SKY_TRACKS = 15;
+        public const int SKY_CLOUD_TEXTURE = 19;
+        public const int SKY_MOON_TEXTURE = 20;
+        public const int SKY_SUN_TEXTURE = 21;
+        public const int SKY_BLUE = 22;
+        public const int SKY_HAZE = 23;
+        public const int SKY_REFLECTION_PROBE_AMBIANCE = 24;
+        public const int WATER_BLUR_MULTIPLIER = 100;
+        public const int WATER_FOG = 101;
+        public const int WATER_FRESNEL = 102;
+        public const int WATER_TEXTURE_DEFAULTS = 103;
+        public const int WATER_NORMAL_SCALE = 104;
+        public const int WATER_REFRACTION = 105;
+        public const int WATER_WAVE_DIRECTION = 106;
+        public const int WATER_NORMAL_TEXTURE = 107;
+
+        // Pathfinding constants, ported from GuntharDeNiro/opensim (real
+        // SL constants).
+        public const int CHARACTER_TYPE_A = 0;
+        public const int CHARACTER_DESIRED_SPEED = 1;
+        public const int CHARACTER_RADIUS = 2;
+        public const int CHARACTER_LENGTH = 3;
+        public const int CHARACTER_AVOIDANCE_MODE = 5;
+        public const int CHARACTER_TYPE = 6;
+        public const int CHARACTER_MAX_ACCEL = 8;
+        public const int CHARACTER_MAX_DECEL = 9;
+        public const int CHARACTER_MAX_TURN_RADIUS = 10;
+        public const int CHARACTER_DESIRED_TURN_SPEED = 12;
+        public const int CHARACTER_MAX_SPEED = 13;
+        public const int CHARACTER_ACCOUNT_FOR_SKIPPED_FRAMES = 14;
+        public const int CHARACTER_STAY_WITHIN_PARCEL = 15;
+
+        public const int CHARACTER_CMD_STOP = 0x00;
+        public const int CHARACTER_CMD_JUMP = 0x01;
+        public const int CHARACTER_CMD_SMOOTH_STOP = 0x02;
+
+        public const int AVOID_CHARACTERS = 1;
+        public const int AVOID_DYNAMIC_OBSTACLES = 2;
+
+        public const int FORCE_DIRECT_PATH = 1;
+        public const int REQUIRE_LINE_OF_SIGHT = 2;
+
+        // Pathfinding option constants used by llGetClosestNavPoint
+        // and llPursue. Values match the LSL protocol constants.
+        public const int GCNP_RADIUS = 0;
+        public const int PURSUIT_OFFSET = 1;
+
+        public const int PU_GOAL_REACHED = 0x01;
+        public const int PU_FAILURE_INVALID_START = 0x02;
+        public const int PU_FAILURE_INVALID_GOAL = 0x03;
+        public const int PU_FAILURE_UNREACHABLE = 0x04;
+        public const int PU_FAILURE_TARGET_GONE = 0x05;
+        public const int PU_FAILURE_NO_VALID_DESTINATION = 0x06;
+        public const int PU_FAILURE_DYNAMIC_PATHFINDING_DISABLED = 0x0A;
+        public const int PU_FAILURE_PARCEL_UNREACHABLE = 0x0B;
+        public const int PU_FAILURE_OTHER = 0xF4240;
+
+        // llSitOnLink additional status codes and llOpenFloater status
+        // codes, ported from GuntharDeNiro/opensim (real SL constants;
+        // SIT_FLAG_* already existed in current core, only the
+        // llSitOnLink-specific error codes below were missing).
+        public const int SIT_NOT_EXPERIENCE = -1;
+        public const int SIT_NO_EXPERIENCE_PERMISSION = -2;
+        public const int SIT_NO_SIT_TARGET = -3;
+        public const int SIT_INVALID_AGENT = -4;
+        public const int SIT_INVALID_LINK = -5;
+        public const int SIT_NO_ACCESS = -6;
+        public const int SIT_INVALID_OBJECT = -7;
+
+        public const int NOT_EXPERIENCE = -1;
+        public const int NOT_ATTACHMENT = -2;
+        public const int BAD_AGENT = -3;
+
+        // Experience system error codes, ported from GuntharDeNiro/opensim
+        // (real SL constants).
+        public const int XP_ERROR_NONE = 0;
+        public const int XP_ERROR_EXPERIENCE_DISABLED = 1;
+        public const int XP_ERROR_EXPERIENCE_NOT_TRUSTED = 2;
+        public const int XP_ERROR_AGENT_NOT_FOUND = 3;
+        public const int XP_ERROR_INVALID_PARAMETERS = 4;
+        public const int XP_ERROR_QUOTA_EXCEEDED = 11;
+        public const int XP_ERROR_STORE_DISABLED = 12;
+        public const int XP_ERROR_STORAGE_EXCEPTION = 13;
+        public const int XP_ERROR_KEY_NOT_FOUND = 14;
+        public const int XP_ERROR_RETRY_UPDATE = 15;
     }
 }

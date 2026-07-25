@@ -1,0 +1,36 @@
+;; OpenSimWeather 0.3.2 manual production test
+;; Replace the texture UUID placeholders before enabling.
+
+[Weather]
+    Enabled = false
+    CommandChannel = 89
+    EstateManagerOnly = true
+
+    CoverageMode = ActiveArea
+    EmitterSpacingMeters = 24.0
+    MaxEmitters = 256
+    ActiveAreaRadiusMeters = 96.0
+    ActiveAreaRefreshSeconds = 3
+    EmitterHeight = 18.0
+    Intensity = 1.0
+
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    AvoidCoveredAreas = true
+    CoverProbeGrid = 3
+    MinimumOpenSkyFraction = 0.67
+    SuppressAroundCoveredAvatars = true
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+
+    AdjustEnvironment = false
+    AdjustWind = false
+    SurfaceEffectsEnabled = false
+
+    LightningEnabled = true
+    ThunderEnabled = false
+    AutoCycleEnabled = false
+    SendWeatherIMOnEntry = false

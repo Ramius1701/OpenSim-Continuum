@@ -1,117 +1,463 @@
-Welcome to OpenSimulator (OpenSim for short)!
+# OpenSim Enhanced
 
-# Overview
+OpenSim Enhanced is a maintained downstream integration of the latest official
+OpenSimulator development code with additional grid, viewer, scripting,
+environment, simulator, web, and reliability features.
 
-OpenSim is a BSD Licensed Open Source project to develop a functioning
-virtual worlds server platform capable of supporting multiple clients
-and servers in a heterogeneous grid structure. OpenSim is written in
-C#, and can run under Mono or the Microsoft .NET runtimes.
+Official OpenSimulator remains the authoritative upstream baseline. Enhanced
+features are retained as discrete commit stacks so that new upstream changes
+can continue to be merged, reviewed, built, and tested.
 
-This is considered an alpha release.  Some stuff works, a lot doesn't.
-If it breaks, you get to keep *both* pieces.
+## Integration status
 
-# Compiling OpenSim
+| Component | Status |
+|---|---|
+| Official OpenSim baseline | `upstream/master` at `1b428a1825cf` |
+| Grid and identity enhancements | Integrated |
+| Region, scripting, and simulator enhancements | Integrated |
+| Combined development branch | `enhanced/integration` |
+| Integration date | 2026-07-19 |
+| Build checkpoints | Annotated component and build-clean tags |
 
-Please see BUILDING.md
+A successful compile is the first checkpoint. New services, database
+migrations, viewer CAPS, Hypergrid behavior, and optional modules still require
+controlled runtime testing before production deployment.
 
-# Running OpenSim on Windows
+# Features and enhancements
 
-You will need dotnet 8.0 runtime (https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+## Display Names and identity services
 
+- Viewer-compatible Display Names for local-grid users.
+- Display Name CAPS and viewer protocol handling.
+- Display Name data storage and account-service plumbing.
+- Hypergrid Display Name lookup and federation.
+- Single-name and `username` login handling.
+- Terms-of-service acceptance during login.
+- RSA-key authentication support.
+- `InternalPort = MATCHING` region configuration support.
 
-To run OpenSim from a command prompt
+These features are configurable and are not assumed to be enabled merely
+because the code compiles.
 
- * cd to the bin/ directory where you unpacked OpenSim
- * review and change configuration files (.ini) for your needs. see the "Configuring OpenSim" section
- * run OpenSim.exe
+## Abuse Reports
 
+- Viewer Abuse Reports CAPS.
+- Abuse-report service interfaces.
+- Local and remote service connectors.
+- Robust server handlers.
+- MySQL storage and migrations.
+- Region-side submission support.
 
-# Running OpenSim on Linux/Mac
+## Parcel, terrain, inventory, and object control
 
-You will need
+- `osTriggerSoundAtPos`.
+- Parcel auto-return get/set support through
+  `PARCEL_DETAILS_OBJECT_RETURN`.
+- In-world terrain console commands for loading terrain textures, elevating,
+  lowering, and filling terrain.
+- Script-controlled terrain layer textures and height ranges.
+- Script-controlled parcel sale state.
+- Scripted object return by object ID.
+- Scripted object return by owner.
+- Scripted object ownership transfer.
+- Direct delivery of inventory items to an avatar.
+- Nested destination-folder support for delivered inventory.
+- Active-group matching.
+- Filtered attachment queries.
+- Synchronous notecard text searching.
+- Sculpt-map animation state and playback fallback.
 
- * [dotnet 8.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
- * libgdiplus 
- 
- if you have mono 6.x complete, you already have libgdiplus, otherwise you need to install it
- using a package manager for your operating system, like apt, brew, macports, etc
- for example on debian:
- 
- `apt-get update && apt-get install -y apt-utils libgdiplus libc6-dev`
- 
-To run OpenSim, from the unpacked distribution type:
+## Expanded LSL and OSSL compatibility
 
- * cd bin
- * review and change configuration files (.ini) for your needs. see the "Configuring OpenSim" section
- * run ./opensim.sh
+The enhanced scripting layer adds 55 LSL/OSSL functions together with the
+required constants, helpers, events, and script-engine support.
 
+### Security and avatar control
 
-# Configuring OpenSim
+- `llSignRSA`
+- `llVerifyRSA`
+- `llGetRegionTimeOfDay`
+- `llSetAgentRot`
+- `llTransferOwnership`
 
-When OpenSim starts for the first time, you will be prompted with a
-series of questions that look something like:
+### Land, objects, inventory, and attachments
 
-	[09-17 03:54:40] DEFAULT REGION CONFIG: Simulator Name [OpenSim Test]:
+- `llReturnObjectsByID`
+- `llReturnObjectsByOwner`
+- `llSetGroundTexture`
+- `llGiveAgentInventory`
+- `llMatchGroup`
+- `llSetParcelForSale`
+- `llGetAttachedListFiltered`
+- `llFindNotecardTextSync`
+- `llSetSculptAnim`
+- `llSetLinkRenderMaterial`
 
-For all the options except simulator name, you can safely hit enter to accept
-the default if you want to connect using a client on the same machine or over
-your local network.
+## GLTF and PBR material overrides
 
-You will then be asked "Do you wish to join an existing estate?".  If you're
-starting OpenSim for the first time then answer no (which is the default) and
-provide an estate name.
+- `llSetLinkGLTFOverrides`
+- Per-face GLTF override handling.
+- Base-color and alpha overrides.
+- Metallic and roughness overrides.
+- Emissive overrides.
+- Double-sided material state.
+- Extension JSON support.
+- Compact LLSD notation encoding.
+- GLTF asset-data parsing required by the override system.
 
-Shortly afterwards, you will then be asked to enter an estate owner first name,
-last name, password and e-mail (which can be left blank).  Do not forget these
-details, since initially only this account will be able to manage your region
-in-world.  You can also use these details to perform your first login.
+The separate `PRIM_GLTF_*` primitive-parameter subsystem is not included.
 
-Once you are presented with a prompt that looks like:
+## Combat2 scripting
 
-	Region (My region name) #
+- `llDamage`
+- `llAdjustDamage`
+- `llDetectedDamage`
+- `llDetectedRezzer`
+- Object-health support through dynamic attributes.
+- Extended `llGetHealth` behavior for supported object targets.
+- Script-engine registration for:
+  - `on_damage`
+  - `final_damage`
+  - `on_death`
+- Correct rezzer tracking for `llDetectedRezzer`.
 
-You have successfully started OpenSim.
+## EEP environment scripting
 
-If you want to create another user account to login rather than the estate
-account, then type "create user" on the OpenSim console and follow the prompts.
+- `llGetEnvironment`
+- `llReplaceEnvironment`
+- `llSetEnvironment`
+- `llReplaceAgentEnvironment`
+- `llSetAgentEnvironment`
+- Region-scoped sky and water access.
+- Parcel-scoped sky and water access.
+- Per-agent environment overrides for trusted Experience-Lite scripts.
+- Supporting sky, water, day-cycle, texture, and environment constants.
 
-Helpful resources:
- * http://opensimulator.org/wiki/Configuration
- * http://opensimulator.org/wiki/Configuring_Regions
+## Pathfinding
 
-# Connecting to your OpenSim
+- `llCreateCharacter`
+- `llUpdateCharacter`
+- `llDeleteCharacter`
+- `llExecCharacterCmd`
+- `llNavigateTo`
+- `llWanderWithin`
+- `llPatrolPoints`
+- `llPursue`
+- `llEvade`
+- `llFleeFrom`
+- `llGetStaticPath`
+- `llGetClosestNavPoint`
 
-By default your sim will be available for login on port 9000.  You can login by
-adding -loginuri http://127.0.0.1:9000 to the command that starts Second Life
-(e.g. in the Target: box of the client icon properties on Windows).  You can
-also login using the network IP address of the machine running OpenSim (e.g.
-http://192.168.1.2:9000)
+The implementation provides approximate, region-local A* navigation using
+terrain, scene queries, obstacle bounds, and OpenSim keyframe motion. It is not
+a physics-engine-native navigation service and requires runtime validation on
+different terrain layouts and variable-sized regions.
 
-To login, use the avatar details that you gave for your estate ownership or the
-one you set up using the "create user" command.
+## Experience-Lite
 
-# Bug reports
+- `llRequestExperiencePermissions`
+- `llReleaseExperiencePermissions`
+- `llIsExperienceTrusted`
+- `llGetExperiencePermissions`
+- `llExperienceCanAutoGrant`
+- `llAgentInExperience`
+- `llGetExperienceDetails`
+- `llGetExperienceErrorMessage`
+- `llCreateKeyValue`
+- `llReadKeyValue`
+- `llUpdateKeyValue`
+- `llDeleteKeyValue`
+- `llKeyCountKeyValue`
+- `llKeysKeyValue`
+- `llDataSizeKeyValue`
+- `llGetExperienceKeyValueStoreStats`
+- `llSitOnLink`
+- `llOpenFloater`
 
-In the very likely event of bugs biting you (err, your OpenSim) we
-encourage you to see whether the problem has already been reported on
-the [OpenSim mantis system](http://opensimulator.org/mantis/main_page.php).
+Experience-Lite provides configurable grid-local trust and persistent
+per-region/per-owner key-value storage. It is intentionally smaller than the
+complete Second Life Experience service.
 
-If your bug has already been reported, you might want to add to the
-bug description and supply additional information.
+`llOpenFloater` remains a stub because OpenSim does not currently provide the
+required viewer-hosted floater service.
 
-If your bug has not been reported yet, file a bug report ("opening a
-mantis"). Useful information to include:
- * description of what went wrong
- * stack trace
- * OpenSim.log (attach as file)
- * OpenSim.ini (attach as file)
+The script engine also recognizes:
 
+- `experience_permissions`
+- `experience_permissions_denied`
 
-# More Information on OpenSim
+## Sit-target and avatar-animation enhancements
 
-More extensive information on building, running, and configuring
-OpenSim, as well as how to report bugs, and participate in the OpenSim
-project can always be found at http://opensimulator.org.
+- Real enforcement of scripted-only sit targets.
+- Working storage and lookup for LSL sit flags.
+- Configurable region-wide male walk-animation override.
+- Configurable region-wide female walk-animation override.
+- Movement-animation resend protection after region crossings.
+- Movement-animation resend protection after movement updates.
 
-Thanks for trying OpenSim, we hope it is a pleasant experience.
+## Region crossings and attachment reliability
 
+- Configurable agent-transfer update timeout.
+- Optional preservation of avatar velocity during crossings.
+- Configurable limits on crossing velocity.
+- Configurable source cleanup delay.
+- Configurable attachment cleanup delay.
+- Reduced visible attachment detach/reattach flashing.
+- Exception protection around attachment script-state restoration.
+- Replacement of stale duplicate attachments.
+- Removal of failed incoming attachment entries.
+- Coordination of queued attachment script restarts during crossings.
+
+## Map-tile generation
+
+- Background map-tile generation.
+- Region startup no longer has to block on map rendering.
+- Grid registration no longer has to wait for map rendering.
+- Configurable map-tile startup delay.
+- Configurable map-rendering thread stack size.
+- Optional wait-for-empty behavior.
+
+## Weather module
+
+An experimental, configurable region-weather system supporting:
+
+- Rain.
+- Snow.
+- Storms.
+- Lightning.
+- Thunder.
+- Wind integration.
+- Cloud integration.
+- Region chat commands.
+- Automatic weather cycling.
+- Configurable emitter behavior.
+- Configurable weather textures.
+- Configurable environmental settings.
+
+Weather is optional and requires region-specific validation for variable-sized
+regions, terrain differences, building penetration, emitter limits, textures,
+and environmental behavior.
+
+## Group Auto Invite module
+
+- Automatically invites arriving avatars to a configured group.
+- Supports a configurable invitation message.
+- Uses a small groups-interface extension.
+
+## Region Web module
+
+- Per-region home pages.
+- Blog and news content.
+- LSL scripting reference pages.
+- OSSL scripting reference pages.
+- Feature-guide pages.
+- Inventory-backed image presentation.
+- Protected estate administration interface.
+- Review of selected OpenSim configuration.
+- Editing of selected OpenSim configuration.
+- Reloading of selected OpenSim configuration.
+
+Region Web operates independently from the currency web interface.
+
+## Region Currency module
+
+An optional web front end for an existing `IMoneyModule`:
+
+- Avatar wallet and balance display.
+- Transaction statements.
+- User-to-user transfers.
+- Purchase requests.
+- Currency grants.
+- Administrative money controls.
+- CSV exports.
+- Optional PayPal Checkout integration.
+
+Region Currency is disabled by default. It is not the underlying currency
+backend. PayPal is also disabled by default and configured for sandbox use
+until an operator explicitly supplies credentials and changes the
+configuration.
+
+Real-money processing requires a separate security, accounting,
+failure-recovery, and legal review.
+
+## MoneyServer production enhancements
+
+- Complete grid MoneyServer, region currency module, and MySQL money-data wrapper.
+- Viewer currency purchases without an external currency.php helper.
+- Configurable successful-purchase limits through TotalDay, TotalWeek, and TotalMonth.
+- Purchase-limit accounting restricted to successful BuyMoney transactions.
+- UTC calendar periods with Monday-based weekly accounting.
+- Atomic balance credit and transaction-ledger recording.
+- Idempotent viewer confirmation UUID handling to prevent duplicate credits.
+- CurrencyMaximum enforcement before changing the balance.
+- Existing group, email-lock, banker, transfer, object-payment, upload-charge, and land-sale controls retained.
+- OpenSim console-appender registration so background diagnostics move and redraw the MoneyServer # prompt correctly.
+- Focused production validation and SQL verification documents included with the module.
+
+The source integration does not alter a live `bin/MoneyServer.ini`. Operators
+must review the included example and validation documents before activating or
+replacing a production MoneyServer.
+
+## Important limitations
+
+- New enhanced database migrations are currently MySQL-only unless equivalent
+  SQLite or PostgreSQL migrations are added.
+- Experience-Lite is not complete Second Life Experience-service
+  compatibility.
+- The separate `PRIM_GLTF_*` primitive-parameter implementation is not
+  included.
+- The temporary cloud-avatar appearance fallback is not included.
+- Dead or duplicate legacy hooks were not included.
+- The PayPal return path credits after the browser return flow rather than a
+  server-to-server webhook, so interrupted returns require operational
+  handling.
+- A feature appearing in this README does not mean it is enabled in a
+  production configuration.
+
+## OpenSim Marketplace v2.1.0
+
+OpenSim Marketplace is included as a complete, portable Direct Delivery system
+rather than only an OpenSimulator DLL. It was originally developed for Casperia,
+but the packaged implementation no longer hardcodes a grid name, website root,
+hostname, region UUID, service-account UUID, database credentials, or deployment
+path.
+
+### Included components
+
+- OpenSimulator add-on module source and `prebuild.xml`;
+- disabled regular configuration and matching `.ini.example`;
+- public PHP catalogue and product pages;
+- shopping cart, ordering, gifting, reviews, and order history;
+- seller application, inventory synchronization, and listing management;
+- Marketplace administration pages;
+- explicit Marketplace v2 MySQL schema;
+- PHP environment configuration template;
+- PHP host-integration adapter template;
+- immutable service-account publication snapshots;
+- source and snapshot SHA-256 fingerprint validation;
+- idempotent original delivery and controlled redelivery;
+- durable JSON Lines delivery receipts.
+
+All Marketplace source files are stored together under:
+
+`addon-modules/OpenSimMarketplace`
+
+Important paths:
+
+- OpenSim configuration:
+  `addon-modules/OpenSimMarketplace/config/OpenSimMarketplace.ini`
+- Matching configuration example:
+  `addon-modules/OpenSimMarketplace/config/OpenSimMarketplace.ini.example`
+- Website source:
+  `addon-modules/OpenSimMarketplace/website`
+- SQL migration:
+  `addon-modules/OpenSimMarketplace/website/database/20260715_opensim_marketplace_v2.sql`
+- PHP environment template:
+  `addon-modules/OpenSimMarketplace/website/include/marketplace_env.example.php`
+- PHP host-adapter template:
+  `addon-modules/OpenSimMarketplace/website/include/marketplace_host.example.php`
+- Detailed documentation:
+  `addon-modules/OpenSimMarketplace/README.md`
+
+The module is disabled by default. Both supplied INI files contain zero UUID
+placeholders. Each operator must provide a stable service-region UUID, a dedicated
+local Marketplace service-account UUID, matching server-side Basic authentication
+credentials, website environment settings, host-site integration callbacks, image
+storage outside the document root, and the Marketplace database before enabling
+the system.
+
+The default protected service paths are configurable and use the neutral prefix:
+
+```text
+/opensim/marketplace/v2/inventory
+/opensim/marketplace/v2/inspect
+/opensim/marketplace/v2/snapshot
+/opensim/marketplace/v2/deliver
+```
+
+The PHP portal does not assume one website layout. Copy the website overlay into a
+compatible PHP site, copy both example integration files without the `.example`
+portion of their names, and adapt `marketplace_host.php` to the host site's database,
+session, login, user-account, and administrator APIs. Real credentials and local
+paths must remain outside version control.
+
+Validate the bundled PHP source before deployment:
+
+```bat
+powershell -NoProfile -Command "$failed=$false; Get-ChildItem 'addon-modules\OpenSimMarketplace\website' -Recurse -Filter '*.php' -File | ForEach-Object { & php -l $_.FullName; if($LASTEXITCODE -ne 0){$failed=$true} }; if($failed){exit 1}"
+```
+
+The absence of LSL is intentional. Marketplace v2 replaces the historical Magic
+Box and scripted delivery-server approach with protected server-side inventory
+operations. The legacy deterministic UUID namespace is retained internally so
+existing v2 inventory-folder identifiers remain stable.
+
+Build-clean portability checkpoint:
+
+`opensim-enhanced-marketplace-v2.1.0-portable`
+
+## Branch model
+
+| Branch | Purpose |
+|---|---|
+| `feature/grid-services-enhancements` | Preserved grid, identity, login, abuse-report, parcel, and service enhancements |
+| `feature/region-scripting-enhancements` | Preserved region, scripting, environment, module, and simulator enhancements |
+| `enhanced/integration` | Official OpenSim plus all OpenSim Enhanced features |
+| `upstream/master` | Official OpenSimulator development history |
+| `origin/*` | Published OpenSim Enhanced branches |
+
+Production or release work should be based on tested commits from
+`enhanced/integration`, not directly on an individual feature branch.
+
+## Keeping current with official OpenSim
+
+Official changes are merged rather than replacing the enhanced repository:
+
+```bat
+git checkout enhanced/integration
+git status
+git fetch upstream --prune
+git merge --no-ff upstream/master
+runprebuild.bat
+dotnet build OpenSim.sln -c Release
+```
+
+Create a safety tag before each upstream merge and create a new build-clean tag
+only after the complete solution builds and controlled tests pass.
+
+## Building
+
+On Windows:
+
+```bat
+runprebuild.bat
+dotnet build OpenSim.sln -c Release
+```
+
+See `BUILDING.md` for base build requirements. Configuration examples for
+enhanced services and modules remain with their respective source and
+`bin/*.ini.example` files.
+
+## Attribution and support
+
+OpenSim Enhanced retains the OpenSimulator license and source history.
+Historical source provenance remains available in the Git commit history.
+
+Report problems caused by enhanced features to this repository. Problems that
+are reproducible on an unmodified official OpenSim build should be reported to
+the official OpenSimulator project.
+
+## Additional grid add-on modules
+
+The following optional add-on modules are included under `addon-modules` and
+are generated into the OpenSim Enhanced solution by `runprebuild.bat`:
+
+- **Gloebit** — optional Gloebit economy integration.
+- **HoloPhysicsGuard** — reduces idle physics load by putting selected physical objects (e.g. bowling pins, vehicles, props) to sleep when a region becomes empty, then waking them again when an avatar enters. Reversible, database-tracked, with a report-only/dry-run mode.
+- **OpenSimMutelist** — external mute-list service integration.
+- **OpenSimSearch** — external viewer search service integration.
+- **OpenSimTide** — configurable per-region tide and water-level simulation.
+
+These modules are not enabled automatically. Their supplied configuration
+examples must be reviewed and merged into the appropriate Robust, GridCommon,
+or region configuration before runtime activation.

@@ -114,6 +114,13 @@ namespace OpenSim.Services.HypergridService
         {
             return false;
         }
+
+        // This is a read-only cache of foreign-grid accounts; setting a
+        // display name doesn't make sense through it.
+        public bool SetDisplayName(UUID userID, string displayName)
+        {
+            return false;
+        }
         #endregion
 
     }

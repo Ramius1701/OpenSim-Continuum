@@ -1,0 +1,38 @@
+; Group Auto Invite module - ported from GuntharDeNiro/opensim as a
+; standalone addon-module.
+;
+; Automatically invites arriving avatars to a configured group after a
+; short delay. Picked up automatically via the addon-modules
+; Include-modules glob in OpenSimDefaults.ini.
+;
+; Requires the small IGroupsModule.InviteGroup(..., string message) overload
+; (added as a core patch alongside this addon - see the commit message) to
+; get a custom invite message; without a working Groups module configured
+; at all, this addon does nothing.
+
+[GroupAutoInvite]
+    ; Master switch. Off by default.
+    Enabled = false
+
+    ; Identify the target group by UUID (preferred) or by exact name.
+    GroupID =
+    GroupName =
+
+    ; Who the invite appears to come from. Leave blank to use the group's
+    ; founder.
+    InviterID =
+
+    ; Role to assign on join. Leave blank for the group's default role.
+    RoleID =
+
+    ; Seconds to wait after an avatar arrives before sending the invite.
+    InviteDelaySeconds = 10
+
+    ; Only invite each avatar once per session (per login), rather than
+    ; every time they enter this region.
+    InviteOncePerSession = true
+
+    ; Invite IM text. Supports {AvatarName}, {GroupName}, {RegionName}
+    ; placeholders. Leave blank to use the Groups module's own default
+    ; invite message.
+    InviteMessage = Welcome to {RegionName}, {AvatarName}! Join the {GroupName} group for news and updates.

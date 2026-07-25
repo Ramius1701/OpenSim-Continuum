@@ -1,0 +1,265 @@
+;; This is the main configuration file for OpenSim Money Server.
+;; If it's named MoneyServer.ini.example then you will need to copy it to
+;; MoneyServer.ini first (if that file does not already exist)
+;;
+;; The settings in this file are in the form "<key> = <value>".
+;; All settings are initially commented out with default values shown.
+;; To change a setting, uncomment it by removing the initial semicolon (;)
+;; and then change the value as needed.
+
+[Startup]
+	;; PID file path (optional)
+	;; If specified, the server will create a PID file at this location
+	; PIDFile = ""
+
+[MySql]
+	;; Database connection settings
+	;; These settings configure the MySQL database connection for the money server
+
+	;; MySQL server hostname or IP address
+	; hostname = "localhost"
+
+	;; MySQL database name
+	; database = "OpenSim"
+
+	;; MySQL username
+	; username = "root"
+
+	;; MySQL password
+	; password = "password"
+
+	;; Connection pooling (recommended: true for better performance)
+	; pooling = "true"
+
+	;; MySQL port
+	; port = "3306"
+
+	;; Maximum number of database connections in the pool
+	;; Valid range: 1-100
+	;; Higher values allow more concurrent transactions but use more resources
+	; MaxConnection = 10
+
+[MoneyServer]
+	;; Core money server settings
+
+	;; Port on which the money server will listen for connections
+	; ServerPort = 8008
+
+	;; Transaction expiration time in seconds
+	;; Transactions older than this will be marked as expired
+	; ExpiredTime = 120
+
+	;; Default balance for new users
+	; DefaultBalance = 1000
+
+	;; Enable force transfer (allows administrative transfers)
+	; EnableForceTransfer = false
+
+	;; Banker avatar UUID (avatar that performs administrative money operations)
+	;; Leave empty for no specific banker avatar
+	; BankerAvatar = ""
+
+	;; Enable amount zero transactions (allow transfers of 0 currency)
+	; EnableAmountZero = false
+
+	;; ==========================================
+	;; Currency Purchase Limits
+	;; ==========================================
+	;; These settings control how much currency users can purchase or receive
+	;; within specific time periods. Set to 0 to disable a specific limit.
+
+	;; Maximum currency that can be purchased per day
+	;; Default: 100
+	; TotalDay = 100
+
+	;; Maximum currency that can be purchased per week
+	;; Default: 250
+	; TotalWeek = 250
+
+	;; Maximum currency that can be purchased per month
+	;; Default: 500
+	; TotalMonth = 500
+
+	;; Maximum total currency a user can hold at any time
+	;; Users exceeding this limit will have their balance reduced to this value
+	;; Default: 10000
+	; CurrencyMaximum = 10000
+
+	;; Enable or disable currency purchases globally
+	;; Values: "on" or "off"
+	;; Default: "off"
+	; CurrencyOnOff = "off"
+
+	;; Restrict currency purchases to specific group members only
+	;; Default: false
+	; CurrencyGroupOnly = false
+
+	;; Group name that is allowed to purchase currency (if CurrencyGroupOnly = true)
+	; CurrencyGroupName = ""
+
+	;; Group UUID that is allowed to purchase currency (if CurrencyGroupOnly = true)
+	; CurrencyGroupID = ""
+
+	;; Lock user transactions if their email is not verified
+	; UserMailLock = false
+
+	;; ==========================================
+	;; Script Money Transfer Settings
+	;; ==========================================
+
+	;; Enable money transfers initiated by LSL scripts
+	; EnableScriptSendMoney = false
+
+	;; Access key required for script money operations
+	;; Scripts must provide this key to perform money transfers
+	; MoneyScriptAccessKey = ""
+
+	;; IP address from which script money requests are accepted
+	;; Default: localhost only
+	; MoneyScriptIPaddress = "127.0.0.1"
+
+	;; ==========================================
+	;; Hypergrid and Guest Avatar Settings
+	;; ==========================================
+
+	;; Enable Hypergrid avatar support
+	;; Allows avatars from other grids to use currency
+	; EnableHGAvatar = false
+
+	;; Default balance for Hypergrid avatars
+	; HGAvatarDefaultBalance = 0
+
+	;; Enable Guest avatar support
+	; EnableGuestAvatar = false
+
+	;; Default balance for Guest avatars
+	; GuestAvatarDefaultBalance = 0
+
+	;; Currency calculation mode
+	;; 0 = Standard calculation
+	;; Other values for specific calculation methods (implementation-specific)
+	; CalculateCurrency = 0
+
+	;; ==========================================
+	;; Balance Message Customization
+	;; ==========================================
+	;; These messages are shown to users in their transaction history
+	;; Use {0} for amount, {1} for other user name, {2} for object name
+
+	; BalanceMessageLandSale = "Paid the Money L${0} for Land."
+	; BalanceMessageRcvLandSale = ""
+	; BalanceMessageSendGift = "Sent Gift L${0} to {1}."
+	; BalanceMessageReceiveGift = "Received Gift L${0} from {1}."
+	; BalanceMessagePayCharge = ""
+	; BalanceMessageBuyObject = "Bought the Object {2} from {1} by L${0}."
+	; BalanceMessageSellObject = "{1} bought the Object {2} by L${0}."
+	; BalanceMessageGetMoney = "Got the Money L${0} from {1}."
+	; BalanceMessageBuyMoney = "Bought the Money L${0}."
+	; BalanceMessageRollBack = "RollBack the Transaction: L${0} from/to {1}."
+	; BalanceMessageSendMoney = "Paid the Money L${0} to {1}."
+	; BalanceMessageReceiveMoney = "Received L${0} from {1}."
+
+	;; ==========================================
+	;; Debug Settings
+	;; ==========================================
+
+	;; Enable debug output to console
+	; DebugConsole = false
+
+	;; Enable debug output to file
+	; m_DebugFile = false
+
+[Certificate]
+	;; SSL/TLS Certificate settings for secure HTTPS communication
+	;; Leave empty to use plain HTTP - this is the correct default for most
+	;; setups. MoneyServer handles in-world currency, not real financial
+	;; transactions, so HTTPS/client-cert verification isn't a hard
+	;; requirement the way it would be for a real-money payment system.
+	;; The code correctly skips all certificate setup entirely when these
+	;; are left blank (verified directly against MoneyServerBase.cs) -
+	;; nothing here is required for MoneyServer to work.
+	;;
+	;; If you do want HTTPS, generate your own certificate - never use a
+	;; certificate file that came bundled with someone else's distribution,
+	;; even as a placeholder. On Windows (PowerShell, run as Administrator):
+	;;   $cert = New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "cert:\LocalMachine\My"
+	;;   $pwd = ConvertTo-SecureString -String "your-password-here" -Force -AsPlainText
+	;;   Export-PfxCertificate -Cert $cert -FilePath "moneyserver_cert.pfx" -Password $pwd
+	;; On Linux/macOS (openssl):
+	;;   openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
+	;;   openssl pkcs12 -export -out moneyserver_cert.pfx -inkey key.pem -in cert.pem
+
+	;; ==========================================
+	;; Server Certificate (HTTPS Server Mode)
+	;; ==========================================
+
+	;; Path to the server certificate file (PFX/P12 format)
+	;; If specified, the money server will use HTTPS instead of HTTP
+	; ServerCertFilename = ""
+
+	;; Password for the server certificate file
+	; ServerCertPassword = ""
+
+	;; ==========================================
+	;; Client Certificate Authentication
+	;; ==========================================
+
+	;; Enable client certificate verification
+	;; When enabled, clients must present a valid certificate signed by the CA
+	; CheckClientCert = false
+
+	;; Path to the Certificate Authority (CA) certificate file
+	;; Used to verify client certificates
+	; CACertFilename = ""
+
+	;; Path to the Certificate Revocation List (CRL) file
+	;; Used to check if client certificates have been revoked
+	; ClientCrlFilename = ""
+
+	;; ==========================================
+	;; Client Certificate (for outgoing XMLRPC calls to region servers)
+	;; ==========================================
+
+	;; Path to the client certificate file used when making XMLRPC calls
+	;; to region servers that require client authentication
+	; ClientCertFilename = ""
+
+	;; Password for the client certificate file
+	; ClientCertPassword = ""
+
+	;; ==========================================
+	;; Server Certificate Verification
+	;; ==========================================
+
+	;; Enable verification of region server certificates
+	;; When enabled, the money server will verify the SSL certificate
+	;; of region servers before making XMLRPC calls to them
+	; CheckServerCert = false
+
+[Stipend]
+	;; Casperia Prime addition. Off by default.
+	;; Grants a fixed amount of local currency to a fixed list of avatars on
+	;; a schedule (e.g. weekly), similar in spirit to old Second Life
+	;; premium-membership stipends - useful for e.g. distributing donation
+	;; income back to residents.
+	;;
+	;; This is intentionally simple for a first version: a fixed avatar
+	;; list, not automatic enrollment by account type/donation history. The
+	;; server checks hourly whether IntervalDays have passed since the last
+	;; grant (tracked in stipend_lastrun.txt next to the server) - so it
+	;; will not double-grant or miss a cycle if the server restarts.
+
+	; Enabled = false
+
+	;; How much local currency each eligible avatar receives per grant.
+	; Amount = 300
+
+	;; Days between grants. 7 = weekly.
+	; IntervalDays = 7
+
+	;; Shown as part of the transaction description.
+	; Description = "Weekly stipend"
+
+	;; Comma-separated list of avatar UUIDs eligible for stipends.
+	;; EligibleAvatars = 8713d37e-1a17-4845-9cc4-362ebf6af1c5, 3f1d9a2b-...
+	; EligibleAvatars =

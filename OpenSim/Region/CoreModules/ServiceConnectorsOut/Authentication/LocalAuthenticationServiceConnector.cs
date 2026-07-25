@@ -177,6 +177,29 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication
             return m_AuthenticationService.SetAuthInfo(info);
         }
 
+        // RSA login is only ever driven from the login service itself, not
+        // through the region-side local connector, so this mirrors Mobius's
+        // own connector in not forwarding these.
+        public bool RSAAuthenticate(UUID principalID, int lifetime, out string magic, out string key)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool FinishRSALogin(UUID principalID, string data, out string token)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool SetPublicKey(UUID principalID, string public_key)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool EnforceRSALogin(UUID principalID, bool enforce)
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion
     }
 }

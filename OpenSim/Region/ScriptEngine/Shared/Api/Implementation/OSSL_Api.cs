@@ -1946,6 +1946,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                             newLand.GroupAVSounds = newgrpsounds;
                         }
                         break;
+
+                    case ScriptBaseClass.PARCEL_DETAILS_OBJECT_RETURN:
+                        iarg = rules.GetIntegerItem(idx++);
+                        if (iarg < 0)
+                            iarg = 0;
+                        if(newLand.OtherCleanTime != iarg)
+                        {
+                            changed = true;
+                            newLand.OtherCleanTime = iarg;
+                        }
+                        break;
                     }
             }
             if(changed)
@@ -5138,6 +5149,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             UUID soundID = ScriptUtils.GetAssetIdFromKeyOrItemName(sop, m_host, sound, AssetType.Sound);
             if (soundID.IsNotZero())
                 m_SoundModule.SendSound(sop, soundID, volume, true, 0, false, false);
+        }
+
+        public void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain)
+        {
+            if (m_SoundModule is null)
+                return;
+
+            UUID soundID = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, sound, AssetType.Sound);
+            if (soundID.IsZero())
+                return;
+
+            m_SoundModule.TriggerSound(soundID, m_host.OwnerID, m_host.UUID, UUID.Zero, gain,
+                    position, m_host.RegionHandle);
         }
 
        public void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume,

@@ -315,6 +315,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDetectedRezzer(int number)
+        {
+            return m_LSL_Functions.llDetectedRezzer(number);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llDetectedDamage(LSL_Integer number)
+        {
+            return m_LSL_Functions.llDetectedDamage(number);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Integer llDetectedType(int number)
         {
             return m_LSL_Functions.llDetectedType(number);
@@ -465,6 +477,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReturnObjectsByID(LSL_List objects)
+        {
+            return m_LSL_Functions.llReturnObjectsByID(objects);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReturnObjectsByOwner(LSL_Key owner, LSL_Integer scope)
+        {
+            return m_LSL_Functions.llReturnObjectsByOwner(owner, scope);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetGroundTexture(LSL_List changes)
+        {
+            return m_LSL_Functions.llSetGroundTexture(changes);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Vector llGetAgentSize(LSL_Key id)
         {
             return m_LSL_Functions.llGetAgentSize(id);
@@ -576,6 +606,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_Vector llGetForce()
         {
             return m_LSL_Functions.llGetForce();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetAttachedListFiltered(LSL_Key id, LSL_List options)
+        {
+            return m_LSL_Functions.llGetAttachedListFiltered(id, options);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -753,6 +789,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llFindNotecardTextSync(string name, string pattern, int start, int count, LSL_List options)
+        {
+            return m_LSL_Functions.llFindNotecardTextSync(name, pattern, start, count, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Key llGetNotecardLine(string name, int line)
         {
             return m_LSL_Functions.llGetNotecardLine(name, line);
@@ -852,6 +894,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_Integer llGetParcelMaxPrims(LSL_Vector pos, int sim_wide)
         {
             return m_LSL_Functions.llGetParcelMaxPrims(pos, sim_wide);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetParcelForSale(LSL_Integer forSale, LSL_List options)
+        {
+            return m_LSL_Functions.llSetParcelForSale(forSale, options);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1041,6 +1089,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Float llGetRegionTimeOfDay()
+        {
+            return m_LSL_Functions.llGetRegionTimeOfDay();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_String llGetTimestamp()
         {
             return m_LSL_Functions.llGetTimestamp();
@@ -1068,6 +1122,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_Float llGetWallclock()
         {
             return m_LSL_Functions.llGetWallclock();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llTransferOwnership(LSL_Key agent_id, LSL_Integer flags, LSL_List options)
+        {
+            return m_LSL_Functions.llTransferOwnership(agent_id, flags, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options)
+        {
+            return m_LSL_Functions.llGiveAgentInventory(agentID, folderName, inventory, options);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1464,6 +1530,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llMoveToTarget(LSL_Vector target, double tau)
         {
             m_LSL_Functions.llMoveToTarget(target, tau);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llMatchGroup(LSL_Key avatar, LSL_List group_keys)
+        {
+            return m_LSL_Functions.llMatchGroup(avatar, group_keys);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1959,6 +2031,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llDamage(LSL_Key target, LSL_Float damage, LSL_Integer damage_type)
+        {
+            m_LSL_Functions.llDamage(target, damage, damage_type);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llAdjustDamage(LSL_Integer number, LSL_Float damage)
+        {
+            m_LSL_Functions.llAdjustDamage(number, damage);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llAdjustDamage(LSL_Float damage)
+        {
+            m_LSL_Functions.llAdjustDamage(damage);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public LSL_Float llGetHealth(LSL_String key)
         {
             return m_LSL_Functions.llGetHealth(key);
@@ -2277,6 +2367,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetAgentRot(LSL_Rotation rot, LSL_Integer flags)
+        {
+            m_LSL_Functions.llSetAgentRot(rot, flags);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void llStartObjectAnimation(string anim)
         {
             m_LSL_Functions.llStartObjectAnimation(anim);
@@ -2430,6 +2526,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public void llTriggerSound(string sound, double volume)
         {
             m_LSL_Functions.llTriggerSound(sound, volume);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetSculptAnim(LSL_Integer mode, LSL_Integer sizex, LSL_Integer sizey, LSL_Integer start_frame, LSL_Integer end_frame, LSL_Float rate, LSL_Integer texture_sync)
+        {
+            m_LSL_Functions.llSetSculptAnim(mode, sizex, sizey, start_frame, end_frame, rate, texture_sync);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2592,6 +2694,216 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_String llJsonGetValue(LSL_String json, LSL_List specifiers)
         {
             return m_LSL_Functions.llJsonGetValue(json, specifiers);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetEnvironment(LSL_Vector position, LSL_List rules)
+        {
+            return m_LSL_Functions.llGetEnvironment(position, rules);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment)
+        {
+            return m_LSL_Functions.llReplaceAgentEnvironment(agent_id, transition, environment);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_List parameters)
+        {
+            return m_LSL_Functions.llSetAgentEnvironment(agent_id, transition, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no, LSL_Integer day_length, LSL_Integer day_offset)
+        {
+            return m_LSL_Functions.llReplaceEnvironment(position, environment, track_no, day_length, day_offset);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llRequestExperiencePermissions(string agent, string experience)
+        {
+            m_LSL_Functions.llRequestExperiencePermissions(agent, experience);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llReleaseExperiencePermissions(string agent)
+        {
+            m_LSL_Functions.llReleaseExperiencePermissions(agent);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llIsExperienceTrusted()
+        {
+            return m_LSL_Functions.llIsExperienceTrusted();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llGetExperiencePermissions()
+        {
+            return m_LSL_Functions.llGetExperiencePermissions();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llExperienceCanAutoGrant(int permissions)
+        {
+            return m_LSL_Functions.llExperienceCanAutoGrant(permissions);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llAgentInExperience(string agent)
+        {
+            return m_LSL_Functions.llAgentInExperience(agent);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetExperienceDetails(string experienceID)
+        {
+            return m_LSL_Functions.llGetExperienceDetails(experienceID);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llOpenFloater(LSL_String floater_name, LSL_String url, LSL_List parameters)
+        {
+            return m_LSL_Functions.llOpenFloater(floater_name, url, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSitOnLink(string agent, int link)
+        {
+            return m_LSL_Functions.llSitOnLink(agent, link);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_String llGetExperienceErrorMessage(int error)
+        {
+            return m_LSL_Functions.llGetExperienceErrorMessage(error);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llCreateKeyValue(string key, string value)
+        {
+            return m_LSL_Functions.llCreateKeyValue(key, value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llReadKeyValue(string key)
+        {
+            return m_LSL_Functions.llReadKeyValue(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue)
+        {
+            return m_LSL_Functions.llUpdateKeyValue(key, value, checkedUpdate, originalValue);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDeleteKeyValue(string key)
+        {
+            return m_LSL_Functions.llDeleteKeyValue(key);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llKeyCountKeyValue()
+        {
+            return m_LSL_Functions.llKeyCountKeyValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llKeysKeyValue(int first, int count)
+        {
+            return m_LSL_Functions.llKeysKeyValue(first, count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Key llDataSizeKeyValue()
+        {
+            return m_LSL_Functions.llDataSizeKeyValue();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetExperienceKeyValueStoreStats()
+        {
+            return m_LSL_Functions.llGetExperienceKeyValueStoreStats();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llCreateCharacter(LSL_List options)
+        {
+            m_LSL_Functions.llCreateCharacter(options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llUpdateCharacter(LSL_List options)
+        {
+            m_LSL_Functions.llUpdateCharacter(options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llDeleteCharacter()
+        {
+            m_LSL_Functions.llDeleteCharacter();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llExecCharacterCmd(LSL_Integer command, LSL_List options)
+        {
+            m_LSL_Functions.llExecCharacterCmd(command, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llNavigateTo(LSL_Vector goal, LSL_List options)
+        {
+            m_LSL_Functions.llNavigateTo(goal, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llWanderWithin(LSL_Vector origin, LSL_Vector distance, LSL_List options)
+        {
+            m_LSL_Functions.llWanderWithin(origin, distance, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llPatrolPoints(LSL_List patrol_points, LSL_List options)
+        {
+            m_LSL_Functions.llPatrolPoints(patrol_points, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llPursue(LSL_Key target, LSL_List options)
+        {
+            m_LSL_Functions.llPursue(target, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llEvade(LSL_Key target, LSL_List options)
+        {
+            m_LSL_Functions.llEvade(target, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llFleeFrom(LSL_Vector source, LSL_Float distance, LSL_List options)
+        {
+            m_LSL_Functions.llFleeFrom(source, distance, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_List llGetStaticPath(LSL_Vector start, LSL_Vector end, LSL_Float radius, LSL_List parameters)
+        {
+            return m_LSL_Functions.llGetStaticPath(start, end, radius, parameters);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Vector llGetClosestNavPoint(LSL_Vector point, LSL_List options)
+        {
+            return m_LSL_Functions.llGetClosestNavPoint(point, options);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llSetEnvironment(LSL_Vector position, LSL_List parameters)
+        {
+            return m_LSL_Functions.llSetEnvironment(position, parameters);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2886,6 +3198,30 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public LSL_String llGetRenderMaterial(LSL_Integer face)
         {
             return m_LSL_Functions.llGetRenderMaterial(face);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_String llSignRSA(LSL_String private_key, LSL_String msg, LSL_String algorithm)
+        {
+            return m_LSL_Functions.llSignRSA(private_key, msg, algorithm);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public LSL_Integer llVerifyRSA(LSL_String public_key, LSL_String msg, LSL_String signature, LSL_String algorithm)
+        {
+            return m_LSL_Functions.llVerifyRSA(public_key, msg, signature, algorithm);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetLinkGLTFOverrides(LSL_Integer linknum, LSL_Integer lsl_face, LSL_List overrides)
+        {
+            m_LSL_Functions.llSetLinkGLTFOverrides(linknum, lsl_face, overrides);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void llSetLinkRenderMaterial(LSL_Integer linknum, LSL_String materialstr, LSL_Integer lsl_face)
+        {
+            m_LSL_Functions.llSetLinkRenderMaterial(linknum, materialstr, lsl_face);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

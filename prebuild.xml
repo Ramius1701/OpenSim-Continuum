@@ -447,6 +447,7 @@
       <Reference name="OpenSim.Framework.Servers.HttpServer"/>
       <Reference name="OpenSim.Services.Interfaces"/>
       <Reference name="OpenSim.Services.Base"/>
+      <Reference name="OpenSim.Services.Connectors"/>
       <Reference name="OpenSim.Data"/>
       <Reference name="Nini"/>
       <Reference name="log4net"/>
@@ -937,6 +938,30 @@
 
     </Project>
 
+    <Project name="OpenSim.Services.AbuseReportsService" path="OpenSim/Services/AbuseReportsService" type="Library">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="OpenSim.Framework"/>
+      <Reference name="OpenSim.Services.Interfaces"/>
+      <Reference name="OpenSim.Services.Base"/>
+      <Reference name="OpenSim.Data"/>
+      <Reference name="OpenMetaverseTypes"/>
+      <Reference name="OpenMetaverse"/>
+      <Reference name="Nini"/>
+      <Reference name="log4net"/>
+
+    </Project>
+
     <Project name="OpenSim.Services.UserProfilesService" path="OpenSim/Services/UserProfilesService" type="Library">
       <Configuration name="Debug">
         <Options>
@@ -995,6 +1020,7 @@
       <Reference name="log4net"/>
       <Reference name="DotNetOpenId"/>
       <Reference name="Mono.Addins"/>
+      <Reference name="System.Drawing.Common"/>
 
       <Files>
         <Match pattern="*.cs" recurse="true">

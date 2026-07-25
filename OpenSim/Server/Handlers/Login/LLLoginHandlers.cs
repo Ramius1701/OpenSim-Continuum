@@ -88,15 +88,32 @@ namespace OpenSim.Server.Handlers.Login
                 //     }
                 // }
 
-                if (requestData.ContainsKey("first") && requestData["first"] != null &&
-                    requestData.ContainsKey("last") && requestData["last"] != null && (
+                if (((requestData.ContainsKey("first") && requestData["first"] != null &&
+                    requestData.ContainsKey("last") && requestData["last"] != null) ||
+                    (requestData.ContainsKey("username") && requestData["username"] != null)) && (
                         (requestData.ContainsKey("passwd") && requestData["passwd"] != null) ||
-                        (!requestData.ContainsKey("passwd") && requestData.ContainsKey("web_login_key") && requestData["web_login_key"] != null && requestData["web_login_key"].ToString() != UUID.ZeroString)
+                        (!requestData.ContainsKey("passwd") && requestData.ContainsKey("web_login_key") && requestData["web_login_key"] != null && requestData["web_login_key"].ToString() != UUID.ZeroString) ||
+                        (!requestData.ContainsKey("passwd") && requestData.ContainsKey("rsa_login") && requestData["rsa_login"] != null)
                     ))
                 {
-                    string first = requestData["first"].ToString();
-                    string last = requestData["last"].ToString();
+                    // A single "username" field (no last name) is treated as
+                    // "Resident" for the last name, matching the official
+                    // single-name viewer login convention. Ported from Mobius.
+                    string first, last;
+                    if (requestData.ContainsKey("username"))
+                    {
+                        first = requestData["username"].ToString();
+                        last = "Resident";
+                    }
+                    else
+                    {
+                        first = requestData["first"].ToString();
+                        last = requestData["last"].ToString();
+                    }
+
                     string passwd = null;
+                    bool rsa_login = false;
+                    string rsa_value = string.Empty;
                     if (requestData.ContainsKey("passwd"))
                     {
                         passwd = requestData["passwd"].ToString();
@@ -105,6 +122,15 @@ namespace OpenSim.Server.Handlers.Login
                     {
                         passwd = "$1$" + requestData["web_login_key"].ToString();
                         m_log.InfoFormat("[LOGIN]: XMLRPC Login Req key {0}", passwd);
+                    }
+                    else if (requestData.ContainsKey("rsa_login"))
+                    {
+                        // ported from Mobius: RSA login is a two-phase
+                        // challenge/response, driven by the value of
+                        // rsa_login ("start" to begin, or the decrypted
+                        // challenge to finish).
+                        rsa_login = true;
+                        rsa_value = requestData["rsa_login"].ToString();
                     }
                     string startLocation = string.Empty;
                     UUID scopeID = UUID.Zero;
@@ -132,8 +158,14 @@ namespace OpenSim.Server.Handlers.Login
 
                     //m_log.InfoFormat("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
 
+                    bool LibOMVclient = request.Params.Count > 4 && (string)request.Params[4] == "gridproxy";
+
+                    bool agree_to_tos = requestData.Contains("agree_to_tos") && requestData["agree_to_tos"] != null &&
+                        requestData["agree_to_tos"].ToString() == "1";
+
                     LoginResponse reply = null;
-                    reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient);
+                    reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient,
+                        LibOMVclient, rsa_login, rsa_value, agree_to_tos);
 
                     XmlRpcResponse response = new XmlRpcResponse();
                     response.Value = reply.ToHashtable();

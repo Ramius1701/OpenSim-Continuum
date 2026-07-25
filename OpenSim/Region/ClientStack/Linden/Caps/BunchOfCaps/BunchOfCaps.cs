@@ -107,6 +107,9 @@ namespace OpenSim.Region.ClientStack.Linden
         private IUserManagement m_UserManager;
         private IUserAccountService m_userAccountService;
         private IMoneyModule m_moneyModule;
+        private IDisplayNamesModule m_DisplayNames;
+        private IEventQueue m_eqModule;
+        private bool m_AllowSetDisplayName = true;
 
         private enum FileAgentInventoryState : int
         {
@@ -132,6 +135,10 @@ namespace OpenSim.Region.ClientStack.Linden
             m_UserManager = m_Scene.RequestModuleInterface<IUserManagement>();
             m_userAccountService = m_Scene.RequestModuleInterface<IUserAccountService>();
             m_moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
+            m_DisplayNames = m_Scene.RequestModuleInterface<IDisplayNamesModule>();
+            m_eqModule = m_Scene.RequestModuleInterface<IEventQueue>();
+            if (m_DisplayNames is null)
+                m_AllowSetDisplayName = false;
             if (m_UserManager is null)
                 m_log.Error("[CAPS]: GetDisplayNames disabled because user management component not found");
 
@@ -283,6 +290,12 @@ namespace OpenSim.Region.ClientStack.Linden
                 {
                     m_HostCapsObj.RegisterSimpleHandler("GetDisplayNames",
                         new SimpleStreamHandler(GetNewCapPath(), GetDisplayNames));
+
+                    if (m_AllowSetDisplayName)
+                    {
+                        m_HostCapsObj.RegisterSimpleHandler("SetDisplayName",
+                            new SimpleStreamHandler(GetNewCapPath(), SetDisplayName));
+                    }
                 }
             }
             catch (Exception e)
@@ -2227,8 +2240,43 @@ namespace OpenSim.Region.ClientStack.Linden
                 LLSDxmlEncode2.AddMap(lsl);
                 LLSDxmlEncode2.AddEmptyArray("agents", lsl);
             }
+            else if (m_DisplayNames is not null)
+            {
+                Dictionary<UUID, NameInfo> names = m_DisplayNames.GetDisplayNames(ids);
+                lsl = LLSDxmlEncode2.Start(names.Count * 256 + 256);
+
+                LLSDxmlEncode2.AddMap(lsl);
+                if (names.Count == 0)
+                    LLSDxmlEncode2.AddEmptyArray("agents", lsl);
+                else
+                {
+                    LLSDxmlEncode2.AddArray("agents", lsl);
+
+                    foreach (KeyValuePair<UUID, NameInfo> kvp in names)
+                    {
+                        NameInfo ni = kvp.Value;
+                        if (string.IsNullOrEmpty(ni.FirstName) || ni.FirstName.Equals("Unknown"))
+                            continue;
+
+                        LLSDxmlEncode2.AddMap(lsl);
+                        LLSDxmlEncode2.AddElem("username", ni.UserName, lsl);
+                        LLSDxmlEncode2.AddElem("display_name", ni.DisplayName, lsl);
+                        LLSDxmlEncode2.AddElem("display_name_next_update", ni.NameChanged.AddDays(7), lsl);
+                        LLSDxmlEncode2.AddElem("display_name_expires", DateTime.UtcNow.AddMonths(1), lsl);
+                        LLSDxmlEncode2.AddElem("legacy_first_name", ni.FirstName, lsl);
+                        LLSDxmlEncode2.AddElem("legacy_last_name", ni.LastName, lsl);
+                        LLSDxmlEncode2.AddElem("id", kvp.Key, lsl);
+                        LLSDxmlEncode2.AddElem("is_display_name_default", ni.IsDefault, lsl);
+                        LLSDxmlEncode2.AddEndMap(lsl);
+                    }
+                    LLSDxmlEncode2.AddEndArray(lsl);
+                }
+            }
             else
             {
+                // Fallback used when the DisplayNames module is disabled:
+                // report everyone's base name as their display name, same
+                // as this handler did before Display Names support existed.
                 List<UserData> names = m_UserManager.GetKnownUsers(ids, m_scopeID);
                 lsl = LLSDxmlEncode2.Start(names.Count * 256 + 256);
 
@@ -2266,6 +2314,130 @@ namespace OpenSim.Region.ClientStack.Linden
             httpResponse.ContentType = "application/llsd+xml";
             httpResponse.StatusCode = (int)HttpStatusCode.OK;
         }
+
+        public void SetDisplayName(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        {
+            if (httpRequest.HttpMethod != "POST" || m_DisplayNames is null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
+
+            ScenePresence sp = m_Scene.GetScenePresence(m_AgentID);
+            if (sp is null || sp.IsDeleted)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.Gone;
+                return;
+            }
+
+            if (!m_UserManager.IsLocalGridUser(m_AgentID))
+            {
+                sp.ControllingClient.SendAlertMessage("You can only set your display name on your home grid!");
+                httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                return;
+            }
+
+            OSD osdRequest;
+            try
+            {
+                osdRequest = OSDParser.DeserializeLLSDXml(httpRequest.InputStream);
+            }
+            catch (Exception e)
+            {
+                m_log.Debug("[CAPS]: Bad SetDisplayName request: " + e.Message);
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (osdRequest is not OSDMap reqMap || !reqMap.TryGetValue("display_name", out OSD dnOsd)
+                    || dnOsd is not OSDArray dnArray || dnArray.Count < 2)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            // Viewer sends [old_display_name, new_display_name]; only the
+            // new value matters here, the old one is only used for the
+            // change-notification we push back out below.
+            string oldName = m_DisplayNames.GetCachedDisplayName(m_AgentID.ToString());
+            string newName = dnArray[1].AsString();
+
+            if (!m_DisplayNames.SetDisplayName(m_AgentID, newName, out NameInfo nameInfo))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.Conflict;
+                return;
+            }
+
+            m_log.InfoFormat("[CAPS]: {0} {1} changed their display name to {2}",
+                nameInfo.FirstName, nameInfo.LastName, nameInfo.DisplayName);
+
+            DateTime nextUpdate = nameInfo.NameChanged.AddDays(7);
+
+            // Reply to the requester...
+            SendDisplayNameReply(newName, oldName, nameInfo, nextUpdate, httpResponse);
+
+            // ...and push a live update to everyone else already rendering
+            // this avatar, so nametags refresh without a relog.
+            if (m_eqModule is not null)
+            {
+                m_Scene.ForEachScenePresence(scenePresence =>
+                {
+                    if (scenePresence.UUID != m_AgentID && !scenePresence.IsChildAgent)
+                        SendDisplayNameUpdate(newName, oldName, nameInfo, scenePresence.UUID, nextUpdate);
+                });
+            }
+        }
+
+        private void SendDisplayNameReply(string newName, string oldName, NameInfo nameInfo, DateTime nextUpdate,
+                IOSHttpResponse httpResponse)
+        {
+            OSDMap content = new()
+            {
+                ["display_name"] = OSD.FromString(newName),
+                ["display_name_next_update"] = OSD.FromDate(nextUpdate),
+                ["legacy_first_name"] = OSD.FromString(nameInfo.FirstName),
+                ["legacy_last_name"] = OSD.FromString(nameInfo.LastName),
+                ["id"] = OSD.FromUUID(m_AgentID),
+                ["is_display_name_default"] = OSD.FromBoolean(nameInfo.IsDefault)
+            };
+
+            OSDMap nameReply = new()
+            {
+                ["message"] = OSD.FromString("SetDisplayNameReply"),
+                ["content"] = content,
+                ["agent_id"] = OSD.FromUUID(m_AgentID)
+            };
+
+            httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(nameReply);
+            httpResponse.ContentType = "application/llsd+xml";
+            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private void SendDisplayNameUpdate(string newName, string oldName, NameInfo nameInfo, UUID toAgentID, DateTime nextUpdate)
+        {
+            if (m_eqModule is null)
+                return;
+
+            OSDMap agentData = new()
+            {
+                ["display_name"] = OSD.FromString(newName),
+                ["display_name_next_update"] = OSD.FromDate(nextUpdate),
+                ["legacy_first_name"] = OSD.FromString(nameInfo.FirstName),
+                ["legacy_last_name"] = OSD.FromString(nameInfo.LastName),
+                ["id"] = OSD.FromUUID(m_AgentID),
+                ["is_display_name_default"] = OSD.FromBoolean(nameInfo.IsDefault),
+                ["old_display_name"] = OSD.FromString(oldName)
+            };
+
+            OSDMap body = new()
+            {
+                ["agents"] = new OSDArray { agentData }
+            };
+
+            byte[] evData = m_eqModule.BuildEvent("DisplayNameUpdate", body);
+            m_eqModule.Enqueue(evData, toAgentID);
+        }
+
 
         public class AssetUploader
         {

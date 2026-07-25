@@ -38,6 +38,7 @@ using System.Xml.Serialization;
 using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
@@ -255,6 +256,140 @@ namespace OpenSim.Region.Framework.Scenes
 
         // WRONG flag in libOmvPrimFlags
         private const uint primFlagVolumeDetect = (uint)PrimFlags.JointLP2P;
+
+        // llSetLinkSitFlags backing storage, ported from GuntharDeNiro/
+        // opensim - this was previously a documented no-op in current
+        // core ("does nothing since we do not have any of the flags").
+        // Only SIT_FLAG_SCRIPTED_ONLY is actually consulted anywhere
+        // right now (by FindNextAvailableSitTarget/CanUseSitTarget in
+        // ScenePresence.cs); the others are stored faithfully but not
+        // yet enforced anywhere, matching the source project's own scope.
+        public const int LslSitFlagSitTarget = 0x01;
+        public const int LslSitFlagAllowUnsit = 0x02;
+        public const int LslSitFlagScriptedOnly = 0x04;
+        public const int LslSitFlagNoCollide = 0x10;
+        public const int LslSitFlagNoDamage = 0x20;
+
+        private const int LslStoredSitFlagsMask =
+            LslSitFlagAllowUnsit | LslSitFlagScriptedOnly | LslSitFlagNoCollide | LslSitFlagNoDamage;
+
+        private const int LslDefaultSitFlags =
+            LslSitFlagAllowUnsit | LslSitFlagNoCollide | LslSitFlagNoDamage;
+
+        private const string LslSitFlagsDynAttrsNamespace = "OpenSim";
+        private const string LslSitFlagsDynAttrsStore = "LSLSitFlags";
+        private const string LslSitFlagsDynAttrsKey = "flags";
+
+        private int GetStoredLslSitFlags()
+        {
+            if (DynAttrs == null)
+                return LslDefaultSitFlags;
+
+            lock (DynAttrs)
+            {
+                if (DynAttrs.TryGetStore(LslSitFlagsDynAttrsNamespace, LslSitFlagsDynAttrsStore, out OSDMap store)
+                    && store != null
+                    && store.TryGetValue(LslSitFlagsDynAttrsKey, out OSD flagsOSD))
+                {
+                    return flagsOSD.AsInteger() & LslStoredSitFlagsMask;
+                }
+            }
+
+            return LslDefaultSitFlags;
+        }
+
+        public int GetLslSitFlags()
+        {
+            int flags = GetStoredLslSitFlags();
+            if (IsSitTargetSet)
+                flags |= LslSitFlagSitTarget;
+            return flags;
+        }
+
+        public bool HasLslSitFlag(int flag)
+        {
+            return (GetLslSitFlags() & flag) != 0;
+        }
+
+        public void SetLslSitFlags(int flags)
+        {
+            DynAttrs ??= new DAMap();
+
+            lock (DynAttrs)
+            {
+                if (!DynAttrs.TryGetStore(LslSitFlagsDynAttrsNamespace, LslSitFlagsDynAttrsStore, out OSDMap store)
+                    || store == null)
+                {
+                    store = new OSDMap();
+                }
+
+                store[LslSitFlagsDynAttrsKey] = new OSDInteger(flags & LslStoredSitFlagsMask);
+                DynAttrs.SetStore(LslSitFlagsDynAttrsNamespace, LslSitFlagsDynAttrsStore, store);
+            }
+
+            if (ParentGroup != null)
+                ParentGroup.HasGroupChanged = true;
+        }
+
+        public void SetLslSitFlag(int flag, bool enabled)
+        {
+            int storedFlags = GetStoredLslSitFlags();
+
+            if (enabled)
+                storedFlags |= flag;
+            else
+                storedFlags &= ~flag;
+
+            SetLslSitFlags(storedFlags);
+        }
+
+        // Combat2 object health tracking, ported from GuntharDeNiro/opensim
+        // - backs llGetHealth/llDamage's object-targeting path and
+        // llDetectedDamage. Stored in DynAttrs (same persisted-dynamic-
+        // attribute mechanism used elsewhere, e.g. llSetSculptAnim)
+        // rather than a new first-class field, since it's an opt-in
+        // combat feature most objects never use.
+        private const string LslCombatDynAttrsNamespace = "OpenSim";
+        private const string LslCombatDynAttrsStore = "LSLCombat";
+        private const string LslCombatHealthKey = "health";
+
+        public float GetLslHealth()
+        {
+            if (DynAttrs == null)
+                return 0f;
+
+            lock (DynAttrs)
+            {
+                if (DynAttrs.TryGetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, out OSDMap store)
+                    && store != null
+                    && store.TryGetValue(LslCombatHealthKey, out OSD healthOSD))
+                {
+                    return (float)healthOSD.AsReal();
+                }
+            }
+
+            return 0f;
+        }
+
+        public void SetLslHealth(float health)
+        {
+            DynAttrs ??= new DAMap();
+
+            lock (DynAttrs)
+            {
+                if (!DynAttrs.TryGetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, out OSDMap store)
+                    || store == null)
+                {
+                    store = new OSDMap();
+                }
+
+                store[LslCombatHealthKey] = OSD.FromReal(health);
+                DynAttrs.SetStore(LslCombatDynAttrsNamespace, LslCombatDynAttrsStore, store);
+            }
+
+            if (ParentGroup != null)
+                ParentGroup.HasGroupChanged = true;
+        }
 
         public bool VolumeDetectActive
         {
