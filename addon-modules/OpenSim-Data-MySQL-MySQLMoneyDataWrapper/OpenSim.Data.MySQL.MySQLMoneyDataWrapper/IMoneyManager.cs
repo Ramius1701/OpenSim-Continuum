@@ -36,7 +36,7 @@ NullPointer-Checks & Fehlerquellen
         Rückgabewerte wie TransactionData oder UserInfo könnten null sein, wenn nichts gefunden wird – auch das ist Sache der Implementierung.
 
     Rückgabewerte:
-        Methoden, die Objekte zurückgeben (FetchTransaction, fetchUserInfo), haben keine Angaben, ob sie null zurückgeben dürfen. 
+        Methoden, die Objekte zurückgeben (FetchTransaction, fetchUserInfo), haben keine Angaben, ob sie null zurückgeben dürfen.
         Das sollte dokumentiert oder in der Implementierung behandelt werden.
 
 Zusammenfassung
@@ -48,7 +48,7 @@ Zusammenfassung
     Definition aller nötigen Methoden zur Verwaltung von Geldtransaktionen und Benutzerinformationen im OpenSim-Kontext.
 
 Fazit:
-Die Datei IMoneyManager.cs ist ein reines Methoden-Interface und enthält keine Logik, die zu NullPointer-Fehlern führen kann. 
+Die Datei IMoneyManager.cs ist ein reines Methoden-Interface und enthält keine Logik, die zu NullPointer-Fehlern führen kann.
 Typische Fehlerquellen und NullPointer sollten in den konkreten Implementierungen der Methoden sorgfältig behandelt werden (z.B. Nullprüfungen auf Parameter, Rückgabewerte).
  */
 
@@ -131,13 +131,5 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
         /// <summary>Updates the user information.</summary>
         /// <param name="user">The user.</param>
         bool updateUserInfo(UserInfo user);
-
-        /// <summary>Gets the total amount of currency purchased by a user in a time period.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="startTime">The start time (Unix epoch).</param>
-        /// <param name="endTime">The end time (Unix epoch).</param>
-        /// <param name="transactionType">The transaction type to sum (e.g., 5001 for currency purchase).</param>
-        /// <returns>Total amount purchased, or -1 on error</returns>
-        int getPurchaseTotal(string userID, int startTime, int endTime, int transactionType);
     }
 }

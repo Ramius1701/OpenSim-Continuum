@@ -1,76 +1,309 @@
-;; OpenSimWeather module configuration
+;; OpenSimWeather 0.3.2 complete configuration reference
 ;;
-;; Copy the [Weather] section below into your OpenSim.ini (or a region
-;; config that is merged into the simulator configuration) and adjust the
-;; values as required. The module is a non-shared region module, so the
-;; settings apply to every region the simulator hosts.
+;; Put these sections in OpenSim.ini, or in a file explicitly included by
+;; OpenSim.ini. Do not place them in Regions.ini.
+;;
+;; All asset settings take OpenSim asset UUIDs, not filenames or inventory names.
+;; This reference is deliberately disabled and conservative.
 
 [Weather]
 
-	;; Master switch for the module.
-	Enabled = true
+    ;; Master switch. A missing section or Enabled=false means fully disabled.
+    Enabled = false
 
-	;; When true the weather can be turned off at runtime via the console/chat
-	;; commands. When false the weather system always stays active.
-	AllowDisabled = false
+    ;; Private non-zero chat channel used for in-world commands.
+    ;; CommandChannel=0 is rejected and replaced with 89.
+    CommandChannel = 89
 
-	;; Chat channel used by the in-world weather commands.
-	CommandChannel = 89
+    ;; true: only estate managers/owners may use weather commands.
+    EstateManagerOnly = true
 
-	;; When true only estate managers/owners may drive the weather commands.
-	EstateManagerOnly = true
+    ;; ------------------------------------------------------------------------
+    ;; WEATHER COVERAGE AND VAR-REGIONS
+    ;; ------------------------------------------------------------------------
 
-	;; Particle emitter layout. EmitterGrid is the number of emitters per axis,
-	;; EmitterHeight is the spawn height above ground in metres.
-	EmitterGrid = 8
-	EmitterHeight = 18.0
+    ;; ActiveArea creates weather cells only near root agents and is the
+    ;; production-oriented default. Region attempts coverage across the full
+    ;; standard or variable-sized region.
+    CoverageMode = ActiveArea
 
-	;; Global precipitation intensity multiplier (0.1 - 10).
-	Intensity = 1.0
+    ;; Preferred var-region-aware cell spacing. The module calculates the
+    ;; required X and Y cell counts from RegionSizeX and RegionSizeY.
+    EmitterSpacingMeters = 24.0
 
-	;; Cloud / windlight handling.
-	AdjustClouds = true
-	RestoreCloudsOnClear = true
+    ;; Global object safety limit after var-region layout calculation.
+    MaxEmitters = 384
 
-	;; Wind handling. The module can drive the region wind plugin to match the
-	;; current weather and restore it when the sky clears again.
-	AdjustWind = true
-	RestoreWindOnClear = true
-	WindDirectionDegrees = 70.0
-	WindDirectionVarianceDegrees = 18.0
-	RainWindStrength = 0.45
-	StormWindStrength = 1.35
-	SnowWindStrength = 0.22
+    ;; Legacy fixed count per axis. Set 0 to use EmitterSpacingMeters.
+    ;; Values 1-128 are accepted for compatibility, but fixed-axis layouts do
+    ;; not preserve the same weather-cell size across var-regions.
+    EmitterGrid = 0
 
-	;; Avoid spawning precipitation under roofs/covered areas using ray casts.
-	AvoidCoveredAreas = true
-	CoverProbeHeight = 96.0
+    ;; ActiveArea radius around each root agent and refresh interval.
+    ActiveAreaRadiusMeters = 96.0
+    ActiveAreaRefreshSeconds = 3
 
-	;; Lightning (visual flashes) during storms.
-	LightningEnabled = true
-	LightningMinDelayMS = 7000
-	LightningMaxDelayMS = 18000
+    ;; Particle burst radius as a fraction of the calculated cell spacing.
+    EmitterRadiusScale = 0.48
 
-	;; Thunder audio that follows the lightning. ThunderSound must be the asset
-	;; UUID of a sound clip; leave empty to disable audio.
-	ThunderEnabled = true
-	ThunderVolume = 1.0
-	ThunderSound =
+    ;; Height above local terrain used for the invisible emitter object.
+    EmitterHeight = 18.0
 
-	;; Automatic weather cycling.
-	AutoCycleEnabled = true
-	AutoCycleHours = 6.0
-	AutoCycleStartupDelaySeconds = 30
-	AutoCycleChangeOnStartup = true
-	AutoCycleChoices = storm,rain,snow,sunny,clear
+    ;; Global precipitation multiplier. Raise cautiously.
+    Intensity = 1.0
 
-	;; Forecast warning broadcast before the next automatic change.
-	;; Placeholders: {RegionName} {NextWeather} {TimeUntilNextForecast}
-	AutoCycleForecastWarningMinutes = 15
-	AutoCycleForecastWarningMessage = Weather forecast update: next conditions for {RegionName} are expected to shift to {NextWeather} in {TimeUntilNextForecast}.
+    ;; ------------------------------------------------------------------------
+    ;; PARTICLE AND LIGHTNING ASSETS
+    ;; ------------------------------------------------------------------------
 
-	;; Instant message sent to avatars when they enter the region.
-	;; Placeholders: {RegionName} {Weather} {NextForecast}
-	SendWeatherIMOnEntry = true
-	WeatherIMDelaySeconds = 8
-	WeatherIMMessage = Weather forecast for {RegionName}: current conditions are {Weather}. Next forecast: {NextForecast}. Stay tuned for further regional updates.
+    ;; Configure uploaded alpha textures here. Blank values use OpenSim's blank
+    ;; texture and can produce visible square/rectangular particle billboards.
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    ;; ------------------------------------------------------------------------
+    ;; BUILDING / COVER SUPPRESSION
+    ;; ------------------------------------------------------------------------
+
+    ;; OpenSim particles do not collide with roofs. These settings suppress
+    ;; whole weather cells whose sampled area is sufficiently covered.
+    AvoidCoveredAreas = true
+    CoverProbeHeight = 256.0
+
+    ;; Odd sample grid from 1-7. 3 means nine probes per weather cell.
+    CoverProbeGrid = 3
+
+    ;; Required fraction of sampled points with open sky before a cell exists.
+    MinimumOpenSkyFraction = 0.67
+
+    ;; Do not maintain an ActiveArea weather bubble around an avatar detected
+    ;; under cover.
+    SuppressAroundCoveredAvatars = true
+
+    ;; false ignores phantom prims during physics cover rays. This also prevents
+    ;; the module's own phantom emitters from being mistaken for roofs.
+    ;; Explicit exclusion volumes below still work when they are phantom.
+    CoverIncludesPhantomPrims = false
+    CoverMaxHits = 32
+
+    ;; Optional named prim/linkset volumes for interiors, caves, hangars, and
+    ;; complex roofs. Any object's name equal to or beginning with
+    ;; "Weather Exclusion" is treated as a no-weather X/Y volume.
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+    ExclusionRefreshSeconds = 30
+
+    ;; Remove non-persistent weather objects left by an earlier module instance
+    ;; when this region module loads.
+    CleanupGeneratedObjectsOnStartup = true
+
+    ;; ------------------------------------------------------------------------
+    ;; REGION ENVIRONMENT / EEP-LIGHTSHARE
+    ;; ------------------------------------------------------------------------
+
+    ;; Canonical switch. AdjustClouds remains accepted as a legacy alias.
+    ;; OpenSim persists these changes, so the explicit acknowledgement is also
+    ;; required before any profile is applied.
+    AdjustEnvironment = false
+    AllowPersistentEnvironmentChanges = false
+    RestoreCloudsOnClear = true
+
+    ;; ------------------------------------------------------------------------
+    ;; WIND
+    ;; ------------------------------------------------------------------------
+
+    ;; Only SimpleRandomWind and ConfigurableWind are modified.
+    AdjustWind = false
+    RestoreWindOnClear = true
+    WindDirectionDegrees = 70.0
+    WindDirectionVarianceDegrees = 18.0
+    RainWindStrength = 0.45
+    StormWindStrength = 1.35
+    SnowWindStrength = 0.22
+
+    ;; ------------------------------------------------------------------------
+    ;; LIGHTNING AND THUNDER
+    ;; ------------------------------------------------------------------------
+
+    LightningEnabled = true
+    LightningMinDelayMS = 7000
+    LightningMaxDelayMS = 18000
+
+    ;; Thunder requires a valid uploaded sound asset UUID.
+    ThunderEnabled = false
+    ThunderVolume = 1.0
+    ThunderSound =
+
+    ;; ------------------------------------------------------------------------
+    ;; AUTOMATIC WEATHER
+    ;; ------------------------------------------------------------------------
+
+    AutoCycleEnabled = false
+    AutoCycleHours = 6.0
+    AutoCycleStartupDelaySeconds = 30
+    AutoCycleChangeOnStartup = false
+    AutoCycleChoices = storm,rain,snow,sunny,clear
+
+    ;; Warning must be shorter than the cycle interval.
+    ;; Placeholders: {RegionName} {NextWeather} {TimeUntilNextForecast}
+    ;;               {NextForecast}
+    AutoCycleForecastWarningMinutes = 15
+    AutoCycleForecastWarningMessage = Weather forecast update: next conditions for {RegionName} are expected to shift to {NextWeather} in {TimeUntilNextForecast}.
+
+    ;; ------------------------------------------------------------------------
+    ;; ENTRY MESSAGE
+    ;; ------------------------------------------------------------------------
+
+    SendWeatherIMOnEntry = false
+    WeatherIMDelaySeconds = 8
+
+    ;; Placeholders: {RegionName} {Weather} {EmitterCount} {AutoCycle}
+    ;;               {NextForecast}
+    WeatherIMMessage = Weather forecast for {RegionName}: current conditions are {Weather}. Next forecast: {NextForecast}.
+
+    ;; ------------------------------------------------------------------------
+    ;; EXPERIMENTAL TERRAIN SURFACE EFFECTS
+    ;; ------------------------------------------------------------------------
+
+    ;; These are temporary, non-persistent terrain overlays near active avatars.
+    ;; They do not rewrite terrain textures and do not accumulate on buildings.
+    SurfaceEffectsEnabled = false
+    PuddlesEnabled = true
+    SnowAccumulationEnabled = true
+
+    ;; Alpha textures are required. Blank values automatically disable the
+    ;; corresponding effect to avoid solid default disks.
+    PuddleTexture =
+    SnowSurfaceTexture =
+
+    ;; Static regional temperature used by the accumulation/melt model.
+    TemperatureC = 10.0
+    FreezingPointC = 0.0
+
+    RainWetnessPerHour = 0.35
+    StormWetnessPerHour = 0.75
+    SnowAccumulationPerHour = 0.30
+
+    ClearDryingPerHour = 0.08
+    SunnyDryingPerHour = 0.25
+
+    ClearSnowMeltPerHour = 0.05
+    SunnySnowMeltPerHour = 0.22
+    RainSnowMeltPerHour = 0.45
+
+    PuddleStartLevel = 0.12
+    SnowPatchStartLevel = 0.08
+
+    SurfacePatchSpacingMeters = 20.0
+    SurfaceRadiusMeters = 80.0
+    MaxSurfacePatches = 128
+    MaxSurfaceSlopeDegrees = 8.0
+    PuddleLowPointToleranceMeters = 0.08
+    SurfaceUpdateSeconds = 60
+
+
+;; ---------------------------------------------------------------------------
+;; ENVIRONMENT PROFILES
+;; ---------------------------------------------------------------------------
+;; These values are fallbacks and are fully configurable. The module copies the
+;; current region LightShare state, changes only the listed sky/cloud fields,
+;; and preserves the current water fields. Clear restores the saved region
+;; environment when RestoreCloudsOnClear=true.
+
+[Weather.Environment.Sunny]
+    CloudCoverage = 0.05
+    CloudScale = 0.28
+    CloudColor = 1.0,0.98,0.9,1.0
+    CloudXYDensity = 0.38,0.18,0.28
+    CloudDetailXYDensity = 0.34,0.16,0.04
+    CloudScrollX = 0.06
+    CloudScrollY = 0.012
+    Horizon = 0.58,0.72,0.95,1.0
+    BlueDensity = 0.16,0.32,0.68,1.0
+    Ambient = 0.48,0.48,0.42,1.0
+    SunMoonColor = 1.0,0.88,0.52,1.0
+    HazeHorizon = 0.10
+    HazeDensity = 0.18
+    DensityMultiplier = 0.08
+    DistanceMultiplier = 1.15
+    SunGlowFocus = 0.22
+    SunGlowSize = 2.40
+    SceneGamma = 1.16
+    StarBrightness = 0.00
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Rain]
+    CloudCoverage = 0.82
+    CloudScale = 0.64
+    CloudColor = 0.16,0.18,0.22,1.0
+    CloudXYDensity = 1.18,0.60,0.96
+    CloudDetailXYDensity = 1.32,0.64,0.24
+    CloudScrollX = 0.28
+    CloudScrollY = 0.05
+    Horizon = 0.15,0.17,0.20,1.0
+    BlueDensity = 0.07,0.09,0.13,1.0
+    Ambient = 0.14,0.15,0.17,1.0
+    SunMoonColor = 0.20,0.21,0.24,1.0
+    HazeHorizon = 0.40
+    HazeDensity = 0.82
+    DensityMultiplier = 0.28
+    DistanceMultiplier = 0.90
+    SunGlowFocus = 0.08
+    SunGlowSize = 1.40
+    SceneGamma = 0.78
+    StarBrightness = 0.03
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Storm]
+    CloudCoverage = 0.94
+    CloudScale = 0.72
+    CloudColor = 0.06,0.07,0.085,1.0
+    CloudXYDensity = 1.35,0.64,1.00
+    CloudDetailXYDensity = 1.55,0.72,0.28
+    CloudScrollX = 0.48
+    CloudScrollY = 0.10
+    Horizon = 0.08,0.09,0.11,1.0
+    BlueDensity = 0.04,0.055,0.08,1.0
+    Ambient = 0.08,0.085,0.095,1.0
+    SunMoonColor = 0.12,0.13,0.15,1.0
+    HazeHorizon = 0.45
+    HazeDensity = 0.92
+    DensityMultiplier = 0.32
+    DistanceMultiplier = 0.80
+    SunGlowFocus = 0.05
+    SunGlowSize = 1.20
+    SceneGamma = 0.72
+    StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Snow]
+    CloudCoverage = 0.86
+    CloudScale = 0.70
+    CloudColor = 0.38,0.40,0.44,1.0
+    CloudXYDensity = 1.18,0.60,0.96
+    CloudDetailXYDensity = 1.28,0.62,0.22
+    CloudScrollX = 0.14
+    CloudScrollY = 0.035
+    Horizon = 0.26,0.28,0.32,1.0
+    BlueDensity = 0.13,0.15,0.20,1.0
+    Ambient = 0.22,0.23,0.25,1.0
+    SunMoonColor = 0.30,0.31,0.34,1.0
+    HazeHorizon = 0.36
+    HazeDensity = 0.72
+    DensityMultiplier = 0.24
+    DistanceMultiplier = 0.95
+    SunGlowFocus = 0.10
+    SunGlowSize = 1.60
+    SceneGamma = 0.86
+    StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false

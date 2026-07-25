@@ -256,11 +256,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "S:\\Master\\Casperia\\addon-modules\\OpenSimWeather\\Module\\OpenSimWeather.Module.csproj",
+      "projectUniqueName": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSimWeather\\Module\\OpenSimWeather.Module.csproj",
       "projectName": "OpenSimWeather.Module",
-      "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSimWeather\\Module\\OpenSimWeather.Module.csproj",
+      "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSimWeather\\Module\\OpenSimWeather.Module.csproj",
       "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-      "outputPath": "S:\\Master\\Casperia\\addon-modules\\OpenSimWeather\\Module\\obj\\",
+      "outputPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSimWeather\\Module\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -278,14 +278,14 @@
           "framework": "net8.0",
           "targetAlias": "net8.0",
           "projectReferences": {
-            "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj"
             }
           }
         }
@@ -320,15 +320,15 @@
         "downloadDependencies": [
           {
             "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           },
           {
             "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           }
         ],
         "frameworkReferences": {
@@ -336,7 +336,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

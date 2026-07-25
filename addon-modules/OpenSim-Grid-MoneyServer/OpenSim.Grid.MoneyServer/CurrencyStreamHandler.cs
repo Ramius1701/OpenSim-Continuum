@@ -3,8 +3,8 @@ Hier ist eine Analyse der Datei CurrencyStreamHandler.cs hinsichtlich möglicher
 
 ### Funktion des Codes
 
-Die Datei definiert die Klasse CurrencyStreamHandler im Namespace OpenSim.Grid.MoneyServer.  
-Diese Klasse erbt von CustomSimpleStreamHandler und dient dazu, HTTP-Requests unter einer bestimmten Pfadangabe zu behandeln.  
+Die Datei definiert die Klasse CurrencyStreamHandler im Namespace OpenSim.Grid.MoneyServer.
+Diese Klasse erbt von CustomSimpleStreamHandler und dient dazu, HTTP-Requests unter einer bestimmten Pfadangabe zu behandeln.
 Im Konstruktor werden ein Pfad (string path) und eine Callback-Action (Action<IOSHttpRequest, IOSHttpResponse> processAction) übergeben und direkt an die Basisklasse weitergereicht.
 
 ### Code-Check: Null-Pointer & Fehlerquellen

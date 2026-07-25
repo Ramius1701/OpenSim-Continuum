@@ -16,7 +16,7 @@
 
 Funktion
 
-IMoneyDBService ist ein Interface für Datenbankoperationen rund um ein Währungssystem, typischerweise für virtuelle Ökonomien. Es definiert Methoden für:
+IMoneyDBService ist ein Interface fï¿½r Datenbankoperationen rund um ein Wï¿½hrungssystem, typischerweise fï¿½r virtuelle ï¿½konomien. Es definiert Methoden fï¿½r:
 
     Nutzerverwaltung (z.B. addUser, DeleteUser, UserExists, UpdateUserInfo)
     Kontostand- und Geldtransaktionen (getBalance, withdrawMoney, giveMoney, BuyMoney, BuyCurrency, PerformMoneyTransfer)
@@ -63,11 +63,11 @@ namespace OpenSim.Grid.MoneyServer
 
         /// <summary>Gibt Geld.</summary>
         /// <param name="transactionID">Die Transaktions-ID.</param>
-        /// <param name="receiverID">Die Empfänger-ID.</param>
+        /// <param name="receiverID">Die Empfï¿½nger-ID.</param>
         /// <param name="amount">Der Betrag.</param>
         bool giveMoney(UUID transactionID, string receiverID, int amount);
 
-        /// <summary>Kauft Geld für einen Benutzer.</summary>
+        /// <summary>Kauft Geld fï¿½r einen Benutzer.</summary>
         /// <param name="transactionID">Die Transaktions-ID.</param>
         /// <param name="userID">Die Benutzer-ID.</param>
         /// <param name="amount">Der zu kaufende Betrag.</param>
@@ -76,11 +76,11 @@ namespace OpenSim.Grid.MoneyServer
 
         bool BuyCurrency(string userID, int amount);
 
-        /// <summary>Fügt die Transaktion hinzu.</summary>
+        /// <summary>Fï¿½gt die Transaktion hinzu.</summary>
         /// <param name="transaction">Die Transaktion.</param>
         bool addTransaction(TransactionData transaction);
 
-        /// <summary>Fügt den Benutzer hinzu.</summary>
+        /// <summary>Fï¿½gt den Benutzer hinzu.</summary>
         /// <param name="userID">Die Benutzer-ID.</param>
         /// <param name="balance">Der Kontostand.</param>
         /// <param name="status">Der Status.</param>
@@ -97,7 +97,7 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="deadTime">Die Ablaufzeit.</param>
         bool SetTransExpired(int deadTime);
 
-        /// <summary>Validiert die Überweisung.</summary>
+        /// <summary>Validiert die ï¿½berweisung.</summary>
         /// <param name="secureCode">Der Sicherheitscode.</param>
         /// <param name="transactionID">Die Transaktions-ID.</param>
         bool ValidateTransfer(string secureCode, UUID transactionID);
@@ -119,15 +119,15 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="endTime">Die Endzeit.</param>
         int getTransactionNum(string userID, int startTime, int endTime);
 
-        /// <summary>Führt die Überweisung durch.</summary>
+        /// <summary>Fï¿½hrt die ï¿½berweisung durch.</summary>
         /// <param name="transactionUUID">Die Transaktions-UUID.</param>
         bool DoTransfer(UUID transactionUUID);
 
-        /// <summary>Führt die Geldaufstockung durch.</summary>
+        /// <summary>Fï¿½hrt die Geldaufstockung durch.</summary>
         /// <param name="transactionUUID">Die Transaktions-UUID.</param>
-        bool DoAddMoney(UUID transactionUUID);  // Hinzugefügt von Fumi.Iseki
+        bool DoAddMoney(UUID transactionUUID);  // Hinzugefï¿½gt von Fumi.Iseki
 
-        /// <summary>Versucht, Benutzerinformationen hinzuzufügen.</summary>
+        /// <summary>Versucht, Benutzerinformationen hinzuzufï¿½gen.</summary>
         /// <param name="user">Der Benutzer.</param>
         bool TryAddUserInfo(UserInfo user);
 
@@ -135,7 +135,7 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="userID">Die Benutzer-ID.</param>
         UserInfo FetchUserInfo(string userID);
 
-        /// <summary>Überprüft, ob ein Benutzer existiert.</summary>
+        /// <summary>ï¿½berprï¿½ft, ob ein Benutzer existiert.</summary>
         /// <param name="userID">Die Benutzer-ID.</param>
         bool UserExists(string userID);
 
@@ -144,28 +144,36 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="updatedInfo">Die aktualisierten Benutzerinformationen.</param>
         bool UpdateUserInfo(string userID, UserInfo updatedInfo);
 
-        /// <summary>Löscht einen Benutzer aus der Datenbank.</summary>
+        /// <summary>Lï¿½scht einen Benutzer aus der Datenbank.</summary>
         /// <param name="userID">Die Benutzer-ID.</param>
         bool DeleteUser(string userID);
 
-        /// <summary>Protokolliert transaktionsbezogene Fehler oder Änderungen zur Fehlerbehebung.</summary>
+        /// <summary>Protokolliert transaktionsbezogene Fehler oder ï¿½nderungen zur Fehlerbehebung.</summary>
         /// <param name="transactionID">Die Transaktions-ID.</param>
-        /// <param name="errorMessage">Die Fehlermeldung oder Änderungshinweis.</param>
+        /// <param name="errorMessage">Die Fehlermeldung oder ï¿½nderungshinweis.</param>
         void LogTransactionError(UUID transactionID, string errorMessage);
 
-        /// <summary>Ruft eine Liste der Transaktionen für einen Benutzer innerhalb eines bestimmten Zeitrahmens ab.</summary>
+        /// <summary>Ruft eine Liste der Transaktionen fï¿½r einen Benutzer innerhalb eines bestimmten Zeitrahmens ab.</summary>
         /// <param name="userID">Die Benutzer-ID.</param>
         /// <param name="startTime">Die Startzeit.</param>
         /// <param name="endTime">Die Endzeit.</param>
         IEnumerable<TransactionData> GetTransactionHistory(string userID, int startTime, int endTime);
 
-        /// <summary>Ruft die Gesamtsumme der gekauften Währung für einen Benutzer in einem Zeitraum ab.</summary>
-        /// <param name="userID">Die Benutzer-ID.</param>
-        /// <param name="startTime">Die Startzeit (Unix-Epoch).</param>
-        /// <param name="endTime">Die Endzeit (Unix-Epoch).</param>
-        /// <param name="transactionType">Der Transaktionstyp (z.B. 5001 für Währungskauf).</param>
-        /// <returns>Gesamtbetrag der Käufe oder -1 bei Fehler.</returns>
-        int GetPurchaseTotal(string userID, int startTime, int endTime, int transactionType);
+
+        /// <summary>
+        /// Atomically credits a successful viewer currency purchase, records it as
+        /// TransactionType.BuyMoney, and enforces the configured purchase limits.
+        /// TotalDay, TotalWeek, or TotalMonth set to 0 disables that period limit.
+        /// </summary>
+        bool TryPurchaseCurrency(
+            UUID transactionID,
+            string receiverID,
+            int amount,
+            int totalDay,
+            int totalWeek,
+            int totalMonth,
+            int currencyMaximum,
+            out string message);
 
         MySQLSuperManager GetLockedConnection();
     }

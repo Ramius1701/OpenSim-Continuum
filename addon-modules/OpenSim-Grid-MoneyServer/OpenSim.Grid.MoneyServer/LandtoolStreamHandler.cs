@@ -13,7 +13,7 @@ Zusammenfassung
     Keine weiteren offensichtlichen Fehler in dieser Datei. Die Robustheit hängt von der Basisklasse und der übergebenen Action ab.
 
 Fazit:
-Der Code ist funktional korrekt und sicher gegen NullPointer-Fehler im laufenden Betrieb, solange die Basisklasse und die Action korrekt implementiert sind. 
+Der Code ist funktional korrekt und sicher gegen NullPointer-Fehler im laufenden Betrieb, solange die Basisklasse und die Action korrekt implementiert sind.
 Für zusätzliche Sicherheit könnten Null-Checks im Konstruktor ergänzt werden, sind aber nicht zwingend notwendig.
 */
 

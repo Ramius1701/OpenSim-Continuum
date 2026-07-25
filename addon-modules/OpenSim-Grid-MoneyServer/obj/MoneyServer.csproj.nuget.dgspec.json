@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "S:\\Master\\Casperia\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj": {}
+    "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj": {}
   },
   "projects": {
-    "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
+    "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj",
         "projectName": "OpenSim.Data.MySQL.MySQLMoneyDataWrapper",
-        "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -29,29 +29,29 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -86,15 +86,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -102,18 +102,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj": {
+    "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj",
         "projectName": "MoneyServer",
-        "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Grid-MoneyServer\\MoneyServer.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Grid-MoneyServer\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Grid-MoneyServer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -131,38 +131,38 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj"
+              "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj"
               },
-              "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj"
+              "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -197,19 +197,19 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Host.win-x64",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -217,18 +217,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj": {
+    "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj",
         "projectName": "OpenSim.Modules.Currency",
-        "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\OpenSim.Modules.Currency.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Modules-Currency\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Modules-Currency\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -246,32 +246,32 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj"
+              "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -306,15 +306,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -322,18 +322,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj",
         "projectName": "OpenSim.Capabilities",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Capabilities\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -351,20 +351,20 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -399,15 +399,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -415,18 +415,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj",
         "projectName": "OpenSim.Data",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Data\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -444,8 +444,8 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               }
             }
           }
@@ -480,15 +480,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -496,18 +496,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj",
         "projectName": "OpenSim.Framework.Console",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -525,11 +525,11 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               }
             }
           }
@@ -564,15 +564,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -580,18 +580,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj",
         "projectName": "OpenSim.Framework.Monitoring",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -609,8 +609,8 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               }
             }
           }
@@ -645,15 +645,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -661,18 +661,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj",
         "projectName": "OpenSim.Framework",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -690,8 +690,8 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj"
+              "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj"
               }
             }
           }
@@ -726,15 +726,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -742,18 +742,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj",
         "projectName": "OpenSim.Framework.Serialization",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -771,11 +771,11 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -810,15 +810,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -826,18 +826,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj",
         "projectName": "OpenSim.Framework.Servers.HttpServer",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -855,14 +855,14 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj"
+              "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj"
               }
             }
           }
@@ -897,15 +897,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -913,18 +913,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj",
         "projectName": "OpenSim.Framework.Servers",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -942,20 +942,20 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               }
             }
           }
@@ -990,15 +990,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1006,18 +1006,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj",
         "projectName": "OpenSim.Region.Framework",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1035,35 +1035,35 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Serialization\\OpenSim.Framework.Serialization.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -1098,15 +1098,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1114,18 +1114,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj",
         "projectName": "OpenSim.Region.PhysicsModules.SharedBase",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\OpenSim.Region.PhysicsModules.SharedBase.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Region\\PhysicsModules\\SharedBase\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\PhysicsModules\\SharedBase\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1143,11 +1143,11 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               }
             }
           }
@@ -1182,15 +1182,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1198,18 +1198,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj",
         "projectName": "OpenSim.Server.Base",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1227,20 +1227,20 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
               }
             }
           }
@@ -1275,15 +1275,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1291,18 +1291,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj",
         "projectName": "OpenSim.Server.Handlers",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\OpenSim.Server.Handlers.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Handlers\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Handlers\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1320,26 +1320,26 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj"
               }
             }
           }
@@ -1374,15 +1374,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1390,18 +1390,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj",
         "projectName": "OpenSim.Services.Base",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1419,14 +1419,14 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -1461,15 +1461,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1477,18 +1477,126 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\OpenSim.Services.Connectors.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\OpenSim.Services.Connectors.csproj",
+        "projectName": "OpenSim.Services.Connectors",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\OpenSim.Services.Connectors.csproj",
+        "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\obj\\",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        ],
+        "originalTargetFrameworks": [
+          "net8.0"
+        ],
+        "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net8.0": {
+            "framework": "net8.0",
+            "targetAlias": "net8.0",
+            "projectReferences": {
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Capabilities\\OpenSim.Capabilities.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Monitoring\\OpenSim.Framework.Monitoring.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.300"
+      },
+      "frameworks": {
+        "net8.0": {
+          "framework": "net8.0",
+          "targetAlias": "net8.0",
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[8.0.29, 8.0.29]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[8.0.29, 8.0.29]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Ref",
+              "version": "[8.0.29, 8.0.29]"
+            }
+          ],
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
+        }
+      }
+    },
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj",
         "projectName": "OpenSim.Services.Interfaces",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1506,14 +1614,14 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               }
             }
           }
@@ -1548,15 +1656,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1564,18 +1672,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj": {
+    "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj",
         "projectName": "OpenSim.Services.UserAccountService",
-        "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\OpenSim.Services.UserAccountService.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\OpenSim\\Services\\UserAccountService\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\UserAccountService\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1593,23 +1701,26 @@
             "framework": "net8.0",
             "targetAlias": "net8.0",
             "projectReferences": {
-              "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Console\\OpenSim.Framework.Console.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Base\\OpenSim.Services.Base.csproj"
               },
-              "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-                "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\OpenSim.Services.Connectors.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Connectors\\OpenSim.Services.Connectors.csproj"
+              },
+              "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+                "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
               }
             }
           }
@@ -1644,15 +1755,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1660,18 +1771,18 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     },
-    "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
+    "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj",
+        "projectUniqueName": "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj",
         "projectName": "SmartThreadPool",
-        "projectPath": "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj",
+        "projectPath": "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\SmartThreadPool.csproj",
         "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-        "outputPath": "S:\\Master\\Casperia\\ThirdParty\\SmartThreadPool\\obj\\",
+        "outputPath": "S:\\Master\\opensim-enhanced\\ThirdParty\\SmartThreadPool\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -1721,15 +1832,15 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Ref",
-              "version": "[8.0.27, 8.0.27]"
+              "version": "[8.0.29, 8.0.29]"
             }
           ],
           "frameworkReferences": {
@@ -1737,7 +1848,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

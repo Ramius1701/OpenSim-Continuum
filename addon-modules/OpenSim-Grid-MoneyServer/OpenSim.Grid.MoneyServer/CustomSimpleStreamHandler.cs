@@ -13,7 +13,7 @@ Verbesserungsvorschläge
     Optional: Dokumentation, dass für sinnvolle Funktionalität eine dieser Methoden/Callbacks gesetzt sein muss.
 
 Fazit:
-Die Klasse ist robust gegen NullPointer-Exceptions, weil überall sauber geprüft wird. Die Fehlerbehandlung ist sehr generisch – für Produktionseinsatz wäre Logging sinnvoll. 
+Die Klasse ist robust gegen NullPointer-Exceptions, weil überall sauber geprüft wird. Die Fehlerbehandlung ist sehr generisch – für Produktionseinsatz wäre Logging sinnvoll.
 Die eigentliche Funktion ist flexibel: Sie ermöglicht Authentifizierung und verschiedene Arten von Request-Handling in HTTP-Servern.
 */
 

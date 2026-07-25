@@ -440,6 +440,7 @@
           "OpenSim.Framework.Console": "1.0.0",
           "OpenSim.Framework.Servers.HttpServer": "1.0.0",
           "OpenSim.Services.Base": "1.0.0",
+          "OpenSim.Services.Connectors": "1.0.0",
           "OpenSim.Services.Interfaces": "1.0.0"
         },
         "compile": {
@@ -617,11 +618,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "S:\\Master\\Casperia\\addon-modules\\Gloebit\\GloebitMoneyModule\\Gloebit.csproj",
+      "projectUniqueName": "S:\\Master\\opensim-enhanced\\addon-modules\\Gloebit\\GloebitMoneyModule\\Gloebit.csproj",
       "projectName": "Gloebit",
-      "projectPath": "S:\\Master\\Casperia\\addon-modules\\Gloebit\\GloebitMoneyModule\\Gloebit.csproj",
+      "projectPath": "S:\\Master\\opensim-enhanced\\addon-modules\\Gloebit\\GloebitMoneyModule\\Gloebit.csproj",
       "packagesPath": "C:\\Users\\Allen\\.nuget\\packages\\",
-      "outputPath": "S:\\Master\\Casperia\\addon-modules\\Gloebit\\GloebitMoneyModule\\obj\\",
+      "outputPath": "S:\\Master\\opensim-enhanced\\addon-modules\\Gloebit\\GloebitMoneyModule\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Allen\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -639,47 +640,47 @@
           "framework": "net8.0",
           "targetAlias": "net8.0",
           "projectReferences": {
-            "S:\\Master\\Casperia\\OpenSim\\Data\\MySQL\\OpenSim.Data.MySQL.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\MySQL\\OpenSim.Data.MySQL.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\MySQL\\OpenSim.Data.MySQL.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\MySQL\\OpenSim.Data.MySQL.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\OpenSim.Data.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\OpenSim.Data.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Data\\PGSQL\\OpenSim.Data.PGSQL.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\PGSQL\\OpenSim.Data.PGSQL.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\PGSQL\\OpenSim.Data.PGSQL.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\PGSQL\\OpenSim.Data.PGSQL.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Data\\SQLite\\OpenSim.Data.SQLite.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Data\\SQLite\\OpenSim.Data.SQLite.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\SQLite\\OpenSim.Data.SQLite.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Data\\SQLite\\OpenSim.Data.SQLite.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\OpenSim.Framework.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\OpenSim.Framework.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\HttpServer\\OpenSim.Framework.Servers.HttpServer.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Framework\\Servers\\OpenSim.Framework.Servers.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\CoreModules\\OpenSim.Region.CoreModules.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\CoreModules\\OpenSim.Region.CoreModules.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\CoreModules\\OpenSim.Region.CoreModules.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\CoreModules\\OpenSim.Region.CoreModules.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\Framework\\OpenSim.Region.Framework.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\OptionalModules\\OpenSim.Region.OptionalModules.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\OptionalModules\\OpenSim.Region.OptionalModules.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\OptionalModules\\OpenSim.Region.OptionalModules.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\OptionalModules\\OpenSim.Region.OptionalModules.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\ScriptEngine\\Shared\\Api\\Runtime\\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\ScriptEngine\\Shared\\Api\\Runtime\\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\ScriptEngine\\Shared\\Api\\Runtime\\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\ScriptEngine\\Shared\\Api\\Runtime\\OpenSim.Region.ScriptEngine.Shared.Api.Runtime.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Region\\ScriptEngine\\Shared\\OpenSim.Region.ScriptEngine.Shared.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Region\\ScriptEngine\\Shared\\OpenSim.Region.ScriptEngine.Shared.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\ScriptEngine\\Shared\\OpenSim.Region.ScriptEngine.Shared.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Region\\ScriptEngine\\Shared\\OpenSim.Region.ScriptEngine.Shared.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Server\\Base\\OpenSim.Server.Base.csproj"
             },
-            "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
-              "projectPath": "S:\\Master\\Casperia\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
+            "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj": {
+              "projectPath": "S:\\Master\\opensim-enhanced\\OpenSim\\Services\\Interfaces\\OpenSim.Services.Interfaces.csproj"
             }
           }
         }
@@ -714,15 +715,15 @@
         "downloadDependencies": [
           {
             "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           },
           {
             "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[8.0.27, 8.0.27]"
+            "version": "[8.0.29, 8.0.29]"
           }
         ],
         "frameworkReferences": {
@@ -730,7 +731,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.300/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

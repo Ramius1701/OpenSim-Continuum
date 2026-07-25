@@ -13,9 +13,9 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- 
+
 Funktion
-Die Klasse MoneyDBService implementiert ein Datenbank-Interface für einen Währungsserver (IMoneyDBService). 
+Die Klasse MoneyDBService implementiert ein Datenbank-Interface für einen Währungsserver (IMoneyDBService).
 Sie verwaltet u.a. Benutzerkonten, Transaktionen, Transfers, Guthaben und Fehlerprotokollierung über eine MySQL-Datenbank.
 Null-Pointer-Checks & Fehlerquellen
 
@@ -242,7 +242,7 @@ namespace OpenSim.Grid.MoneyServer
             }
             //m_log.Debug("Reconnect attempt completed.");
         }
-         
+
 
 
         // Plan:
@@ -273,7 +273,7 @@ namespace OpenSim.Grid.MoneyServer
                 dbm.Release();
             }
         }
-               
+
         public int CheckMaximumMoney(string userID, int m_CurrencyMaximum)
         {
             MySQLSuperManager dbm = GetLockedConnection();
@@ -483,6 +483,306 @@ namespace OpenSim.Grid.MoneyServer
         }
 
 
+        /// <summary>
+        /// Completes a viewer currency purchase as one database transaction.
+        /// The avatar balance and the successful BuyMoney ledger row either both
+        /// commit or both roll back. Calendar limits use UTC; weeks start Monday.
+        /// </summary>
+        public bool TryPurchaseCurrency(
+            UUID transactionID,
+            string receiverID,
+            int amount,
+            int totalDay,
+            int totalWeek,
+            int totalMonth,
+            int currencyMaximum,
+            out string message)
+        {
+            message = string.Empty;
+
+            UUID receiverUUID;
+            if (string.IsNullOrWhiteSpace(receiverID) ||
+                !UUID.TryParse(receiverID, out receiverUUID) ||
+                receiverUUID == UUID.Zero)
+            {
+                message = "A valid avatar ID is required.";
+                return false;
+            }
+
+            if (amount <= 0)
+            {
+                message = "The currency purchase amount must be greater than zero.";
+                return false;
+            }
+
+            if (totalDay < 0 || totalWeek < 0 || totalMonth < 0 || currencyMaximum < 0)
+            {
+                message = "Currency purchase limits cannot be negative.";
+                return false;
+            }
+
+            if (transactionID == UUID.Zero)
+                transactionID = UUID.Random();
+
+            MySQLSuperManager dbm = GetLockedConnection();
+            MySqlTransaction dbTransaction = null;
+
+            try
+            {
+                MySqlConnection connection = dbm.Manager.dbcon;
+                dbTransaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted);
+
+                // Serialize all viewer purchases for this avatar. This prevents two
+                // simultaneous requests from each passing the same period-limit check.
+                int currentBalance;
+                const string balanceSql =
+                    "SELECT balance FROM balances WHERE user = ?receiverID FOR UPDATE";
+
+                using (MySqlCommand balanceCommand = new MySqlCommand(balanceSql, connection, dbTransaction))
+                {
+                    balanceCommand.Parameters.AddWithValue("?receiverID", receiverID);
+                    object balanceResult = balanceCommand.ExecuteScalar();
+                    if (balanceResult == null || balanceResult == DBNull.Value)
+                    {
+                        dbTransaction.Rollback();
+                        message = "The avatar does not have a currency account.";
+                        return false;
+                    }
+
+                    currentBalance = Convert.ToInt32(balanceResult);
+                }
+
+                // The quote confirmation UUID is the idempotency key. A repeated
+                // confirmation returns the original success without crediting twice.
+                const string duplicateSql =
+                    "SELECT receiver, amount, type, status FROM transactions " +
+                    "WHERE UUID = ?transactionID LIMIT 1";
+
+                bool duplicateFound = false;
+                string recordedReceiver = string.Empty;
+                int recordedAmount = 0;
+                int recordedType = 0;
+                int recordedStatus = 0;
+
+                using (MySqlCommand duplicateCommand = new MySqlCommand(duplicateSql, connection, dbTransaction))
+                {
+                    duplicateCommand.Parameters.AddWithValue("?transactionID", transactionID.ToString());
+                    using (MySqlDataReader reader = duplicateCommand.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            duplicateFound = true;
+                            recordedReceiver = Convert.ToString(reader["receiver"]);
+                            recordedAmount = Convert.ToInt32(reader["amount"]);
+                            recordedType = Convert.ToInt32(reader["type"]);
+                            recordedStatus = Convert.ToInt32(reader["status"]);
+                        }
+                    }
+                }
+
+                if (duplicateFound)
+                {
+                    if (string.Equals(recordedReceiver, receiverID, StringComparison.OrdinalIgnoreCase) &&
+                        recordedAmount == amount &&
+                        recordedType == (int)TransactionType.BuyMoney &&
+                        recordedStatus == (int)Status.SUCCESS_STATUS)
+                    {
+                        dbTransaction.Commit();
+                        message = "This currency purchase was already completed.";
+                        return true;
+                    }
+
+                    dbTransaction.Rollback();
+                    message = "The supplied purchase confirmation is already in use.";
+                    return false;
+                }
+
+                long newBalanceLong = (long)currentBalance + amount;
+                if (newBalanceLong > int.MaxValue)
+                {
+                    dbTransaction.Rollback();
+                    message = "The purchase would exceed the supported balance range.";
+                    return false;
+                }
+
+                if (currencyMaximum > 0 && newBalanceLong > currencyMaximum)
+                {
+                    dbTransaction.Rollback();
+                    message = string.Format(
+                        "This purchase would exceed the maximum balance of L${0}.",
+                        currencyMaximum);
+                    return false;
+                }
+
+                DateTime utcNow = DateTime.UtcNow;
+                DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                DateTime dayStartUtc = utcNow.Date;
+                int daysSinceMonday = ((int)utcNow.DayOfWeek + 6) % 7;
+                DateTime weekStartUtc = utcNow.Date.AddDays(-daysSinceMonday);
+                DateTime monthStartUtc = new DateTime(
+                    utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+                int nowEpoch = checked((int)(utcNow - epoch).TotalSeconds);
+                int dayStart = checked((int)(dayStartUtc - epoch).TotalSeconds);
+                int weekStart = checked((int)(weekStartUtc - epoch).TotalSeconds);
+                int monthStart = checked((int)(monthStartUtc - epoch).TotalSeconds);
+
+                long dayTotal = 0;
+                long weekTotal = 0;
+                long monthTotal = 0;
+
+                if (totalDay > 0 || totalWeek > 0 || totalMonth > 0)
+                {
+                    int earliestStart = nowEpoch;
+                    if (totalDay > 0) earliestStart = Math.Min(earliestStart, dayStart);
+                    if (totalWeek > 0) earliestStart = Math.Min(earliestStart, weekStart);
+                    if (totalMonth > 0) earliestStart = Math.Min(earliestStart, monthStart);
+
+                    const string totalsSql =
+                        "SELECT " +
+                        "COALESCE(SUM(CASE WHEN time >= ?dayStart THEN amount ELSE 0 END), 0) AS dayTotal, " +
+                        "COALESCE(SUM(CASE WHEN time >= ?weekStart THEN amount ELSE 0 END), 0) AS weekTotal, " +
+                        "COALESCE(SUM(CASE WHEN time >= ?monthStart THEN amount ELSE 0 END), 0) AS monthTotal " +
+                        "FROM transactions " +
+                        "WHERE receiver = ?receiverID AND type = ?transactionType " +
+                        "AND status = ?successStatus AND time >= ?earliestStart AND time <= ?nowEpoch";
+
+                    using (MySqlCommand totalsCommand = new MySqlCommand(totalsSql, connection, dbTransaction))
+                    {
+                        totalsCommand.Parameters.AddWithValue("?dayStart", dayStart);
+                        totalsCommand.Parameters.AddWithValue("?weekStart", weekStart);
+                        totalsCommand.Parameters.AddWithValue("?monthStart", monthStart);
+                        totalsCommand.Parameters.AddWithValue("?receiverID", receiverID);
+                        totalsCommand.Parameters.AddWithValue("?transactionType", (int)TransactionType.BuyMoney);
+                        totalsCommand.Parameters.AddWithValue("?successStatus", (int)Status.SUCCESS_STATUS);
+                        totalsCommand.Parameters.AddWithValue("?earliestStart", earliestStart);
+                        totalsCommand.Parameters.AddWithValue("?nowEpoch", nowEpoch);
+
+                        using (MySqlDataReader reader = totalsCommand.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                dayTotal = Convert.ToInt64(reader["dayTotal"]);
+                                weekTotal = Convert.ToInt64(reader["weekTotal"]);
+                                monthTotal = Convert.ToInt64(reader["monthTotal"]);
+                            }
+                        }
+                    }
+                }
+
+                if (totalDay > 0 && dayTotal + amount > totalDay)
+                {
+                    dbTransaction.Rollback();
+                    message = string.Format(
+                        "The daily currency purchase limit is L${0}; L${1} remains available today.",
+                        totalDay,
+                        Math.Max(0L, (long)totalDay - dayTotal));
+                    return false;
+                }
+
+                if (totalWeek > 0 && weekTotal + amount > totalWeek)
+                {
+                    dbTransaction.Rollback();
+                    message = string.Format(
+                        "The weekly currency purchase limit is L${0}; L${1} remains available this week.",
+                        totalWeek,
+                        Math.Max(0L, (long)totalWeek - weekTotal));
+                    return false;
+                }
+
+                if (totalMonth > 0 && monthTotal + amount > totalMonth)
+                {
+                    dbTransaction.Rollback();
+                    message = string.Format(
+                        "The monthly currency purchase limit is L${0}; L${1} remains available this month.",
+                        totalMonth,
+                        Math.Max(0L, (long)totalMonth - monthTotal));
+                    return false;
+                }
+
+                int newBalance = (int)newBalanceLong;
+                const string updateBalanceSql =
+                    "UPDATE balances SET balance = ?newBalance WHERE user = ?receiverID";
+
+                using (MySqlCommand updateCommand = new MySqlCommand(updateBalanceSql, connection, dbTransaction))
+                {
+                    updateCommand.Parameters.AddWithValue("?newBalance", newBalance);
+                    updateCommand.Parameters.AddWithValue("?receiverID", receiverID);
+                    if (updateCommand.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        message = "The avatar balance could not be updated.";
+                        return false;
+                    }
+                }
+
+                const string insertTransactionSql =
+                    "INSERT INTO transactions " +
+                    "(`UUID`,`sender`,`receiver`,`amount`,`senderBalance`,`receiverBalance`," +
+                    "`objectUUID`,`objectName`,`regionHandle`,`regionUUID`,`type`,`time`," +
+                    "`secure`,`status`,`commonName`,`description`) VALUES " +
+                    "(?transactionID,?sender,?receiver,?amount,-1,?receiverBalance," +
+                    "?objectUUID,?objectName,?regionHandle,?regionUUID,?type,?time," +
+                    "?secure,?status,?commonName,?description)";
+
+                using (MySqlCommand insertCommand = new MySqlCommand(insertTransactionSql, connection, dbTransaction))
+                {
+                    insertCommand.Parameters.AddWithValue("?transactionID", transactionID.ToString());
+                    insertCommand.Parameters.AddWithValue("?sender", UUID.Zero.ToString());
+                    insertCommand.Parameters.AddWithValue("?receiver", receiverID);
+                    insertCommand.Parameters.AddWithValue("?amount", amount);
+                    insertCommand.Parameters.AddWithValue("?receiverBalance", newBalance);
+                    insertCommand.Parameters.AddWithValue("?objectUUID", UUID.Zero.ToString());
+                    insertCommand.Parameters.AddWithValue("?objectName", string.Empty);
+                    insertCommand.Parameters.AddWithValue("?regionHandle", string.Empty);
+                    insertCommand.Parameters.AddWithValue("?regionUUID", UUID.Zero.ToString());
+                    insertCommand.Parameters.AddWithValue("?type", (int)TransactionType.BuyMoney);
+                    insertCommand.Parameters.AddWithValue("?time", nowEpoch);
+                    insertCommand.Parameters.AddWithValue("?secure", UUID.Random().ToString());
+                    insertCommand.Parameters.AddWithValue("?status", (int)Status.SUCCESS_STATUS);
+                    insertCommand.Parameters.AddWithValue("?commonName", string.Empty);
+                    insertCommand.Parameters.AddWithValue("?description", "Viewer currency purchase");
+
+                    if (insertCommand.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        message = "The purchase transaction could not be recorded.";
+                        return false;
+                    }
+                }
+
+                dbTransaction.Commit();
+                message = string.Format("Successfully purchased L${0}.", amount);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    if (dbTransaction != null)
+                        dbTransaction.Rollback();
+                }
+                catch
+                {
+                    // Preserve the original database error for logging below.
+                }
+
+                m_log.ErrorFormat(
+                    "[TRY PURCHASE CURRENCY]: Purchase failed for {0}, amount {1}: {2}",
+                    receiverID,
+                    amount,
+                    ex);
+                message = "The currency purchase could not be completed.";
+                return false;
+            }
+            finally
+            {
+                if (dbTransaction != null)
+                    dbTransaction.Dispose();
+                dbm.Release();
+            }
+        }
+
         public bool BuyCurrency(string userID, int amount)
         {
             MySQLSuperManager dbm = GetLockedConnection();
@@ -544,7 +844,7 @@ namespace OpenSim.Grid.MoneyServer
             MySQLSuperManager dbm = GetLockedConnection();
 
             if (transaction.Receiver == transaction.Sender) return false;
-            if (transaction.Sender == UUID.Zero.ToString()) return false;            
+            if (transaction.Sender == UUID.Zero.ToString()) return false;
 
             int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
             try
@@ -1034,37 +1334,6 @@ namespace OpenSim.Grid.MoneyServer
                 e.ToString();
                 dbm.Manager.Reconnect();
                 return dbm.Manager.getTransactionNum(userID, startTime, endTime);
-            }
-            catch (Exception e)
-            {
-                m_log.Error(e);
-                return -1;
-            }
-            finally
-            {
-                dbm.Release();
-            }
-        }
-
-        /// <summary>Gets the total amount of currency purchased by a user in a time period.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="startTime">The start time (Unix epoch).</param>
-        /// <param name="endTime">The end time (Unix epoch).</param>
-        /// <param name="transactionType">The transaction type to sum (e.g., 5001 for currency purchase).</param>
-        /// <returns>Total amount purchased, or -1 on error</returns>
-        public int GetPurchaseTotal(string userID, int startTime, int endTime, int transactionType)
-        {
-            MySQLSuperManager dbm = GetLockedConnection();
-
-            try
-            {
-                return dbm.Manager.getPurchaseTotal(userID, startTime, endTime, transactionType);
-            }
-            catch (MySql.Data.MySqlClient.MySqlException e)
-            {
-                e.ToString();
-                dbm.Manager.Reconnect();
-                return dbm.Manager.getPurchaseTotal(userID, startTime, endTime, transactionType);
             }
             catch (Exception e)
             {

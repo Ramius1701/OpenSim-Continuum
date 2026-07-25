@@ -1,4 +1,3 @@
-<?xml version="1.0" ?>
 <Project frameworkVersion="v4_0" name="OpenSimWeather.Module" path="addon-modules/OpenSimWeather/Module" type="Library">
 	 <Configuration name="Debug">
 	   <Options>
@@ -16,7 +15,6 @@
 	 <ReferencePath>../../../bin/</ReferencePath>
 	 <Reference name="OpenMetaverse"/>
 	 <Reference name="OpenMetaverseTypes"/>
-	 <Reference name="OpenMetaverse.StructuredData"/>
 	 <Reference name="OpenSim.Framework"/>
 	 <Reference name="OpenSim.Region.Framework"/>
 	 <Reference name="OpenSim.Region.PhysicsModules.SharedBase"/>

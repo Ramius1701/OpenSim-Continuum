@@ -4,14 +4,14 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Mono.Addins;
 
-[assembly: Addin("OpenSimWeather", "0.1")]
+[assembly: Addin("OpenSimWeather", "0.3.2")]
 [assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
 
 namespace OpenSimWeather
 {
     class Info
     {
-        public const string VersionNumber = "0.1";
+        public const string VersionNumber = "0.3.2";
 
         public static string AssemblyDirectory
         {

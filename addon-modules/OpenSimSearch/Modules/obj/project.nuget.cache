@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "tnPP5tshQBY=",
+  "dgSpecHash": "0u6yK33UmNw=",
   "success": true,
-  "projectFilePath": "S:\\Master\\Casperia\\addon-modules\\OpenSimSearch\\Modules\\OpenSimSearch.Modules.csproj",
+  "projectFilePath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSimSearch\\Modules\\OpenSimSearch.Modules.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.27\\microsoft.windowsdesktop.app.ref.8.0.27.nupkg.sha512",
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.27\\microsoft.netcore.app.ref.8.0.27.nupkg.sha512",
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.27\\microsoft.aspnetcore.app.ref.8.0.27.nupkg.sha512"
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.29\\microsoft.windowsdesktop.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.29\\microsoft.netcore.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.29\\microsoft.aspnetcore.app.ref.8.0.29.nupkg.sha512"
   ],
   "logs": []
 }

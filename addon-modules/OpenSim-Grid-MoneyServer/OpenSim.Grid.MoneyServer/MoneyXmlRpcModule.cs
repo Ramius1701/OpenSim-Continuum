@@ -85,7 +85,7 @@ if (requestData == null) { ... }
 
 Verbesserungsmöglichkeiten
 
-    In einigen Methoden werden Werte aus Hashtables direkt abgerufen, ohne vorher zu prüfen, 
+    In einigen Methoden werden Werte aus Hashtables direkt abgerufen, ohne vorher zu prüfen,
     ob sie wirklich existieren oder den erwarteten Typ haben (z.B. int.Parse direkt auf einen String aus einer Hashtable). Hier könnten defensive Checks ergänzt werden.
     XML-Parsing könnte robuster gestaltet werden, um fehlerhafte oder absichtlich manipulierte Requests besser abzufangen.
     Teilweise könnten Methoden Parameter noch expliziter auf Plausibilität prüfen (z.B. Range-Checks bei Beträgen).
@@ -150,6 +150,12 @@ namespace OpenSim.Grid.MoneyServer
 
         private bool m_forceTransfer = false;
         private string m_bankerAvatar = "";
+        // IP addresses allowed to call the AddBankerMoney admin endpoint. Defaults to
+        // localhost-only so this uncapped, un-rate-limited money-grant call can't be
+        // reached by anyone who merely learns/guesses the BankerAvatar UUID over the
+        // open network. Widen only to specific, trusted caller IPs if this needs to
+        // be reachable from elsewhere.
+        private List<string> m_bankerAllowedIPs = new List<string> { "127.0.0.1", "::1" };
 
         // Testbereich
         // Maximum pro Tag:
@@ -159,7 +165,7 @@ namespace OpenSim.Grid.MoneyServer
         // Maximum pro Monat:
         public int m_TotalMonth = 500;
         // Maximum Besitz:
-        public int m_CurrencyMaximum;
+        public int m_CurrencyMaximum = 10000;
         // Geldkauf abschalten:
         public string m_CurrencyOnOff;
         // Geldkauf nur für Gruppe:
@@ -190,7 +196,7 @@ namespace OpenSim.Grid.MoneyServer
         private string m_certFilename = "";
         private string m_certPassword = "";
 
-        
+
 
         // SSL settings
         private string m_sslCommonName = "";
@@ -216,9 +222,6 @@ namespace OpenSim.Grid.MoneyServer
 
         const int MONEYMODULE_REQUEST_TIMEOUT = 30 * 1000;  //30 seconds
         private long TicksToEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
-
-        // Transaction type for currency purchases (buying currency with real money)
-        private const int TRANSACTION_TYPE_BUY_CURRENCY = 5001;
 
         private IMoneyDBService m_moneyDBService;
         // Konfig fuer Konsolenbefehle.
@@ -269,6 +272,7 @@ namespace OpenSim.Grid.MoneyServer
             m_defaultBalance = serverConfig.GetInt("DefaultBalance", m_defaultBalance);
             m_forceTransfer = serverConfig.GetBoolean("EnableForceTransfer", m_forceTransfer);
             m_bankerAvatar = serverConfig.GetString("BankerAvatar", m_bankerAvatar).ToLower();
+            m_bankerAllowedIPs = ParseAllowedIPs(serverConfig.GetString("BankerAllowedIPs", string.Join(",", m_bankerAllowedIPs)));
 
             m_moneyDBService = moneyDBService;
             m_moneyCore = moneyCore;
@@ -283,7 +287,7 @@ namespace OpenSim.Grid.MoneyServer
             m_CurrencyOnOff = serverConfig.GetString("CurrencyOnOff", m_CurrencyOnOff);
             m_CurrencyGroupOnly = serverConfig.GetBoolean("CurrencyGroupOnly", m_CurrencyGroupOnly);
             m_UserMailLock = serverConfig.GetBoolean("UserMailLock", m_UserMailLock);
-            
+
             m_CurrencyGroupName = serverConfig.GetString("CurrencyGroupName", m_CurrencyGroupName);
             m_CurrencyGroupID = serverConfig.GetString("CurrencyGroupID", m_CurrencyGroupID);
 
@@ -294,6 +298,7 @@ namespace OpenSim.Grid.MoneyServer
 
             string banker = m_server_config.GetString("BankerAvatar", m_bankerAvatar);
             m_bankerAvatar = banker.ToLower();
+            m_bankerAllowedIPs = ParseAllowedIPs(m_server_config.GetString("BankerAllowedIPs", string.Join(",", m_bankerAllowedIPs)));
 
             m_enableAmountZero = m_server_config.GetBoolean("EnableAmountZero", m_enableAmountZero);
             m_scriptSendMoney = m_server_config.GetBoolean("EnableScriptSendMoney", m_scriptSendMoney);
@@ -316,7 +321,6 @@ namespace OpenSim.Grid.MoneyServer
             m_CurrencyGroupName = m_server_config.GetString("CurrencyGroupName", m_CurrencyGroupName);
             m_CurrencyGroupID = m_server_config.GetString("CurrencyGroupID", m_CurrencyGroupID);
 
-            if (m_CurrencyMaximum <= 0) m_CurrencyMaximum = 1000;
 
             // Hyper Grid Avatar
             m_hg_enable = m_server_config.GetBoolean("EnableHGAvatar", m_hg_enable);
@@ -748,139 +752,97 @@ namespace OpenSim.Grid.MoneyServer
 
         private void CurrencyProcessPHP(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            m_log.InfoFormat("[CURRENCY PROCESS PHP]: Currency Process Starting...");
-
             if (httpRequest == null || httpResponse == null)
-            {
-                m_log.Error("[CURRENCY PROCESS PHP]: Invalid request or response object.");
-                httpResponse.StatusCode = 400;
-                httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>Invalid request</response>");
                 return;
-            }
 
             try
             {
                 string requestBody;
-                using (var reader = new StreamReader(httpRequest.InputStream, Encoding.UTF8))
-                {
+                using (StreamReader reader = new StreamReader(httpRequest.InputStream, Encoding.UTF8))
                     requestBody = reader.ReadToEnd();
-                }
 
                 XmlDocument doc = new XmlDocument();
                 doc.LoadXml(requestBody);
 
                 XmlNode methodNameNode = doc.SelectSingleNode("/methodCall/methodName");
                 if (methodNameNode == null)
-                {
                     throw new Exception("Missing method name in XML-RPC request.");
-                }
 
                 string methodName = methodNameNode.InnerText;
-
                 Hashtable parameters = ExtractXmlRpcParams(doc);
+                string agentId = GetHashtableString(parameters, "agentId");
+                string secureSessionId = GetHashtableString(parameters, "secureSessionId");
+                int currencyBuy = GetHashtableInt(parameters, "currencyBuy");
 
-                string agentId = parameters["agentId"]?.ToString();
-                string secureSessionId = parameters["secureSessionId"]?.ToString();
-                int currencyBuy = int.Parse(parameters["currencyBuy"]?.ToString() ?? "0");
-
-                m_log.InfoFormat("[CURRENCY PROCESS PHP]: Parsed values - AgentId: {0}, CurrencyBuy: {1}, SecureSessionId: {2}", agentId, currencyBuy, secureSessionId);
-
-                string transactionID = parameters["transactionID"]?.ToString();
-                string userID = parameters["agentId"]?.ToString();
-                int amount = int.Parse(parameters["currencyBuy"]?.ToString() ?? "0");
-
-                if (string.IsNullOrEmpty(transactionID))
+                string accessMessage;
+                if (!ValidateCurrencyPurchaseRequest(agentId, currencyBuy, out accessMessage))
                 {
-                    transactionID = secureSessionId;
-                }
-
-                m_log.InfoFormat("[CURRENCY PROCESS PHP]: Parsed values - transactionID: {0}, userID: {1}, amount: {2}", transactionID, userID, amount);
-
-                if (m_CurrencyGroupOnly && m_CurrencyGroupID != "00000000-0000-0000-0000-000000000000" && !IsUserInGroup(agentId, m_CurrencyGroupID))
-                {
-                    m_log.InfoFormat("[CURRENCY PROCESS PHP]: User {0} is not a member of the required group {1}.", agentId, m_CurrencyGroupID);
-                    httpResponse.StatusCode = 403;
-                    httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>User is not a member of the required group</response>");
+                    WriteCurrencyXmlRpcResponse(httpResponse, false, accessMessage, null);
                     return;
                 }
-
-                if (m_UserMailLock && !UserMailLock(agentId))
-                {
-                    m_log.InfoFormat("[CURRENCY PROCESS PHP]: User {0} does not have a registered email address.", agentId);
-                    httpResponse.StatusCode = 403;
-                    httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>User does not have a registered email address</response>");
-                    return;
-                }
-
-                if (m_CurrencyOnOff != "off" && !CheckGroupMoney(agentId, m_CurrencyGroupID))
-                {
-                    m_log.Info("[CURRENCY PROCESS PHP]: Currency purchase is turned off for this user.");
-                    httpResponse.StatusCode = 403;
-                    httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>Currency purchase is turned off</response>");
-                    return;
-                }
-
-                // Check time-based purchase limits (daily, weekly, monthly)
-                string limitError = CheckAllPurchaseLimits(agentId, currencyBuy);
-                if (!string.IsNullOrEmpty(limitError))
-                {
-                    m_log.InfoFormat("[CURRENCY PROCESS PHP]: Purchase limit exceeded for user {0}: {1}", agentId, limitError);
-                    httpResponse.StatusCode = 403;
-                    httpResponse.RawBuffer = Encoding.UTF8.GetBytes($"<response>{limitError}</response>");
-                    return;
-                }
-
-                m_log.InfoFormat("[CURRENCY PROCESS PHP]: Currency Maximum loaded: {0}", m_CurrencyMaximum);
 
                 if (methodName == "getCurrencyQuote")
                 {
                     Hashtable quoteResponse = PerformGetCurrencyQuote(agentId, currencyBuy, secureSessionId);
-
-                    int excessAmount = CheckMaximumMoney(agentId, m_CurrencyMaximum);
-                    if (excessAmount > 0)
-                    {
-                        quoteResponse["message"] = $"Your balance was reduced by {excessAmount} to enforce the maximum limit.";
-                    }
-
                     XmlRpcResponse xmlResponse = new XmlRpcResponse { Value = quoteResponse };
                     httpResponse.StatusCode = 200;
                     httpResponse.RawBuffer = Encoding.UTF8.GetBytes(xmlResponse.ToString());
+                    return;
                 }
-                else if (methodName == "buyCurrency")
+
+                if (methodName == "buyCurrency")
                 {
-                    Hashtable purchaseResponse = PerformBuyCurrency(agentId, currencyBuy, secureSessionId);
+                    UUID purchaseTransactionID = ResolveCurrencyTransactionID(
+                        GetHashtableString(parameters, "transactionID"),
+                        GetHashtableString(parameters, "confirm"));
 
-                    if ((bool)purchaseResponse["success"])
+                    string purchaseMessage;
+                    bool purchaseSucceeded = m_moneyDBService.TryPurchaseCurrency(
+                        purchaseTransactionID,
+                        agentId,
+                        currencyBuy,
+                        m_TotalDay,
+                        m_TotalWeek,
+                        m_TotalMonth,
+                        m_CurrencyMaximum,
+                        out purchaseMessage);
+
+                    if (purchaseSucceeded)
                     {
-                        m_log.Info("[CURRENCY PROCESS PHP]: Purchase successful. Proceeding to credit currency.");
-                        PerformMoneyTransfer("BANKER", agentId, currencyBuy);
-                        UpdateBalance(agentId, "Currency purchase successful.");
-
-                        CheckMaximumMoney(agentId, m_CurrencyMaximum);
-
-                        XmlRpcResponse xmlResponse = new XmlRpcResponse { Value = purchaseResponse };
-                        httpResponse.StatusCode = 200;
-                        httpResponse.RawBuffer = Encoding.UTF8.GetBytes(xmlResponse.ToString());
+                        m_log.InfoFormat(
+                            "[CURRENCY PROCESS PHP]: Completed viewer purchase for {0}: L${1}, transaction {2}.",
+                            agentId,
+                            currencyBuy,
+                            purchaseTransactionID);
+                        UpdateBalance(agentId, purchaseMessage);
                     }
                     else
                     {
-                        m_log.Error("[CURRENCY PROCESS PHP]: Currency purchase failed.");
-                        httpResponse.StatusCode = 400;
-                        httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>Currency purchase failed</response>");
+                        m_log.WarnFormat(
+                            "[CURRENCY PROCESS PHP]: Rejected viewer purchase for {0}: L${1}. {2}",
+                            agentId,
+                            currencyBuy,
+                            purchaseMessage);
                     }
+
+                    WriteCurrencyXmlRpcResponse(
+                        httpResponse,
+                        purchaseSucceeded,
+                        purchaseMessage,
+                        purchaseTransactionID.ToString());
+                    return;
                 }
-                else
-                {
-                    m_log.ErrorFormat("[CURRENCY PROCESS PHP]: Unknown method name: {0}", methodName);
-                    httpResponse.StatusCode = 400;
-                    httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>Invalid method name</response>");
-                }
+
+                WriteCurrencyXmlRpcResponse(httpResponse, false, "Invalid currency method.", null);
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[CURRENCY PROCESS PHP]: Error processing request. Error: {0}", ex.ToString());
-                httpResponse.StatusCode = 500;
-                httpResponse.RawBuffer = Encoding.UTF8.GetBytes("<response>Error</response>");
+                m_log.ErrorFormat("[CURRENCY PROCESS PHP]: Error processing request: {0}", ex);
+                WriteCurrencyXmlRpcResponse(
+                    httpResponse,
+                    false,
+                    "The currency request could not be processed.",
+                    null);
             }
         }
 
@@ -1041,7 +1003,7 @@ namespace OpenSim.Grid.MoneyServer
                 }
 
                 // Überprüfen, ob das Guthaben über dem Maximum liegt und ggf. abziehen
-                if (currentBalance > m_CurrencyMaximum)
+                if (m_CurrencyMaximum > 0 && currentBalance > m_CurrencyMaximum)
                 {
                     int excessAmount = currentBalance - m_CurrencyMaximum;
 
@@ -1070,178 +1032,6 @@ namespace OpenSim.Grid.MoneyServer
             {
                 dbm.Release();
             }
-        }
-
-        /// <summary>Checks if the user has exceeded their daily purchase limit.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="purchaseAmount">The amount the user wants to purchase.</param>
-        /// <returns>True if the purchase would exceed the daily limit, false otherwise.</returns>
-        public bool CheckDailyLimit(string userID, int purchaseAmount)
-        {
-            if (m_TotalDay <= 0)
-            {
-                // Daily limit disabled
-                return false;
-            }
-
-            try
-            {
-                // Calculate start and end times for today (UTC)
-                DateTime now = DateTime.UtcNow;
-                DateTime startOfDay = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc);
-                int startTime = (int)((startOfDay.Ticks - TicksToEpoch) / 10000000);
-                int endTime = (int)((now.Ticks - TicksToEpoch) / 10000000);
-
-                // Get total purchased today
-                int totalPurchasedToday = m_moneyDBService.GetPurchaseTotal(userID, startTime, endTime, TRANSACTION_TYPE_BUY_CURRENCY);
-
-                if (totalPurchasedToday < 0)
-                {
-                    m_log.ErrorFormat("[CHECK DAILY LIMIT]: Error retrieving purchase total for user {0}", userID);
-                    return true; // Fail safe - deny purchase on error
-                }
-
-                int totalAfterPurchase = totalPurchasedToday + purchaseAmount;
-                bool wouldExceed = totalAfterPurchase > m_TotalDay;
-
-                if (wouldExceed)
-                {
-                    m_log.InfoFormat("[CHECK DAILY LIMIT]: User {0} would exceed daily limit. Current: {1}, Attempting: {2}, Limit: {3}",
-                        userID, totalPurchasedToday, purchaseAmount, m_TotalDay);
-                }
-
-                return wouldExceed;
-            }
-            catch (Exception ex)
-            {
-                m_log.ErrorFormat("[CHECK DAILY LIMIT]: Error checking daily limit for user {0}: {1}", userID, ex.Message);
-                return true; // Fail safe - deny purchase on error
-            }
-        }
-
-        /// <summary>Checks if the user has exceeded their weekly purchase limit.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="purchaseAmount">The amount the user wants to purchase.</param>
-        /// <returns>True if the purchase would exceed the weekly limit, false otherwise.</returns>
-        public bool CheckWeeklyLimit(string userID, int purchaseAmount)
-        {
-            if (m_TotalWeek <= 0)
-            {
-                // Weekly limit disabled
-                return false;
-            }
-
-            try
-            {
-                // Calculate start and end times for this week (UTC, week starts Monday)
-                DateTime now = DateTime.UtcNow;
-                int daysSinceMonday = ((int)now.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
-                DateTime startOfWeek = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc).AddDays(-daysSinceMonday);
-                int startTime = (int)((startOfWeek.Ticks - TicksToEpoch) / 10000000);
-                int endTime = (int)((now.Ticks - TicksToEpoch) / 10000000);
-
-                // Get total purchased this week
-                int totalPurchasedThisWeek = m_moneyDBService.GetPurchaseTotal(userID, startTime, endTime, TRANSACTION_TYPE_BUY_CURRENCY);
-
-                if (totalPurchasedThisWeek < 0)
-                {
-                    m_log.ErrorFormat("[CHECK WEEKLY LIMIT]: Error retrieving purchase total for user {0}", userID);
-                    return true; // Fail safe - deny purchase on error
-                }
-
-                int totalAfterPurchase = totalPurchasedThisWeek + purchaseAmount;
-                bool wouldExceed = totalAfterPurchase > m_TotalWeek;
-
-                if (wouldExceed)
-                {
-                    m_log.InfoFormat("[CHECK WEEKLY LIMIT]: User {0} would exceed weekly limit. Current: {1}, Attempting: {2}, Limit: {3}",
-                        userID, totalPurchasedThisWeek, purchaseAmount, m_TotalWeek);
-                }
-
-                return wouldExceed;
-            }
-            catch (Exception ex)
-            {
-                m_log.ErrorFormat("[CHECK WEEKLY LIMIT]: Error checking weekly limit for user {0}: {1}", userID, ex.Message);
-                return true; // Fail safe - deny purchase on error
-            }
-        }
-
-        /// <summary>Checks if the user has exceeded their monthly purchase limit.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="purchaseAmount">The amount the user wants to purchase.</param>
-        /// <returns>True if the purchase would exceed the monthly limit, false otherwise.</returns>
-        public bool CheckMonthlyLimit(string userID, int purchaseAmount)
-        {
-            if (m_TotalMonth <= 0)
-            {
-                // Monthly limit disabled
-                return false;
-            }
-
-            try
-            {
-                // Calculate start and end times for this month (UTC)
-                DateTime now = DateTime.UtcNow;
-                DateTime startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-                int startTime = (int)((startOfMonth.Ticks - TicksToEpoch) / 10000000);
-                int endTime = (int)((now.Ticks - TicksToEpoch) / 10000000);
-
-                // Get total purchased this month
-                int totalPurchasedThisMonth = m_moneyDBService.GetPurchaseTotal(userID, startTime, endTime, TRANSACTION_TYPE_BUY_CURRENCY);
-
-                if (totalPurchasedThisMonth < 0)
-                {
-                    m_log.ErrorFormat("[CHECK MONTHLY LIMIT]: Error retrieving purchase total for user {0}", userID);
-                    return true; // Fail safe - deny purchase on error
-                }
-
-                int totalAfterPurchase = totalPurchasedThisMonth + purchaseAmount;
-                bool wouldExceed = totalAfterPurchase > m_TotalMonth;
-
-                if (wouldExceed)
-                {
-                    m_log.InfoFormat("[CHECK MONTHLY LIMIT]: User {0} would exceed monthly limit. Current: {1}, Attempting: {2}, Limit: {3}",
-                        userID, totalPurchasedThisMonth, purchaseAmount, m_TotalMonth);
-                }
-
-                return wouldExceed;
-            }
-            catch (Exception ex)
-            {
-                m_log.ErrorFormat("[CHECK MONTHLY LIMIT]: Error checking monthly limit for user {0}: {1}", userID, ex.Message);
-                return true; // Fail safe - deny purchase on error
-            }
-        }
-
-        /// <summary>Checks all time-based purchase limits (daily, weekly, monthly).</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="purchaseAmount">The amount the user wants to purchase.</param>
-        /// <returns>Error message if any limit would be exceeded, or empty string if all checks pass.</returns>
-        public string CheckAllPurchaseLimits(string userID, int purchaseAmount)
-        {
-            // Skip checks for system accounts
-            if (userID == "SYSTEM" || userID == "BANKER" || userID == m_bankerAvatar)
-            {
-                return string.Empty;
-            }
-
-            if (CheckDailyLimit(userID, purchaseAmount))
-            {
-                return $"Daily purchase limit of {m_TotalDay} exceeded.";
-            }
-
-            if (CheckWeeklyLimit(userID, purchaseAmount))
-            {
-                return $"Weekly purchase limit of {m_TotalWeek} exceeded.";
-            }
-
-            if (CheckMonthlyLimit(userID, purchaseAmount))
-            {
-                return $"Monthly purchase limit of {m_TotalMonth} exceeded.";
-            }
-
-            return string.Empty;
         }
 
         private Hashtable ExtractXmlRpcParams(XmlDocument doc)
@@ -1353,72 +1143,172 @@ namespace OpenSim.Grid.MoneyServer
         }
         public XmlRpcResponse buyCurrency(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            Hashtable requestData = (Hashtable)request.Params[0];
-            string agentId = requestData["agentId"]?.ToString();
-            int amount = (int)requestData["currencyBuy"];
-
-            // Protokolliere die eingehende XML-Anfrage
-            m_log.InfoFormat("[BUY CURRENCY]: Incoming XML Request: {0}", ToXmlString((Hashtable)request.Params[0]));
-
-            // Verarbeite den Kauf und logge die Details
-            m_log.InfoFormat("[BUY CURRENCY]: Processing currency purchase for AgentId: {0}, Amount: {1}, Banker: {2}", agentId, amount, m_bankerAvatar);
-
-            Hashtable responseData = new Hashtable();
-            responseData["success"] = false;
-
-            // Check time-based purchase limits before processing
-            string limitError = CheckAllPurchaseLimits(agentId, amount);
-            if (!string.IsNullOrEmpty(limitError))
+            Hashtable responseData = new Hashtable
             {
-                m_log.InfoFormat("[BUY CURRENCY]: Purchase limit exceeded for user {0}: {1}", agentId, limitError);
-                responseData["message"] = limitError;
-                XmlRpcResponse errorResponse = new XmlRpcResponse { Value = responseData };
-                return errorResponse;
-            }
+                { "success", false },
+                { "message", "Currency purchase failed." }
+            };
 
-            // Hier erfolgt der Transfer an den Money Banker (BankerAvatar als Sender)
-            string senderID = m_bankerAvatar;  // Der Sender ist der BankerAvatar
-            string receiverID = agentId;       // Der Empfänger ist der Agent
-            UUID transactionUUID = UUID.Random(); // Eine eindeutige Transaktions-ID für die Transaktion
-
-            // Versuche, die Transaktion auszuführen
             try
             {
-                // Logge die Übertragung
-                m_log.InfoFormat("[MONEY XMLRPC]: handlePayMoneyCharge: Transferring money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
-
-                // Führe die tatsächliche Transaktion durch, indem die handlePayMoneyCharge-Methode aufgerufen wird
-                XmlRpcResponse transferResponse = handlePayMoneyCharge(request, remoteClient); // Übergibt die Anfrage an die tatsächliche Überweisungsmethode
-
-                // Überprüfe, ob die Antwort erfolgreich war
-                if (transferResponse != null && transferResponse.Value is Hashtable transferResult &&
-                    transferResult.ContainsKey("success") && (bool)transferResult["success"])
+                if (request == null || request.Params == null || request.Params.Count == 0)
                 {
-                    // Wenn die Transaktion erfolgreich war, setze die Antwortdaten
-                    responseData["success"] = true;
-                    responseData["message"] = $"Successfully purchased {amount} currency for AgentId {agentId}";
+                    responseData["message"] = "Invalid currency purchase request.";
+                    return new XmlRpcResponse { Value = responseData };
                 }
+
+                Hashtable requestData = request.Params[0] as Hashtable;
+                if (requestData == null)
+                {
+                    responseData["message"] = "Invalid currency purchase request.";
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                string agentId = GetHashtableString(requestData, "agentId");
+                int amount = GetHashtableInt(requestData, "currencyBuy");
+                string accessMessage;
+                if (!ValidateCurrencyPurchaseRequest(agentId, amount, out accessMessage))
+                {
+                    responseData["message"] = accessMessage;
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                UUID transactionID = ResolveCurrencyTransactionID(
+                    GetHashtableString(requestData, "transactionID"),
+                    GetHashtableString(requestData, "confirm"));
+
+                string purchaseMessage;
+                bool purchaseSucceeded = m_moneyDBService.TryPurchaseCurrency(
+                    transactionID,
+                    agentId,
+                    amount,
+                    m_TotalDay,
+                    m_TotalWeek,
+                    m_TotalMonth,
+                    m_CurrencyMaximum,
+                    out purchaseMessage);
+
+                responseData["success"] = purchaseSucceeded;
+                responseData["message"] = purchaseMessage;
+                responseData["transactionID"] = transactionID.ToString();
+
+                if (purchaseSucceeded)
+                    UpdateBalance(agentId, purchaseMessage);
                 else
-                {
-                    // Fehler bei der Überweisung
-                    responseData["message"] = "Currency purchase failed during money transfer.";
-                }
+                    m_log.WarnFormat("[BUY CURRENCY]: Purchase rejected: {0}", purchaseMessage);
             }
             catch (Exception ex)
             {
-                // Fehlerbehandlung
-                m_log.Error($"[BUY CURRENCY]: Error processing currency purchase: {ex.Message}");
-                responseData["message"] = "Currency purchase failed.";
+                m_log.ErrorFormat("[BUY CURRENCY]: Error processing currency purchase: {0}", ex);
+                responseData["success"] = false;
+                responseData["message"] = "The currency purchase could not be completed.";
             }
 
-            // Erstelle die Antwort
-            XmlRpcResponse returnval = new XmlRpcResponse { Value = responseData };
-
-            // Protokolliere die XML-Antwort
-            m_log.InfoFormat("[BUY CURRENCY]: XML Response: {0}", ToXmlString(responseData));
-
-            return returnval;
+            return new XmlRpcResponse { Value = responseData };
         }
+
+        private bool ValidateCurrencyPurchaseRequest(string agentId, int amount, out string message)
+        {
+            if (string.IsNullOrWhiteSpace(agentId))
+            {
+                message = "A valid avatar ID is required.";
+                return false;
+            }
+
+            if (amount <= 0)
+            {
+                message = "The currency purchase amount must be greater than zero.";
+                return false;
+            }
+
+            string currencyState = (m_CurrencyOnOff ?? string.Empty).Trim();
+            currencyState = currencyState.TrimEnd(';').Trim().Trim('"');
+            if (!string.Equals(currencyState, "on", StringComparison.OrdinalIgnoreCase))
+            {
+                message = "Currency purchasing is disabled.";
+                return false;
+            }
+
+            if (m_CurrencyGroupOnly)
+            {
+                if (string.IsNullOrWhiteSpace(m_CurrencyGroupID) ||
+                    m_CurrencyGroupID == UUID.Zero.ToString())
+                {
+                    message = "Currency purchasing is restricted, but CurrencyGroupID is not configured.";
+                    return false;
+                }
+
+                if (!IsUserInGroup(agentId, m_CurrencyGroupID))
+                {
+                    message = "You are not a member of the group permitted to purchase currency.";
+                    return false;
+                }
+            }
+
+            if (m_UserMailLock && !UserMailLock(agentId))
+            {
+                message = "A registered email address is required to purchase currency.";
+                return false;
+            }
+
+            message = string.Empty;
+            return true;
+        }
+
+        private static string GetHashtableString(Hashtable values, string key)
+        {
+            if (values == null || !values.ContainsKey(key) || values[key] == null)
+                return string.Empty;
+
+            return values[key].ToString();
+        }
+
+        private static int GetHashtableInt(Hashtable values, string key)
+        {
+            string value = GetHashtableString(values, key);
+            int result;
+            return int.TryParse(value, out result) ? result : 0;
+        }
+
+        private static UUID ResolveCurrencyTransactionID(params string[] candidates)
+        {
+            if (candidates != null)
+            {
+                foreach (string candidate in candidates)
+                {
+                    UUID transactionID;
+                    if (!string.IsNullOrWhiteSpace(candidate) &&
+                        UUID.TryParse(candidate, out transactionID) &&
+                        transactionID != UUID.Zero)
+                    {
+                        return transactionID;
+                    }
+                }
+            }
+
+            return UUID.Random();
+        }
+
+        private static void WriteCurrencyXmlRpcResponse(
+            IOSHttpResponse httpResponse,
+            bool success,
+            string message,
+            string transactionID)
+        {
+            Hashtable responseData = new Hashtable
+            {
+                { "success", success },
+                { "message", message ?? string.Empty }
+            };
+
+            if (!string.IsNullOrWhiteSpace(transactionID))
+                responseData["transactionID"] = transactionID;
+
+            XmlRpcResponse xmlResponse = new XmlRpcResponse { Value = responseData };
+            httpResponse.StatusCode = 200;
+            httpResponse.RawBuffer = Encoding.UTF8.GetBytes(xmlResponse.ToString());
+        }
+
         public new bool PerformMoneyTransfer(string senderID, string receiverID, int amount)
         {
             //m_log.InfoFormat("[MONEY TRANSFER]: Transferring {0} from {1} to {2}.", amount, senderID, receiverID);
@@ -2077,7 +1967,7 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
-     
+
         public XmlRpcResponse handleClientLogout(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             GetSSLCommonName(request);
@@ -2508,6 +2398,112 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
+        private static List<string> ParseAllowedIPs(string raw)
+        {
+            List<string> result = new List<string>();
+            if (string.IsNullOrWhiteSpace(raw))
+                return result;
+
+            foreach (string part in raw.Split(','))
+            {
+                string trimmed = part.Trim();
+                if (trimmed.Length > 0)
+                    result.Add(trimmed);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Casperia Prime addition: grants a stipend to each avatar in
+        /// eligibleAvatars. Called on a schedule from MoneyServerBase's
+        /// CheckStipends(), not via an incoming XML-RPC request - there is
+        /// no external caller to authenticate here, unlike
+        /// handleScriptTransaction, since this is triggered internally by
+        /// the server's own timer.
+        ///
+        /// Reuses the exact same addTransaction/DoTransfer/FetchTransaction/
+        /// UpdateBalance sequence handleScriptTransaction uses for SendMoney -
+        /// no new balance-moving logic, just applied to a list of avatars
+        /// instead of one XML-RPC caller's request.
+        /// </summary>
+        public void GrantStipends(int amount, string description, List<string> eligibleAvatars)
+        {
+            if (amount <= 0 || eligibleAvatars == null || eligibleAvatars.Count == 0)
+            {
+                return;
+            }
+
+            string senderID = UUID.Zero.ToString(); // system-generated money, same convention as elsewhere
+
+            foreach (string receiverID in eligibleAvatars)
+            {
+                if (!UUID.TryParse(receiverID, out UUID parsedReceiver) || parsedReceiver == UUID.Zero)
+                {
+                    m_log.ErrorFormat("[STIPEND]: Skipping invalid avatar UUID in EligibleAvatars: {0}", receiverID);
+                    continue;
+                }
+
+                try
+                {
+                    UserInfo receiverInfo = m_moneyDBService.FetchUserInfo(receiverID);
+                    if (receiverInfo == null)
+                    {
+                        m_log.ErrorFormat("[STIPEND]: Avatar {0} not found in DB, skipping.", receiverID);
+                        continue;
+                    }
+
+                    UUID transactionUUID = UUID.Random();
+                    int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
+
+                    TransactionData transaction = new TransactionData();
+                    transaction.TransUUID = transactionUUID;
+                    transaction.Sender = senderID;
+                    transaction.Receiver = receiverID;
+                    transaction.Amount = amount;
+                    transaction.ObjectUUID = UUID.Zero.ToString();
+                    transaction.RegionHandle = "0";
+                    transaction.Type = 0;
+                    transaction.Time = time;
+                    transaction.SecureCode = UUID.Random().ToString();
+                    transaction.Status = (int)Status.PENDING_STATUS;
+                    transaction.CommonName = GetSSLCommonName();
+                    transaction.Description = description + " " + DateTime.UtcNow.ToString();
+
+                    bool result = m_moneyDBService.addTransaction(transaction);
+                    if (!result)
+                    {
+                        m_log.ErrorFormat("[STIPEND]: addTransaction failed for avatar {0}", receiverID);
+                        continue;
+                    }
+
+                    if (m_moneyDBService.DoTransfer(transactionUUID))
+                    {
+                        transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                        if (transaction != null && transaction.Status == (int)Status.SUCCESS_STATUS)
+                        {
+                            string message = string.Format(m_BalanceMessageReceiveMoney, amount, "SYSTEM", "");
+                            UpdateBalance(receiverID, message);
+                            m_log.InfoFormat("[STIPEND]: Granted {0} to {1}", amount, receiverID);
+                        }
+                        else
+                        {
+                            m_log.ErrorFormat("[STIPEND]: Transfer did not complete successfully for avatar {0}", receiverID);
+                        }
+                    }
+                    else
+                    {
+                        m_log.ErrorFormat("[STIPEND]: DoTransfer failed for avatar {0}", receiverID);
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.ErrorFormat("[STIPEND]: Exception granting stipend to {0}: {1}", receiverID, e.ToString());
+                    // Continue to the next avatar rather than aborting the whole
+                    // batch over one avatar's failure.
+                }
+            }
+        }
+
         public XmlRpcResponse handleAddBankerMoney(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             GetSSLCommonName(request);
@@ -2534,6 +2530,19 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+
+            // Check caller IP first. bankerID alone is not a secret (avatar UUIDs are
+            // discoverable in-world), so this endpoint must also be restricted to
+            // known, trusted caller addresses - see BankerAllowedIPs in MoneyServer.ini.
+            string callerAddress = remoteClient?.Address?.ToString() ?? string.Empty;
+            if (!m_bankerAllowedIPs.Contains(callerAddress))
+            {
+                m_log.ErrorFormat("[MONEY XMLRPC]: handleAddBankerMoney: Rejected call from disallowed address {0}", callerAddress);
+                m_log.Error("[MONEY XMLRPC]: handleAddBankerMoney: Add the caller's IP to BankerAllowedIPs at [MoneyServer] in MoneyServer.ini if this call should be trusted");
+                responseData["message"] = "not allowed add money to avatar!";
+                responseData["banker"] = false;
+                return response;
+            }
 
             // Check Banker Avatar
             if (m_bankerAvatar != UUID.Zero.ToString() && m_bankerAvatar != bankerID)
@@ -3539,7 +3548,7 @@ namespace OpenSim.Grid.MoneyServer
             responseData["description"] = "Session check failure, please re-login";
             return response;
         }
-  
+
         private Hashtable genericCurrencyXMLRPCRequest(Hashtable reqParams, string method, string uri)
         {
             m_log.InfoFormat("[MONEY XMLRPC]: genericCurrencyXMLRPCRequest: to {0}", uri);
@@ -3551,7 +3560,7 @@ namespace OpenSim.Grid.MoneyServer
                 if (!uri.StartsWith("https://"))
                 {
                     m_log.InfoFormat("[MONEY XMLRPC]: genericCurrencyXMLRPCRequest: CheckServerCert is true, but protocol is not HTTPS. Please check INI file.");
-                    //return null; 
+                    //return null;
                 }
             }
             else

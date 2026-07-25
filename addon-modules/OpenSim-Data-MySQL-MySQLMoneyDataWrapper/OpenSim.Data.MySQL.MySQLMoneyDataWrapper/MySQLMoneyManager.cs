@@ -1363,7 +1363,7 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
             UUID uuid = UUID.Random();
 
             // Record only transactions involving objects
-            // if (objectUUID==UUID.Zero.ToString()) return bRet;  
+            // if (objectUUID==UUID.Zero.ToString()) return bRet;
 
             sql = "INSERT INTO " + Table_of_TotalSales;
             sql += " (`UUID`,`user`,`objectUUID`,`type`,`TotalCount`,`TotalAmount`,`time`) VALUES";
@@ -1759,53 +1759,6 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
 
             cmd.Dispose();
             return iRet;
-        }
-
-
-        /// <summary>Gets the total amount of currency purchased by a user in a time period.</summary>
-        /// <param name="userID">The user identifier.</param>
-        /// <param name="startTime">The start time (Unix epoch).</param>
-        /// <param name="endTime">The end time (Unix epoch).</param>
-        /// <param name="transactionType">The transaction type to sum (e.g., 5001 for currency purchase).</param>
-        /// <returns>Total amount purchased, or -1 on error</returns>
-        public int getPurchaseTotal(string userID, int startTime, int endTime, int transactionType)
-        {
-            int totalAmount = 0;
-            string sql = string.Empty;
-
-            // Sum the amount field where the user is the receiver (purchased currency)
-            // and the transaction occurred within the time range with specified type
-            sql = "SELECT COALESCE(SUM(amount), 0) AS total FROM " + Table_of_Transactions + " ";
-            sql += "WHERE time>=?start AND time<=?end ";
-            sql += "AND receiver=?user AND type=?transType;";
-
-            MySqlCommand cmd = new MySqlCommand(sql, dbcon);
-
-            cmd.Parameters.AddWithValue("?start", startTime);
-            cmd.Parameters.AddWithValue("?end", endTime);
-            cmd.Parameters.AddWithValue("?user", userID);
-            cmd.Parameters.AddWithValue("?transType", transactionType);
-
-            try
-            {
-                using (MySqlDataReader r = cmd.ExecuteReader())
-                {
-                    if (r.Read())
-                    {
-                        totalAmount = Convert.ToInt32(r["total"]);
-                    }
-                    r.Close();
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.Error("[MONEY MANAGER]: Unable to get purchase total: " + e.ToString());
-                cmd.Dispose();
-                return -1;
-            }
-
-            cmd.Dispose();
-            return totalAmount;
         }
 
 

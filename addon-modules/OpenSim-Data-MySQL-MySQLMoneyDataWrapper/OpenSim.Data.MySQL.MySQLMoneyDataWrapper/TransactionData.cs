@@ -33,18 +33,18 @@ Null Pointer
 
 Fehlerquellen
     Keine Methoden mit Logik, also keine klassische Fehlerquelle wie Division durch 0, Indexfehler o.ä.
-    Setter führen keine Validierung durch (z.B. auf gültige UUIDs, Wertebereiche), 
+    Setter führen keine Validierung durch (z.B. auf gültige UUIDs, Wertebereiche),
     was bei fehlerhafter Nutzung zu inkonsistenten Daten führen könnte – das ist aber kein NullPointer und im Kontext von Datenklassen üblich.
     UserInfo: Alle Felder sind mit sinnvollen Defaultwerten versehen (string.Empty oder ein Enum-Wert).
 
 Zusammenfassung
     Null Pointer: Es gibt im aktuellen Code keine Gefahr für NullPointer-Exceptions, da alle Felder mit Defaultwerten belegt sind und keine Logik existiert.
-    Fehlerquellen: Keine Methoden, keine Validierung – klassisch für Datenklassen. 
+    Fehlerquellen: Keine Methoden, keine Validierung – klassisch für Datenklassen.
     Fehler können nur entstehen, wenn von außen ungültige Werte gesetzt werden, aber das verursacht keine NullPointer-Fehler.
     Funktion: Kapselt Daten für Transaktionen und Benutzer im OpenSim-Money-System.
 
 Fazit:
-Die Datei ist eine reine Datenstruktur und sicher gegenüber NullPointer-Fehlern. Es gibt keine gefährlichen Stellen im Code. 
+Die Datei ist eine reine Datenstruktur und sicher gegenüber NullPointer-Fehlern. Es gibt keine gefährlichen Stellen im Code.
 Die Nutzung ist robust, solange von außen sinnvolle Werte gesetzt werden.
  */
 

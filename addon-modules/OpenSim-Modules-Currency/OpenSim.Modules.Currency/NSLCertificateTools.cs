@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) Contributors, http://www.nsl.tuis.ac.jp
 
 Funktion
@@ -41,7 +41,7 @@ Zusammenfassung
     Funktion: Die Klasse ist robust und für produktiven Serverbetrieb geeignet. Sie bietet vollständige und sichere Zertifikatsprüfung für Server- und Client-Zertifikate inkl. CRL-Unterstützung.
 
 Fazit:
-Die Klasse ist sicher gegenüber NullPointer-Exceptions und behandelt alle Fehlerfälle sauber mit Logging. 
+Die Klasse ist sicher gegenüber NullPointer-Exceptions und behandelt alle Fehlerfälle sauber mit Logging.
 Sie erfüllt alle Anforderungen für sichere Zertifikatsvalidierung in einem OpenSim-Serverumfeld.
  */
 
@@ -199,7 +199,7 @@ namespace NSL.Certificate.Tools
             {
                 if (m_chain.ChainStatus[i].Status == X509ChainStatusFlags.UntrustedRoot) return true;
             }
-            
+
             return false;
         }
 

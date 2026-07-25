@@ -1,4 +1,4 @@
-﻿/* 
+﻿/*
  * Copyright (c) Contributors, http://www.nsl.tuis.ac.jp
  *
 

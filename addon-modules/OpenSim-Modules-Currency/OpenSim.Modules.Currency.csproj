@@ -63,37 +63,37 @@
   <ItemGroup>
     <Reference Include="log4net" >
       <Name>log4net</Name>
-      <HintPath>S:\Master\Casperia\bin\log4net.dll</HintPath>
+      <HintPath>..\..\bin\log4net.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Mono.Addins" >
       <Name>Mono.Addins</Name>
-      <HintPath>S:\Master\Casperia\bin\Mono.Addins.dll</HintPath>
+      <HintPath>..\..\bin\Mono.Addins.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Mono.Security" >
       <Name>Mono.Security</Name>
-      <HintPath>S:\Master\Casperia\bin\Mono.Security.dll</HintPath>
+      <HintPath>..\..\bin\Mono.Security.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Nini" >
       <Name>Nini</Name>
-      <HintPath>S:\Master\Casperia\bin\Nini.dll</HintPath>
+      <HintPath>..\..\bin\Nini.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverse" >
       <Name>OpenMetaverse</Name>
-      <HintPath>S:\Master\Casperia\bin\OpenMetaverse.dll</HintPath>
+      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="OpenMetaverseTypes" >
       <Name>OpenMetaverseTypes</Name>
-      <HintPath>S:\Master\Casperia\bin\OpenMetaverseTypes.dll</HintPath>
+      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="XMLRPC" >
       <Name>XMLRPC</Name>
-      <HintPath>S:\Master\Casperia\bin\XMLRPC.dll</HintPath>
+      <HintPath>..\..\bin\XMLRPC.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>

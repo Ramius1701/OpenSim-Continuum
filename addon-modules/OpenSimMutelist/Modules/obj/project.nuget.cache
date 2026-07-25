@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "Ik3EVMT6afM=",
+  "dgSpecHash": "iGyT+51tUYo=",
   "success": true,
-  "projectFilePath": "S:\\Master\\Casperia\\addon-modules\\OpenSimMutelist\\Modules\\OpenSimMutelist.Modules.csproj",
+  "projectFilePath": "S:\\Master\\opensim-enhanced\\addon-modules\\OpenSimMutelist\\Modules\\OpenSimMutelist.Modules.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.27\\microsoft.windowsdesktop.app.ref.8.0.27.nupkg.sha512",
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.27\\microsoft.netcore.app.ref.8.0.27.nupkg.sha512",
-    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.27\\microsoft.aspnetcore.app.ref.8.0.27.nupkg.sha512"
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.29\\microsoft.windowsdesktop.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.29\\microsoft.netcore.app.ref.8.0.29.nupkg.sha512",
+    "C:\\Users\\Allen\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.29\\microsoft.aspnetcore.app.ref.8.0.29.nupkg.sha512"
   ],
   "logs": []
 }
