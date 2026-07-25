@@ -1,4 +1,4 @@
-# OpenSim Enhanced
+# OpenSim Continuum
 
 OpenSim Enhanced is a maintained downstream integration of the latest official
 OpenSimulator development code with additional grid, viewer, scripting,
