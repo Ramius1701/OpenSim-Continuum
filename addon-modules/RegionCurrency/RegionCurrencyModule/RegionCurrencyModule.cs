@@ -89,13 +89,13 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
         private void HandleCurrencyCommand(string module, string[] cmd)
         {
-            if (cmd == null || cmd.Length < 3)
+            if (cmd == null || cmd.Length < 2)
             {
-                MainConsole.Instance.Output("[REGION WEB]: Usage: regionweb currency pending|approve|deny");
+                MainConsole.Instance.Output("[REGION CURRENCY]: Usage: regioncurrency pending|approve|deny");
                 return;
             }
 
-            string action = cmd[2].ToLowerInvariant();
+            string action = cmd[1].ToLowerInvariant();
             if (action == "pending")
             {
                 List<CurrencyPurchaseRequest> pending;
@@ -107,14 +107,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
                 if (pending.Count == 0)
                 {
-                    MainConsole.Instance.Output("[REGION WEB]: No pending currency purchase requests.");
+                    MainConsole.Instance.Output("[REGION CURRENCY]: No pending currency purchase requests.");
                     return;
                 }
 
                 foreach (CurrencyPurchaseRequest request in pending)
                 {
                     MainConsole.Instance.Output(
-                        "[REGION WEB]: {0}: {1} requested {2} tokens at {3}",
+                        "[REGION CURRENCY]: {0}: {1} requested {2} tokens at {3}",
                         request.RequestID,
                         request.DisplayName,
                         request.Amount.ToString(CultureInfo.InvariantCulture),
@@ -123,29 +123,29 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 return;
             }
 
-            if (cmd.Length < 4)
+            if (cmd.Length < 3)
             {
-                MainConsole.Instance.Output("[REGION WEB]: Usage: regionweb currency {0} <request-id> [note]", action);
+                MainConsole.Instance.Output("[REGION CURRENCY]: Usage: regioncurrency {0} <request-id> [note]", action);
                 return;
             }
 
-            string requestID = cmd[3];
-            string note = cmd.Length > 4 ? string.Join(" ", cmd.Skip(4).ToArray()) : string.Empty;
+            string requestID = cmd[2];
+            string note = cmd.Length > 3 ? string.Join(" ", cmd.Skip(3).ToArray()) : string.Empty;
             if (action == "approve")
             {
                 ApproveCurrencyPurchase(requestID, note, out string message);
-                MainConsole.Instance.Output("[REGION WEB]: " + message);
+                MainConsole.Instance.Output("[REGION CURRENCY]: " + message);
                 return;
             }
 
             if (action == "deny")
             {
                 DenyCurrencyPurchase(requestID, note, out string message);
-                MainConsole.Instance.Output("[REGION WEB]: " + message);
+                MainConsole.Instance.Output("[REGION CURRENCY]: " + message);
                 return;
             }
 
-            MainConsole.Instance.Output("[REGION WEB]: Usage: regionweb currency pending|approve|deny");
+            MainConsole.Instance.Output("[REGION CURRENCY]: Usage: regioncurrency pending|approve|deny");
         }
 
         private void SendCurrencyPortal(string[] parts, IOSHttpRequest request, IOSHttpResponse response)
