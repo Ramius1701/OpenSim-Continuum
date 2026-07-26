@@ -1,0 +1,100 @@
+[EstateManagement]
+    ; If false, then block any region restart requests from the client even if they are otherwise valid.
+    ; Default is true
+    AllowRegionRestartFromClient = false
+
+[Economy]
+; The gaming economy module used: https://github.com/ManfredAabye/opensimcurrencyserver-dotnet
+; To use other modules, this setting must be overridden
+; economymodule = BetaGridLikeMoneyModule
+EconomyModule = DTLNSLMoneyModule
+
+; The URL of the economy service.
+; This must match the grid economy setting (also known as helperURI or CurrencyServer, etc)
+; Robust.ini: economy = "${Const|BaseURL}:8008/"
+CurrencyServer = ${Const|BaseURL}:8008/
+UserServer = ${Const|BaseURL}:8002/
+CheckServerCert = false
+
+;# {SellEnabled} {} {Enable selling for 0?} {true false} true
+;; The default economy module only implements enough to allow free actions (object transfers, etc).
+;; There is no intention to implement more in the OpenSimulator core.
+;; This functionality must be provided by third-party modules.
+;; Enables selling items for $0. Default is true.
+SellEnabled = true
+
+;# {PriceUpload} {} {Price for uploads?} {} 0
+;; Fee in currency units for uploading textures, animations, etc. Default is 0.
+PriceUpload = 0
+
+;# {PriceGroupCreate} {} {Fee for creating a group} {} 0
+;; Fee in currency units for creating groups. Default is 0.
+PriceGroupCreate = 0
+
+;# {MeshModelUploadCostFactor} {} {Cost factor for uploading mesh models} {} 1.0
+;; Defines the cost factor for uploading a mesh model. Default is 1.0.
+MeshModelUploadCostFactor = 1.0
+
+;# {MeshModelUploadTextureCostFactor} {} {Cost factor for textures in mesh models} {} 1.0
+;; Defines the cost for uploaded textures in a mesh model. Default is 1.0.
+MeshModelUploadTextureCostFactor = 1.0
+
+;# {MeshModelMinCostFactor} {} {Minimum cost factor for mesh models} {} 1.0
+;; Sets the minimum price charged for uploading a mesh model. Default is 1.0.
+MeshModelMinCostFactor = 1.0
+
+;# {ObjectCount} {} {Maximum number of objects} {} 0
+;; Defines how many objects a user can own at most. Default is 0 (no limit).
+ObjectCount = 0
+
+;# {PriceEnergyUnit} {} {Price per energy unit} {} 0
+;; Specifies how much one energy unit costs. Default is 0.
+PriceEnergyUnit = 0
+
+;# {PriceObjectClaim} {} {Price for claiming an object} {} 0
+;; Cost for claiming an object in the system. Default is 0.
+PriceObjectClaim = 0
+
+;# {PricePublicObjectDecay} {} {Cost for decay of public objects} {} 0
+;; Specifies whether and how much is charged for automatic decay of public objects. Default is 0.
+PricePublicObjectDecay = 0
+
+;# {PricePublicObjectDelete} {} {Cost for deleting public objects} {} 0
+;; Indicates whether deleting public objects costs money. Default is 0.
+PricePublicObjectDelete = 0
+
+;# {PriceParcelClaim} {} {Price for claiming a parcel} {} 0
+;; Cost for taking over a parcel. Default is 0.
+PriceParcelClaim = 0
+
+;# {PriceParcelClaimFactor} {} {Multiplier for parcel prices} {} 1
+;; Factor that influences the price of a parcel. Default is 1.
+PriceParcelClaimFactor = 1
+
+;# {PriceRentLight} {} {Price for renting a light source} {} 0
+;; Cost for renting a light source. Default is 0.
+PriceRentLight = 0
+
+;# {TeleportMinPrice} {} {Minimum price for teleportation} {} 0
+;; Defines the minimum cost for teleporting. Default is 0.
+TeleportMinPrice = 0
+
+;# {TeleportPriceExponent} {} {Exponent for calculating teleport costs} {} 2
+;; Determines how strongly teleport costs increase with distance. Default is 2.
+TeleportPriceExponent = 2
+
+;# {EnergyEfficiency} {} {Efficiency of energy usage} {} 1
+;; Indicates how efficiently energy is used. Default is 1.
+EnergyEfficiency = 1
+
+;# {PriceObjectRent} {} {Price for renting an object} {} 0
+;; Cost for renting an object in the system. Default is 0.
+PriceObjectRent = 0
+
+;# {PriceObjectScaleFactor} {} {Scaling factor for object prices} {} 10
+;; Defines how object prices are scaled. Default is 10.
+PriceObjectScaleFactor = 10
+
+;# {PriceParcelRent} {} {Price for renting a parcel} {} 0
+;; Cost for renting a parcel. Default is 0.
+PriceParcelRent = 0

@@ -1,0 +1,129 @@
+;; OpenSim Continuum MoneyServer configuration example.
+;; Copy this file to MoneyServer.ini in the OpenSim bin directory.
+;; All currency is local simulation currency; no real-money settlement occurs.
+
+[Startup]
+    ;; Optional PID and log file paths.
+    ; PIDFile = ""
+    ; logfile = "MoneyServer.log"
+    ; StatsLogFile = "MoneyServerStats.log"
+
+    ;; TLS validation behavior inherited from OpenSim server startup.
+    ; NoVerifyCertChain = true
+    ; NoVerifyCertHostname = true
+
+    ;; Set to 0 to disable periodic server-stat logging.
+    ; LogShowStatsSeconds = 3600
+
+[MySql]
+    hostname = "localhost"
+    database = "OpenSim"
+    username = "opensim"
+    password = "change-me"
+    pooling = "true"
+    port = "3306"
+    MaxConnection = 10
+
+[MoneyServer]
+    ServerPort = 8008
+    ExpiredTime = 120
+    DefaultBalance = 1000
+
+    ;; Administrative/forced transfers.
+    EnableForceTransfer = false
+    BankerAvatar = "00000000-0000-0000-0000-000000000000"
+
+    ;; Exact trusted source IP addresses permitted to call AddBankerMoney.
+    ;; Keep loopback only when the caller runs on this host. Add the specific
+    ;; simulator or service IP when it runs elsewhere. Do not use broad ranges.
+    BankerAllowedIPs = "127.0.0.1,::1"
+
+    EnableAmountZero = false
+
+    ;; Viewer currency purchase support. This must be exactly "on" to enable.
+    ;; Secure viewer sessions are checked before a quote or purchase is accepted.
+    CurrencyOnOff = "off"
+
+    ;; Successful viewer BuyMoney totals use UTC calendar boundaries.
+    ;; Week begins Monday UTC. Zero disables an individual period limit.
+    TotalDay = 100
+    TotalWeek = 250
+    TotalMonth = 500
+
+    ;; Maximum account balance. A viewer purchase that would exceed it is
+    ;; rejected. Other balance-update paths retain the historic clamp behavior.
+    ;; Zero disables the maximum.
+    CurrencyMaximum = 10000
+
+    ;; Optional purchase restrictions. Group checks require os_groups_membership
+    ;; in the MoneyServer database. CurrencyGroupID is the enforced setting;
+    ;; CurrencyGroupName is descriptive only.
+    CurrencyGroupOnly = false
+    CurrencyGroupName = ""
+    CurrencyGroupID = "00000000-0000-0000-0000-000000000000"
+
+    ;; Requires a non-empty UserAccounts.email value. This does not verify that
+    ;; the user controls the address.
+    UserMailLock = false
+
+    ;; LSL/script-initiated money transfer endpoint.
+    EnableScriptSendMoney = false
+    MoneyScriptAccessKey = ""
+    MoneyScriptIPaddress = "127.0.0.1"
+
+    ;; Hypergrid and guest handling.
+    EnableHGAvatar = false
+    HGAvatarDefaultBalance = 0
+    EnableGuestAvatar = false
+    GuestAvatarDefaultBalance = 0
+    CalculateCurrency = 0
+
+    ;; Viewer transaction messages.
+    BalanceMessageLandSale = "Paid the Money L${0} for Land."
+    BalanceMessageRcvLandSale = ""
+    BalanceMessageSendGift = "Sent Gift L${0} to {1}."
+    BalanceMessageReceiveGift = "Received Gift L${0} from {1}."
+    BalanceMessagePayCharge = ""
+    BalanceMessageBuyObject = "Bought the Object {2} from {1} by L${0}."
+    BalanceMessageSellObject = "{1} bought the Object {2} by L${0}."
+    BalanceMessageGetMoney = "Got the Money L${0} from {1}."
+    BalanceMessageBuyMoney = "Bought the Money L${0}."
+    BalanceMessageRollBack = "RollBack the Transaction: L${0} from/to {1}."
+    BalanceMessageSendMoney = "Paid the Money L${0} to {1}."
+    BalanceMessageReceiveMoney = "Received L${0} from {1}."
+
+    ;; Reserved legacy diagnostics. The current code loads these flags, but not
+    ;; every path uses them. Standard log4net settings remain authoritative.
+    DebugConsole = false
+    DebugFile = false
+
+[Stipend]
+    ;; Optional scheduled local-currency stipend. Off by default.
+    Enabled = false
+    Amount = 300
+    IntervalDays = 7
+
+    ;; Cycles are deterministic intervals beginning at this UTC date. For a
+    ;; seven-day interval, 1970-01-05 anchors cycles to Monday UTC.
+    AnchorDateUtc = "1970-01-05"
+    Description = "Weekly stipend"
+
+    ;; Comma-separated local avatar UUIDs. Invalid and duplicate values are
+    ;; ignored. Each avatar/cycle has a deterministic transaction UUID, so an
+    ;; hourly retry or server restart cannot credit that cycle twice.
+    EligibleAvatars = ""
+
+[Certificate]
+    ;; Leave certificate filenames empty for normal HTTP operation.
+    ;; Generate certificates locally when HTTPS or mutual TLS is required;
+    ;; never reuse private certificate files from another distribution.
+    ServerCertFilename = ""
+    ServerCertPassword = ""
+    CheckClientCert = false
+    CACertFilename = ""
+    ClientCrlFilename = ""
+
+    ;; Certificate used by MoneyServer for outgoing XML-RPC calls.
+    ClientCertFilename = ""
+    ClientCertPassword = ""
+    CheckServerCert = false
