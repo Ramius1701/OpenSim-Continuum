@@ -1,0 +1,48 @@
+; HoloPhysicsGuard 0.5.0
+;
+; Copy this section into OpenSim.ini or into a file that OpenSim.ini
+; explicitly includes. OpenSim does not automatically load arbitrary files
+; merely because they are placed under bin/addon-modules.
+;
+; Safe first-run defaults are disabled and report-only.
+
+[HoloPhysicsGuard]
+Enabled = false
+
+; Supported values: ReportOnly, PersistSleep
+Mode = ReportOnly
+
+; DryRun=true always forces ReportOnly regardless of Mode.
+DryRun = true
+
+; Leave blank to inherit [DatabaseService] ConnectionString.
+; Set an explicit MySQL connection string only when the guard table must use
+; a different database. Never commit live credentials.
+ConnectionString =
+
+AutoCreateTable = true
+
+SleepWhenEmpty = true
+WakeOnStart = false
+WakeOnAvatarEnter = true
+
+CheckIntervalSeconds = 30
+EmptyDelaySeconds = 60
+
+ZeroVelocities = true
+Verbose = false
+
+; Conservative object selection:
+; - NeverSleepNameContains is checked first.
+; - When AlwaysSleepNameContains is non-empty, only matching names are eligible.
+; - When the allow list is empty, AllowAllPhysicalObjects must be true before
+;   any physical object is eligible.
+AllowAllPhysicalObjects = false
+AlwaysSleepNameContains = bowling_pin,bowling_ball
+NeverSleepNameContains = elevator,boat,vehicle,tram,train,region infrastructure
+
+; Broad development test:
+; Mode = ReportOnly
+; DryRun = true
+; AllowAllPhysicalObjects = true
+; AlwaysSleepNameContains =
