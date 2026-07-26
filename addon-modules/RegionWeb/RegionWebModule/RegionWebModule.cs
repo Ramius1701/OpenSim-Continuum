@@ -146,7 +146,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 "Estate", m_basePath + "/",
                 "Feature menu", m_basePath + "/#features",
                 "Script reference", m_basePath + "/scripts",
-                "Avatar wallet", m_basePath + "/currency/");
+                "Avatar wallet", CurrencyPortalUrl());
             html.Append("<p class=\"feature-kicker\">Feature guide</p><h1>")
                 .Append(Html(content.Title)).Append("</h1><p class=\"lead\">")
                 .Append(Html(content.Summary)).Append("</p>");
@@ -193,14 +193,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                     "All functions", m_basePath + "/scripts",
                     "Estate", m_basePath + "/",
                     "Feature menu", m_basePath + "/#features",
-                    "Avatar wallet", m_basePath + "/currency/");
+                    "Avatar wallet", CurrencyPortalUrl());
             }
             else
             {
                 AppendPageLinks(html,
                     "Estate", m_basePath + "/",
                     "Feature menu", m_basePath + "/#features",
-                    "Avatar wallet", m_basePath + "/currency/");
+                    "Avatar wallet", CurrencyPortalUrl());
             }
             html.Append("<p class=\"feature-kicker\">Script compatibility</p><h1>LSL Compatibility Center</h1>")
                 .Append("<p class=\"lead\">Expanded Second Life-style LSL functions implemented or corrected in this OpenSim build, with signatures, return values, permissions, compatibility status and exact in-world usage notes.</p>")
@@ -940,7 +940,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             AppendPageLinks(html,
                 "Estate", m_basePath + "/",
                 "All regions", m_basePath + "/#regions",
-                "Avatar wallet", m_basePath + "/currency/",
+                "Avatar wallet", CurrencyPortalUrl(),
                 "Script reference", m_basePath + "/scripts");
             html.Append("<p>").Append(Html(content.Tagline)).Append("</p>")
                 .Append("<h1>").Append(Html(content.Title)).Append("</h1>")
@@ -3842,18 +3842,41 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             html.Append("</div></div></nav>");
         }
 
+        private string CurrencyPortalUrl(string suffix = null)
+        {
+            if (string.IsNullOrWhiteSpace(m_currencyPortalUrl))
+                return string.Empty;
+
+            string url = m_currencyPortalUrl.Trim();
+            if (string.IsNullOrWhiteSpace(suffix))
+                return url;
+
+            return url.TrimEnd('/') + "/" + suffix.TrimStart('/');
+        }
+
         private static void AppendPageLinks(StringBuilder html, params string[] labelUrlPairs)
         {
             if (labelUrlPairs == null || labelUrlPairs.Length < 2)
                 return;
 
-            html.Append("<nav class=\"page-links\" aria-label=\"Page navigation\">");
+            StringBuilder links = new StringBuilder();
             for (int i = 0; i + 1 < labelUrlPairs.Length; i += 2)
             {
-                html.Append("<a href=\"").Append(Html(labelUrlPairs[i + 1])).Append("\">")
-                    .Append(Html(labelUrlPairs[i])).Append("</a>");
+                string label = labelUrlPairs[i];
+                string url = labelUrlPairs[i + 1];
+
+                if (string.IsNullOrWhiteSpace(label) || string.IsNullOrWhiteSpace(url))
+                    continue;
+
+                links.Append("<a href=\"").Append(Html(url)).Append("\">")
+                    .Append(Html(label)).Append("</a>");
             }
-            html.Append("</nav>");
+
+            if (links.Length == 0)
+                return;
+
+            html.Append("<nav class=\"page-links\" aria-label=\"Page navigation\">")
+                .Append(links).Append("</nav>");
         }
 
         private static string EndPage()
@@ -3993,7 +4016,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             html.Append("<main class=\"wrap wallet-page estate-admin-page\">");
             AppendPageLinks(html,
                 "Estate", m_basePath + "/",
-                "Avatar wallet", m_basePath + "/currency/");
+                "Avatar wallet", CurrencyPortalUrl());
             html.Append("<p class=\"feature-kicker\">Estate owner control room</p><h1>Estate Admin</h1>")
                 .Append("<p class=\"lead\">Install, inspect, edit, save and backup OpenSim configuration from one protected web portal. Request a one-time inworld token before touching simulator files.</p>");
 
@@ -4048,8 +4071,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             html.Append("<main class=\"wrap wallet-page estate-admin-page\">");
             AppendPageLinks(html,
                 "Estate", m_basePath + "/",
-                "Avatar wallet", m_basePath + "/currency/",
-                "Money admin", m_basePath + "/currency/admin");
+                "Avatar wallet", CurrencyPortalUrl(),
+                "Money admin", CurrencyPortalUrl("admin"));
             html.Append("<p class=\"feature-kicker\">Estate owner control room</p><h1>Estate Admin</h1>")
                 .Append("<p class=\"lead\">A protected control panel for OpenSim configuration files: browse, edit, backup and apply safe reload operations from the web.</p>");
 
