@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\OpenSimTide.Module.dll
-S:\Github\opensim-enhanced\bin\OpenSimTide.Module.pdb
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimT.B92A0B26.Up2Date
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.dll
-S:\Github\opensim-enhanced\addon-modules\OpenSimTide\Module\obj\Release\OpenSimTide.Module.pdb

@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\OpenSimMutelist.Modules.dll
-S:\Github\opensim-enhanced\bin\OpenSimMutelist.Modules.pdb
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimM.D0D58768.Up2Date
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.dll
-S:\Github\opensim-enhanced\addon-modules\OpenSimMutelist\Modules\obj\Release\OpenSimMutelist.Modules.pdb

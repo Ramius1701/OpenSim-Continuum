@@ -1,8 +1,0 @@
-S:\Master\opensim-enhanced\bin\OpenSimWeather.Module.dll
-S:\Master\opensim-enhanced\bin\OpenSimWeather.Module.pdb
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimWeather.Module.csproj.AssemblyReference.cache
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimWeather.Module.GeneratedMSBuildEditorConfig.editorconfig
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimWeather.Module.csproj.CoreCompileInputs.cache
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimW.01DEAAD9.Up2Date
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimWeather.Module.dll
-S:\Master\opensim-enhanced\addon-modules\OpenSimWeather\Module\obj\Debug\OpenSimWeather.Module.pdb
