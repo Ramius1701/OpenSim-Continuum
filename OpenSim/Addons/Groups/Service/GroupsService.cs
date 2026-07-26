@@ -457,10 +457,16 @@ namespace OpenSim.Groups
                 return false;
             }
 
-            // Check whether there are pending invitations and delete them
+            // A caller-supplied deterministic invite ID allows auto-invite
+            // modules to suppress duplicate sends across simulator processes.
             InvitationData invite = m_Database.RetrieveInvitation(groupID, agentID);
             if (invite != null)
+            {
+                if (invite.InviteID == inviteID)
+                    return false;
+
                 m_Database.DeleteInvite(invite.InviteID);
+            }
 
             invite = new InvitationData();
             invite.InviteID = inviteID;

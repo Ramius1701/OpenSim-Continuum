@@ -26,7 +26,8 @@
  */
 
 using System;
-using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using System.Reflection;
 using System.Threading;
 using log4net;
@@ -43,8 +44,6 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
     public class GroupAutoInviteModule : INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-        private readonly ConcurrentDictionary<UUID, byte> m_invitedThisSession = new ConcurrentDictionary<UUID, byte>();
 
         private Scene m_scene;
         private IGroupsModule m_groupsModule;
@@ -84,7 +83,6 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
             m_scene = scene;
             m_scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            m_scene.EventManager.OnClientClosed += OnClientClosed;
         }
 
         public void RemoveRegion(Scene scene)
@@ -93,8 +91,6 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                 return;
 
             m_scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-            m_scene.EventManager.OnClientClosed -= OnClientClosed;
-            m_invitedThisSession.Clear();
             m_groupsModule = null;
             m_scene = null;
         }
@@ -111,17 +107,17 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         public void Close()
         {
-            m_invitedThisSession.Clear();
             m_groupsModule = null;
             m_scene = null;
         }
 
         private void OnMakeRootAgent(ScenePresence sp)
         {
-            if (!m_enabled || sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent)
+            if (!m_enabled || sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent || sp.ControllingClient == null)
                 return;
 
-            if (m_inviteOncePerSession && m_invitedThisSession.ContainsKey(sp.UUID))
+            UUID sessionID = sp.ControllingClient.SessionId;
+            if (sessionID.IsZero())
                 return;
 
             Util.FireAndForget(
@@ -130,19 +126,14 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                     if (m_inviteDelaySeconds > 0)
                         Thread.Sleep(m_inviteDelaySeconds * 1000);
 
-                    TryInvite(sp.UUID);
+                    TryInvite(sp.UUID, sessionID);
                 },
                 null,
                 "GroupAutoInvite",
                 false);
         }
 
-        private void OnClientClosed(UUID agentID, Scene scene)
-        {
-            m_invitedThisSession.TryRemove(agentID, out _);
-        }
-
-        private void TryInvite(UUID agentID)
+        private void TryInvite(UUID agentID, UUID sessionID)
         {
             Scene scene = m_scene;
             if (scene == null)
@@ -150,6 +141,10 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
             ScenePresence sp = scene.GetScenePresence(agentID);
             if (sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent || sp.ControllingClient == null)
+                return;
+
+            // The delayed task must still belong to the same viewer login.
+            if (sp.ControllingClient.SessionId != sessionID)
                 return;
 
             IGroupsModule groups = m_groupsModule ?? scene.RequestModuleInterface<IGroupsModule>();
@@ -177,11 +172,22 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                     return;
                 }
 
-                if (m_inviteOncePerSession && !m_invitedThisSession.TryAdd(agentID, 0))
-                    return;
-
                 string inviteMessage = FormatInviteMessage(sp, group);
-                groups.InviteGroup(null, inviterID, group.GroupID, agentID, m_roleID, inviteMessage);
+                UUID inviteID = m_inviteOncePerSession
+                    ? CreateSessionInviteID(agentID, group.GroupID, sessionID)
+                    : UUID.Random();
+
+                if (!groups.InviteGroup(
+                    null,
+                    inviterID,
+                    group.GroupID,
+                    agentID,
+                    m_roleID,
+                    inviteMessage,
+                    inviteID))
+                {
+                    return;
+                }
 
                 m_log.InfoFormat(
                     "[GROUP AUTO INVITE]: Invited {0} to group {1} ({2}) in {3} with message '{4}'.",
@@ -195,6 +201,24 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             }
         }
 
+        private static UUID CreateSessionInviteID(UUID agentID, UUID groupID, UUID sessionID)
+        {
+            string seed = string.Concat(
+                agentID.ToString(), "|",
+                groupID.ToString(), "|",
+                sessionID.ToString());
+
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(seed));
+            string hex = Convert.ToHexString(hash).ToLowerInvariant();
+
+            // a17a0001 identifies a GroupAutoInvite per-login marker.
+            return new UUID(string.Format(
+                "a17a0001-{0}-{1}-{2}-{3}",
+                hex.Substring(0, 4),
+                hex.Substring(4, 4),
+                hex.Substring(8, 4),
+                hex.Substring(12, 12)));
+        }
         private GroupRecord ResolveGroup(IGroupsModule groups)
         {
             if (!m_groupID.IsZero())

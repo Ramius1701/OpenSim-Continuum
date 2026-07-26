@@ -105,6 +105,12 @@ namespace OpenSim.Region.Framework.Interfaces
         /// null or empty message falls back to the default invite text.
         /// </summary>
         void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID, string message);
+
+        /// <summary>
+        /// Sends an invite using a caller-supplied invite ID. The Groups
+        /// service returns false when that invite ID is already pending.
+        /// </summary>
+        bool InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID, string message, UUID inviteID);
         void NotifyChange(UUID GroupID);
 
         ulong GetFullGroupPowers(UUID agentID, UUID groupID);

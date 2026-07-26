@@ -411,7 +411,8 @@ namespace OpenSim.Groups
                             }
                         }
 
-                        m_groupData.RemoveAgentToGroupInvite(remoteAgentIDstr, inviteID);
+                        if (!IsSessionAutoInviteID(inviteID))
+                            m_groupData.RemoveAgentToGroupInvite(remoteAgentIDstr, inviteID);
                     }
 
                     // Reject
@@ -420,7 +421,12 @@ namespace OpenSim.Groups
                         if (m_debugEnabled)
                             m_log.DebugFormat("[Groups]: Received a reject invite notice.");
 
-                        m_groupData.RemoveAgentToGroupInvite(remoteAgentIDstr, inviteID);
+                        // Keep a GroupAutoInvite marker until the next viewer
+                        // login so region crossings cannot trigger another
+                        // invite during the same session.
+                        if (!IsSessionAutoInviteID(inviteID))
+                            m_groupData.RemoveAgentToGroupInvite(remoteAgentIDstr, inviteID);
+
                         m_groupData.RemoveAgentFromGroup(remoteAgentIDstr, inviteInfo.AgentID, inviteInfo.GroupID);
                     }
                 }
@@ -1314,7 +1320,20 @@ namespace OpenSim.Groups
         // and send the actual invite IM.
         public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
         {
-            if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
+            InviteGroup(remoteClient, agentID, groupID, invitedAgentID, roleID, message, UUID.Random());
+        }
+
+        public bool InviteGroup(
+            IClientAPI remoteClient,
+            UUID agentID,
+            UUID groupID,
+            UUID invitedAgentID,
+            UUID roleID,
+            string message,
+            UUID inviteID)
+        {
+            if (m_debugEnabled)
+                m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             string agentName = m_UserManagement.GetUserName(agentID);
             RegionInfo regionInfo = m_sceneList[0].RegionInfo;
@@ -1323,46 +1342,51 @@ namespace OpenSim.Groups
             if (group == null)
             {
                 m_log.DebugFormat("[Groups]: No such group {0}", groupID);
-                return;
+                return false;
             }
 
             // Todo: Security check, probably also want to send some kind of notification
-            UUID InviteID = UUID.Random();
+            if (inviteID.IsZero())
+                inviteID = UUID.Random();
 
-            if (m_groupData.AddAgentToGroupInvite(agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString()))
+            if (!m_groupData.AddAgentToGroupInvite(
+                agentID.ToString(),
+                inviteID,
+                groupID,
+                roleID,
+                invitedAgentID.ToString()))
             {
-                if (m_msgTransferModule != null)
-                {
-                    Guid inviteUUID = InviteID.Guid;
-
-                    GridInstantMessage msg = new GridInstantMessage();
-
-                    msg.imSessionID = inviteUUID;
-
-                    // msg.fromAgentID = agentID.Guid;
-                    msg.fromAgentID = groupID.Guid;
-                    msg.toAgentID = invitedAgentID.Guid;
-                    //msg.timestamp = (uint)Util.UnixTimeSinceEpoch();
-                    msg.timestamp = 0;
-                    msg.fromAgentName = agentName;
-                    msg.message = FormatInviteMessage(
-                        message,
-                        agentName,
-                        group.GroupName,
-                        string.Format("{0} has invited you to join a group called {1}. There is no cost to join this group.", agentName, group.GroupName));
-                    msg.dialog = (byte)OpenMetaverse.InstantMessageDialog.GroupInvitation;
-                    msg.fromGroup = true;
-                    msg.offline = (byte)0;
-                    msg.ParentEstateID = 0;
-                    msg.Position = Vector3.Zero;
-                    msg.RegionID = regionInfo.RegionID.Guid;
-                    msg.binaryBucket = new byte[20];
-
-                    OutgoingInstantMessage(msg, invitedAgentID);
-                }
+                return false;
             }
-        }
 
+            if (m_msgTransferModule == null)
+                return false;
+
+            GridInstantMessage msg = new GridInstantMessage();
+            msg.imSessionID = inviteID.Guid;
+            msg.fromAgentID = groupID.Guid;
+            msg.toAgentID = invitedAgentID.Guid;
+            msg.timestamp = 0;
+            msg.fromAgentName = agentName;
+            msg.message = FormatInviteMessage(
+                message,
+                agentName,
+                group.GroupName,
+                string.Format(
+                    "{0} has invited you to join a group called {1}. There is no cost to join this group.",
+                    agentName,
+                    group.GroupName));
+            msg.dialog = (byte)OpenMetaverse.InstantMessageDialog.GroupInvitation;
+            msg.fromGroup = true;
+            msg.offline = (byte)0;
+            msg.ParentEstateID = 0;
+            msg.Position = Vector3.Zero;
+            msg.RegionID = regionInfo.RegionID.Guid;
+            msg.binaryBucket = new byte[20];
+
+            OutgoingInstantMessage(msg, invitedAgentID);
+            return true;
+        }
         private static string FormatInviteMessage(string message, string inviterName, string groupName, string defaultMessage)
         {
             if (string.IsNullOrEmpty(message))
@@ -1371,6 +1395,13 @@ namespace OpenSim.Groups
             return message
                 .Replace("{InviterName}", inviterName)
                 .Replace("{GroupName}", groupName);
+        }
+
+        private static bool IsSessionAutoInviteID(UUID inviteID)
+        {
+            return inviteID.ToString().StartsWith(
+                "a17a0001-",
+                StringComparison.OrdinalIgnoreCase);
         }
 
         public List<DirGroupsReplyData> FindGroups(IClientAPI remoteClient, string query)
