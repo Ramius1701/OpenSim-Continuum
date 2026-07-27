@@ -1,0 +1,58 @@
+;; OpenSimWeather 0.3.3 experimental puddle/snow example
+;;
+;; Upload suitable alpha textures and paste their asset UUIDs below.
+;; Surface patches are temporary terrain overlays near active avatars. They do
+;; not alter terrain textures and do not accumulate on roofs or mesh floors.
+
+[Weather]
+    Enabled = false
+    CommandChannel = 89
+    EstateManagerOnly = true
+
+    CoverageMode = Region
+    EmitterGrid = 8
+
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    AvoidCoveredAreas = true
+    CoverProbeGrid = 3
+    MinimumOpenSkyFraction = 0.67
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+
+    AdjustEnvironment = false
+    AdjustWind = false
+
+    SurfaceEffectsEnabled = true
+    PuddlesEnabled = true
+    SnowAccumulationEnabled = true
+    PuddleTexture =
+    SnowSurfaceTexture =
+
+    TemperatureC = -2.0
+    FreezingPointC = 0.0
+
+    RainWetnessPerHour = 0.35
+    StormWetnessPerHour = 0.75
+    SnowAccumulationPerHour = 0.30
+    ClearDryingPerHour = 0.08
+    SunnyDryingPerHour = 0.25
+    ClearSnowMeltPerHour = 0.05
+    SunnySnowMeltPerHour = 0.22
+    RainSnowMeltPerHour = 0.45
+
+    PuddleStartLevel = 0.12
+    SnowPatchStartLevel = 0.08
+    SurfacePatchSpacingMeters = 20.0
+    SurfaceRadiusMeters = 80.0
+    MaxSurfacePatches = 128
+    MaxSurfaceSlopeDegrees = 8.0
+    PuddleLowPointToleranceMeters = 0.08
+    SurfaceUpdateSeconds = 60
+
+    LightningEnabled = true
+    ThunderEnabled = false
+    AutoCycleEnabled = false
