@@ -1,0 +1,137 @@
+;; OpenSimWeather 0.3.3 environment/wind example
+;;
+;; OpenSim persists region environment changes. Export or record the current
+;; region environment before enabling this example. All four configurable
+;; weather profiles are included below and may be edited per weather type.
+
+[Weather]
+    Enabled = false
+    CommandChannel = 89
+    EstateManagerOnly = true
+
+    CoverageMode = Region
+    EmitterGrid = 8
+
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    AvoidCoveredAreas = true
+    CoverProbeGrid = 3
+    MinimumOpenSkyFraction = 0.67
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+
+    AdjustEnvironment = true
+    AllowPersistentEnvironmentChanges = true
+    RestoreCloudsOnClear = true
+
+    AdjustWind = true
+    RestoreWindOnClear = true
+    WindDirectionDegrees = 70.0
+    WindDirectionVarianceDegrees = 18.0
+    RainWindStrength = 0.45
+    StormWindStrength = 1.35
+    SnowWindStrength = 0.22
+
+    SurfaceEffectsEnabled = false
+    LightningEnabled = true
+    ThunderEnabled = false
+    AutoCycleEnabled = false
+
+[Weather.Environment.Sunny]
+    CloudCoverage = 0.05
+    CloudScale = 0.28
+    CloudColor = 1.0,0.98,0.9,1.0
+    CloudXYDensity = 0.38,0.18,0.28
+    CloudDetailXYDensity = 0.34,0.16,0.04
+    CloudScrollX = 0.06
+    CloudScrollY = 0.012
+    Horizon = 0.58,0.72,0.95,1.0
+    BlueDensity = 0.16,0.32,0.68,1.0
+    Ambient = 0.48,0.48,0.42,1.0
+    SunMoonColor = 1.0,0.88,0.52,1.0
+    HazeHorizon = 0.10
+    HazeDensity = 0.18
+    DensityMultiplier = 0.08
+    DistanceMultiplier = 1.15
+    SunGlowFocus = 0.22
+    SunGlowSize = 2.40
+    SceneGamma = 1.16
+    StarBrightness = 0.00
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Rain]
+    CloudCoverage = 0.82
+    CloudScale = 0.64
+    CloudColor = 0.16,0.18,0.22,1.0
+    CloudXYDensity = 1.18,0.60,0.96
+    CloudDetailXYDensity = 1.32,0.64,0.24
+    CloudScrollX = 0.28
+    CloudScrollY = 0.05
+    Horizon = 0.15,0.17,0.20,1.0
+    BlueDensity = 0.07,0.09,0.13,1.0
+    Ambient = 0.14,0.15,0.17,1.0
+    SunMoonColor = 0.20,0.21,0.24,1.0
+    HazeHorizon = 0.40
+    HazeDensity = 0.82
+    DensityMultiplier = 0.28
+    DistanceMultiplier = 0.90
+    SunGlowFocus = 0.08
+    SunGlowSize = 1.40
+    SceneGamma = 0.78
+    StarBrightness = 0.03
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Storm]
+    CloudCoverage = 0.94
+    CloudScale = 0.72
+    CloudColor = 0.06,0.07,0.085,1.0
+    CloudXYDensity = 1.35,0.64,1.00
+    CloudDetailXYDensity = 1.55,0.72,0.28
+    CloudScrollX = 0.48
+    CloudScrollY = 0.10
+    Horizon = 0.08,0.09,0.11,1.0
+    BlueDensity = 0.04,0.055,0.08,1.0
+    Ambient = 0.08,0.085,0.095,1.0
+    SunMoonColor = 0.12,0.13,0.15,1.0
+    HazeHorizon = 0.45
+    HazeDensity = 0.92
+    DensityMultiplier = 0.32
+    DistanceMultiplier = 0.80
+    SunGlowFocus = 0.05
+    SunGlowSize = 1.20
+    SceneGamma = 0.72
+    StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Snow]
+    CloudCoverage = 0.86
+    CloudScale = 0.70
+    CloudColor = 0.38,0.40,0.44,1.0
+    CloudXYDensity = 1.18,0.60,0.96
+    CloudDetailXYDensity = 1.28,0.62,0.22
+    CloudScrollX = 0.14
+    CloudScrollY = 0.035
+    Horizon = 0.26,0.28,0.32,1.0
+    BlueDensity = 0.13,0.15,0.20,1.0
+    Ambient = 0.22,0.23,0.25,1.0
+    SunMoonColor = 0.30,0.31,0.34,1.0
+    HazeHorizon = 0.36
+    HazeDensity = 0.72
+    DensityMultiplier = 0.24
+    DistanceMultiplier = 0.95
+    SunGlowFocus = 0.10
+    SunGlowSize = 1.60
+    SceneGamma = 0.86
+    StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false

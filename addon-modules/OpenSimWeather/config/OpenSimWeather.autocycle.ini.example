@@ -1,0 +1,40 @@
+;; OpenSimWeather 0.3.3 particle-only automatic cycle example
+;; Replace texture UUIDs, test manually, then set Enabled=true.
+
+[Weather]
+    Enabled = false
+    CommandChannel = 89
+    EstateManagerOnly = true
+
+    CoverageMode = Region
+    EmitterGrid = 8
+    EmitterHeight = 18.0
+    Intensity = 1.0
+
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    AvoidCoveredAreas = true
+    CoverProbeGrid = 3
+    MinimumOpenSkyFraction = 0.67
+    SuppressAroundCoveredAvatars = true
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+
+    AdjustEnvironment = false
+    AdjustWind = false
+    SurfaceEffectsEnabled = false
+
+    LightningEnabled = true
+    ThunderEnabled = false
+
+    AutoCycleEnabled = true
+    AutoCycleHours = 6.0
+    AutoCycleStartupDelaySeconds = 30
+    AutoCycleChangeOnStartup = false
+    AutoCycleChoices = storm,rain,snow,sunny,clear
+    AutoCycleForecastWarningMinutes = 15
+
+    SendWeatherIMOnEntry = false

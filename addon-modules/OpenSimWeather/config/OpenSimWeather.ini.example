@@ -1,0 +1,58 @@
+;; OpenSimWeather 0.3.3 common configuration example
+;;
+;; Put this [Weather] section in OpenSim.ini, or in a file explicitly included
+;; by OpenSim.ini. Do not place it in Regions.ini.
+;;
+;; This example contains the settings most region operators normally need.
+;; See OpenSimWeather.reference.ini.example and the focused examples for every
+;; advanced tuning option. Asset settings use OpenSim asset UUIDs.
+
+[Weather]
+    ;; Master switch. Keep false until particle texture UUIDs are configured.
+    Enabled = false
+
+    ;; Private non-zero command channel. Channel 0 is rejected.
+    CommandChannel = 89
+    EstateManagerOnly = true
+
+    ;; Region restores the original full-region behavior. EmitterGrid is scaled
+    ;; across RegionSizeX and RegionSizeY, including variable-sized regions.
+    CoverageMode = Region
+    EmitterGrid = 8
+    EmitterHeight = 18.0
+    Intensity = 1.0
+
+    ;; Upload suitable alpha textures and paste their asset UUIDs here.
+    RainTexture =
+    StormTexture =
+    SnowTexture =
+    LightningTexture =
+
+    ;; Particle systems cannot collide with roofs. These options suppress
+    ;; covered cells and permit explicit no-weather volumes in complex builds.
+    AvoidCoveredAreas = true
+    UseExclusionVolumes = true
+    ExclusionObjectName = Weather Exclusion
+    CleanupGeneratedObjectsOnStartup = true
+
+    ;; Region environment and wind changes are opt-in.
+    AdjustEnvironment = false
+    AllowPersistentEnvironmentChanges = false
+    RestoreCloudsOnClear = true
+
+    AdjustWind = false
+    RestoreWindOnClear = true
+
+    ;; Storm effects. Thunder requires a valid uploaded sound UUID.
+    LightningEnabled = true
+    ThunderEnabled = false
+    ThunderSound =
+
+    ;; Automatic cycling and entry messages are opt-in.
+    AutoCycleEnabled = false
+    AutoCycleHours = 6.0
+    AutoCycleChoices = storm,rain,snow,sunny,clear
+    SendWeatherIMOnEntry = false
+
+    ;; Experimental temporary terrain overlays are opt-in.
+    SurfaceEffectsEnabled = false
