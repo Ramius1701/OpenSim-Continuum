@@ -847,12 +847,21 @@
     ;; Robust.ini or Robust.HG.ini configuration.
     ;# {MuteListModule} {MuteListModule:MuteListModule} {} {} None
     ; MuteListModule = MuteListModule
+    ;; Viewer abuse reports. This CAPS module requires an AbuseReportsService
+    ;; connector selected by the active StandaloneCommon or GridCommon file.
+    ;# {AbuseReportsModule} {AbuseReportsModule:AbuseReportsModule} {} {} None
+    ; AbuseReportsModule = AbuseReportsModule
 
     ;; Control whether group invites and notices are stored for offline users.
     ;; Default is true.
     ;; This applies to both core groups module.
     ; ForwardOfflineGroupMessages = true
 
+
+[AbuseReports]
+    ;; Enables the viewer SendUserReport and SendUserReportWithScreenshot CAPS.
+    ;; The service connector must also be enabled for the active architecture.
+    ; Enabled = true
 
 [BulletSim]
     ;# {AvatarToAvatarCollisionsByDefault} {[Startup]physics:BulletSim} {Should avatars collide with each other?} {true false} true

@@ -141,6 +141,9 @@
     ;; Uncomment if you want to have centralized estate data
     ; EstateDataService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:EstateDataRobustConnector"
 
+    ;; Uncomment to receive grid-wide viewer abuse reports on the private port.
+    ; AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
+
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
     ;; Additions for Hypergrid
@@ -887,3 +890,8 @@
 
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
+
+[AbuseReportsService]
+    LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    ;; StorageProvider and ConnectionString inherit from [DatabaseService].
+    ;; Override them here only when using a separate abuse-report database.
