@@ -79,6 +79,13 @@
     ;; Authorization is not on by default, as it depends on external php
     ;AuthorizationServices = "RemoteAuthorizationServicesConnector"
 
+    ;; Send viewer abuse reports to the grid-wide ROBUST service.
+    ; AbuseReportsService = "RemoteAbuseReportsServicesConnector"
+
+[AbuseReportsService]
+    ;; Private ROBUST endpoint used by RemoteAbuseReportsServicesConnector.
+    ; AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
+
 [AssetService]
     DefaultAssetLoader = "OpenSim.Framework.AssetLoader.Filesystem.dll"
     AssetLoaderArgs = "assets/AssetSets.xml"
