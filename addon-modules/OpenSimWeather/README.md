@@ -1,4 +1,4 @@
-# OpenSimWeather 0.3.3
+# OpenSimWeather 0.3.4
 
 OpenSimWeather is an experimental but production-conscious OpenSimulator region
 module that provides Clear, Sunny, Rain, Storm, and Snow conditions. It uses
@@ -95,6 +95,8 @@ With `CommandChannel = 89`:
 
 `meteo` is retained as an alias. The command and weather state are parsed as
 exact tokens, so unrelated text containing words such as `rain` is ignored.
+Replies are sent by the object-style chat source named `Weather`, so reply text
+does not repeat a second `Weather:` prefix.
 When `EstateManagerOnly = true`, only estate managers/owners can change the
 weather.
 
@@ -206,13 +208,15 @@ limitation, not real collision simulation.
 - `[Weather.Environment.Snow]`
 
 All fields changed by the module are exposed in those sections. The module
-starts with the current region LightShare data, modifies only the configured
-weather-related sky/cloud fields, and preserves water fields and other
-unmanaged environment values.
+starts with the current region LightShare data, applies the complete configured
+weather sky/cloud profile including `SunMoonPosition`, `EastAngle`, and
+`MaxAltitude`, and preserves water fields and other unmanaged environment
+values.
 
-Fallback profile values remain in C# so a missing profile section has defined
-behavior, but the shipped complete example exposes every applied field. The
-fallbacks are not the only available settings.
+Each missing profile or missing individual key uses the built-in profile value.
+The built-in sun-position values come from OpenSim's `RegionLightShareData`
+defaults, preventing a dark pre-weather sun position from leaking into Sunny.
+The shipped complete example exposes every applied field.
 
 ### Persistence warning
 

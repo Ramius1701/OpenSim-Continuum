@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.4 - chat response and complete environment profiles
+
+- Removed the duplicate `Weather:` prefix from object-style chat replies.
+- Kept `weather` as the canonical private-channel command namespace and retained
+  `meteo` as an alias.
+- Added configurable `SunMoonPosition`, `EastAngle`, and `MaxAltitude` to Sunny,
+  Rain, Storm, and Snow environment profiles.
+- Missing environment sections and missing individual keys use built-in profile
+  values derived from OpenSim LightShare defaults.
+- Sunny no longer inherits a dark pre-weather sun position from the region.
+
 ## 0.3.3 — coverage compatibility and configuration reconciliation
 
 - Restored `CoverageMode = Region` as the safe default.

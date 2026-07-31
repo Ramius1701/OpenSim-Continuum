@@ -86,6 +86,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             public float SunGlowSize;
             public float SceneGamma;
             public float StarBrightness;
+            public float SunMoonPosition;
+            public float EastAngle;
+            public ushort MaxAltitude;
             public bool DrawClassicClouds = true;
             public bool CloudScrollXLock;
             public bool CloudScrollYLock;
@@ -571,7 +574,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             IClientAPI client = chat.Sender;
             if (m_estateManagerOnly && !scene.Permissions.IsEstateManager(client.AgentId))
             {
-                SendReply(client, "Weather: only estate managers can change weather here.");
+                SendReply(client, "Only estate managers can change weather here.");
                 return;
             }
 
@@ -583,21 +586,21 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             if (!TryResolveWeather(request, out WeatherKind weather))
             {
-                SendReply(client, "Weather: use rain, storm, snow, sunny, clear, or status.");
+                SendReply(client, "Use weather rain, weather storm, weather snow, weather sunny, weather clear, or weather status.");
                 return;
             }
 
             if (weather == WeatherKind.Clear)
             {
                 ClearWeather(true, true);
-                SendReply(client, "Weather: clear.");
+                SendReply(client, "Clear.");
                 return;
             }
 
             if (ApplyWeather(weather, client.AgentId))
-                SendReply(client, string.Format("Weather: {0} started.", WeatherName(weather)));
+                SendReply(client, string.Format("{0} started.", WeatherName(weather)));
             else
-                SendReply(client, "Weather: could not create emitters.");
+                SendReply(client, "Could not create emitters.");
         }
 
         private bool ApplyWeather(WeatherKind weather, UUID ownerId)
@@ -1651,6 +1654,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             profile.SunGlowSize = Math.Max(0f, config.GetFloat("SunGlowSize", profile.SunGlowSize));
             profile.SceneGamma = Math.Max(0.01f, config.GetFloat("SceneGamma", profile.SceneGamma));
             profile.StarBrightness = Math.Max(0f, config.GetFloat("StarBrightness", profile.StarBrightness));
+            profile.SunMoonPosition = Clamp(config.GetFloat("SunMoonPosition", profile.SunMoonPosition), 0f, 1f);
+            profile.EastAngle = Clamp(config.GetFloat("EastAngle", profile.EastAngle), 0f, 1f);
+            profile.MaxAltitude = (ushort)Math.Min(ushort.MaxValue, Math.Max(0, config.GetInt("MaxAltitude", profile.MaxAltitude)));
             profile.DrawClassicClouds = config.GetBoolean("DrawClassicClouds", profile.DrawClassicClouds);
             profile.CloudScrollXLock = config.GetBoolean("CloudScrollXLock", profile.CloudScrollXLock);
             profile.CloudScrollYLock = config.GetBoolean("CloudScrollYLock", profile.CloudScrollYLock);
@@ -1659,6 +1665,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private static EnvironmentProfile CreateDefaultEnvironmentProfile(WeatherKind weather)
         {
+            RegionLightShareData lightShareDefaults = new RegionLightShareData();
+
             if (weather == WeatherKind.Sunny)
             {
                 return new EnvironmentProfile
@@ -1681,7 +1689,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                     SunGlowFocus = 0.22f,
                     SunGlowSize = 2.4f,
                     SceneGamma = 1.16f,
-                    StarBrightness = 0f
+                    StarBrightness = 0f,
+                    SunMoonPosition = lightShareDefaults.sunMoonPosition,
+                    EastAngle = lightShareDefaults.eastAngle,
+                    MaxAltitude = lightShareDefaults.maxAltitude
                 };
             }
 
@@ -1707,7 +1718,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                     SunGlowFocus = 0.05f,
                     SunGlowSize = 1.2f,
                     SceneGamma = 0.72f,
-                    StarBrightness = 0.02f
+                    StarBrightness = 0.02f,
+                    SunMoonPosition = lightShareDefaults.sunMoonPosition,
+                    EastAngle = lightShareDefaults.eastAngle,
+                    MaxAltitude = lightShareDefaults.maxAltitude
                 };
             }
 
@@ -1733,7 +1747,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                     SunGlowFocus = 0.1f,
                     SunGlowSize = 1.6f,
                     SceneGamma = 0.86f,
-                    StarBrightness = 0.02f
+                    StarBrightness = 0.02f,
+                    SunMoonPosition = lightShareDefaults.sunMoonPosition,
+                    EastAngle = lightShareDefaults.eastAngle,
+                    MaxAltitude = lightShareDefaults.maxAltitude
                 };
             }
 
@@ -1757,7 +1774,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 SunGlowFocus = 0.08f,
                 SunGlowSize = 1.4f,
                 SceneGamma = 0.78f,
-                StarBrightness = 0.03f
+                StarBrightness = 0.03f,
+                SunMoonPosition = lightShareDefaults.sunMoonPosition,
+                EastAngle = lightShareDefaults.eastAngle,
+                MaxAltitude = lightShareDefaults.maxAltitude
             };
         }
 
@@ -2318,6 +2338,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             environment.sunGlowSize = profile.SunGlowSize;
             environment.sceneGamma = profile.SceneGamma;
             environment.starBrightness = profile.StarBrightness;
+            environment.sunMoonPosition = profile.SunMoonPosition;
+            environment.eastAngle = profile.EastAngle;
+            environment.maxAltitude = profile.MaxAltitude;
             environment.drawClassicClouds = profile.DrawClassicClouds;
             environment.cloudScrollXLock = profile.CloudScrollXLock;
             environment.cloudScrollYLock = profile.CloudScrollYLock;
@@ -2633,7 +2656,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 client,
                 string.Format(
                     CultureInfo.InvariantCulture,
-                    "Weather: {0}, emitters={1}, coverage={2}, exclusions={3}, surface patches={4}, wetness={5:0.00}, snow={6:0.00}, temperature={7:0.0}C, auto={8}.",
+                    "{0}, emitters={1}, coverage={2}, exclusions={3}, surface patches={4}, wetness={5:0.00}, snow={6:0.00}, temperature={7:0.0}C, auto={8}.",
                     WeatherName(weather),
                     emitterCount,
                     m_coverageMode == CoverageMode.ActiveArea ? "active-area" : "region",

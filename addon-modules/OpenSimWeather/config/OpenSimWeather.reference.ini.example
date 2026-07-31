@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.3 complete configuration reference
+;; OpenSimWeather 0.3.4 complete configuration reference
 ;;
 ;; Put these sections in OpenSim.ini, or in a file explicitly included by
 ;; OpenSim.ini. Do not place them in Regions.ini.
@@ -210,8 +210,10 @@
 ;; ENVIRONMENT PROFILES
 ;; ---------------------------------------------------------------------------
 ;; These values are fallbacks and are fully configurable. The module copies the
-;; current region LightShare state, changes only the listed sky/cloud fields,
-;; and preserves the current water fields. Clear restores the saved region
+;; current region LightShare state, applies the listed sky/cloud and sun-position
+;; fields, and preserves the current water fields. SunMoonPosition and EastAngle
+;; are LightShare fractions of a full circle from 0.0 through 1.0. MaxAltitude
+;; is the LightShare atmosphere altitude. Clear restores the saved region
 ;; environment when RestoreCloudsOnClear=true.
 
 [Weather.Environment.Sunny]
@@ -226,6 +228,9 @@
     BlueDensity = 0.16,0.32,0.68,1.0
     Ambient = 0.48,0.48,0.42,1.0
     SunMoonColor = 1.0,0.88,0.52,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.10
     HazeDensity = 0.18
     DensityMultiplier = 0.08
@@ -250,6 +255,9 @@
     BlueDensity = 0.07,0.09,0.13,1.0
     Ambient = 0.14,0.15,0.17,1.0
     SunMoonColor = 0.20,0.21,0.24,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.40
     HazeDensity = 0.82
     DensityMultiplier = 0.28
@@ -274,6 +282,9 @@
     BlueDensity = 0.04,0.055,0.08,1.0
     Ambient = 0.08,0.085,0.095,1.0
     SunMoonColor = 0.12,0.13,0.15,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.45
     HazeDensity = 0.92
     DensityMultiplier = 0.32
@@ -298,6 +309,9 @@
     BlueDensity = 0.13,0.15,0.20,1.0
     Ambient = 0.22,0.23,0.25,1.0
     SunMoonColor = 0.30,0.31,0.34,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.36
     HazeDensity = 0.72
     DensityMultiplier = 0.24

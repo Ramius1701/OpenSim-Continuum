@@ -1,8 +1,10 @@
-;; OpenSimWeather 0.3.3 environment/wind example
+;; OpenSimWeather 0.3.4 environment/wind example
 ;;
 ;; OpenSim persists region environment changes. Export or record the current
 ;; region environment before enabling this example. All four configurable
 ;; weather profiles are included below and may be edited per weather type.
+;; SunMoonPosition and EastAngle are LightShare fractions of a full circle
+;; from 0.0 through 1.0. MaxAltitude is the LightShare atmosphere altitude.
 
 [Weather]
     Enabled = false
@@ -52,6 +54,9 @@
     BlueDensity = 0.16,0.32,0.68,1.0
     Ambient = 0.48,0.48,0.42,1.0
     SunMoonColor = 1.0,0.88,0.52,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.10
     HazeDensity = 0.18
     DensityMultiplier = 0.08
@@ -76,6 +81,9 @@
     BlueDensity = 0.07,0.09,0.13,1.0
     Ambient = 0.14,0.15,0.17,1.0
     SunMoonColor = 0.20,0.21,0.24,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.40
     HazeDensity = 0.82
     DensityMultiplier = 0.28
@@ -100,6 +108,9 @@
     BlueDensity = 0.04,0.055,0.08,1.0
     Ambient = 0.08,0.085,0.095,1.0
     SunMoonColor = 0.12,0.13,0.15,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.45
     HazeDensity = 0.92
     DensityMultiplier = 0.32
@@ -124,6 +135,9 @@
     BlueDensity = 0.13,0.15,0.20,1.0
     Ambient = 0.22,0.23,0.25,1.0
     SunMoonColor = 0.30,0.31,0.34,1.0
+    SunMoonPosition = 0.317
+    EastAngle = 0.0
+    MaxAltitude = 1605
     HazeHorizon = 0.36
     HazeDensity = 0.72
     DensityMultiplier = 0.24

@@ -1,4 +1,4 @@
-OpenSimWeather 0.3.3 validation
+OpenSimWeather 0.3.4 validation
 Date: 2026-07-19
 
 PASS - C# source parsed with tree-sitter C# grammar; no ERROR or missing nodes.
@@ -11,10 +11,10 @@ PASS - config/OpenSimWeather.reference.ini.example parsed and contains the compl
 PASS - config/OpenSimWeather.manual.ini.example parsed and contains [Weather].
 PASS - config/OpenSimWeather.surface.ini.example parsed and contains [Weather].
 PASS - Complete reference contains all 76 canonical [Weather] keys; AdjustClouds is retained only as an undocumented legacy alias.
-PASS - Weather.Environment.Sunny contains all 22 environment fields changed by source.
-PASS - Weather.Environment.Rain contains all 22 environment fields changed by source.
-PASS - Weather.Environment.Storm contains all 22 environment fields changed by source.
-PASS - Weather.Environment.Snow contains all 22 environment fields changed by source.
+PASS - Weather.Environment.Sunny contains all 25 environment fields changed by source.
+PASS - Weather.Environment.Rain contains all 25 environment fields changed by source.
+PASS - Weather.Environment.Storm contains all 25 environment fields changed by source.
+PASS - Weather.Environment.Snow contains all 25 environment fields changed by source.
 PASS - No developer-specific absolute source/build paths remain.
 PASS - No private/generated IDE or binary build artifacts are included.
 PASS - Var-region-aware spacing and global emitter ceiling are present.
@@ -76,3 +76,12 @@ PASS - unused OpenMetaverse.StructuredData prebuild reference is removed.
 - Confirm OpenSimWeather.ini.example contains only common settings.
 - Confirm OpenSimWeather.reference.ini.example contains every supported
   [Weather] setting and all four complete environment profiles.
+
+0.3.4 chat/environment checks
+-----------------------------
+- Confirm `/89 weather sunny` replies as `Weather: sunny started.` with only the
+  sender-provided Weather label.
+- Confirm a dark pre-weather region becomes visibly bright when Sunny is selected.
+- Confirm each profile accepts SunMoonPosition, EastAngle, and MaxAltitude.
+- Confirm omission of any new key uses the built-in LightShare default.
+- Confirm `weather clear` restores the exact pre-weather region environment.
