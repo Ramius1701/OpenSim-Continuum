@@ -133,6 +133,7 @@ The integration draws on work from:
 - Mobius-Team/Mobius
 - OpenSim-NGC/OpenSim-Tranquillity
 - WhiteCoreSim/WhiteCore-Dev as a first-class behavioural and viewer-protocol reference; its divergent architecture still rules out wholesale source-tree ports
+- WhiteCore directory/search behaviour as the completeness reference for hardening OpenSimSearch across people, places, land, events, classifieds, map results, privacy, paging, and grid-scale indexing
 - Previous OpenSim Continuum and opensim-enhanced branches
 - Original repositories for Gloebit, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, OpenSimWeather, and recovered addons
 

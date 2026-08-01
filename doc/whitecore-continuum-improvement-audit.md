@@ -272,6 +272,89 @@ The goals are:
   and cache expiry.
 - **Recommendation:** P1 contract audit; avoid a second identity database.
 
+### 10. Grid search and directory completeness
+
+- **Classification:** optional addon module improvements, with narrow core
+  compatibility fixes only where the viewer protocol requires them.
+- **Behaviour:** provide an SL-like grid directory covering people, places,
+  land sales, popular places, events and classifieds, plus event/classified
+  details and compatible map-item results. Results must page predictably,
+  respect maturity and publication/privacy settings, use correct landing
+  points, and remain current when regions or parcels change.
+- **WhiteCore evidence:**
+  `WhiteCore/Modules/Avatar/Search/SearchModule.cs` implements the complete
+  legacy viewer directory request family and map-item bridge. Its
+  `LocalDirectoryServiceConnector` maintains grid-side `search_parcel`,
+  `event_information`, `event_notifications`, and `user_classifieds` data,
+  including parcel landing point/look-at data and scope filtering. The reviewed
+  donor remains snapshot `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`.
+- **Current Continuum equivalent:** the optional
+  `addon-modules/OpenSimSearch` module implements places, popular places, land,
+  events, classifieds, event/classified details and map items through the
+  established OpenSimSearch XML-RPC service. Core Dev supplies avatar-picker
+  people search and the basic/map search modules. Display-name matching has
+  already been added to the current user-account search path.
+- **Genuinely missing or unproven:** a single production test matrix across all
+  search categories; reliable incremental parcel removal/update after region
+  changes; event notification behaviour; maturity/category/price/area filters;
+  stable paging and deterministic ordering; privacy/`AllowPublish` handling;
+  display-name presentation without losing the legacy username; variable-size
+  region coordinates; stale-region cleanup; query limits and abuse resistance;
+  Hypergrid identity collision handling; and indexed MySQL query plans at grid
+  scale.
+- **WhiteCore lessons worth adopting:** preserve the entire viewer request
+  family as one compatibility contract; keep grid-search data in a service-side
+  index rather than scanning live regions; store parcel landing and look-at
+  coordinates; apply scope and publication filters; return empty valid replies
+  for zero results; and split legacy UDP replies into viewer-safe batches.
+- **WhiteCore code not suitable to port:** people search performs per-result
+  profile, group and online-status calls and is explicitly marked for
+  optimization; this creates an N+1 service-call path. Its generic connector,
+  reflection/remoting framework and database abstraction do not fit current
+  OpenSim Dev. Search strings and legacy XML-RPC inputs also require stricter
+  validation, limits and escaping than the donor demonstrates.
+- **Affected components:** OpenSimSearch region module and web service/database,
+  user-account and profile services, grid/region/parcel publication, map-item
+  responses, Display Names, event/classified profile data, and viewer UDP/CAPS
+  search entry points.
+- **Addon/core decision:** retain OpenSimSearch as the grid-wide optional addon.
+  Do not create a WhiteCore directory service inside core. Core changes are
+  acceptable only for protocol correctness, identity consistency, or a clean
+  service interface that also benefits other directory providers.
+- **Robust compatibility:** search must run as a separately authenticated
+  grid-wide service with region publication credentials and bounded read APIs.
+  It must not require direct region-database access from Robust.
+- **MySQL compatibility:** certify schema migrations, UTF-8/Unicode matching,
+  indexes for text/category/maturity/scope/price/area/time queries, deterministic
+  paging, stale-row cleanup, and query plans with production-sized fixtures.
+- **Windows compatibility:** certify the service and module under the supported
+  .NET Windows build, including URL/config parsing, time zones for events, and
+  no case-sensitive path assumptions.
+- **Hypergrid implications:** local results must carry unambiguous UUID/UUI and
+  home-grid identity. Remote visitors must not overwrite or collide with local
+  people records, and private online/location data must not cross grid trust
+  boundaries. Foreign parcel/event indexing is out of scope until an explicit
+  federation policy exists.
+- **Viewer requirements:** test Firestorm and another current OpenSim-capable
+  viewer using legacy directory panels, web-search entry points where enabled,
+  map event/land markers, profiles and avatar picker. Display names supplement
+  rather than replace the stable legacy account name.
+- **Licensing/provenance:** WhiteCore is behavioural and protocol evidence under
+  its BSD-style contributor notice. Any adapted logic requires file-level
+  provenance and notice review. Prefer independently implemented changes in the
+  existing OpenSimSearch codebase.
+- **Required tests:** people by legacy and display name; duplicate display names;
+  places by text/category/maturity; land by sale type/price/area; popular ranking;
+  upcoming/in-progress events and event details/notifications; classifieds and
+  details; paging beyond one packet; zero/large result sets; Unicode and hostile
+  input; parcel add/update/delete and region offline/re-register; permissions;
+  MySQL restart/migration; multi-region concurrency; Hypergrid visitors; and
+  sustained latency/load tests.
+- **Recommendation:** P1 production hardening after the Experience management
+  checkpoint. First add black-box compatibility tests around the current
+  OpenSimSearch service, then fix demonstrated gaps. Do not replace it wholesale
+  with WhiteCore search.
+
 ## Lower-priority and rejected direct ports
 
 | Candidate | WhiteCore behaviour | Continuum decision |
