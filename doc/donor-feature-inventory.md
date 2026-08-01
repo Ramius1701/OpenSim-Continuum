@@ -35,6 +35,19 @@ The earlier official baseline build passed with four known CS9193 warnings. This
 - Gunthar commit identities and history in this checkpoint were verified directly from a temporary clone of `https://github.com/GuntharDeNiro/opensim.git` (`origin/master` observed at `6c7021cc36fd6890db27200cd65fd4bb37bd60fd`).
 - A candidate is not eligible to port until its original upstream license and complete provenance chain are confirmed. OpenSim-derived code is generally BSD-3-Clause, but bundled assets and third-party addons must be checked individually.
 
+## Production integration order
+
+The official baseline already builds successfully. Production work should keep each candidate isolated, tested, and independently reversible rather than combining unrelated donor histories.
+
+| Lane | Items | Integration decision |
+|---|---|---|
+| Focused correctness | Provisional YEngine orphaned-event recovery | Implement first with a regression test because it is narrow and has no schema impact. |
+| Service enhancements | Mutable Display Names, user aliases, Experiences | Implement on separate branches in dependency/risk order; each requires schema, connector, CAPS, Robust, MySQL, and HG verification. |
+| Optional modules | RegionWeb and recovered addons | Integrate one module per branch with disabled-by-default configuration and failure isolation. |
+| Experimental behaviour | Warp3D sprite renderer, ubODE tuning | Keep out of production until deterministic visual/physics and performance tests pass. |
+
+The preserved runtime-stabilization branch remains available for issue-by-issue review, but its existence is not evidence that unrelated changes should ship together.
+
 ## Prioritized inventory
 
 Priority reflects expected value and auditability, not authorization to implement.
@@ -44,9 +57,9 @@ Priority reflects expected value and auditability, not authorization to implemen
 | P0 | YEngine orphaned resumed-event guard | upstream-quality bug fix (provisional) | Gunthar `af16af08b66c049d81faef423950b5c98f34eb9` | The throwing path is present; construct a focused state-corruption/restart test before selecting recovery semantics. |
 | Closed | Estate connector must not terminate host process | already present in OpenSim Dev | Tranquillity `d978ab12b4c0c05a9ff2016bdce7ed569e7e13f8`; Dev equivalent `a9be42a304d9113c889a59ef2041bdccfc37c6f3` | No port. Current Dev already returns null without terminating the process. |
 | P2 | Warp3D alpha texture-card sprites | experimental feature | Gunthar initial subsystem `50ff704e14f2114ff2b5613be4aa1252fbad6694`, later black-card fix `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7` | Audit the complete 400-line sprite subsystem as an optional renderer enhancement; the later fix cannot stand alone. |
-| P1 | Display Names | Robust service extension | Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619` plus MySQL case fix `45232b2f318e6f225675047fc92edfd20f54b51a` | Design as an opt-in service/caps slice; do not transplant wholesale. |
-| P1 | User aliases and OAR identity resolution | Robust service extension | Tranquillity `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, negative cache `39aaed76b74c640db62f73ca1f46d42bd299d15b`, config example `d3aac7d244456d74374bbb8446f8188be45ebe96` | Audit API and threat model together with Display Names. |
-| P1 | Experiences | Robust service extension | Tranquillity `26d3971448107725ad30d0abf769175ccb7f2467`; restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83` | Split protocol/service/data/script work into milestones; high test burden. |
+| P1 | Mutable Display Names | Robust service extension | Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619` plus MySQL case fix `45232b2f318e6f225675047fc92edfd20f54b51a` | Dev already serves default names; implement mutable-name persistence as a dedicated production branch. |
+| P2 | User aliases and OAR identity resolution | Robust service extension | Tranquillity feature merge `0fa0abcbc7ef081117c40cb82da01d3f5203199e`; later OAR/cache fixes `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, `39aaed76b74c640db62f73ca1f46d42bd299d15b` | Audit and implement the 25-file service as a standalone identity project. |
+| P2 | Experiences | Robust service extension | Tranquillity `26d3971448107725ad30d0abf769175ccb7f2467`; restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83` | Stage the 62-file feature through architecture and protocol milestones. |
 | P1 | Hypergrid stale identity URL/IP repair | narrow core compatibility patch | Gunthar `b72694a29bf2aa7d119cfa4a7900b83b113a18af` (related stored URL repair `4c0d5e1e586ee33a919cece719a6d4562d8d1b4e`) | Reproduce against current HG before considering a minimal patch. |
 | P1 | RegionWeb | optional addon module | Gunthar, represented by protected admin increment `b05cd2bb4bc0d325aa1a7c6771d8a933ec6d1405` | Keep optional and region-scoped; perform security review before packaging. |
 | P2 | Recovered operational addons | optional addon module | Continuum build-clean checkpoints listed below | Keep out of core; audit each against its original repository and current APIs. |
@@ -95,44 +108,44 @@ Priority reflects expected value and auditability, not authorization to implemen
 - **Tests required:** golden images for opaque, blended, masked, and fully transparent texture cards; comparison with baseline volume output; sprite/texture decode budgets; missing assets; Linux/Windows parity; memory and map-generation timing.
 - **Recommendation:** downgrade to P2 experimental. Audit the entire sprite subsystem and its performance/security limits; do not describe or port `c2c30d...` as a standalone upstream bug fix.
 
-### 4. Display Names
+### 4. Mutable Display Names
 
-- **Feature and intended behaviour:** store and serve viewer-visible names independently of immutable account names through caps, account services, and grid service connectors.
+- **Feature and intended behaviour:** let residents change viewer-visible names independently of immutable account names, persist the value, enforce a change interval, and distribute updates through CAPS and grid services.
 - **Donor and commit:** Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619`; MySQL migration case correction `45232b2f318e6f225675047fc92edfd20f54b51a`.
-- **Current Dev equivalent / missing behaviour:** Dev has avatar search/user management but lacks `DisplayNameModule.cs` and a display-name service/data slice. Historical Mobius code has analogous handlers but is not preferred provenance.
+- **Current Dev equivalent / missing behaviour:** Dev already registers `GetDisplayNames`, returns default legacy names, and exposes display-name-shaped fields through avatar search. What is genuinely missing is mutable `SetDisplayName`, persisted `DisplayName`/`NameChanged` account fields, and propagation of non-default names. Historical Mobius code has analogous handlers but is not preferred provenance.
 - **Affected files and services:** UserAccount data/service/connectors, CAPS, avatar picker/search, user-management and HG account cache; MySQL migration and configuration.
 - **Addon versus core:** opt-in Robust service extension with narrowly required core interfaces/caps wiring.
-- **Compatibility:** needs standalone and Robust modes; MySQL migration/rollback and mixed-case table tests; Windows-neutral managed code; HG trust, caching, spoofing, and fallback-name rules are central.
+- **Compatibility:** needs standalone and Robust modes; MySQL migration/rollback and mixed-case table tests; Windows-neutral managed code; HG trust, caching, spoofing, and fallback-name rules are central. The feature commit's migration incorrectly names `useraccounts` and requires follow-up `45232b2...` to use `UserAccounts`, demonstrating that the feature commit is not safe alone on case-sensitive MySQL deployments.
 - **Viewer requirements:** viewers supporting standard Display Names caps; legacy viewers must retain account-name fallback.
 - **Licensing/provenance:** traceable Tranquillity BSD-derived commits; compare Mobius only as historical prior art.
 - **Tests required:** CAPS conformance, cache expiry, rate limits, Unicode/normalization, MySQL upgrade, search, HG foreign-user fallback, old viewer regression.
-- **Recommendation:** P1 design spike and protocol tests before code selection.
+- **Recommendation:** P1 production enhancement on a dedicated branch. Treat the approximately 495-added-line/17-file donor change as a design source, not a blind cherry-pick candidate.
 
 ### 5. User alias service and OAR identity resolution
 
 - **Feature and intended behaviour:** map stable identities through configured aliases, optionally resolving OAR creators/owners without silently substituting a default user; negative caching prevents connector hammering.
-- **Donor and commit:** Tranquillity `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, `39aaed76b74c640db62f73ca1f46d42bd299d15b`, and config example `d3aac7d244456d74374bbb8446f8188be45ebe96`.
+- **Donor and commit:** Tranquillity feature merge `0fa0abcbc7ef081117c40cb82da01d3f5203199e`; later OAR behaviour `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, negative caching `39aaed76b74c640db62f73ca1f46d42bd299d15b`, and config example `d3aac7d244456d74374bbb8446f8188be45ebe96`.
 - **Current Dev equivalent / missing behaviour:** Dev has OAR identity/default-user handling but no identified alias service.
-- **Affected files and services:** archive read/import, user-account lookup/cache, connector configuration, and likely Robust endpoints after full history tracing.
+- **Affected files and services:** the feature merge changes 25 files with about 1,534 additions: MySQL data/migration, local and remote region connectors, Robust handlers/connectors, service interfaces and implementation, scene/application wiring, remote admin, archive import, configuration/build metadata, and tests.
 - **Addon versus core:** Robust service extension plus narrow archive compatibility hooks.
 - **Compatibility:** define standalone/Robust behaviour; MySQL schema depends on final design; Windows-neutral; HG aliases must never permit foreign identity impersonation.
 - **Viewer requirements:** none directly.
 - **Licensing/provenance:** trace all commits behind the alias connector, not only the config commit; BSD compatibility must be confirmed.
 - **Tests required:** OAR import matrices, missing/duplicate alias, cache expiry, SSRF/authentication review, MySQL persistence, HG foreign/local collision cases.
-- **Recommendation:** P1, audit jointly with Display Names but keep identity semantics distinct.
+- **Recommendation:** P2 standalone identity project. Audit jointly with Display Names at the trust boundary, but keep semantics and persistence distinct; do not use the later four-file OAR commit as if it contained the service itself.
 
 ### 6. Experiences
 
 - **Feature and intended behaviour:** implement viewer Experience capabilities, permissions, estate/land integration, persistence, and LSL experience APIs.
 - **Donor and commit:** Tranquillity feature integration `26d3971448107725ad30d0abf769175ccb7f2467`; persisted-state restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83`; typo cleanup `d707ed64e056c77bbf5ae110c45bedf3098d5eb8`.
 - **Current Dev equivalent / missing behaviour:** Dev exposes some experience-related constants/stubs but lacks the donor's `ExperienceService`, connectors, data implementation, CAPS module, and complete runtime behaviour.
-- **Affected files and services:** broad cross-cut across MySQL, estate/region stores, CAPS/event queue, scene/attachments/inventory, YEngine, LSL APIs, Robust handlers/connectors, configuration, and tests.
+- **Affected files and services:** 62 files, roughly 6,543 additions and 53 deletions: MySQL, estate/region stores, CAPS/event queue, scene/attachments/inventory, YEngine, LSL APIs, Robust handlers/connectors, configuration, and tests. The largest slices are LSL API integration (about 1,678 changed lines) and the new CAPS module (about 1,337 lines).
 - **Addon versus core:** Robust service extension requiring core protocol, persistence, simulator, and script changes; cannot be a drop-in addon alone.
 - **Compatibility:** standalone and Robust deployment are mandatory; MySQL migrations need upgrade/rollback validation; Windows-neutral; HG permission ownership and foreign experience IDs require an explicit policy.
 - **Viewer requirements:** an Experience-capable viewer; non-supporting viewers and scripts must degrade safely.
 - **Licensing/provenance:** traceable Tranquillity/OpenSim lineage, but review every new file and contribution in the feature merge.
 - **Tests required:** service/API contracts, permission lifecycle, parcel/estate controls, script restart, KV storage, attachments, MySQL concurrency/migration, Robust outage, HG boundaries, viewer interoperability.
-- **Recommendation:** P1 but highest complexity; stage only after an architecture decision record.
+- **Recommendation:** P2 and highest complexity. Stage only after an architecture decision record, with independently testable service, CAPS, persistence, and scripting milestones.
 
 ### 7. Hypergrid stale identity repair
 
