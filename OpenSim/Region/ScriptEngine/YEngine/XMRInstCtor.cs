@@ -552,8 +552,8 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             //    m_StackLeft = int.Parse(stkN.InnerText);
 
             XmlElement experienceKey = (XmlElement)scriptStateN.SelectSingleNode("ExperienceKey");
-            if (experienceKey is not null)
-                UUID.TryParse(experienceKey.InnerText, out m_Item.ExperienceID);
+            if (experienceKey is not null && UUID.TryParse(experienceKey.InnerText, out UUID experienceID))
+                m_Item.ExperienceID = experienceID;
 
             XmlElement permissionsN = (XmlElement)scriptStateN.SelectSingleNode("Permissions");
             m_Item.PermsGranter = new UUID(permissionsN.GetAttribute("granter"));

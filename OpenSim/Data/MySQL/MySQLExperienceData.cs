@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Data;
-using MySqlConnector;
+using MySql.Data.MySqlClient;
 using OpenSim.Framework;
 using System.Collections.Generic;
 using OpenMetaverse;
