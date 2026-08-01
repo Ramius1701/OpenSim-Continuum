@@ -68,6 +68,9 @@ The importer must run while the legacy MoneyServer is stopped. Transaction
 history is archived in `continuum_economy_legacy_transactions`; it is not replayed
 into the new ledger and therefore cannot change imported balances. A completed
 manifest records source account count, total balance and history-row count.
+The offline tool accepts database credentials only through an environment
+variable, provides a read-only `analyze` mode, and requires explicit stopped
+service, completed snapshot and destructive-import confirmation flags.
 
 ## Donor boundary
 

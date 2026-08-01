@@ -34,5 +34,22 @@ legacy `balances` and `transactions` tables. `Import()` requires an empty target
 rejects invalid UUIDs and negative balances, copies balances in one repeatable
 read transaction, archives transaction history separately, reconciles every
 balance, and commits an import manifest. Stop MoneyServer and snapshot the
-database before running an eventual migration tool; no command-line migration
-tool is published yet.
+database before running the command-line migration tool; it must never be used
+against a live service.
+
+## Offline migration tool
+
+`ContinuumEconomy.Migrate analyze` is read-only. It reports legacy account and
+history counts, the total balance, invalid accounts and whether the new ledger
+is empty. The connection string is accepted only through the
+`CONTINUUM_ECONOMY_CONNECTION_STRING` environment variable so credentials do
+not appear in the process command line.
+
+The `import` operation additionally requires all of these literal flags:
+
+- `--moneyserver-stopped`
+- `--database-snapshot-complete`
+- `--confirm=IMPORT-LEGACY-MONEYSERVER`
+
+They do not replace operational verification. The importer independently
+rejects invalid legacy accounts and any non-empty target ledger.

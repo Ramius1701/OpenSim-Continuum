@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<Project name="ContinuumEconomy.Migrate" path="addon-modules/ContinuumEconomy/ContinuumEconomy.Migrate" type="Exe" version="0.1.0-$Rev$" frameworkVersion="net8_0">
+  <Configuration name="Debug">
+    <Options><OutputPath>../../../bin/</OutputPath></Options>
+  </Configuration>
+  <Configuration name="Release">
+    <Options><OutputPath>../../../bin/</OutputPath></Options>
+  </Configuration>
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="OpenSim.Continuum.Economy" localCopy="false" />
+  <Files>
+    <Match pattern="*.cs" recurse="false" />
+    <Exclude name="obj/**" />
+    <Exclude name="bin/**" />
+  </Files>
+</Project>
