@@ -89,3 +89,8 @@ remains selected unless both MoneyServer `ContinuumEconomyEnabled` and region
 authorized purchases that have not been captured or cancelled. It defaults to
 holds older than 15 minutes, accepts `--older-than-minutes=N`, caps output at
 500 rows and never resolves a hold automatically.
+
+Manual `capture-hold` and `cancel-hold` commands require the exact purchase and
+buyer UUIDs, a delivery-success or delivery-failure evidence assertion, and a
+different literal confirmation for each outcome. Buyer binding is checked
+again inside the locked database operation.

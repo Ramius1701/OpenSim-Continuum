@@ -12,6 +12,7 @@ namespace ContinuumEconomy.Migrate
         private static int Main(string[] args)
         {
             if (args.Length == 0 || (args[0] != "analyze" && args[0] != "holds" &&
+                args[0] != "capture-hold" && args[0] != "cancel-hold" &&
                 args[0] != "initialize" && args[0] != "import"))
             {
                 Usage();
@@ -50,6 +51,34 @@ namespace ContinuumEconomy.Migrate
                     if (pending.Count == 500)
                         Console.Error.WriteLine("Result limit reached; investigate before assuming this is the complete set.");
                     return 0;
+                }
+
+                if (args[0] == "capture-hold" || args[0] == "cancel-hold")
+                {
+                    bool capture = args[0] == "capture-hold";
+                    string purchaseText = ArgumentValue(args, "--purchase=");
+                    string buyerText = ArgumentValue(args, "--buyer=");
+                    string evidenceFlag = capture ? "--delivery-verified" : "--delivery-failed-verified";
+                    string confirmation = capture
+                        ? "--confirm=CAPTURE-AUTHORIZED-PURCHASE"
+                        : "--confirm=CANCEL-AUTHORIZED-PURCHASE";
+                    if (!Guid.TryParse(purchaseText, out Guid purchaseID) || purchaseID == Guid.Empty ||
+                        !Guid.TryParse(buyerText, out Guid buyerID) || buyerID == Guid.Empty ||
+                        Array.IndexOf(args, evidenceFlag) < 0 || Array.IndexOf(args, confirmation) < 0)
+                    {
+                        Console.Error.WriteLine("Hold resolution refused: exact IDs, evidence assertion and literal confirmation are required.");
+                        Usage();
+                        return 2;
+                    }
+                    MySqlEconomyPurchaseService purchases = new(connectionString);
+                    LedgerPurchaseResult result = capture
+                        ? purchases.Capture(purchaseID, buyerID)
+                        : purchases.Cancel(purchaseID, buyerID);
+                    Console.WriteLine("Purchase: {0}", result.PurchaseID);
+                    Console.WriteLine("State:    {0}", result.State);
+                    Console.WriteLine("Result:   {0}", result.Code);
+                    Console.WriteLine("Message:  {0}", result.Message);
+                    return result.Succeeded ? 0 : 3;
                 }
 
                 if (args[0] == "initialize")
@@ -117,8 +146,18 @@ namespace ContinuumEconomy.Migrate
             Console.Error.WriteLine("Usage:");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate analyze");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate holds [--older-than-minutes=15]");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate capture-hold --purchase=UUID --buyer=UUID --delivery-verified --confirm=CAPTURE-AUTHORIZED-PURCHASE");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate cancel-hold --purchase=UUID --buyer=UUID --delivery-failed-verified --confirm=CANCEL-AUTHORIZED-PURCHASE");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate initialize {0}", SchemaConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
+        }
+
+        private static string ArgumentValue(string[] args, string prefix)
+        {
+            foreach (string argument in args)
+                if (argument.StartsWith(prefix, StringComparison.Ordinal))
+                    return argument.Substring(prefix.Length);
+            return String.Empty;
         }
     }
 }
