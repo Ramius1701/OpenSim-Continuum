@@ -2,7 +2,7 @@
 
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The project is in integration testing: the complete solution builds, but individual features still require the runtime, viewer, database, Hypergrid, security, and performance tests described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md).
+The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The project is a production-test candidate: the complete solution builds, but promotion requires the runtime, viewer, database, Hypergrid, security, and performance tests described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy production-test runbook](doc/continuum-economy-production-test.md).
 
 ## Project status
 
@@ -156,6 +156,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [Abuse Reports](doc/AbuseReports.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)
 - [ContinuumEconomy compatibility contract](doc/continuum-economy-compatibility-contract.md)
+- [ContinuumEconomy production-test runbook](doc/continuum-economy-production-test.md)
 - [ContinuumEconomy development package](addon-modules/ContinuumEconomy/README.md)
 - [OpenSimWeather documentation](addon-modules/OpenSimWeather/README.md)
 - [OpenSimTide documentation](addon-modules/OpenSimTide/README.md)

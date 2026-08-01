@@ -29,6 +29,42 @@ namespace OpenSim.Continuum.Economy
             command.ExecuteNonQuery();
         }
 
+        public void ValidateSchema()
+        {
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND (
+                    (table_name = 'continuum_economy_accounts' AND column_name IN ('account_id','balance','account_type')) OR
+                    (table_name = 'continuum_economy_transactions' AND column_name IN ('transaction_id','request_hash','sender_id','receiver_id','amount','status')) OR
+                    (table_name = 'continuum_economy_operations' AND column_name IN ('operation_id','request_hash','operation_kind')) OR
+                    (table_name = 'continuum_economy_adjustments' AND column_name IN ('operation_id','account_id','actor_id','amount','status')) OR
+                    (table_name = 'continuum_economy_purchases' AND column_name IN ('purchase_id','request_hash','buyer_id','seller_id','amount','state')) OR
+                    (table_name = 'continuum_economy_account_registrations' AND column_name IN ('operation_id','account_id','actor_id','account_type'))
+                )";
+            int found = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+            const int required = 27;
+            if (found != required)
+                throw new InvalidOperationException(String.Format(CultureInfo.InvariantCulture,
+                    "ContinuumEconomy schema validation failed: found {0} of {1} required columns. Run the guarded initialize command before enabling the service.",
+                    found, required));
+
+            command.CommandText = @"SELECT ENGINE FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN
+                ('continuum_economy_accounts','continuum_economy_transactions','continuum_economy_operations',
+                 'continuum_economy_adjustments','continuum_economy_purchases','continuum_economy_account_registrations')";
+            using MySqlDataReader reader = command.ExecuteReader();
+            int tables = 0;
+            while (reader.Read())
+            {
+                tables++;
+                if (!String.Equals(reader.GetString(0), "InnoDB", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("All ContinuumEconomy tables must use InnoDB for atomic transactions");
+            }
+            if (tables < 6)
+                throw new InvalidOperationException("ContinuumEconomy schema validation failed: one or more required tables are missing");
+        }
+
         public long GetBalance(Guid accountID)
         {
             if (accountID == Guid.Empty)

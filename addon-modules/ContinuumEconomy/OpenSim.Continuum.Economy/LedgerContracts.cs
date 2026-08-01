@@ -160,6 +160,7 @@ namespace OpenSim.Continuum.Economy
     public interface IEconomyLedger
     {
         void EnsureSchema();
+        void ValidateSchema();
         void EnsureAccount(Guid accountID);
         bool AccountExists(Guid accountID);
         long GetBalance(Guid accountID);

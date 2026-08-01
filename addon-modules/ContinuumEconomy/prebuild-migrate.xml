@@ -8,6 +8,7 @@
   </Configuration>
   <ReferencePath>../../../bin/</ReferencePath>
   <Reference name="OpenSim.Continuum.Economy" localCopy="false" />
+  <Reference name="MySql.Data" localCopy="false" />
   <Files>
     <Match pattern="*.cs" recurse="false" />
     <Exclude name="obj/**" />

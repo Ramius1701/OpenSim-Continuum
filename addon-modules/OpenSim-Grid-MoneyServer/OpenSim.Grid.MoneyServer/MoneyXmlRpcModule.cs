@@ -217,8 +217,9 @@ namespace OpenSim.Grid.MoneyServer
                 if (!Guid.TryParse(actorText, out m_continuumSystemActor) || m_continuumSystemActor == Guid.Empty)
                     throw new InvalidOperationException("ContinuumEconomyEnabled=true requires a non-zero ContinuumSystemActor UUID");
                 m_continuumLedger = new MySqlEconomyLedger(m_connectionString);
+                m_continuumLedger.ValidateSchema();
                 m_continuumPurchases = new MySqlEconomyPurchaseService(m_connectionString);
-                m_log.Info("[MONEY XMLRPC]: ContinuumEconomy backend enabled. Schema and legacy import must already be complete.");
+                m_log.Info("[MONEY XMLRPC]: ContinuumEconomy backend enabled after successful schema validation.");
             }
 
             // [MoneyServer] Section
@@ -3337,6 +3338,15 @@ namespace OpenSim.Grid.MoneyServer
             UUID transactionUUID = UUID.Zero;
 
             responseData["success"] = false;
+
+            // Continuum transfers commit atomically and cannot be changed after the fact.
+            // Purchase holds have a separate, buyer-bound cancellation workflow. Never
+            // mutate the legacy transaction database while Continuum is authoritative.
+            if (m_continuumEconomyEnabled)
+            {
+                responseData["message"] = "Committed ContinuumEconomy transfers cannot be cancelled; use the evidence-gated purchase hold workflow for an authorized purchase";
+                return response;
+            }
 
             if (requestData.ContainsKey("secureCode")) secureCode = (string)requestData["secureCode"];
             if (requestData.ContainsKey("transactionID"))

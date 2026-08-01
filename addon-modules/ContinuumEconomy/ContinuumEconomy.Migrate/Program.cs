@@ -1,4 +1,6 @@
 using System;
+using System.Threading.Tasks;
+using MySql.Data.MySqlClient;
 using OpenSim.Continuum.Economy;
 
 namespace ContinuumEconomy.Migrate
@@ -8,12 +10,13 @@ namespace ContinuumEconomy.Migrate
         private const string ConnectionVariable = "CONTINUUM_ECONOMY_CONNECTION_STRING";
         private const string ImportConfirmation = "--confirm=IMPORT-LEGACY-MONEYSERVER";
         private const string SchemaConfirmation = "--confirm=CREATE-CONTINUUM-ECONOMY-SCHEMA";
+        private const string TestConfirmation = "--confirm=RUN-ON-DEDICATED-TEST-DATABASE";
 
         private static int Main(string[] args)
         {
             if (args.Length == 0 || (args[0] != "analyze" && args[0] != "holds" &&
                 args[0] != "capture-hold" && args[0] != "cancel-hold" &&
-                args[0] != "register-group" &&
+                args[0] != "register-group" && args[0] != "verify" && args[0] != "self-test" &&
                 args[0] != "initialize" && args[0] != "import"))
             {
                 Usage();
@@ -29,6 +32,16 @@ namespace ContinuumEconomy.Migrate
 
             try
             {
+                if (args[0] == "verify")
+                {
+                    new MySqlEconomyLedger(connectionString).ValidateSchema();
+                    Console.WriteLine("ContinuumEconomy schema and InnoDB readiness validation succeeded.");
+                    return 0;
+                }
+
+                if (args[0] == "self-test")
+                    return SelfTest(connectionString, args);
+
                 if (args[0] == "holds")
                 {
                     int ageMinutes = 15;
@@ -167,12 +180,77 @@ namespace ContinuumEconomy.Migrate
         {
             Console.Error.WriteLine("Usage:");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate analyze");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate verify");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate self-test {0}", TestConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate holds [--older-than-minutes=15]");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate capture-hold --purchase=UUID --buyer=UUID --delivery-verified --confirm=CAPTURE-AUTHORIZED-PURCHASE");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate cancel-hold --purchase=UUID --buyer=UUID --delivery-failed-verified --confirm=CANCEL-AUTHORIZED-PURCHASE");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate register-group --operation=UUID --group=UUID --actor=UUID --name=NAME --confirm=REGISTER-GROUP-ECONOMY-ACCOUNT");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate initialize {0}", SchemaConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
+        }
+
+        private static int SelfTest(string connectionString, string[] args)
+        {
+            MySqlConnectionStringBuilder builder = new(connectionString);
+            if (Array.IndexOf(args, TestConfirmation) < 0 ||
+                String.IsNullOrWhiteSpace(builder.Database) ||
+                builder.Database.IndexOf("test", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                Console.Error.WriteLine("Self-test refused. Use a dedicated database whose name contains 'test' and provide the literal confirmation flag.");
+                return 2;
+            }
+
+            MySqlEconomyLedger ledger = new(connectionString);
+            ledger.ValidateSchema();
+            Guid actor = Guid.NewGuid();
+            Guid buyer = Guid.NewGuid();
+            Guid sellerA = Guid.NewGuid();
+            Guid sellerB = Guid.NewGuid();
+            LedgerAdjustmentResult credit = ledger.Adjust(new LedgerAdjustmentRequest {
+                OperationID=Guid.NewGuid(), AccountID=buyer, ActorID=actor, Amount=100,
+                Kind=LedgerAdjustmentKind.Credit, TransactionType=9000, Reason="Continuum production acceptance self-test",
+                MaximumBalance=1000, DailyCreditLimit=1000, WeeklyCreditLimit=1000, MonthlyCreditLimit=1000 });
+            Require(credit.Code == LedgerResultCode.Committed && ledger.GetBalance(buyer) == 100, "initial audited credit");
+
+            Guid replayID = Guid.NewGuid();
+            LedgerTransferRequest replay = new() { TransactionID=replayID, SenderID=buyer, ReceiverID=sellerA,
+                Amount=10, TransactionType=9001, Description="idempotency self-test" };
+            Require(ledger.Transfer(replay).Code == LedgerResultCode.Committed, "first transfer");
+            Require(ledger.Transfer(replay).Code == LedgerResultCode.Replayed, "idempotent replay");
+            replay.Amount = 11;
+            Require(ledger.Transfer(replay).Code == LedgerResultCode.TransactionConflict, "fingerprint conflict");
+
+            LedgerTransferRequest concurrentA = new() { TransactionID=Guid.NewGuid(), SenderID=buyer, ReceiverID=sellerA,
+                Amount=70, TransactionType=9002, Description="concurrency A" };
+            LedgerTransferRequest concurrentB = new() { TransactionID=Guid.NewGuid(), SenderID=buyer, ReceiverID=sellerB,
+                Amount=70, TransactionType=9002, Description="concurrency B" };
+            Task<LedgerTransferResult> taskA = Task.Run(() => ledger.Transfer(concurrentA));
+            Task<LedgerTransferResult> taskB = Task.Run(() => ledger.Transfer(concurrentB));
+            Task.WaitAll(taskA, taskB);
+            int committed = (taskA.Result.Code == LedgerResultCode.Committed ? 1 : 0) +
+                (taskB.Result.Code == LedgerResultCode.Committed ? 1 : 0);
+            int insufficient = (taskA.Result.Code == LedgerResultCode.InsufficientFunds ? 1 : 0) +
+                (taskB.Result.Code == LedgerResultCode.InsufficientFunds ? 1 : 0);
+            Require(committed == 1 && insufficient == 1 && ledger.GetBalance(buyer) == 20, "concurrent overspend prevention");
+
+            MySqlEconomyPurchaseService purchases = new(connectionString);
+            Guid purchaseID = Guid.NewGuid();
+            LedgerPurchaseResult authorized = purchases.Authorize(new LedgerPurchaseRequest { PurchaseID=purchaseID,
+                BuyerID=buyer, SellerID=sellerB, Amount=15, TransactionType=9003, Description="hold self-test" });
+            Require(authorized.State == LedgerPurchaseState.Authorized && ledger.GetAvailableBalance(buyer) == 5, "purchase hold");
+            Require(purchases.Capture(purchaseID, buyer).State == LedgerPurchaseState.Captured && ledger.GetBalance(buyer) == 5,
+                "purchase capture");
+            Require(ledger.CountHistory(buyer, null, null) >= 3, "account history");
+            Console.WriteLine("ContinuumEconomy MySQL acceptance self-test passed. Test rows use unique UUIDs and were intentionally retained for auditability.");
+            return 0;
+        }
+
+        private static void Require(bool condition, string test)
+        {
+            if (!condition)
+                throw new InvalidOperationException("Self-test failed: " + test);
+            Console.WriteLine("PASS: {0}", test);
         }
 
         private static string ArgumentValue(string[] args, string prefix)

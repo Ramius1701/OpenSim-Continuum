@@ -5,8 +5,8 @@ DTL/NSL-compatible MoneyServer stack. It retains OpenSim's `IMoneyModule`
 extension boundary while adding selected WhiteCore economy behaviour through
 independently implemented Continuum services.
 
-The existing MoneyServer remains the deployable compatibility baseline. This
-package is not selected by any configuration profile yet.
+The existing MoneyServer remains the deployable compatibility boundary. The
+Continuum ledger is selected only by explicit MoneyServer and region switches.
 
 The first assembly provides an atomic MySQL ledger with deterministic account
 locking, unique transaction IDs, request fingerprints, idempotent results,
@@ -26,8 +26,17 @@ Donor lineage:
   file ledger is not used as the grid authority.
 - Continuum: independent transactional implementation and hardening.
 
-Gloebit is excluded. Do not point a production region at this package until the
-legacy importer, authentication, adapters and failure tests are complete.
+Gloebit is excluded. Use a separate production-test deployment and complete
+`doc/continuum-economy-production-test.md` before considering a live cutover.
+
+`ContinuumEconomy.Migrate verify` is a read-only readiness check for all required
+columns and InnoDB tables. MoneyServer runs the same validation and fails startup
+when `ContinuumEconomyEnabled=true` but the schema is incomplete.
+
+`ContinuumEconomy.Migrate self-test --confirm=RUN-ON-DEDICATED-TEST-DATABASE`
+requires a database name containing `test`. It performs real atomic, replay,
+conflict, concurrent overspend, purchase-hold and history tests using unique
+UUIDs. It never deletes rows and must never be pointed at production.
 
 The legacy importer has two explicit operations. `Analyze()` only reads the
 legacy `balances` and `transactions` tables. `Import()` requires an empty target,
