@@ -29,8 +29,9 @@ The earlier official baseline build passed with four known CS9193 warnings. This
 
 - GuntharDeNiro/opensim is the closest active OpenSim-derived donor. RegionWeb is a per-region website module, not a grid portal.
 - WhiteCore WebUI is a separate grid-wide public/administrative interface. WhiteCore is a behavioural reference because its service, data, and module architecture is substantially divergent.
-- Mobius is a historical feature reference; the recovered local archive has no Git metadata, so it cannot itself establish commit-level provenance.
-- Tranquillity is the leading service-level reference for Display Names, aliases, and Experiences.
+- Mobius is the original donor lineage for Display Names, Experiences, and Abuse Reports. The recovered local archive has no Git metadata, so exact Mobius commit provenance still needs recovery before code-level attribution is complete.
+- Tranquillity enhances the Mobius Display Names and Experiences work and is the leading traceable service-level donor for those implementations.
+- Gunthar implements a separate Experience-Lite series. It must be reconciled against the fuller Mobius/Tranquillity service implementation rather than treated as a replacement.
 - Previous Continuum branches and recovered archives are evidence and staging references, not proof that a change belongs in official core. This checkpoint does not use the local Casperia checkout.
 - Gunthar commit identities and history in this checkpoint were verified directly from a temporary clone of `https://github.com/GuntharDeNiro/opensim.git` (`origin/master` observed at `6c7021cc36fd6890db27200cd65fd4bb37bd60fd`).
 - A candidate is not eligible to port until its original upstream license and complete provenance chain are confirmed. OpenSim-derived code is generally BSD-3-Clause, but bundled assets and third-party addons must be checked individually.
@@ -59,14 +60,14 @@ Priority reflects expected value and auditability, not authorization to implemen
 | P2 | Warp3D alpha texture-card sprites | experimental feature | Gunthar initial subsystem `50ff704e14f2114ff2b5613be4aa1252fbad6694`, later black-card fix `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7` | Audit the complete 400-line sprite subsystem as an optional renderer enhancement; the later fix cannot stand alone. |
 | P1 | Mutable Display Names | Robust service extension | Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619` plus MySQL case fix `45232b2f318e6f225675047fc92edfd20f54b51a` | Dev already serves default names; implement mutable-name persistence as a dedicated production branch. |
 | P2 | User aliases and OAR identity resolution | Robust service extension | Tranquillity feature merge `0fa0abcbc7ef081117c40cb82da01d3f5203199e`; later OAR/cache fixes `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, `39aaed76b74c640db62f73ca1f46d42bd299d15b` | Audit and implement the 25-file service as a standalone identity project. |
-| P2 | Experiences | Robust service extension | Tranquillity `26d3971448107725ad30d0abf769175ccb7f2467`; restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83` | Stage the 62-file feature through architecture and protocol milestones. |
+| P2 | Experiences reconciliation | Robust service extension | Mobius origin; Tranquillity `26d3971448107725ad30d0abf769175ccb7f2467`; Gunthar Experience-Lite series `a4fbbbd0b0a733c8a838af9d21d9bb43cbcec7ae` through `4f43137c8beac427ae93557f422d0022079e1ede` | Reconcile full service/CAPS behavior with Gunthar's script-facing additions; do not cherry-pick either implementation wholesale. |
 | P1 | Hypergrid stale identity URL/IP repair | narrow core compatibility patch | Gunthar `b72694a29bf2aa7d119cfa4a7900b83b113a18af` (related stored URL repair `4c0d5e1e586ee33a919cece719a6d4562d8d1b4e`) | Reproduce against current HG before considering a minimal patch. |
 | P1 | RegionWeb | optional addon module | Gunthar, represented by protected admin increment `b05cd2bb4bc0d325aa1a7c6771d8a933ec6d1405` | Keep optional and region-scoped; perform security review before packaging. |
 | P2 | Recovered operational addons | optional addon module | Continuum build-clean checkpoints listed below | Keep out of core; audit each against its original repository and current APIs. |
 | P2 | First-run Windows setup wizard | optional addon module | Gunthar `603aa2c983e2f4d52495947010ad19656d951893`, timing fix `db1509cdc43a97df1244e72999f76e7bf838bebe` | Generalize branding/config assumptions before considering a tools package. |
 | P3 | ubODE social, contact, and water tuning | experimental feature | Gunthar series culminating in `95aec15852ce206b0acc0147a3487c6721f0c83a` | Do not port as a batch; require deterministic physics benchmarks and opt-in settings. |
 | P3 | WhiteCore WebUI | obsolete or unsuitable (as a direct donor) | WhiteCore `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa` snapshot | Use only for behavioural requirements; architecture is not a suitable OpenSim module transplant. |
-| P3 | Mobius Display Names implementation | obsolete or unsuitable (as code provenance) | recovered `mobius-master` archive; commit unknown | Use for historical protocol comparison only; prefer Tranquillity's traceable history. |
+| Provenance | Mobius Display Names implementation | original feature lineage | recovered `mobius-master` archive; commit unknown | Preserve Mobius attribution while using Tranquillity's traceable enhancement history for integration. |
 
 ## Candidate records
 
@@ -111,13 +112,13 @@ Priority reflects expected value and auditability, not authorization to implemen
 ### 4. Mutable Display Names
 
 - **Feature and intended behaviour:** let residents change viewer-visible names independently of immutable account names, persist the value, enforce a change interval, and distribute updates through CAPS and grid services.
-- **Donor and commit:** Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619`; MySQL migration case correction `45232b2f318e6f225675047fc92edfd20f54b51a`.
-- **Current Dev equivalent / missing behaviour:** Dev already registers `GetDisplayNames`, returns default legacy names, and exposes display-name-shaped fields through avatar search. What is genuinely missing is mutable `SetDisplayName`, persisted `DisplayName`/`NameChanged` account fields, and propagation of non-default names. Historical Mobius code has analogous handlers but is not preferred provenance.
+- **Donor and commit:** original feature lineage is Mobius; Tranquillity enhancement/integration `0e0953667cdc71a9934bfcdef73a661befcd6619`; MySQL migration case correction `45232b2f318e6f225675047fc92edfd20f54b51a`.
+- **Current Dev equivalent / missing behaviour:** Dev already registers `GetDisplayNames`, returns default legacy names, and exposes display-name-shaped fields through avatar search. What is genuinely missing is mutable `SetDisplayName`, persisted `DisplayName`/`NameChanged` account fields, and propagation of non-default names. Mobius is the original feature source; Tranquillity provides the enhanced, traceable integration used for the production port.
 - **Affected files and services:** UserAccount data/service/connectors, CAPS, avatar picker/search, user-management and HG account cache; MySQL migration and configuration.
 - **Addon versus core:** opt-in Robust service extension with narrowly required core interfaces/caps wiring.
 - **Compatibility:** needs standalone and Robust modes; MySQL migration/rollback and mixed-case table tests; Windows-neutral managed code; HG trust, caching, spoofing, and fallback-name rules are central. The feature commit's migration incorrectly names `useraccounts` and requires follow-up `45232b2...` to use `UserAccounts`, demonstrating that the feature commit is not safe alone on case-sensitive MySQL deployments.
 - **Viewer requirements:** viewers supporting standard Display Names caps; legacy viewers must retain account-name fallback.
-- **Licensing/provenance:** traceable Tranquillity BSD-derived commits; compare Mobius only as historical prior art.
+- **Licensing/provenance:** preserve Mobius as original feature lineage and Tranquillity contributors for the enhanced integration. Exact Mobius archive commit remains unresolved; both are OpenSim-derived, but file-level attribution must be retained and verified.
 - **Tests required:** CAPS conformance, cache expiry, rate limits, Unicode/normalization, MySQL upgrade, search, HG foreign-user fallback, old viewer regression.
 - **Recommendation:** P1 production enhancement on a dedicated branch. Treat the approximately 495-added-line/17-file donor change as a design source, not a blind cherry-pick candidate.
 
@@ -137,15 +138,15 @@ Priority reflects expected value and auditability, not authorization to implemen
 ### 6. Experiences
 
 - **Feature and intended behaviour:** implement viewer Experience capabilities, permissions, estate/land integration, persistence, and LSL experience APIs.
-- **Donor and commit:** Tranquillity feature integration `26d3971448107725ad30d0abf769175ccb7f2467`; persisted-state restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83`; typo cleanup `d707ed64e056c77bbf5ae110c45bedf3098d5eb8`.
-- **Current Dev equivalent / missing behaviour:** Dev exposes some experience-related constants/stubs but lacks the donor's `ExperienceService`, connectors, data implementation, CAPS module, and complete runtime behaviour.
+- **Donor and commit:** original feature lineage is Mobius. Tranquillity feature integration `26d3971448107725ad30d0abf769175ccb7f2467`, persisted-state restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83`, and typo cleanup `d707ed64e056c77bbf5ae110c45bedf3098d5eb8`. Gunthar Experience-Lite additions run from auto-grants `a4fbbbd0b0a733c8a838af9d21d9bb43cbcec7ae` through build repair `4f43137c8beac427ae93557f422d0022079e1ede`.
+- **Current Dev equivalent / missing behaviour:** Dev exposes some experience-related constants/stubs but lacks Tranquillity's `ExperienceService`, connectors, data implementation, CAPS module, and complete runtime behaviour. Gunthar adds script-facing Experience-Lite permissions, events, KVP persistence/statistics, information APIs, and scripted sit behavior, but does not contain the full service file set in its current tree.
 - **Affected files and services:** 62 files, roughly 6,543 additions and 53 deletions: MySQL, estate/region stores, CAPS/event queue, scene/attachments/inventory, YEngine, LSL APIs, Robust handlers/connectors, configuration, and tests. The largest slices are LSL API integration (about 1,678 changed lines) and the new CAPS module (about 1,337 lines).
 - **Addon versus core:** Robust service extension requiring core protocol, persistence, simulator, and script changes; cannot be a drop-in addon alone.
 - **Compatibility:** standalone and Robust deployment are mandatory; MySQL migrations need upgrade/rollback validation; Windows-neutral; HG permission ownership and foreign experience IDs require an explicit policy.
 - **Viewer requirements:** an Experience-capable viewer; non-supporting viewers and scripts must degrade safely.
 - **Licensing/provenance:** traceable Tranquillity/OpenSim lineage, but review every new file and contribution in the feature merge.
 - **Tests required:** service/API contracts, permission lifecycle, parcel/estate controls, script restart, KV storage, attachments, MySQL concurrency/migration, Robust outage, HG boundaries, viewer interoperability.
-- **Recommendation:** P2 and highest complexity. Stage only after an architecture decision record, with independently testable service, CAPS, persistence, and scripting milestones.
+- **Recommendation:** P2 and highest complexity. Use Tranquillity as the full service/CAPS/data base, then reconcile Gunthar's Experience-Lite script behavior item by item. Stage independently testable service, CAPS, persistence, permissions/events, KVP, and scripting milestones.
 
 ### 7. Hypergrid stale identity repair
 
@@ -175,7 +176,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 ### 9. Recovered operational addon set
 
-- **Feature and intended behaviour:** optional Abuse Reports, Gloebit money, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, and OpenSimWeather capabilities recovered and previously reconciled in Continuum.
+- **Feature and intended behaviour:** optional Abuse Reports, Gloebit money, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, and OpenSimWeather capabilities recovered and previously reconciled in Continuum. Abuse Reports originates from the Mobius lineage.
 - **Donor and commit:** Continuum checkpoints: Abuse Reports `900dcad6fce839a5fc493192aa83f3d651839f23`; Gloebit `86051a68327b9d4c0034c25a9445404f46d28afa`; HoloPhysicsGuard `d9152a92ad725e19daffffd338b948fcb60f9434`; MoneyServer `e86018e495677fad241e60d33130e45d3fa81ada`; Search `15afe9937a81d3631d2071bcfc5cc6362668959f`; Tide `346a96359eb65eab21f0792674b6cac3680f6061`; Weather `211f2a81a12ba084092a6c9d16d4769483781d0b`.
 - **Current Dev equivalent / missing behaviour:** Dev includes basic search and a sample money module, but not these complete third-party behaviours. Each candidate needs a separate equivalence analysis.
 - **Affected files and services:** optional region modules, external web/service endpoints, configuration, assets, and—in MoneyServer/Search/Abuse Reports—database and Robust-adjacent services.
@@ -225,9 +226,9 @@ Priority reflects expected value and auditability, not authorization to implemen
 - **Tests required:** requirements-level acceptance tests, API/auth design, role authorization, CSRF/XSS, MySQL, Robust HA, Windows hosting, HG privacy.
 - **Recommendation:** classify direct code port as obsolete or unsuitable; retain as behavioural reference only.
 
-### 13. Mobius historical Display Names reference
+### 13. Mobius Display Names origin
 
-- **Feature and intended behaviour:** historical Display Names caps and Hypergrid handlers.
+- **Feature and intended behaviour:** original Display Names feature lineage, including caps and Hypergrid handlers later enhanced by Tranquillity.
 - **Donor and commit:** Mobius-Team/Mobius, but the recovered `mobius-master` directory lacks `.git`; exact source commit is not yet established.
 - **Current Dev equivalent / missing behaviour:** Dev lacks complete Display Names; the archive contains `DisplayNamesModule`, `GetDisplayNames` handlers, and HG connectors.
 - **Affected files and services:** CAPS, region module interfaces, HG handlers/connectors, user lookup.
@@ -236,7 +237,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 - **Viewer requirements:** Display Names-capable viewer.
 - **Licensing/provenance:** blocked for code use until commit and license are tied to the archive.
 - **Tests required:** protocol comparison against Tranquillity and current viewers; no code tests until provenance is resolved.
-- **Recommendation:** P3 reference only; prefer Tranquillity's traceable implementation history.
+- **Recommendation:** retain as required provenance and behavioral comparison. Use Tranquillity's traceable enhancement commits for integration while preserving Mobius attribution.
 
 ## Already-present and unsuitable observations
 
