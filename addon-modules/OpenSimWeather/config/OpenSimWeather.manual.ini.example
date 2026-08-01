@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.3 manual production test
+;; OpenSimWeather 0.3.4 manual production test
 ;; Replace the texture UUID placeholders before enabling.
 
 [Weather]

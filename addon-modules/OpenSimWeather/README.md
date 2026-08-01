@@ -1,6 +1,6 @@
-# OpenSimWeather 0.3.3
+# OpenSimWeather 0.3.4
 
-OpenSimWeather is an experimental but production-conscious OpenSimulator region
+OpenSimWeather is a Gunthar-based, experimental but production-conscious OpenSimulator region
 module that provides Clear, Sunny, Rain, Storm, and Snow conditions. It uses
 viewer-visible particle systems and can optionally coordinate wind,
 LightShare/EEP-style region environment profiles, lightning, thunder, forecast

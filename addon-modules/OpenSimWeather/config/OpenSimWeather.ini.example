@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.3 common configuration example
+;; OpenSimWeather 0.3.4 common configuration example
 ;;
 ;; Put this [Weather] section in OpenSim.ini, or in a file explicitly included
 ;; by OpenSim.ini. Do not place it in Regions.ini.

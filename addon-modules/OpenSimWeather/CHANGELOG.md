@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.4
+
+- Re-established GuntharDeNiro/opensim `6c7021cc36fd6890db27200cd65fd4bb37bd60fd`
+  as the runtime and provenance baseline while retaining the intended 0.3.3
+  Continuum extensions.
+- Made partial region-emitter startup atomic by deleting every emitter already
+  created when a later location fails.
+- Made timer rescheduling safe during simultaneous shutdown and weather change.
+- Restricted interrupted-startup cleanup to objects carrying Continuum's
+  generated-object marker, preventing name-based deletion of unrelated builds.
+
 ## 0.3.3 — coverage compatibility and configuration reconciliation
 
 - Restored `CoverageMode = Region` as the safe default.

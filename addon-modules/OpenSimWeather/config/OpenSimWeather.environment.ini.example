@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.3 environment/wind example
+;; OpenSimWeather 0.3.4 environment/wind example
 ;;
 ;; OpenSim persists region environment changes. Export or record the current
 ;; region environment before enabling this example. All four configurable

@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.3 particle-only automatic cycle example
+;; OpenSimWeather 0.3.4 particle-only automatic cycle example
 ;; Replace texture UUIDs, test manually, then set Enabled=true.
 
 [Weather]

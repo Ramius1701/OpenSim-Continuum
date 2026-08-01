@@ -1,4 +1,18 @@
-OpenSimWeather 0.3.3 validation
+OpenSimWeather 0.3.4 validation
+
+0.3.4 Gunthar-baseline regression checks
+-----------------------------------------
+
+* Force AddNewSceneObject to reject an emitter after at least one successful
+  insertion. The command must fail and leave zero OpenSimWeather emitters.
+* Start active-area weather while repeatedly entering/leaving the region, then
+  clear and stop the simulator. No disposed-timer exception may be logged.
+* Run the same teardown test with auto-cycle and surface effects independently.
+* Create a temporary user object named "weather rain emitter". Startup cleanup
+  must not delete it. A marked OpenSimWeather object must be removed.
+* Repeat Gunthar's rain, storm, snow, sunny, clear, status, wind, lightning,
+  thunder, auto-cycle, forecast, entry-message, roof suppression, and varregion
+  tests before testing Continuum-only coverage or surface settings.
 Date: 2026-07-19
 
 PASS - C# source parsed with tree-sitter C# grammar; no ERROR or missing nodes.

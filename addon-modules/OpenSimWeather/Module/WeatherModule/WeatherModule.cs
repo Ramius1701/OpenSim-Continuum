@@ -696,26 +696,36 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             GetEmitterLayout(sizeX, sizeY, out int countX, out int countY, out float spacingX, out float spacingY);
             float radius = Math.Max(spacingX, spacingY) * m_emitterRadiusScale;
 
-            for (int x = 0; x < countX; x++)
+            try
             {
-                for (int y = 0; y < countY; y++)
+                for (int x = 0; x < countX; x++)
                 {
-                    float posX = JitteredCellPosition(x, spacingX, sizeX);
-                    float posY = JitteredCellPosition(y, spacingY, sizeY);
-                    float ground = scene.GetGroundHeight(posX, posY);
-                    Vector3 position = new Vector3(posX, posY, ground + JitterHeight());
-                    float openSky = GetOpenSkyFraction(posX, posY, spacingX * 0.45f, spacingY * 0.45f, position.Z);
-                    if (openSky < m_minOpenSkyFraction)
-                        continue;
+                    for (int y = 0; y < countY; y++)
+                    {
+                        float posX = JitteredCellPosition(x, spacingX, sizeX);
+                        float posY = JitteredCellPosition(y, spacingY, sizeY);
+                        float ground = scene.GetGroundHeight(posX, posY);
+                        Vector3 position = new Vector3(posX, posY, ground + JitterHeight());
+                        float openSky = GetOpenSkyFraction(posX, posY, spacingX * 0.45f, spacingY * 0.45f, position.Z);
+                        if (openSky < m_minOpenSkyFraction)
+                            continue;
 
-                    SceneObjectGroup emitter = CreateEmitter(ownerId, weather, position, radius * (float)Math.Sqrt(Math.Max(0.15f, openSky)));
-                    if (!scene.AddNewSceneObject(emitter, false))
-                        throw new InvalidOperationException("OpenSim rejected a weather emitter.");
+                        SceneObjectGroup emitter = CreateEmitter(ownerId, weather, position, radius * (float)Math.Sqrt(Math.Max(0.15f, openSky)));
+                        if (!scene.AddNewSceneObject(emitter, false))
+                            throw new InvalidOperationException("OpenSim rejected a weather emitter.");
 
-                    emitter.RootPart.SendFullUpdateToAllClients();
-                    emitter.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
-                    created.Add(emitter);
+                        emitter.RootPart.SendFullUpdateToAllClients();
+                        emitter.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
+                        created.Add(emitter);
+                    }
                 }
+            }
+            catch
+            {
+                // The caller cannot see a list whose construction threw. Roll back
+                // here, matching Gunthar's all-or-nothing emitter startup behavior.
+                DeleteEmitters(created);
+                throw;
             }
 
             return created;
@@ -803,7 +813,16 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         {
             Timer timer = m_activeAreaTimer;
             if (timer != null)
-                timer.Change(0, m_activeAreaRefreshSeconds * 1000);
+            {
+                try
+                {
+                    timer.Change(0, m_activeAreaRefreshSeconds * 1000);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Region shutdown or a simultaneous weather transition won.
+                }
+            }
         }
 
         private void ActiveAreaTimerElapsed(object state)
@@ -1034,7 +1053,14 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             dueTimeMS = Math.Max(1000, dueTimeMS);
             m_nextAutoCycleTicks = DateTime.Now.Ticks + dueTimeMS * 10000L;
-            timer.Change(dueTimeMS, Timeout.Infinite);
+            try
+            {
+                timer.Change(dueTimeMS, Timeout.Infinite);
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
 
             ScheduleAutoCycleWarning(dueTimeMS);
         }
@@ -1049,11 +1075,23 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             int warningDueMS = dueTimeMS - warningLeadMS;
             if (warningDueMS <= 0)
             {
-                warningTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                try
+                {
+                    warningTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
                 return;
             }
 
-            warningTimer.Change(warningDueMS, Timeout.Infinite);
+            try
+            {
+                warningTimer.Change(warningDueMS, Timeout.Infinite);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         private void AutoCycleForecastWarningElapsed(object state)
@@ -1819,7 +1857,16 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             Timer timer = m_surfaceTimer;
             if (timer != null && immediate)
-                timer.Change(0, m_surfaceUpdateSeconds * 1000);
+            {
+                try
+                {
+                    timer.Change(0, m_surfaceUpdateSeconds * 1000);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Region shutdown or weather teardown won the race.
+                }
+            }
         }
 
         private void SurfaceTimerElapsed(object state)
@@ -2184,18 +2231,15 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 return false;
 
             string name = group.Name ?? string.Empty;
-            if (name.StartsWith(GeneratedNamePrefix, StringComparison.OrdinalIgnoreCase))
+            if (name.StartsWith(GeneratedNamePrefix, StringComparison.OrdinalIgnoreCase)
+                && group.RootPart.Description == GeneratedDescription)
                 return true;
 
-            if (group.RootPart.Description == GeneratedDescription)
+            if (group.RootPart.Description == GeneratedDescription
+                && (group.TemporaryInstance || (group.RootPart.Flags & PrimFlags.TemporaryOnRez) != 0))
                 return true;
 
-            return string.Equals(name, "weather lightning flash", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather rain emitter", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather storm emitter", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather snow emitter", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(name, "weather puddle", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(name, "weather snow accumulation", StringComparison.OrdinalIgnoreCase);
+            return false;
         }
 
         private void RefreshExclusionVolumes(bool force)

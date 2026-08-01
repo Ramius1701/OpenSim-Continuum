@@ -1,8 +1,23 @@
-# OpenSimWeather production audit — 0.3.3
+# OpenSimWeather production audit — 0.3.4
+
+## 0.3.4 Gunthar-baseline correction
+
+GuntharDeNiro/opensim commit
+`6c7021cc36fd6890db27200cd65fd4bb37bd60fd` is the authoritative runtime
+baseline. Continuum 0.3.3 had incorrectly described a combined AI rewrite as
+authoritative. Version 0.3.4 treats the enhanced coverage, assets, environment
+profiles, indoor suppression, generated-object safeguards, and experimental
+surface effects as bounded extensions of Gunthar's weather lifecycle.
+
+The correction fixes three concrete 0.3.3 production faults: partial region
+emitter construction now rolls back at its creation boundary; disposed
+auto-cycle, active-area, and surface timers cannot escape teardown; and startup
+cleanup requires Continuum's generated-object marker instead of deleting
+unrelated temporary objects by legacy-looking names.
 
 ## 0.3.3 reconciliation result
 
-The combined Copilot/ChatGPT/Claude module remains the authoritative source.
+Gunthar's current weather module remains the authoritative behavioral source.
 The audit found that the expanded configuration settings are implemented, but
 the 0.3.2 emitter defaults changed established behavior: ActiveArea became the
 default and the original dimension-scaled grid was demoted. Version 0.3.3
