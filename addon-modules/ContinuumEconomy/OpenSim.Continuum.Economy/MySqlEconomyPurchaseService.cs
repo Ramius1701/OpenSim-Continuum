@@ -60,14 +60,17 @@ namespace OpenSim.Continuum.Economy
             }
         }
 
-        public LedgerPurchaseResult Capture(Guid purchaseID)
+        public LedgerPurchaseResult Capture(Guid purchaseID, Guid expectedBuyerID)
         {
-            if (purchaseID == Guid.Empty) return Invalid(purchaseID, "A non-zero purchase ID is required");
+            if (purchaseID == Guid.Empty || expectedBuyerID == Guid.Empty)
+                return Invalid(purchaseID, "Non-zero purchase and buyer IDs are required");
             using MySqlConnection connection = new(m_connectionString);
             connection.Open();
             using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             PurchaseRow row = Read(connection, transaction, purchaseID, true);
             if (row == null) return Finish(transaction, Invalid(purchaseID, "Purchase not found"));
+            if (row.BuyerID != expectedBuyerID)
+                return Finish(transaction, Conflict(purchaseID));
             if (row.State == LedgerPurchaseState.Captured) return Finish(transaction, PriorResult(row, row.RequestHash));
             if (row.State != LedgerPurchaseState.Authorized)
                 return Finish(transaction, Invalid(purchaseID, "Only an authorized purchase can be captured"));
@@ -96,14 +99,17 @@ namespace OpenSim.Continuum.Economy
                 newBuyer, available, newSeller, "Purchase captured");
         }
 
-        public LedgerPurchaseResult Cancel(Guid purchaseID)
+        public LedgerPurchaseResult Cancel(Guid purchaseID, Guid expectedBuyerID)
         {
-            if (purchaseID == Guid.Empty) return Invalid(purchaseID, "A non-zero purchase ID is required");
+            if (purchaseID == Guid.Empty || expectedBuyerID == Guid.Empty)
+                return Invalid(purchaseID, "Non-zero purchase and buyer IDs are required");
             using MySqlConnection connection = new(m_connectionString);
             connection.Open();
             using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             PurchaseRow row = Read(connection, transaction, purchaseID, true);
             if (row == null) return Finish(transaction, Invalid(purchaseID, "Purchase not found"));
+            if (row.BuyerID != expectedBuyerID)
+                return Finish(transaction, Conflict(purchaseID));
             if (row.State == LedgerPurchaseState.Cancelled) return Finish(transaction, PriorResult(row, row.RequestHash));
             if (row.State != LedgerPurchaseState.Authorized)
                 return Finish(transaction, Invalid(purchaseID, "Only an authorized purchase can be cancelled"));

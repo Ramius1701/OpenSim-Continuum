@@ -114,13 +114,15 @@ namespace OpenSim.Continuum.Economy
     public interface IEconomyPurchaseService
     {
         LedgerPurchaseResult Authorize(LedgerPurchaseRequest request);
-        LedgerPurchaseResult Capture(Guid purchaseID);
-        LedgerPurchaseResult Cancel(Guid purchaseID);
+        LedgerPurchaseResult Capture(Guid purchaseID, Guid expectedBuyerID);
+        LedgerPurchaseResult Cancel(Guid purchaseID, Guid expectedBuyerID);
     }
 
     public interface IEconomyLedger
     {
         void EnsureSchema();
+        void EnsureAccount(Guid accountID);
+        bool AccountExists(Guid accountID);
         long GetBalance(Guid accountID);
         long GetAvailableBalance(Guid accountID);
         LedgerTransferResult Transfer(LedgerTransferRequest request);

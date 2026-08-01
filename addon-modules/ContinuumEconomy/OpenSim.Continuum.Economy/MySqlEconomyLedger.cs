@@ -42,6 +42,30 @@ namespace OpenSim.Continuum.Economy
             return value == null || value == DBNull.Value ? 0L : Convert.ToInt64(value, CultureInfo.InvariantCulture);
         }
 
+        public bool AccountExists(Guid accountID)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = "SELECT 1 FROM continuum_economy_accounts WHERE account_id = ?account LIMIT 1";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            return command.ExecuteScalar() != null;
+        }
+
+        public void EnsureAccount(Guid accountID)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = "INSERT IGNORE INTO continuum_economy_accounts (account_id, balance) VALUES (?account, 0)";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            command.ExecuteNonQuery();
+        }
+
         public long GetAvailableBalance(Guid accountID)
         {
             if (accountID == Guid.Empty)
