@@ -3413,6 +3413,27 @@ namespace OpenSim.Grid.MoneyServer
 
                     try
                     {
+                        if (m_continuumEconomyEnabled)
+                        {
+                            LedgerHistoryEntry entry = m_continuumLedger.GetOperation(Guid.Parse(transactionUUID.ToString()));
+                            Guid requestingAccount = Guid.Parse(clientID);
+                            if (entry == null || (entry.AccountID != requestingAccount && entry.CounterpartyID != requestingAccount))
+                            {
+                                responseData["description"] = "Invalid Transaction UUID";
+                                return response;
+                            }
+                            Guid sender = entry.IsCredit ? entry.CounterpartyID : entry.AccountID;
+                            Guid receiver = entry.IsCredit ? entry.AccountID : entry.CounterpartyID;
+                            responseData["success"] = true;
+                            responseData["amount"] = ToViewerBalance(entry.Amount);
+                            responseData["time"] = (int)Math.Min(Int32.MaxValue, new DateTimeOffset(entry.CreatedUtc).ToUnixTimeSeconds());
+                            responseData["type"] = entry.TransactionType;
+                            responseData["sender"] = sender.ToString();
+                            responseData["receiver"] = receiver.ToString();
+                            responseData["description"] = entry.Description;
+                            return response;
+                        }
+
                         TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
                         if (transaction != null)
                         {
@@ -3615,6 +3636,35 @@ namespace OpenSim.Grid.MoneyServer
                 {
                     try
                     {
+                        if (m_continuumEconomyEnabled)
+                        {
+                            Guid accountID = Guid.Parse(userID);
+                            DateTime? startUtc = startTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(startTime).UtcDateTime : null;
+                            DateTime? endUtc = endTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(endTime).UtcDateTime : null;
+                            long totalCount = m_continuumLedger.CountHistory(accountID, startUtc, endUtc);
+                            int requestedIndex = lastIndex + 1;
+                            if (requestedIndex < 0 || requestedIndex >= 500)
+                            {
+                                responseData["errorMessage"] = "Continuum history index must be between 0 and 499";
+                                return response;
+                            }
+                            IReadOnlyList<LedgerHistoryEntry> history = m_continuumLedger.GetHistory(
+                                accountID, endUtc, Math.Min(500, requestedIndex + 1));
+                            List<LedgerHistoryEntry> filtered = new List<LedgerHistoryEntry>();
+                            foreach (LedgerHistoryEntry historyEntry in history)
+                                if (!startUtc.HasValue || historyEntry.CreatedUtc >= startUtc.Value) filtered.Add(historyEntry);
+                            if (requestedIndex >= filtered.Count)
+                            {
+                                responseData["errorMessage"] = String.Format("Unable to fetch transaction data with the index {0}", requestedIndex);
+                                responseData["isEnd"] = true;
+                                return response;
+                            }
+                            LedgerHistoryEntry entry = filtered[requestedIndex];
+                            PopulateContinuumHistoryResponse(responseData, entry, requestedIndex,
+                                requestedIndex + 1 >= totalCount);
+                            return response;
+                        }
+
                         int total = m_moneyDBService.getTransactionNum(userID, startTime, endTime);
                         TransactionData tran = null;
                         m_log.InfoFormat("[MONEY XMLRPC]: handleWebGetTransaction: Getting transation[{0}] for user {1}", lastIndex + 1, userID);
@@ -3698,7 +3748,12 @@ namespace OpenSim.Grid.MoneyServer
             {
                 if (m_webSessionDic[userID] == webSessionID)
                 {
-                    int it = m_moneyDBService.getTransactionNum(userID, startTime, endTime);
+                    long count = m_continuumEconomyEnabled
+                        ? m_continuumLedger.CountHistory(Guid.Parse(userID),
+                            startTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(startTime).UtcDateTime : null,
+                            endTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(endTime).UtcDateTime : null)
+                        : m_moneyDBService.getTransactionNum(userID, startTime, endTime);
+                    int it = count > Int32.MaxValue ? Int32.MaxValue : (int)count;
                     if (it >= 0)
                     {
                         m_log.InfoFormat("[MONEY XMLRPC]: handleWebGetTransactionNum: Get {0} transactions for user {1}", it, userID);
@@ -3712,6 +3767,29 @@ namespace OpenSim.Grid.MoneyServer
             m_log.Error("[MONEY XMLRPC]: handleWebGetTransactionNum: Session authentication failed when getting transaction number for user " + userID);
             responseData["errorMessage"] = "Session check failure, please re-login";
             return response;
+        }
+
+        private void PopulateContinuumHistoryResponse(Hashtable response, LedgerHistoryEntry entry,
+            int index, bool isEnd)
+        {
+            Guid senderID = entry.IsCredit ? entry.CounterpartyID : entry.AccountID;
+            Guid receiverID = entry.IsCredit ? entry.AccountID : entry.CounterpartyID;
+            UserInfo sender = senderID == Guid.Empty ? null : m_moneyDBService.FetchUserInfo(senderID.ToString());
+            UserInfo receiver = receiverID == Guid.Empty ? null : m_moneyDBService.FetchUserInfo(receiverID.ToString());
+            long unixTime = new DateTimeOffset(entry.CreatedUtc).ToUnixTimeSeconds();
+            response["success"] = true;
+            response["isEnd"] = isEnd;
+            response["transactionIndex"] = index;
+            response["transactionUUID"] = entry.TransactionID.ToString();
+            response["senderID"] = senderID.ToString();
+            response["receiverID"] = receiverID.ToString();
+            response["senderName"] = sender?.Avatar ?? (entry.IsAdjustment ? "SYSTEM" : "unknown user");
+            response["receiverName"] = receiver?.Avatar ?? "unknown user";
+            response["amount"] = ToViewerBalance(entry.Amount);
+            response["type"] = entry.TransactionType;
+            response["time"] = unixTime > Int32.MaxValue ? Int32.MaxValue : (int)unixTime;
+            response["status"] = entry.Succeeded ? (int)Status.SUCCESS_STATUS : (int)Status.FAILED_STATUS;
+            response["description"] = entry.Description;
         }
 
 

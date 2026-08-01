@@ -147,5 +147,7 @@ namespace OpenSim.Continuum.Economy
         LedgerAdjustmentResult Adjust(LedgerAdjustmentRequest request);
         IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit);
         long GetCreditedTotal(Guid accountID, int transactionType, DateTime sinceUtc);
+        long CountHistory(Guid accountID, DateTime? startUtc, DateTime? endUtc);
+        LedgerHistoryEntry GetOperation(Guid operationID);
     }
 }

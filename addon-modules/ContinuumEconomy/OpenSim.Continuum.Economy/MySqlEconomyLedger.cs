@@ -334,6 +334,69 @@ namespace OpenSim.Continuum.Economy
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 
+        public long CountHistory(Guid accountID, DateTime? startUtc, DateTime? endUtc)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT
+                (SELECT COUNT(*) FROM continuum_economy_transactions
+                 WHERE (sender_id=?account OR receiver_id=?account)
+                   AND (?start IS NULL OR created_utc>=?start) AND (?end IS NULL OR created_utc<=?end)) +
+                (SELECT COUNT(*) FROM continuum_economy_adjustments
+                 WHERE account_id=?account
+                   AND (?start IS NULL OR created_utc>=?start) AND (?end IS NULL OR created_utc<=?end))";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            command.Parameters.AddWithValue("?start", startUtc.HasValue ? startUtc.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("?end", endUtc.HasValue ? endUtc.Value.ToUniversalTime() : DBNull.Value);
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        public LedgerHistoryEntry GetOperation(Guid operationID)
+        {
+            if (operationID == Guid.Empty)
+                throw new ArgumentException("A non-zero operation ID is required", nameof(operationID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using (MySqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = @"SELECT sender_id,receiver_id,amount,transaction_type,region_id,object_id,
+                        description,status,sender_balance,failure_reason,created_utc
+                    FROM continuum_economy_transactions WHERE transaction_id=?operation";
+                command.Parameters.AddWithValue("?operation", operationID.ToString());
+                using MySqlDataReader reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    Guid sender = Guid.Parse(reader.GetString(0));
+                    return new LedgerHistoryEntry { TransactionID=operationID, AccountID=sender,
+                        CounterpartyID=Guid.Parse(reader.GetString(1)), Amount=reader.GetInt64(2),
+                        TransactionType=reader.GetInt32(3), RegionID=Guid.Parse(reader.GetString(4)),
+                        ObjectID=Guid.Parse(reader.GetString(5)), Description=reader.GetString(6),
+                        Succeeded=reader.GetInt32(7)==1, ResultingBalance=reader.GetInt64(8),
+                        FailureReason=reader.GetString(9), CreatedUtc=DateTime.SpecifyKind(reader.GetDateTime(10),DateTimeKind.Utc),
+                        IsCredit=false, IsAdjustment=false };
+                }
+            }
+            using (MySqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = @"SELECT account_id,actor_id,amount,adjustment_kind,transaction_type,reason,
+                        status,resulting_balance,failure_reason,created_utc
+                    FROM continuum_economy_adjustments WHERE operation_id=?operation";
+                command.Parameters.AddWithValue("?operation", operationID.ToString());
+                using MySqlDataReader reader = command.ExecuteReader();
+                if (!reader.Read()) return null;
+                return new LedgerHistoryEntry { TransactionID=operationID, AccountID=Guid.Parse(reader.GetString(0)),
+                    CounterpartyID=Guid.Parse(reader.GetString(1)), ActorID=Guid.Parse(reader.GetString(1)),
+                    Amount=reader.GetInt64(2), IsCredit=reader.GetInt32(3)==(int)LedgerAdjustmentKind.Credit,
+                    TransactionType=reader.GetInt32(4), Description=reader.GetString(5),
+                    Succeeded=reader.GetInt32(6)==1, ResultingBalance=reader.GetInt64(7),
+                    FailureReason=reader.GetString(8), CreatedUtc=DateTime.SpecifyKind(reader.GetDateTime(9),DateTimeKind.Utc),
+                    IsAdjustment=true };
+            }
+        }
+
         private static LedgerTransferResult Validate(LedgerTransferRequest request)
         {
             if (request == null)
