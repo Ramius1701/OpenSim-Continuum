@@ -380,6 +380,44 @@ namespace OpenSim.Region.ClientStack.Linden
                 validCaps.Add(cstr);
             }
 
+            // Some OpenSim viewer builds do not request the complete Experience
+            // capability family even though their parcel and region panels depend
+            // on RegionExperiences being present in the seed response. WhiteCore
+            // avoids this interoperability problem by returning all registered
+            // capabilities. Keep OpenSim's requested-cap filtering for everything
+            // else, but publish registered Experience capabilities consistently.
+            string[] experienceCaps =
+            {
+                "AgentExperiences",
+                "ExperiencePreferences",
+                "FindExperienceByName",
+                "GetAdminExperiences",
+                "GetCreatorExperiences",
+                "GetExperienceInfo",
+                "GetExperiences",
+                "GetMetadata",
+                "GroupExperiences",
+                "IsExperienceAdmin",
+                "IsExperienceContributor",
+                "RegionExperiences",
+                "UpdateExperience"
+            };
+
+            string[] allRegisteredCaps = m_HostCapsObj.CapsHandlers.Caps;
+            HashSet<string> registeredCapNames = new(allRegisteredCaps);
+
+            if (registeredCapNames.Contains("RegionExperiences"))
+            {
+                foreach (string experienceCap in experienceCaps)
+                {
+                    if (registeredCapNames.Contains(experienceCap))
+                        validCaps.Add(experienceCap);
+                }
+
+                m_log.Debug(
+                    $"[CAPS]: Publishing Experience capabilities in {m_regionName} for agent {m_HostCapsObj.AgentID}");
+            }
+
             osUTF8 sb = LLSDxmlEncode2.Start();
             LLSDxmlEncode2.AddMap(sb);
             m_HostCapsObj.GetCapsDetailsLLSDxml(validCaps, sb);

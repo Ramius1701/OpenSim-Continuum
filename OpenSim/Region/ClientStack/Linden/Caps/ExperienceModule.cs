@@ -154,6 +154,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 {
                     HandleExperiencePreferences(httpRequest, httpResponse, agent);
                 }));
+
+            m_log.DebugFormat(
+                "[EXPERIENCE]: Registered viewer capabilities for agent {0} in region {1}",
+                agent, m_scene.RegionInfo.RegionName);
         }
 
 
