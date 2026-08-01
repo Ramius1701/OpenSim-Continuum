@@ -3537,7 +3537,7 @@ namespace OpenSim.Region.Framework.Scenes
                 StandUp();
 
 
-            SendSitResponse(part.UUID, part.SitTargetPositionLL, part.SitTargetOrientationLL);
+            SendSitResponse(part.UUID, part.SitTargetPositionLL, part.SitTargetOrientationLL, true);
         }
 
         // returns  false if does not suport so older sit can be tried

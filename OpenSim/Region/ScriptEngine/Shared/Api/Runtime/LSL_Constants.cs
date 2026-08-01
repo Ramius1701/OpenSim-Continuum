@@ -1273,44 +1273,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         // llGetEnvironment/llSetEnvironment/llReplaceEnvironment/
         // llSetAgentEnvironment/llReplaceAgentEnvironment constants,
         // ported from GuntharDeNiro/opensim (real SL constants).
-        public const int ENV_NOT_EXPERIENCE = -1;
-        public const int ENV_NO_EXPERIENCE_PERMISSION = -2;
-        public const int ENV_NO_ENVIRONMENT = -3;
-        public const int ENV_INVALID_AGENT = -4;
-        public const int ENV_INVALID_RULE = -5;
-        public const int ENV_VALIDATION_FAIL = -6;
-        public const int ENV_NO_EXPERIENCE_LAND = -7;
-        public const int ENV_THROTTLE = -8;
         public const int ENV_NO_PERMISSIONS = -9;
 
         public const int ENVIRONMENT_DAYINFO = 200;
         public const int SKY_TEXTURE_DEFAULTS = 1;
-        public const int SKY_AMBIENT = 0;
-        public const int SKY_CLOUDS = 2;
-        public const int SKY_DOME = 4;
-        public const int SKY_GAMMA = 5;
-        public const int SKY_GLOW = 6;
         public const int SKY_LIGHT = 8;
-        public const int SKY_MOON = 9;
-        public const int SKY_PLANET = 10;
-        public const int SKY_REFRACTION = 11;
-        public const int SKY_STAR_BRIGHTNESS = 13;
-        public const int SKY_SUN = 14;
         public const int SKY_TRACKS = 15;
-        public const int SKY_CLOUD_TEXTURE = 19;
-        public const int SKY_MOON_TEXTURE = 20;
-        public const int SKY_SUN_TEXTURE = 21;
-        public const int SKY_BLUE = 22;
-        public const int SKY_HAZE = 23;
-        public const int SKY_REFLECTION_PROBE_AMBIANCE = 24;
-        public const int WATER_BLUR_MULTIPLIER = 100;
-        public const int WATER_FOG = 101;
-        public const int WATER_FRESNEL = 102;
         public const int WATER_TEXTURE_DEFAULTS = 103;
-        public const int WATER_NORMAL_SCALE = 104;
-        public const int WATER_REFRACTION = 105;
-        public const int WATER_WAVE_DIRECTION = 106;
-        public const int WATER_NORMAL_TEXTURE = 107;
 
         // Pathfinding constants, ported from GuntharDeNiro/opensim (real
         // SL constants).
@@ -1352,29 +1321,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         // codes, ported from GuntharDeNiro/opensim (real SL constants;
         // SIT_FLAG_* already existed in current core, only the
         // llSitOnLink-specific error codes below were missing).
-        public const int SIT_NOT_EXPERIENCE = -1;
-        public const int SIT_NO_EXPERIENCE_PERMISSION = -2;
-        public const int SIT_NO_SIT_TARGET = -3;
-        public const int SIT_INVALID_AGENT = -4;
-        public const int SIT_INVALID_LINK = -5;
-        public const int SIT_NO_ACCESS = -6;
-        public const int SIT_INVALID_OBJECT = -7;
-
         public const int NOT_EXPERIENCE = -1;
         public const int NOT_ATTACHMENT = -2;
         public const int BAD_AGENT = -3;
 
         // Experience system error codes, ported from GuntharDeNiro/opensim
         // (real SL constants).
-        public const int XP_ERROR_NONE = 0;
-        public const int XP_ERROR_EXPERIENCE_DISABLED = 1;
         public const int XP_ERROR_EXPERIENCE_NOT_TRUSTED = 2;
         public const int XP_ERROR_AGENT_NOT_FOUND = 3;
-        public const int XP_ERROR_INVALID_PARAMETERS = 4;
-        public const int XP_ERROR_QUOTA_EXCEEDED = 11;
-        public const int XP_ERROR_STORE_DISABLED = 12;
-        public const int XP_ERROR_STORAGE_EXCEPTION = 13;
-        public const int XP_ERROR_KEY_NOT_FOUND = 14;
-        public const int XP_ERROR_RETRY_UPDATE = 15;
     }
 }

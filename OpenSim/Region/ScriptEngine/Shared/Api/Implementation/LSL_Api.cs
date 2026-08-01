@@ -23020,6 +23020,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             error = ScriptBaseClass.XP_ERROR_NONE;
             return true;
         }
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public void llRequestExperiencePermissions(string agent, string experience)
         {
             if (!UUID.TryParse(agent, out UUID agentID) || agentID.IsZero())
@@ -23051,6 +23052,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             PostExperiencePermissions(agentID);
         }
 
+#endif
         public void llReleaseExperiencePermissions(string agent)
         {
             if (UUID.TryParse(agent, out UUID agentID) && agentID.IsNotZero())
@@ -23075,6 +23077,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return (permissions & ~m_scriptExperienceAutoGrantPermissions) == 0 ? 1 : 0;
         }
 
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Integer llAgentInExperience(string agent)
         {
             if (!UUID.TryParse(agent, out UUID agentID) || agentID.IsZero())
@@ -23087,6 +23090,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return presence != null && !presence.IsDeleted && !presence.IsChildAgent ? 1 : 0;
         }
 
+#endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_List llGetExperienceDetails(string experienceID)
         {
             if (!IsScriptExperienceTrusted())
@@ -23110,6 +23115,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return details;
         }
 
+#endif
         public LSL_Integer llOpenFloater(LSL_String floater_name, LSL_String url, LSL_List parameters)
         {
             if (!m_host.ParentGroup.IsAttachment)
@@ -23199,6 +23205,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llCreateKeyValue(string key, string value)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23236,6 +23243,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, String.Empty);
         }
 
+#endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llReadKeyValue(string key)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23257,6 +23266,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, value);
         }
 
+#endif
         public LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23292,6 +23302,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, String.Empty);
         }
 
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llDeleteKeyValue(string key)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23319,6 +23330,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, String.Empty);
         }
 
+#endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llKeyCountKeyValue()
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23336,6 +23349,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, count.ToString());
         }
 
+#endif
         public LSL_Key llKeysKeyValue(int first, int count)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23371,6 +23385,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, result.ToString());
         }
 
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llDataSizeKeyValue()
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -23388,6 +23403,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, usedBytes.ToString() + "," + m_scriptExperienceKvpMaxStoreBytes.ToString());
         }
 
+#endif
         public LSL_List llGetExperienceKeyValueStoreStats()
         {
             LSL_List result = new();
@@ -23986,6 +24002,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             return changed;
         }
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Integer llReplaceAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_String environment)
         {
             if (!IsScriptExperienceTrusted())
@@ -24028,6 +24045,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+#endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Integer llSetAgentEnvironment(LSL_Key agent_id, LSL_Float transition, LSL_List parameters)
         {
             if (!IsScriptExperienceTrusted())
@@ -24064,6 +24083,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
 
+#endif
         public LSL_Integer llReplaceEnvironment(LSL_Vector position, LSL_String environment, LSL_Integer track_no,
                 LSL_Integer day_length, LSL_Integer day_offset)
         {
