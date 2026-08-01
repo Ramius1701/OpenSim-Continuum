@@ -23187,8 +23187,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     return "experience disabled";
                 case ScriptBaseClass.XP_ERROR_EXPERIENCE_NOT_TRUSTED:
                     return "experience not trusted";
-                case ScriptBaseClass.XP_ERROR_AGENT_NOT_FOUND:
-                    return "agent not found";
                 case ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS:
                     return "invalid parameters";
                 case ScriptBaseClass.XP_ERROR_QUOTA_EXCEEDED:
