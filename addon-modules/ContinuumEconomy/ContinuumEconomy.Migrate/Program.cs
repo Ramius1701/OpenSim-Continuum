@@ -11,7 +11,8 @@ namespace ContinuumEconomy.Migrate
 
         private static int Main(string[] args)
         {
-            if (args.Length == 0 || (args[0] != "analyze" && args[0] != "initialize" && args[0] != "import"))
+            if (args.Length == 0 || (args[0] != "analyze" && args[0] != "holds" &&
+                args[0] != "initialize" && args[0] != "import"))
             {
                 Usage();
                 return 2;
@@ -26,6 +27,31 @@ namespace ContinuumEconomy.Migrate
 
             try
             {
+                if (args[0] == "holds")
+                {
+                    int ageMinutes = 15;
+                    foreach (string argument in args)
+                    {
+                        const string prefix = "--older-than-minutes=";
+                        if (argument.StartsWith(prefix, StringComparison.Ordinal) &&
+                            (!Int32.TryParse(argument.Substring(prefix.Length), out ageMinutes) || ageMinutes < 0))
+                        {
+                            Console.Error.WriteLine("The hold age must be a non-negative whole number of minutes.");
+                            return 2;
+                        }
+                    }
+                    var pending = new MySqlEconomyPurchaseService(connectionString)
+                        .GetPending(DateTime.UtcNow.AddMinutes(-ageMinutes), 500);
+                    Console.WriteLine("Pending purchase holds: {0}", pending.Count);
+                    foreach (LedgerPendingPurchase hold in pending)
+                        Console.WriteLine("{0:u} {1} buyer={2} seller={3} amount={4} region={5} object={6} {7}",
+                            hold.CreatedUtc, hold.PurchaseID, hold.BuyerID, hold.SellerID,
+                            hold.Amount, hold.RegionID, hold.ObjectID, hold.Description);
+                    if (pending.Count == 500)
+                        Console.Error.WriteLine("Result limit reached; investigate before assuming this is the complete set.");
+                    return 0;
+                }
+
                 if (args[0] == "initialize")
                 {
                     if (Array.IndexOf(args, SchemaConfirmation) < 0)
@@ -90,6 +116,7 @@ namespace ContinuumEconomy.Migrate
         {
             Console.Error.WriteLine("Usage:");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate analyze");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate holds [--older-than-minutes=15]");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate initialize {0}", SchemaConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
         }

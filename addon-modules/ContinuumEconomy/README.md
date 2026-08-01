@@ -84,3 +84,8 @@ stipends and viewer currency purchases. Purchase-period and maximum-balance
 limits execute under the same account lock as the credit. Legacy behavior
 remains selected unless both MoneyServer `ContinuumEconomyEnabled` and region
 `ContinuumPurchaseRpc` are deliberately enabled after migration.
+
+`ContinuumEconomy.Migrate holds` is a read-only operational report of
+authorized purchases that have not been captured or cancelled. It defaults to
+holds older than 15 minutes, accepts `--older-than-minutes=N`, caps output at
+500 rows and never resolves a hold automatically.

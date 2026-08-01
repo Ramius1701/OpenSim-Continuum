@@ -120,6 +120,20 @@ namespace OpenSim.Continuum.Economy
         LedgerPurchaseResult Authorize(LedgerPurchaseRequest request);
         LedgerPurchaseResult Capture(Guid purchaseID, Guid expectedBuyerID);
         LedgerPurchaseResult Cancel(Guid purchaseID, Guid expectedBuyerID);
+        IReadOnlyList<LedgerPendingPurchase> GetPending(DateTime createdBeforeUtc, int limit);
+    }
+
+    public sealed class LedgerPendingPurchase
+    {
+        public Guid PurchaseID { get; set; }
+        public Guid BuyerID { get; set; }
+        public Guid SellerID { get; set; }
+        public long Amount { get; set; }
+        public int TransactionType { get; set; }
+        public Guid RegionID { get; set; }
+        public Guid ObjectID { get; set; }
+        public string Description { get; set; } = String.Empty;
+        public DateTime CreatedUtc { get; set; }
     }
 
     public interface IEconomyLedger

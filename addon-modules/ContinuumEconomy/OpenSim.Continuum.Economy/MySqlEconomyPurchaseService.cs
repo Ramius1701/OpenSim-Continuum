@@ -3,6 +3,7 @@ using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Collections.Generic;
 using MySql.Data.MySqlClient;
 
 namespace OpenSim.Continuum.Economy
@@ -120,6 +121,35 @@ namespace OpenSim.Continuum.Economy
             transaction.Commit();
             return Result(purchaseID, LedgerResultCode.Committed, LedgerPurchaseState.Cancelled,
                 buyerBalance, available, sellerBalance, "Purchase cancelled");
+        }
+
+        public IReadOnlyList<LedgerPendingPurchase> GetPending(DateTime createdBeforeUtc, int limit)
+        {
+            if (limit < 1 || limit > 500)
+                throw new ArgumentOutOfRangeException(nameof(limit), "Pending purchase limit must be between 1 and 500");
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT purchase_id,buyer_id,seller_id,amount,transaction_type,
+                    region_id,object_id,description,created_utc
+                FROM continuum_economy_purchases WHERE state=1 AND created_utc < ?before
+                ORDER BY created_utc,purchase_id LIMIT ?limit";
+            command.Parameters.AddWithValue("?before", createdBeforeUtc.ToUniversalTime());
+            command.Parameters.AddWithValue("?limit", limit);
+            List<LedgerPendingPurchase> pending = new(limit);
+            using MySqlDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                pending.Add(new LedgerPendingPurchase
+                {
+                    PurchaseID=Guid.Parse(reader.GetString(0)), BuyerID=Guid.Parse(reader.GetString(1)),
+                    SellerID=Guid.Parse(reader.GetString(2)), Amount=reader.GetInt64(3),
+                    TransactionType=reader.GetInt32(4), RegionID=Guid.Parse(reader.GetString(5)),
+                    ObjectID=Guid.Parse(reader.GetString(6)), Description=reader.GetString(7),
+                    CreatedUtc=DateTime.SpecifyKind(reader.GetDateTime(8),DateTimeKind.Utc)
+                });
+            }
+            return pending;
         }
 
         private static LedgerPurchaseResult Validate(LedgerPurchaseRequest request)
