@@ -187,6 +187,15 @@ namespace OpenSim.Continuum.Economy
                     return AdjustmentResult(request.OperationID, LedgerResultCode.InsufficientFunds, balance, "Insufficient funds");
                 }
 
+                string policyFailure = request.Kind == LedgerAdjustmentKind.Credit
+                    ? CheckCreditPolicy(connection, transaction, request, balance) : null;
+                if (policyFailure != null)
+                {
+                    InsertAdjustment(connection, transaction, request, fingerprint, 3, balance, policyFailure);
+                    transaction.Commit();
+                    return AdjustmentResult(request.OperationID, LedgerResultCode.InvalidRequest, balance, policyFailure);
+                }
+
                 long signedAmount = request.Kind == LedgerAdjustmentKind.Credit ? request.Amount : -request.Amount;
                 long updatedBalance;
                 try
@@ -309,6 +318,22 @@ namespace OpenSim.Continuum.Economy
             return entries;
         }
 
+        public long GetCreditedTotal(Guid accountID, int transactionType, DateTime sinceUtc)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT COALESCE(SUM(amount), 0) FROM continuum_economy_adjustments
+                WHERE account_id = ?account AND transaction_type = ?type
+                  AND adjustment_kind = 1 AND status = 1 AND created_utc >= ?since";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            command.Parameters.AddWithValue("?type", transactionType);
+            command.Parameters.AddWithValue("?since", sinceUtc.ToUniversalTime());
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
         private static LedgerTransferResult Validate(LedgerTransferRequest request)
         {
             if (request == null)
@@ -338,7 +363,46 @@ namespace OpenSim.Continuum.Economy
             if (String.IsNullOrWhiteSpace(request.Reason) || request.Reason.Length > 255)
                 return AdjustmentResult(request.OperationID, LedgerResultCode.InvalidRequest, 0,
                     "A reason between 1 and 255 characters is required");
+            if (request.MaximumBalance < 0 || request.DailyCreditLimit < 0 ||
+                request.WeeklyCreditLimit < 0 || request.MonthlyCreditLimit < 0)
+                return AdjustmentResult(request.OperationID, LedgerResultCode.InvalidRequest, 0,
+                    "Credit limits cannot be negative");
             return null;
+        }
+
+        private static string CheckCreditPolicy(MySqlConnection connection, MySqlTransaction transaction,
+            LedgerAdjustmentRequest request, long balance)
+        {
+            if (request.MaximumBalance > 0 &&
+                (balance > request.MaximumBalance || request.Amount > request.MaximumBalance - balance))
+                return "The purchase would exceed the maximum account balance";
+            DateTime now = DateTime.UtcNow;
+            DateTime day = now.Date;
+            DateTime week = day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
+            DateTime month = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            if (ExceedsCreditLimit(connection, transaction, request, day, request.DailyCreditLimit))
+                return "The daily currency purchase limit would be exceeded";
+            if (ExceedsCreditLimit(connection, transaction, request, week, request.WeeklyCreditLimit))
+                return "The weekly currency purchase limit would be exceeded";
+            if (ExceedsCreditLimit(connection, transaction, request, month, request.MonthlyCreditLimit))
+                return "The monthly currency purchase limit would be exceeded";
+            return null;
+        }
+
+        private static bool ExceedsCreditLimit(MySqlConnection connection, MySqlTransaction transaction,
+            LedgerAdjustmentRequest request, DateTime sinceUtc, long limit)
+        {
+            if (limit == 0) return false;
+            using MySqlCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = @"SELECT COALESCE(SUM(amount), 0) FROM continuum_economy_adjustments
+                WHERE account_id = ?account AND transaction_type = ?type AND adjustment_kind = 1
+                  AND status = 1 AND created_utc >= ?since";
+            command.Parameters.AddWithValue("?account", request.AccountID.ToString());
+            command.Parameters.AddWithValue("?type", request.TransactionType);
+            command.Parameters.AddWithValue("?since", sinceUtc);
+            long prior = Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+            return prior > limit || request.Amount > limit - prior;
         }
 
         private static void ReserveOperation(MySqlConnection connection, MySqlTransaction transaction,
@@ -402,8 +466,10 @@ namespace OpenSim.Continuum.Economy
                 return AdjustmentResult(operationID, LedgerResultCode.TransactionConflict, 0,
                     "The operation ID is already associated with a different request");
             int status = reader.GetInt32(1);
-            return AdjustmentResult(operationID, status == 1 ? LedgerResultCode.Replayed : LedgerResultCode.InsufficientFunds,
-                reader.GetInt64(2), status == 1 ? "Adjustment already committed" : reader.GetString(3));
+            LedgerResultCode code = status == 1 ? LedgerResultCode.Replayed :
+                status == 2 ? LedgerResultCode.InsufficientFunds : LedgerResultCode.InvalidRequest;
+            return AdjustmentResult(operationID, code, reader.GetInt64(2),
+                status == 1 ? "Adjustment already committed" : reader.GetString(3));
         }
 
         private static string AdjustmentFingerprint(LedgerAdjustmentRequest request)
@@ -411,6 +477,15 @@ namespace OpenSim.Continuum.Economy
             string canonical = String.Join("|", request.AccountID, request.ActorID,
                 request.Amount.ToString(CultureInfo.InvariantCulture), ((int)request.Kind).ToString(CultureInfo.InvariantCulture),
                 request.TransactionType.ToString(CultureInfo.InvariantCulture), request.Reason);
+            // Preserve request hashes produced before credit-policy fields were
+            // introduced when all policy values use their original zero defaults.
+            if (request.MaximumBalance != 0 || request.DailyCreditLimit != 0 ||
+                request.WeeklyCreditLimit != 0 || request.MonthlyCreditLimit != 0)
+                canonical = String.Join("|", canonical,
+                    request.MaximumBalance.ToString(CultureInfo.InvariantCulture),
+                    request.DailyCreditLimit.ToString(CultureInfo.InvariantCulture),
+                    request.WeeklyCreditLimit.ToString(CultureInfo.InvariantCulture),
+                    request.MonthlyCreditLimit.ToString(CultureInfo.InvariantCulture));
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
         }
 

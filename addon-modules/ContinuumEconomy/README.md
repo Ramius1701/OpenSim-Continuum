@@ -76,3 +76,11 @@ spendable funds without crediting the seller; successful delivery captures the
 hold atomically, while failed delivery cancels it without a reverse transfer.
 Ordinary transfers subtract active holds when checking available funds, which
 prevents concurrent spending from consuming money reserved for a purchase.
+
+The compatibility adapter now covers authenticated login and initial balances,
+available-balance queries, resident and forced transfers, scripted transfers,
+object-payment delivery, two-phase object sales, charges, banker credits,
+stipends and viewer currency purchases. Purchase-period and maximum-balance
+limits execute under the same account lock as the credit. Legacy behavior
+remains selected unless both MoneyServer `ContinuumEconomyEnabled` and region
+`ContinuumPurchaseRpc` are deliberately enabled after migration.

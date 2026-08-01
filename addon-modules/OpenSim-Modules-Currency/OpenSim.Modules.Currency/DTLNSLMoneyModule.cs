@@ -1672,6 +1672,7 @@ namespace OpenSim.Modules.Currency
                 // Fill parameters for money transfer XML-RPC.
                 if (type < 0) type = (int)TransactionType.ReferBonus;
                 Hashtable paramTable = new Hashtable();
+                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["receiverID"] = avatarID.ToString();
                 paramTable["transactionType"] = type;
                 paramTable["amount"] = amount;
@@ -1714,6 +1715,7 @@ namespace OpenSim.Modules.Currency
             {
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
+                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = senderID.ToString();
                 paramTable["receiverID"] = receiverID.ToString();
                 paramTable["transactionType"] = (int)TransactionType.MoveMoney;

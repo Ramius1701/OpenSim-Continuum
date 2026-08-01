@@ -68,6 +68,10 @@ namespace OpenSim.Continuum.Economy
         public LedgerAdjustmentKind Kind { get; set; }
         public int TransactionType { get; set; }
         public string Reason { get; set; } = String.Empty;
+        public long MaximumBalance { get; set; }
+        public long DailyCreditLimit { get; set; }
+        public long WeeklyCreditLimit { get; set; }
+        public long MonthlyCreditLimit { get; set; }
     }
 
     public sealed class LedgerAdjustmentResult
@@ -128,5 +132,6 @@ namespace OpenSim.Continuum.Economy
         LedgerTransferResult Transfer(LedgerTransferRequest request);
         LedgerAdjustmentResult Adjust(LedgerAdjustmentRequest request);
         IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit);
+        long GetCreditedTotal(Guid accountID, int transactionType, DateTime sinceUtc);
     }
 }
