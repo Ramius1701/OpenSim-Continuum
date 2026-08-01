@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+﻿using System;
+using System.Reflection;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -57,7 +58,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (!m_Enabled)
                 return;
 
+            scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
+            scene.UnregisterModuleInterface<IDisplayNameModule>(this);
             m_Scene = null;
+            m_EventQueue = null;
         }
 
         public void RegionLoaded(Scene scene)
@@ -135,55 +139,71 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
             }
 
-            var userData = m_Scene.UserManagementModule.GetUserData(agent_id);
-
-            if (userData.NameChanged.AddDays(7) > DateTime.UtcNow)
+            UserData userData = m_Scene.UserManagementModule.GetUserData(agent_id);
+            if (userData is null)
             {
-                m_Scene.GetScenePresence(agent_id).ControllingClient.SendAlertMessage("You can only change your display name once a week!");
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
 
-            OSDMap req = (OSDMap)OSDParser.DeserializeLLSDXml(httpRequest.InputStream);
-            if (req.ContainsKey("display_name"))
+            if (userData.NameChanged.AddDays(7) > DateTime.UtcNow)
             {
-                OSDArray name = req["display_name"] as OSDArray;
-
-                string oldName = name[0].AsString();
-                string newName = name[1].AsString();
-
-                bool resetting = string.IsNullOrWhiteSpace(newName);
-                if (resetting) newName = string.Empty;
-
-                bool success = m_Scene.UserManagementModule.SetDisplayName(agent_id, newName);
-
-                if (success)
-                {
-                    // Update the current object
-                    userData.DisplayName = newName;
-                    userData.NameChanged = DateTime.UtcNow;
-
-                    if (resetting)
-                        m_log.InfoFormat("[DISPLAY NAMES] {0} {1} reset their display name", userData.FirstName, userData.LastName);
-                    else
-                        m_log.InfoFormat("[DISPLAY NAMES] {0} {1} changed their display name to {2}", userData.FirstName, userData.LastName, userData.DisplayName);
-
-                    DateTime next_update = DateTime.UtcNow.AddDays(7);
-
-                    OSD update = FormatDisplayNameUpdate(oldName, userData, next_update);
-
-                    m_Scene.ForEachClient(x => {
-                        m_EventQueue.Enqueue(update, x.AgentId);
-                    });
-
-                    SendSetDisplayNameReply(newName, oldName, userData, next_update);
-                }
-                else
-                {
-                    m_Scene.GetScenePresence(agent_id).ControllingClient.SendAlertMessage("Failed to update display name.");
-                    httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
-                    return;
-                }
+                sp.ControllingClient.SendAlertMessage("You can only change your display name once a week!");
+                httpResponse.StatusCode = (int)HttpStatusCode.TooManyRequests;
+                return;
             }
+
+            OSDMap req;
+            try
+            {
+                req = OSDParser.DeserializeLLSDXml(httpRequest.InputStream) as OSDMap;
+            }
+            catch (Exception e)
+            {
+                m_log.DebugFormat("[DISPLAY NAMES]: Invalid SetDisplayName request for {0}: {1}", agent_id, e.Message);
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (req is null || !req.TryGetValue("display_name", out OSD displayNameValue) ||
+                displayNameValue is not OSDArray name || name.Count < 2)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            string oldName = userData.ViewerDisplayName;
+            string newName = name[1].AsString().Trim();
+            bool resetting = string.IsNullOrWhiteSpace(newName);
+            if (resetting)
+                newName = string.Empty;
+
+            if (newName.Length > 31 || newName.IndexOfAny(['\r', '\n', '\t']) >= 0)
+            {
+                sp.ControllingClient.SendAlertMessage("Display names must be 31 characters or fewer and cannot contain control characters.");
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (!m_Scene.UserManagementModule.SetDisplayName(agent_id, newName))
+            {
+                sp.ControllingClient.SendAlertMessage("Failed to update display name.");
+                httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
+                return;
+            }
+
+            userData.DisplayName = newName;
+            userData.NameChanged = DateTime.UtcNow;
+
+            if (resetting)
+                m_log.InfoFormat("[DISPLAY NAMES] {0} {1} reset their display name", userData.FirstName, userData.LastName);
+            else
+                m_log.InfoFormat("[DISPLAY NAMES] {0} {1} changed their display name to {2}", userData.FirstName, userData.LastName, userData.DisplayName);
+
+            DateTime next_update = DateTime.UtcNow.AddDays(7);
+            OSD update = FormatDisplayNameUpdate(oldName, userData, next_update);
+            m_Scene.ForEachClient(x => m_EventQueue.Enqueue(update, x.AgentId));
+            SendSetDisplayNameReply(newName, oldName, userData, next_update);
 
             httpResponse.ContentType = "application/llsd+xml";
             httpResponse.RawBuffer = Utils.StringToBytes("<llsd><undef/></llsd>");
