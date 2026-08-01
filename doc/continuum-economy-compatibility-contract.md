@@ -64,6 +64,11 @@ transaction totals, produce a signed/reportable discrepancy list, and require
 an explicit cutover. It must never update the old and new ledgers concurrently
 without a designed dual-write protocol and reconciliation test.
 
+The importer must run while the legacy MoneyServer is stopped. Transaction
+history is archived in `continuum_economy_legacy_transactions`; it is not replayed
+into the new ledger and therefore cannot change imported balances. A completed
+manifest records source account count, total balance and history-row count.
+
 ## Donor boundary
 
 WhiteCore supplies behavior and schema requirements for group accounting,

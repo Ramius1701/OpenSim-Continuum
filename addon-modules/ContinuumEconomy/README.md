@@ -28,3 +28,11 @@ Donor lineage:
 
 Gloebit is excluded. Do not point a production region at this package until the
 legacy importer, authentication, adapters and failure tests are complete.
+
+The legacy importer has two explicit operations. `Analyze()` only reads the
+legacy `balances` and `transactions` tables. `Import()` requires an empty target,
+rejects invalid UUIDs and negative balances, copies balances in one repeatable
+read transaction, archives transaction history separately, reconciles every
+balance, and commits an import manifest. Stop MoneyServer and snapshot the
+database before running an eventual migration tool; no command-line migration
+tool is published yet.
