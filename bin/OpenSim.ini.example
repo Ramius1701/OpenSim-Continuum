@@ -850,6 +850,8 @@
     ;; Enables the viewer SendUserReport and SendUserReportWithScreenshot CAPS.
     ;; The service connector must also be enabled for the active architecture.
     ; Enabled = true
+    ;; Maximum screenshot upload size in bytes. Set to 0 to reject screenshots.
+    ; MaxScreenshotBytes = 5242880
 
 [BulletSim]
     ;# {AvatarToAvatarCollisionsByDefault} {[Startup]physics:BulletSim} {Should avatars collide with each other?} {true false} true

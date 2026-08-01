@@ -25,6 +25,7 @@ namespace OpenSim.Region.ClientStack.Linden
         private Scene m_Scene;
         private IAbuseReportsService m_Connector;
         private IUserManagement m_UserManager;
+        private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
 
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
@@ -33,6 +34,8 @@ namespace OpenSim.Region.ClientStack.Linden
         {
             IConfig config = source.Configs["AbuseReports"];
             m_Enabled = config != null && config.GetBoolean("Enabled", false);
+            if (config != null)
+                m_MaxScreenshotBytes = Math.Max(0, config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes));
 
             if (m_Enabled)
                 m_log.Info("[ABUSE REPORTS]: Viewer abuse report CAPS enabled");
@@ -226,7 +229,16 @@ namespace OpenSim.Region.ClientStack.Linden
                         report.ImageData = data ?? Array.Empty<byte>();
 
                         OSDMap uploadResponse = new OSDMap();
-                        if (m_Connector.ReportAbuse(report))
+                        if (report.ImageData.Length > m_MaxScreenshotBytes)
+                        {
+                            m_log.WarnFormat(
+                                "[ABUSE REPORTS]: Rejected {0}-byte screenshot from {1}; limit is {2} bytes",
+                                report.ImageData.Length,
+                                report.SenderName,
+                                m_MaxScreenshotBytes);
+                            uploadResponse["state"] = "failed";
+                        }
+                        else if (m_Connector.ReportAbuse(report))
                         {
                             m_log.InfoFormat(
                                 "[ABUSE REPORTS]: {0} reported {1} with screenshot in {2}",
@@ -252,7 +264,8 @@ namespace OpenSim.Region.ClientStack.Linden
                 OSDMap response = new OSDMap
                 {
                     ["state"] = "upload",
-                    ["uploader"] = "http://" + caps.HostName + ":" + caps.Port + uploader.Path
+                    ["uploader"] = (caps.SSLCaps ? "https://" : "http://") +
+                        (caps.SSLCaps ? caps.SSLCommonName : caps.HostName) + ":" + caps.Port + uploader.Path
                 };
 
                 return OSDParser.SerializeLLSDXmlString(response);
