@@ -115,9 +115,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 caps.RegisterSimpleHandler("SetDisplayName", new SimpleStreamHandler($"/{UUID.Random()}", (req, resp) => SetDisplayName(agentID, req, resp)));
 
                 // A live name change sends DisplayNameUpdate immediately, but that
-                // viewer cache is lost on relog. Seed it again from the persisted
-                // grid account when the agent receives its new capabilities so the
-                // in-world nameplate agrees with search and the nearby-people list.
+                // update is local to one simulator. Discard this simulator's cached
+                // account before seeding capabilities so crossings, relogs, and a
+                // login on another simulator read the Robust-authoritative value.
+                m_Scene.UserManagementModule.RemoveUser(agentID);
                 UserData userData = m_Scene.UserManagementModule.GetUserData(agentID);
                 if (userData is not null)
                 {

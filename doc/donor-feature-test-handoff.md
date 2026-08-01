@@ -54,6 +54,17 @@ Do not deploy either test branch over the running grid in place. Build and confi
 
 - WhiteCore WebUI is not copied into OpenSim. It is a separate grid-wide web application with a divergent service/data architecture; use it only as a behavioural and administrative acceptance-test reference.
 - Mobius establishes provenance for Display Names, Experiences, and Abuse Reports. Tranquillity supplies the traceable enhanced service implementation used here. Gunthar's Experience-Lite behavior is tested as an opt-in script layer and is not allowed to replace the authoritative Tranquillity service.
+
+### Display Names multi-simulator gate
+
+Display Names are not accepted on a single-region result. With at least two
+separate simulator processes connected to the same Robust services, cache the
+same resident on both, change the name on simulator A, and verify simulator B
+returns the new Robust value through `GetDisplayNames`. Then cross A→B, relog
+directly into B, restart B only, and restart the complete grid. In every case
+the nameplate, nearby list, profile/search results, and display-name LSL calls
+must agree. Repeat reset-to-legacy-name and test an adjacent-region observer.
+Failure of any step blocks promotion.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
 - SQLite and PGSQL providers for the new full Experience service are not present and are not claimed production-ready. The production certification target is MySQL/MariaDB with Robust.

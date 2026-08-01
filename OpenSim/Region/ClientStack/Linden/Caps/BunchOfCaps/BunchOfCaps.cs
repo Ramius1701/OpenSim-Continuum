@@ -2278,6 +2278,17 @@ namespace OpenSim.Region.ClientStack.Linden
             }
             else
             {
+                // Display names are mutable grid-wide state. UserManagement caches
+                // are simulator-local and receive no invalidation when another sim
+                // accepts SetDisplayName, so a normal cache read can remain stale for
+                // up to 30 minutes. Refresh only the UUIDs explicitly requested by
+                // this capability before formatting the viewer response.
+                foreach (string id in ids)
+                {
+                    if (UUID.TryParse(id, out UUID userID) && !userID.IsZero())
+                        m_UserManager.RemoveUser(userID);
+                }
+
                 List<UserData> names = m_UserManager.GetKnownUsers(ids, m_scopeID);
                 lsl = LLSDxmlEncode2.Start(names.Count * 256 + 256);
 
