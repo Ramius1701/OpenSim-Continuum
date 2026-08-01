@@ -94,3 +94,9 @@ Manual `capture-hold` and `cancel-hold` commands require the exact purchase and
 buyer UUIDs, a delivery-success or delivery-failure evidence assertion, and a
 different literal confirmation for each outcome. Buyer binding is checked
 again inside the locked database operation.
+
+Group economy accounts use account type 100, distinct from resident and legacy
+avatar classifications. `register-group` requires explicit operation, group and
+actor UUIDs, a name and literal confirmation. Registration reserves the global
+operation ID and writes an immutable provenance row; an existing UUID with a
+different account class is rejected.

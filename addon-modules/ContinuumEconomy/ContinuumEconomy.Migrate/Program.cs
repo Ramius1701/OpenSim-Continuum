@@ -13,6 +13,7 @@ namespace ContinuumEconomy.Migrate
         {
             if (args.Length == 0 || (args[0] != "analyze" && args[0] != "holds" &&
                 args[0] != "capture-hold" && args[0] != "cancel-hold" &&
+                args[0] != "register-group" &&
                 args[0] != "initialize" && args[0] != "import"))
             {
                 Usage();
@@ -79,6 +80,27 @@ namespace ContinuumEconomy.Migrate
                     Console.WriteLine("Result:   {0}", result.Code);
                     Console.WriteLine("Message:  {0}", result.Message);
                     return result.Succeeded ? 0 : 3;
+                }
+
+                if (args[0] == "register-group")
+                {
+                    if (!Guid.TryParse(ArgumentValue(args, "--operation="), out Guid operationID) || operationID == Guid.Empty ||
+                        !Guid.TryParse(ArgumentValue(args, "--group="), out Guid groupID) || groupID == Guid.Empty ||
+                        !Guid.TryParse(ArgumentValue(args, "--actor="), out Guid actorID) || actorID == Guid.Empty ||
+                        String.IsNullOrWhiteSpace(ArgumentValue(args, "--name=")) ||
+                        Array.IndexOf(args, "--confirm=REGISTER-GROUP-ECONOMY-ACCOUNT") < 0)
+                    {
+                        Console.Error.WriteLine("Group registration refused: operation, group, actor, name and literal confirmation are required.");
+                        Usage();
+                        return 2;
+                    }
+                    LedgerResultCode code = new MySqlEconomyAccountService(connectionString).Register(
+                        new LedgerAccountRegistrationRequest { OperationID=operationID, AccountID=groupID,
+                            ActorID=actorID, AccountType=LedgerAccountType.Group,
+                            DisplayName=ArgumentValue(args, "--name=") }, out string registrationMessage);
+                    Console.WriteLine("Result:  {0}", code);
+                    Console.WriteLine("Message: {0}", registrationMessage);
+                    return code == LedgerResultCode.Committed || code == LedgerResultCode.Replayed ? 0 : 3;
                 }
 
                 if (args[0] == "initialize")
@@ -148,6 +170,7 @@ namespace ContinuumEconomy.Migrate
             Console.Error.WriteLine("  ContinuumEconomy.Migrate holds [--older-than-minutes=15]");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate capture-hold --purchase=UUID --buyer=UUID --delivery-verified --confirm=CAPTURE-AUTHORIZED-PURCHASE");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate cancel-hold --purchase=UUID --buyer=UUID --delivery-failed-verified --confirm=CANCEL-AUTHORIZED-PURCHASE");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate register-group --operation=UUID --group=UUID --actor=UUID --name=NAME --confirm=REGISTER-GROUP-ECONOMY-ACCOUNT");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate initialize {0}", SchemaConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
         }

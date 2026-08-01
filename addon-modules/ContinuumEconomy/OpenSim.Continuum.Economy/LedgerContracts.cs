@@ -18,6 +18,27 @@ namespace OpenSim.Continuum.Economy
         Debit = 2
     }
 
+    public enum LedgerAccountType
+    {
+        Resident = 0,
+        Group = 100,
+        System = 200
+    }
+
+    public sealed class LedgerAccountRegistrationRequest
+    {
+        public Guid OperationID { get; set; }
+        public Guid AccountID { get; set; }
+        public Guid ActorID { get; set; }
+        public LedgerAccountType AccountType { get; set; }
+        public string DisplayName { get; set; } = String.Empty;
+    }
+
+    public interface IEconomyAccountService
+    {
+        LedgerResultCode Register(LedgerAccountRegistrationRequest request, out string message);
+    }
+
     public sealed class LedgerTransferRequest
     {
         public Guid TransactionID { get; set; }

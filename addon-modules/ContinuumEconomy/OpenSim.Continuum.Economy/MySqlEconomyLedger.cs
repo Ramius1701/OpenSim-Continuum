@@ -703,6 +703,13 @@ CREATE TABLE IF NOT EXISTS continuum_economy_purchases (
  completed_utc TIMESTAMP(6) NULL, PRIMARY KEY (purchase_id),
  KEY idx_continuum_economy_purchase_buyer_state (buyer_id, state),
  KEY idx_continuum_economy_purchase_seller_time (seller_id, created_utc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS continuum_economy_account_registrations (
+ operation_id CHAR(36) NOT NULL, request_hash CHAR(64) NOT NULL,
+ account_id CHAR(36) NOT NULL, actor_id CHAR(36) NOT NULL,
+ account_type TINYINT UNSIGNED NOT NULL, display_name VARCHAR(255) NOT NULL,
+ created_utc TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (operation_id),
+ KEY idx_continuum_economy_registration_account (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
     }
 }
