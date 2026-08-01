@@ -1986,6 +1986,13 @@ namespace OpenSim.Grid.MoneyServer
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
+            if (requestData.ContainsKey("transactionID") &&
+                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
+            {
+                responseData["message"] = "Invalid transaction identifier";
+                return response;
+            }
+
             if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
             if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
             if (requestData.ContainsKey("senderSessionID")) senderSessionID = (string)requestData["senderSessionID"];
@@ -2112,6 +2119,13 @@ namespace OpenSim.Grid.MoneyServer
 
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
+
+            if (requestData.ContainsKey("transactionID") &&
+                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
+            {
+                responseData["message"] = "Invalid transaction identifier";
+                return response;
+            }
 
             //
             if (!m_forceTransfer)

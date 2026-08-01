@@ -1485,6 +1485,10 @@ namespace OpenSim.Modules.Currency
 
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
+                // Keep one identifier for every retry of this logical request.  New
+                // Continuum ledgers use it for idempotency; legacy MoneyServer
+                // versions safely ignore the additional field.
+                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = sender.ToString();
                 paramTable["receiverID"] = receiver.ToString();
                 paramTable["senderSessionID"] = senderClient.SessionId.ToString();
@@ -1538,6 +1542,7 @@ namespace OpenSim.Modules.Currency
 
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
+                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = sender.ToString();
                 paramTable["receiverID"] = receiver.ToString();
                 paramTable["transactionType"] = type;
