@@ -80,7 +80,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private bool m_textureAverageTerrain = false; // replace terrain textures by their average color
         private bool m_texturePrims = true;     // true if should texture the rendered prims
         private float m_texturePrimSize = 48f;  // size of prim before we consider texturing it
-        private bool m_renderMeshes = true;     // true if to render meshes rather than just bounding boxes
+        private bool m_renderMeshes = false;    // opt-in: render meshes rather than just bounding boxes
         private bool m_useCachedAssetsOnly = true;
         private bool m_skipMissingExternalGeometry = true;
         private bool m_skipFlatTextureCardsWithoutTexture = true;
@@ -90,7 +90,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private int m_maxMeshAssetDecodes = 2048;
         private int m_maxTextureAssetDecodes = 192;
         private int m_textureDownsample = 8;
-        private bool m_drawFlatTextureCardSprites = true;
+        private bool m_drawFlatTextureCardSprites = false;
         private int m_spriteRenderTimeBudgetMS = 12000;
         private int m_maxSpriteTextureDecodes = 512;
         private int m_spriteTextureMaxSize = 256;

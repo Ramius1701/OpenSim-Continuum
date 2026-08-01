@@ -617,7 +617,7 @@
 
     ;# {RenderMeshes} {} {Render meshes and sculpties on map tiles?} {true false} true
     ;; Attempt to render meshes and sculpties on the map.
-    ; RenderMeshes = true
+    ; RenderMeshes = false
 
     ;# {Map3DUseCachedAssetsOnly} {RenderMeshes} {Use only cached mesh/sculpt/texture assets while rendering 3D maptiles?} {true false} true
     ;; Keeps maptile generation from blocking simulator threads on remote asset fetches.
@@ -644,8 +644,8 @@
     ;# {Map3DForceGC} {} {Force full GC after 3D maptile generation?} {true false} false
     ; Map3DForceGC = false
 
-    ;# {Map3DDrawFlatTextureCardSprites} {TexturePrims} {Draw alpha-textured flat cards as real texture sprites after the 3D pass so vertical billboard trees/decorations remain visible from the map view?} {true false} true
-    ; Map3DDrawFlatTextureCardSprites = true
+    ;# {Map3DDrawFlatTextureCardSprites} {TexturePrims} {Draw alpha-textured flat cards as real texture sprites after the 3D pass so vertical billboard trees/decorations remain visible from the map view?} {true false} false
+    ; Map3DDrawFlatTextureCardSprites = false
 
     ;# {Map3DTextureCardSpriteBudgetMS} {Map3DDrawFlatTextureCardSprites} {Maximum time budget for the texture-card sprite overlay pass per region maptile} {} 12000
     ; Map3DTextureCardSpriteBudgetMS = 12000
