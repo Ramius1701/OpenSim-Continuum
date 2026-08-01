@@ -1504,6 +1504,45 @@ namespace OpenSim.Region.CoreModules.World.Estate
                     if (needReply)
                         sendExperienceLists[remote_client] = invoice;
                 }
+
+                if ((estateAccessType & 64) != 0) // add blocked experience
+                {
+                    if (thisSettings.BlockedExperiencesCount() >= (int)Constants.EstateAccessLimits.BlockedExperiences)
+                    {
+                        remote_client.SendAlertMessage("Estate Blocked Experiences list is full");
+                    }
+                    else
+                    {
+                        if (doOtherEstates)
+                        {
+                            foreach (EstateSettings estateSettings in otherEstates)
+                            {
+                                if (estateSettings.BlockedExperiencesCount() >= (int)Constants.EstateAccessLimits.BlockedExperiences)
+                                    continue;
+                                estateSettings.AddBlockedExperience(experience);
+                                changed[(int)estateSettings.EstateID] = estateSettings;
+                            }
+                        }
+
+                        thisSettings.AddBlockedExperience(experience);
+                        changed[thisEstateID] = thisSettings;
+                    }
+                }
+
+                if ((estateAccessType & 128) != 0) // remove blocked experience
+                {
+                    if (doOtherEstates)
+                    {
+                        foreach (EstateSettings estateSettings in otherEstates)
+                        {
+                            estateSettings.RemoveBlockedExperience(experience);
+                            changed[(int)estateSettings.EstateID] = estateSettings;
+                        }
+                    }
+
+                    thisSettings.RemoveBlockedExperience(experience);
+                    changed[thisEstateID] = thisSettings;
+                }
             }
             lock (deltareqLock)
                 runnigDeltaExec = false;
@@ -2300,4 +2339,3 @@ namespace OpenSim.Region.CoreModules.World.Estate
         }
     }
 }
-

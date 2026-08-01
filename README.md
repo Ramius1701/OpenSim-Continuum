@@ -31,7 +31,7 @@ Do not replace a running production installation in place. Build a separate test
 
 ### Experiences and scripting
 
-- Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel integration, MySQL storage, and restart handling
+- Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, MySQL storage, and restart handling
 - Gunthar Experience scripting additions reconciled with the authoritative Tranquillity service
 - Experience permission, Combat2 damage, and path-update script events
 - Experience KVP, permission, sit, environment, and information APIs

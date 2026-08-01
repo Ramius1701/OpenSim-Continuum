@@ -104,7 +104,8 @@ namespace OpenSim.Framework
             EstateBans = 500,
             EstateManagers = MaxEstateManagers,
             AllowedExperiences = 8,
-            KeyExperiences = 8
+            KeyExperiences = 8,
+            BlockedExperiences = 8
         }
 
         [Flags]public enum TeleportFlags : uint

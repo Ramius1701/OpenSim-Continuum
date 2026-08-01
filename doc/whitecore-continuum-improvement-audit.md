@@ -129,8 +129,12 @@ The goals are:
 - **Current equivalent:** Continuum has the Tranquillity/Mobius service, MySQL
   schema, Robust connector, region connector, CAPS handlers, estate lists, LSL
   functions, and script permission integration.
-- **Genuinely missing or unproven:** runtime CAPS visibility; correct GET/PUT
-  behaviour for `RegionExperiences`; parcel allowed/blocked list mutation;
+- **Implemented checkpoint:** the Experience capability family is published;
+  `RegionExperiences` supports estate-authorized viewer GET/POST management;
+  estate trusted, allowed and blocked policy persists in MySQL; parcel allowed
+  and blocked entries are returned to the viewer as well as accepted; and
+  blocked estate/parcel policy overrides script permission grants.
+- **Still unproven at runtime:** tab visibility after deployment;
   Experience create/edit/search usability; contributor/admin paths; grid-wide
   vs estate vs parcel policy; restart and multi-region enforcement. WhiteCore's
   inspected handlers often return empty maps, so they are not a functional
@@ -399,8 +403,9 @@ predate current .NET OpenSim work. The useful performance lessons are narrower:
    viewer cache and full Robust/simulator restart.
 2. Complete authenticated Abuse Report list/get/update console and Robust APIs,
    then notification, then the later portal UI.
-3. Capture the Experience seed response and finish region/parcel mutation and
-   full Experience CRUD/permission tests.
+3. Deploy the completed Experience seed, region/parcel mutation and blocked
+   policy checkpoint, then capture viewer traffic and run the full Experience
+   CRUD/permission/restart test matrix.
 4. Reproduce the prim script paste/save issue with CAPS lifecycle diagnostics;
    port nothing from WhiteCore unless a specific semantic difference is proven.
 5. Run identity/profile/group contract tests and correct only demonstrated

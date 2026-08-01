@@ -1048,6 +1048,16 @@ namespace OpenSim.Region.CoreModules.World.Land
             }
             else
                 remote_client.SendLandAccessListData(banlist, (uint)AccessList.Ban, LandData.LocalID);
+
+            if (allowed.Count == 0)
+                remote_client.SendLandAccessListData(new List<LandAccessEntry>() { new LandAccessEntry() }, 8u, LandData.LocalID);
+            else
+                remote_client.SendLandAccessListData(allowed, 8u, LandData.LocalID);
+
+            if (blocked.Count == 0)
+                remote_client.SendLandAccessListData(new List<LandAccessEntry>() { new LandAccessEntry() }, 0x10u, LandData.LocalID);
+            else
+                remote_client.SendLandAccessListData(blocked, 0x10u, LandData.LocalID);
         }
 
         public void UpdateAccessList(uint flags, UUID transactionID, List<LandAccessEntry> entries)

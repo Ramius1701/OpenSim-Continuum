@@ -143,7 +143,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             caps.RegisterHandler("GetExperienceInfo", new GetExperienceInfoGetHandler(agent, this));
             caps.RegisterHandler("IsExperienceAdmin", new IsExperienceAdminGetHandler(agent, this));
             caps.RegisterHandler("IsExperienceContributor", new IsExperienceContributorGetHandler(agent, this));
-            caps.RegisterHandler("RegionExperiences", new RegionExperiencesGetHandler(agent, this));
+            caps.RegisterSimpleHandler("RegionExperiences",
+                new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    HandleRegionExperiences(httpRequest, httpResponse, agent);
+                }));
             caps.RegisterHandler("UpdateExperience", new UpdateExperiencePostHandler(agent, this));
             caps.RegisterHandler("GetMetadata", new GetMetadataPostHandler(agent, this, m_scene));
             caps.RegisterHandler("GroupExperiences", new GroupExperiencesGetHandler(agent, this));
@@ -158,6 +162,98 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             m_log.DebugFormat(
                 "[EXPERIENCE]: Registered viewer capabilities for agent {0} in region {1}",
                 agent, m_scene.RegionInfo.RegionName);
+        }
+
+        private void HandleRegionExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
+        {
+            if (request.HttpMethod == "POST")
+            {
+                if (!m_scene.Permissions.IsAdministrator(agentID) && !m_scene.Permissions.IsEstateManager(agentID))
+                {
+                    response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    return;
+                }
+
+                OSDMap body;
+                try
+                {
+                    body = OSDParser.DeserializeLLSDXml(request.InputStream) as OSDMap;
+                }
+                catch
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
+
+                if (body == null)
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
+
+                UUID[] allowed = ReadExperienceList(body, "allowed", (int)Constants.EstateAccessLimits.AllowedExperiences);
+                UUID[] blocked = ReadExperienceList(body, "blocked", (int)Constants.EstateAccessLimits.BlockedExperiences);
+                UUID[] trusted = ReadExperienceList(body, "trusted", (int)Constants.EstateAccessLimits.KeyExperiences);
+                if (allowed == null || blocked == null || trusted == null)
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
+
+                // A policy entry must have one meaning. Trusted takes precedence,
+                // followed by blocked, then ordinarily allowed.
+                HashSet<UUID> trustedSet = new(trusted);
+                HashSet<UUID> blockedSet = new(blocked.Where(id => !trustedSet.Contains(id)));
+                allowed = allowed.Where(id => !trustedSet.Contains(id) && !blockedSet.Contains(id)).ToArray();
+
+                EstateSettings settings = m_scene.RegionInfo.EstateSettings;
+                settings.AllowedExperiences = allowed;
+                settings.BlockedExperiences = blockedSet.ToArray();
+                settings.KeyExperiences = trusted;
+                m_scene.EstateDataService.StoreEstateSettings(settings);
+            }
+            else if (request.HttpMethod != "GET")
+            {
+                response.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+                return;
+            }
+
+            OSDMap result = new()
+            {
+                ["allowed"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.AllowedExperiences),
+                ["blocked"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.BlockedExperiences),
+                ["default"] = UUID.Zero,
+                ["disabled"] = new OSDArray(),
+                ["trusted"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.KeyExperiences)
+            };
+
+            response.ContentType = "application/llsd+xml";
+            response.RawBuffer = OSDParser.SerializeLLSDXmlBytes(result);
+            response.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private static UUID[] ReadExperienceList(OSDMap body, string name, int maximum)
+        {
+            if (!body.TryGetValue(name, out OSD value) || value is not OSDArray array || array.Count > maximum)
+                return null;
+
+            HashSet<UUID> values = new();
+            foreach (OSD entry in array)
+            {
+                UUID id = entry.AsUUID();
+                if (id.IsZero())
+                    return null;
+                values.Add(id);
+            }
+            return values.ToArray();
+        }
+
+        private static OSDArray ToOSDArray(IEnumerable<UUID> values)
+        {
+            OSDArray array = new();
+            foreach (UUID value in values)
+                array.Add(value);
+            return array;
         }
 
 
@@ -560,9 +656,15 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             return m_scene.RegionInfo.EstateSettings.KeyExperiences;
         }
 
+        public UUID[] GetEstateBlockedExperiences()
+        {
+            return m_scene.RegionInfo.EstateSettings.BlockedExperiences;
+        }
+
 
         // These need to be added to the existing AccessList enum!
         public const int ACCESS_LIST_ALLOWED = 8;
+        public const int ACCESS_LIST_BLOCKED = 0x10;
 
         private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
         {
@@ -572,9 +674,14 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             var parcel_experiences = land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED).Select(x => x.AgentID);
 
+            var blocked_experiences = m_scene.RegionInfo.EstateSettings.BlockedExperiences.Union(
+                land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED).Select(x => x.AgentID));
+
             var agent_allowed = m_ExperiencePermissions.ContainsKey(avatar.UUID) ? m_ExperiencePermissions[avatar.UUID].Where(x => x.Value == true).Select(x => x.Key) : Enumerable.Empty<UUID>();
 
-            var allowed = estate_experiences.Union(parcel_experiences).Where(x => agent_allowed.Contains(x));
+            var allowed = estate_experiences.Union(parcel_experiences)
+                .Except(blocked_experiences)
+                .Where(x => agent_allowed.Contains(x));
 
             m_scene.ForEachSOG(sog =>
             {
@@ -1038,6 +1145,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             UUID[] allowed = m_ExperienceModule.GetEstateAllowedExperiences();
             UUID[] key = m_ExperienceModule.GetEstateKeyExperiences();
+            UUID[] blocked = m_ExperienceModule.GetEstateBlockedExperiences();
 
             string response_str = "<llsd><map><key>allowed</key>";
             if (allowed.Length > 0)
@@ -1051,7 +1159,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             }
             else response_str += "<undef />";
 
-            response_str += "<key>blocked</key><undef /><key>default</key><uuid /><key>disabled</key><undef /><key>trusted</key>";
+            response_str += "<key>blocked</key>";
+            if (blocked.Length > 0)
+            {
+                response_str += "<array>";
+                foreach (UUID id in blocked)
+                    response_str += string.Format("<uuid>{0}</uuid>", id);
+                response_str += "</array>";
+            }
+            else response_str += "<array />";
+
+            response_str += "<key>default</key><uuid /><key>disabled</key><array /><key>trusted</key>";
 
             if (key.Length > 0)
             {
