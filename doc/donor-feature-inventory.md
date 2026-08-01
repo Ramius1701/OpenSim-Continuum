@@ -236,6 +236,11 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 ### 12. WhiteCore WebUI and feature behaviour
 
+The broader simulator/service review is maintained in
+[`whitecore-continuum-improvement-audit.md`](whitecore-continuum-improvement-audit.md).
+WhiteCore is a first-class behavioural and viewer-protocol donor even though
+its divergent architecture makes wholesale OpenSim ports unsuitable.
+
 - **Feature and intended behaviour:** grid-wide public and administrative web interface; WhiteCore also demonstrates Display Names and Experiences behaviours.
 - **Donor and commit:** WhiteCoreSim/WhiteCore-Dev snapshot `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`.
 - **Current Dev equivalent / missing behaviour:** official Dev has no equivalent bundled grid-wide WebUI. This is distinct from RegionWeb.

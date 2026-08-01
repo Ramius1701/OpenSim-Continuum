@@ -132,7 +132,7 @@ The integration draws on work from:
 - GuntharDeNiro/opensim
 - Mobius-Team/Mobius
 - OpenSim-NGC/OpenSim-Tranquillity
-- WhiteCoreSim/WhiteCore-Dev as a behavioral reference only
+- WhiteCoreSim/WhiteCore-Dev as a first-class behavioural and viewer-protocol reference; its divergent architecture still rules out wholesale source-tree ports
 - Previous OpenSim Continuum and opensim-enhanced branches
 - Original repositories for Gloebit, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, OpenSimWeather, and recovered addons
 
@@ -150,6 +150,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 ## Further documentation
 
 - [Donor feature inventory and disposition record](doc/donor-feature-inventory.md)
+- [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Abuse Reports](doc/AbuseReports.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)
