@@ -402,7 +402,21 @@
     ;; both to set this to false and comment out the [Modules] MapImageServiceModule setting in config-include/
     ; GenerateMaptiles = true
 
-    ;# {MapImageModule} {} {The map image module to use} {MapImageModule Warp3DImageModule} MapImageModule
+    ;# {GenerateMaptilesInBackground} {GenerateMaptiles} {Generate map tiles on a background thread instead of blocking region startup?} {true false} true
+    ;; If true, maptile generation runs on its own low-priority background
+    ;; thread rather than delaying region startup and grid registration.
+    ; GenerateMaptilesInBackground = true
+
+    ;# {MaptileStartupDelaySeconds} {GenerateMaptilesInBackground} {Seconds to wait after startup before generating the first background maptile} {} 180
+    ; MaptileStartupDelaySeconds = 180
+
+    ;# {MaptileThreadStackSizeKB} {GenerateMaptilesInBackground} {Stack size (KB) for the background maptile generation thread. Minimum 1024.} {} 8192
+    ; MaptileThreadStackSizeKB = 8192
+
+    ;# {MaptileDeferIfAgentsPresent} {GenerateMaptilesInBackground} {Wait until the region is empty of avatars before generating a background maptile?} {true false} true
+    ; MaptileDeferIfAgentsPresent = true
+
+
     ;; The module to use in order to generate map images.
     ;; MapImageModule is the default.  Warp3DImageModule is an alternative experimental module that can
     ;; generate better images.
@@ -813,6 +827,18 @@
     ;; avatars with god permissions; SL lets gods land wherever they want.
     ;LandingPointBehavior = LandingPointBehavior_OS
 
+    ;# {PreserveVelocityOnRegionCrossing} {} {Keep an avatar's velocity when it crosses into a neighbouring region?} {true false} true
+    ;PreserveVelocityOnRegionCrossing = true
+
+    ;# {MaxRegionCrossingVelocity} {} {Maximum horizontal speed (m/s) preserved across a region crossing. 0 = no limit.} {} 30.0
+    ;MaxRegionCrossingVelocity = 30.0
+
+    ;# {RegionCrossingSourceCleanupDelayMS} {} {Delay (ms) before cleaning up an avatar's presence on the source region after a successful crossing.} {} 250
+    ;RegionCrossingSourceCleanupDelayMS = 250
+
+    ;# {RegionCrossingAttachmentCleanupDelayMS} {} {Delay (ms) before cleaning up duplicate/stale attachments on the source region after a crossing.} {} 2500
+    ;RegionCrossingAttachmentCleanupDelayMS = 2500
+
 [Messaging]
     ;# {OfflineMessageModule} {} {Module to use for offline message storage} {OfflineMessageModule "Offline Message Module V2" *}
     ;; Module to handle offline messaging. The core module requires an external
@@ -834,6 +860,9 @@
     ;# {MuteListModule} {MuteListModule:MuteListModule} {} {} None
     ; Disabled by default
     ; MuteListModule = MuteListModule
+
+    ;# {MuteListURL} {MuteListModule:MuteListModule} {URL of the external mute-list web service} {} {}
+    ; MuteListURL =
 
     ; Abuse reports handler (ported from Mobius). Also requires
     ; [Modules] AbuseReportsService and an [AbuseReportsService] section
@@ -1265,6 +1294,26 @@
 ;    FullNames = "Test User, Foo Bar"
 ;    Surnames = "Kryztlsk"
 
+;;
+;; OpenSim Continuum optional add-on modules
+;;
+;; Copy the desired .ini.example file to the indicated .ini filename,
+;; configure it, and then uncomment its Include line below.
+;;
+;; Optional modules remain inactive while their Include lines are commented.
+;;
+
+[ContinuumModules]
+
+    ; Include-Gloebit = "config-include/Gloebit.ini"
+    ; Include-GroupAutoInvite = "config-include/GroupAutoInvite.ini"
+    ; Include-HoloPhysicsGuard = "config-include/HoloPhysicsGuard.ini"
+    ; Include-OpenSimMarketplace = "config-include/OpenSimMarketplace.ini"
+    ; Include-OpenSimTide = "config-include/OpenSimTide.ini"
+    ; Include-OpenSimWeather = "config-include/OpenSimWeather.ini"
+    ; Include-RegionCurrency = "config-include/RegionCurrency.ini"
+    ; Include-RegionWeb = "config-include/RegionWeb.ini"
+
 [Architecture]
     ;# {Include-Architecture} {} {Choose one of the following architectures} {config-include/Standalone.ini config-include/StandaloneHypergrid.ini config-include/Grid.ini config-include/GridHypergrid.ini} config-include/Standalone.ini
     ;; Uncomment one of the following includes as required.  For instance, to create a standalone OpenSim,
@@ -1281,3 +1330,52 @@
     ; Include-Architecture = "config-include/StandaloneHypergrid.ini"
     ; Include-Architecture = "config-include/Grid.ini"
     ; Include-Architecture = "config-include/GridHypergrid.ini"
+
+[HoloPhysicsGuard]
+    ;# {Enabled} {} {Enable HoloPhysicsGuard - sleeps idle physical objects when a region is empty of avatars?} {true false} false
+    ; Enabled = false
+
+    ;# {DryRun} {Enabled} {Log what would be put to sleep without actually doing it? Use this to verify behavior before enabling for real.} {true false} true
+    ; DryRun = true
+
+    ;# {SleepWhenEmpty} {Enabled} {Put idle physical objects to sleep when the region has no avatars present?} {true false} true
+    ; SleepWhenEmpty = true
+
+    ;# {ZeroVelocities} {Enabled} {Zero out velocities on objects being put to sleep?} {true false} true
+    ; ZeroVelocities = true
+
+    ;# {WakeOnStart} {Enabled} {Wake all sleeping objects when the region starts up?} {true false} false
+    ; WakeOnStart = false
+
+    ;# {WakeOnAvatarEnter} {Enabled} {Wake sleeping objects when an avatar enters the region?} {true false} true
+    ; WakeOnAvatarEnter = true
+
+    ;# {CheckIntervalSeconds} {Enabled} {How often (seconds) to check whether the region is empty} {} 30
+    ; CheckIntervalSeconds = 30
+
+    ;# {EmptyDelaySeconds} {Enabled} {How long (seconds) the region must be empty before objects are put to sleep} {} 60
+    ; EmptyDelaySeconds = 60
+
+    ;# {Mode} {Enabled} {Sleep mode} {PersistSleep} PersistSleep
+    ; Mode = "PersistSleep"
+
+    ;# {AlwaysSleepNameContains} {Enabled} {Comma-separated list of object-name substrings that should always be put to sleep, regardless of other settings} {} {}
+    ; AlwaysSleepNameContains =
+
+    ;# {NeverSleepNameContains} {Enabled} {Comma-separated list of object-name substrings that should never be put to sleep} {} {}
+    ; NeverSleepNameContains =
+
+    ;# {AutoCreateTable} {Enabled} {Automatically create the database table this module needs, if it doesn't already exist?} {true false} true
+    ; AutoCreateTable = true
+
+    ;# {ConnectionString} {Enabled} {Database connection string, if different from the main region database} {} {}
+    ; ConnectionString =
+
+[Search]
+    ;# {Module} {} {Search module to use} {OpenSimSearch} OpenSimSearch
+    ;; Leave at the default to use OpenSimSearch below.
+    ; Module = OpenSimSearch
+
+    ;# {SearchURL} {Module:OpenSimSearch} {URL of the external XML-RPC search backend (e.g. helper/query.php on a web front end)} {} {}
+    ;; If empty, this region does not relay viewer search requests anywhere.
+    ; SearchURL =

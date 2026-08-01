@@ -873,11 +873,11 @@ namespace OpenSim.Grid.MoneyServer
                     }
                 }
 
-                // Überprüfen, ob die E-Mail-Adresse leer ist oder null
-                if (string.IsNullOrEmpty(email))
+                // Überprüfen, ob die E-Mail-Adresse leer, null, oder ungültig formatiert ist
+                if (string.IsNullOrEmpty(email) || !IsValidEmail(email))
                 {
-                    m_log.InfoFormat("[USER MAIL LOCK]: User {0} does not have a registered email address", userID);
-                    return false; // Benutzer hat keine hinterlegte E-Mail-Adresse
+                    m_log.InfoFormat("[USER MAIL LOCK]: User {0} does not have a valid registered email address", userID);
+                    return false; // Benutzer hat keine gültige hinterlegte E-Mail-Adresse
                 }
 
                 m_log.InfoFormat("[USER MAIL LOCK]: User {0} has a registered email address", userID);
