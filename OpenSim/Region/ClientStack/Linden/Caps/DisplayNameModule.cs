@@ -113,7 +113,18 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (m_Scene.UserManagementModule.IsLocalGridUser(agentID))
             {
                 caps.RegisterSimpleHandler("SetDisplayName", new SimpleStreamHandler($"/{UUID.Random()}", (req, resp) => SetDisplayName(agentID, req, resp)));
-                return;
+
+                // A live name change sends DisplayNameUpdate immediately, but that
+                // viewer cache is lost on relog. Seed it again from the persisted
+                // grid account when the agent receives its new capabilities so the
+                // in-world nameplate agrees with search and the nearby-people list.
+                UserData userData = m_Scene.UserManagementModule.GetUserData(agentID);
+                if (userData is not null)
+                {
+                    DateTime nextUpdate = userData.NameChanged.AddDays(7);
+                    OSD update = FormatDisplayNameUpdate(userData.LegacyName, userData, nextUpdate);
+                    m_EventQueue.Enqueue(update, agentID);
+                }
             }
         }
 
