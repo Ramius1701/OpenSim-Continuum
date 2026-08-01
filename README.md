@@ -54,7 +54,7 @@ The extended scripting surface is powerful and has estate/security implications.
 - RegionCurrency
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
-- MoneyServer and viewer currency modules
+- ContinuumEconomy: a unified MoneyServer successor using the current DTL/NSL-compatible service as its OpenSim base, WhiteCore's integrated currency behavior as its feature reference, and Gunthar's module/portal work as integration guidance; Gloebit is excluded
 - HoloPhysicsGuard
 - OpenSimSearch
 - OpenSimTide
@@ -155,6 +155,8 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Abuse Reports](doc/AbuseReports.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)
+- [ContinuumEconomy compatibility contract](doc/continuum-economy-compatibility-contract.md)
+- [ContinuumEconomy development package](addon-modules/ContinuumEconomy/README.md)
 - [OpenSimWeather documentation](addon-modules/OpenSimWeather/README.md)
 - [OpenSimTide documentation](addon-modules/OpenSimTide/README.md)
 - [HoloPhysicsGuard documentation](addon-modules/HoloPhysicsGuard/README.md)

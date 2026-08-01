@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<Project name="OpenSim.Continuum.Economy" path="addon-modules/ContinuumEconomy/OpenSim.Continuum.Economy" type="Library" version="0.1.0-$Rev$" frameworkVersion="net8_0">
+  <Configuration name="Debug">
+    <Options><OutputPath>../../../bin/</OutputPath></Options>
+  </Configuration>
+  <Configuration name="Release">
+    <Options><OutputPath>../../../bin/</OutputPath></Options>
+  </Configuration>
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="MySql.Data" />
+  <Files>
+    <Match pattern="*.cs" recurse="false" />
+    <Exclude name="obj/**" />
+    <Exclude name="bin/**" />
+  </Files>
+</Project>

@@ -359,6 +359,99 @@ The goals are:
   OpenSimSearch service, then fix demonstrated gaps. Do not replace it wholesale
   with WhiteCore search.
 
+### 11. Built-in grid economy
+
+- **Classification:** Robust service extension with narrow core compatibility
+  integration. This supersedes the earlier assumption that WhiteCore was only a
+  behavioural economy reference.
+- **Behaviour:** provide one authoritative grid ledger for balances, transfers,
+  object/script payments, land and object purchases, uploads, group creation,
+  classifieds and parcel-directory fees; push viewer balance updates; retain an
+  auditable transaction history; and support controlled grants, purchases,
+  stipends and group accounting.
+- **WhiteCore evidence:** `WhiteCore/Modules/Currency` contains the service,
+  database connector, viewer RPC handlers, configuration, scheduled payments
+  and remote/local connector boundary. `GroupMoneyModule` supplies viewer group
+  accounting. Currency migration 6 defines keyed user and group balances,
+  transaction histories and currency-purchase records. The reviewed donor is
+  snapshot `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`.
+- **Gunthar evidence:** the Gunthar-derived RegionCurrency work describes an
+  enhanced `BetaGridLikeMoneyModule` as a local persistent ledger with a
+  first-use balance and viewer updates, avoiding a separate server. The
+  RegionCurrency portal then calls the active `IMoneyModule`. This is a useful
+  OpenSim integration attempt, but its region-local tab-separated ledger is not
+  an authoritative multi-region production datastore. RegionCurrency is a
+  wallet/admin presentation layer, not the grid ledger itself.
+- **Current Continuum equivalent:** the recovered DTL/NSL-style MoneyServer,
+  region currency module and MySQL money wrapper provide a dedicated process,
+  XML-RPC viewer/region integration and MySQL-backed balances/transactions.
+  Production repairs have improved concurrency, console behavior, banker
+  controls and diagnostics, but the subsystem remains a separately evolved
+  addon code island with duplicated service hosting and legacy RPC assumptions.
+- **Genuinely missing or unproven:** atomic double-entry transfer semantics;
+  idempotency for every charge and purchase path; crash-safe land/object sale
+  completion and refund; consistent group balances/accounting; classified and
+  directory renewal; scheduled stipend exactly-once behavior; administrative
+  adjustment audit; clean Robust authentication; service failover/recovery;
+  migration from the existing MoneyServer schema without balance drift; and a
+  complete viewer transaction-description matrix.
+- **Architecture decision:** evolve MoneyServer into the authoritative
+  ContinuumEconomy service, built from shared service/data assemblies with
+  authenticated connectors. The dedicated service process remains the primary
+  production host and the region `IMoneyModule` remains a thin adapter. Shared
+  assemblies may permit optional Robust hosting later, but there will never be
+  two ledger implementations. RegionCurrency remains an optional portal over
+  the service. Do not use a per-region file ledger.
+- **WhiteCore lessons worth adopting:** unified user/group accounting; explicit
+  transaction IDs and history; server-side purchase limits; configurable fees;
+  scheduled-payment records; remote/local service separation; and one shared
+  policy source for viewer economy data and charges.
+- **WhiteCore code not suitable to port directly:** its registry, generic data,
+  reflection/remoting and scheduler architectures are WhiteCore-specific. Some
+  transfer paths update balances in multiple steps and must not be assumed
+  atomic. Real-currency purchase code requires a new security/payment review;
+  it must not be copied as production financial code.
+- **MoneyServer reuse decision:** retain proven viewer protocol behavior,
+  transaction types, existing MySQL migration knowledge and compatibility
+  endpoints. Extract and rewrite the ledger boundary behind tests instead of
+  discarding deployed balances or copying WhiteCore wholesale.
+- **Robust compatibility:** private mutation endpoints require service
+  authentication, replay protection and request idempotency. Public viewer quote
+  or helper endpoints must expose no administrative operation. No production
+  database credentials belong in region configuration.
+- **MySQL compatibility:** certify transactional row locking, non-negative and
+  overflow constraints, unique transaction IDs, indexed account/history
+  queries, deadlock retry, schema upgrade/rollback and reconciliation against a
+  snapshot of the existing MoneyServer tables.
+- **Windows compatibility:** support the standard .NET Windows build and service
+  supervision, invariant numeric/date serialization, TLS certificates, graceful
+  shutdown and restart during in-flight requests.
+- **Hypergrid implications:** currency is local-grid authority. A foreign avatar
+  may use a deliberately provisioned local account, but balances and debit
+  authority must never be trusted from a foreign grid. Cross-grid exchange is a
+  separate, disabled design requiring explicit settlement and fraud controls.
+- **Viewer requirements:** validate balance display, pay resident/object,
+  scripted payment, object and land purchase, upload/group/classified fees,
+  insufficient-funds messages, transaction descriptions, currency quote/buy
+  panels and group accounting in current Firestorm and another compatible
+  viewer.
+- **Licensing/provenance:** preserve OpenSim/DTL-NSL and WhiteCore/Aurora notices
+  at file level. Record independently reimplemented WhiteCore semantics and the
+  Gunthar-derived RegionCurrency lineage. Gloebit is explicitly excluded and
+  must not be modified or used as the backend.
+- **Required tests:** concurrent same-account transfers; duplicate/replayed
+  requests; debit/credit atomicity; insufficient funds; integer boundaries;
+  object/script/group/land/classified/upload charges; sale delivery failure and
+  refund; service/region/database crash at each transaction phase; stipend
+  restart; group accounting privacy; admin grant audit; TLS/auth failures;
+  multi-region balance updates; MySQL clean/upgrade migration; reconciliation;
+  Hypergrid visitor isolation; and sustained load/latency tests.
+- **Recommendation:** promote this to P0 after the Experience runtime checkpoint.
+  First freeze an acceptance contract around the deployed MoneyServer protocol
+  and schema, then implement a shared Robust-hostable economy service behind the
+  existing region adapter. Do not deploy Gunthar's file ledger or directly port
+  WhiteCore's financial transaction implementation.
+
 ## Lower-priority and rejected direct ports
 
 | Candidate | WhiteCore behaviour | Continuum decision |
