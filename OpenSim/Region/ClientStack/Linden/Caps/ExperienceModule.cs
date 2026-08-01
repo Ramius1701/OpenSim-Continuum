@@ -23,7 +23,7 @@ using System.Net;
 namespace OpenSim.Region.ClientStack.LindenCaps
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ExperienceModule")]
-    public class ExperienceModule : IExperienceModule, ISharedRegionModule
+    public class ExperienceModule : IExperienceModule, INonSharedRegionModule
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -83,7 +83,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             scene.EventManager.OnRegisterCaps -= RegisterCaps;
             scene.EventManager.OnNewClient -= OnNewClient;
-            scene = null;
+            scene.EventManager.OnClientClosed -= OnClientClosed;
+            scene.EventManager.OnAvatarEnteringNewParcel -= EventManager_OnAvatarEnteringNewParcel;
+            scene.UnregisterModuleInterface<IExperienceModule>(this);
+            m_ExperiencePermissions.Clear();
+            m_scene = null;
         }
 
         public void RegionLoaded(Scene scene)
@@ -104,11 +108,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             scene.EventManager.OnRegisterCaps += RegisterCaps;
             scene.EventManager.OnNewClient += OnNewClient;
+            scene.EventManager.OnClientClosed += OnClientClosed;
         }
 
         private void OnNewClient(IClientAPI client)
         {
             m_ExperiencePermissions[client.AgentId] = m_ExperienceService.FetchExperiencePermissions(client.AgentId);
+        }
+
+        private void OnClientClosed(UUID agentID, Scene scene)
+        {
+            m_ExperiencePermissions.Remove(agentID);
         }
 
         public void PostInitialise() {}
@@ -178,7 +188,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             {
                 string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
 
-                UUID experience_id = UUID.Parse(key_str);
+                if (!UUID.TryParse(key_str, out UUID experience_id))
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
 
                 ForgetExperiencePermissions(agentID, experience_id);
 
@@ -201,7 +215,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             {
                 string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
 
-                UUID experience_id = UUID.Parse(key_str);
+                if (!UUID.TryParse(key_str, out UUID experience_id))
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
 
                 ExperiencePermission experiencePermission = GetExperiencePermission(agentID, experience_id);
 
@@ -227,9 +245,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (map.Keys.Count == 1)
             {
                 string first_key = map.Keys.First();
-                UUID experience_id = UUID.Parse(first_key);
-
-                OSDMap m = (OSDMap)map[first_key];
+                if (!UUID.TryParse(first_key, out UUID experience_id) || map[first_key] is not OSDMap m)
+                {
+                    response.StatusCode = (int)HttpStatusCode.BadRequest;
+                    return;
+                }
 
                 if (m.ContainsKey("permission"))
                 {
@@ -481,6 +501,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public bool IsExperienceAdmin(UUID agent_id, UUID experience_id)
         {
             ExperienceInfo info = GetExperienceInfo(experience_id, true);
+            if (info == null)
+                return false;
             if (info.owner_id == agent_id)
                 return true;
 
@@ -503,6 +525,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public bool IsExperienceContributor(UUID agent_id, UUID experience_id)
         {
             ExperienceInfo info = GetExperienceInfo(experience_id, true);
+            if (info == null)
+                return false;
             if (info.owner_id == agent_id)
                 return true;
 
@@ -719,10 +743,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         {
             string response_str = "<llsd><map><key>experience_ids</key><array>";
 
-            if (httpRequest.Query.ContainsKey(""))
+            if (httpRequest.Query.ContainsKey("") && UUID.TryParse(httpRequest.Query[""].ToString(), out UUID group_id))
             {
-                UUID group_id = UUID.Parse(httpRequest.Query[""].ToString());
-
                 UUID[] experiences = m_ExperienceModule.GetGroupExperiences(group_id);
 
                 foreach(UUID id in experiences)
@@ -855,6 +877,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             string marketplace = extended["marketplace"].AsString();
 
             ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
+
+            if (currentInfo == null)
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
 
             bool is_admin = m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id);
 
@@ -1069,9 +1094,13 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             string response_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
 
+            if (ids == null)
+                return Encoding.UTF8.GetBytes("<llsd><map><key>experience_keys</key><array/></map></llsd>");
+
             foreach (string id in ids)
             {
-                UUID experience_id = UUID.Parse(id);
+                if (!UUID.TryParse(id, out UUID experience_id))
+                    continue;
 
                 ExperienceInfo info = m_ExperienceModule.GetExperienceInfo(experience_id);
 
@@ -1334,4 +1363,3 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         }
     }
 }
-

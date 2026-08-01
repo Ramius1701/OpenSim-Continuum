@@ -32,8 +32,8 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS `experience_kv` (
 	`experience` VARCHAR(36) NOT NULL,
-	`key` VARCHAR(1011) NOT NULL COLLATE 'latin1_bin', 
-    `value` VARCHAR(4095) NOT NULL COLLATE 'utf8mb4_0900_ai_ci', 
+	`key` VARCHAR(1011) CHARACTER SET latin1 COLLATE latin1_bin NOT NULL,
+    `value` VARCHAR(4095) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     PRIMARY KEY(`experience`, `key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
