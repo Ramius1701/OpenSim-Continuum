@@ -213,6 +213,7 @@ namespace OpenSim.Services.LLLoginService
         // Login
         private string firstname;
         private string lastname;
+        private string displayName;
 
         // Web map
         private string mapTileURL;
@@ -289,6 +290,7 @@ namespace OpenSim.Services.LLLoginService
             CircuitCode = (int)aCircuit.circuitcode;
             Lastname = account.LastName;
             Firstname = account.FirstName;
+            DisplayName = string.IsNullOrWhiteSpace(account.DisplayName) ? account.Name : account.DisplayName;
             AgentID = account.PrincipalID;
             SessionID = aCircuit.SessionID;
             SecureSessionID = aCircuit.SecureSessionID;
@@ -531,6 +533,7 @@ namespace OpenSim.Services.LLLoginService
 
                 responseData["first_name"] = Firstname;
                 responseData["last_name"] = Lastname;
+                responseData["display_name"] = DisplayName;
                 responseData["agent_access"] = agentAccess;
                 responseData["agent_access_max"] = agentAccessMax;
 
@@ -637,6 +640,7 @@ namespace OpenSim.Services.LLLoginService
 
                 map["first_name"] = OSD.FromString(Firstname);
                 map["last_name"] = OSD.FromString(Lastname);
+                map["display_name"] = OSD.FromString(DisplayName);
                 map["agent_access"] = OSD.FromString(agentAccess);
                 map["agent_access_max"] = OSD.FromString(agentAccessMax);
 
@@ -1005,6 +1009,12 @@ namespace OpenSim.Services.LLLoginService
         {
             get { return lastname; }
             set { lastname = value; }
+        }
+
+        public string DisplayName
+        {
+            get { return displayName; }
+            set { displayName = value; }
         }
 
         public string AgentAccess

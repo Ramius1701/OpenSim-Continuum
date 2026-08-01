@@ -2256,7 +2256,18 @@ namespace OpenSim.Region.ClientStack.Linden
 
             // Full content request
             NameValueCollection query = httpRequest.QueryString;
-            string[] ids = query.GetValues("ids");
+            string[] ids = query.GetValues("ids") ?? Array.Empty<string>();
+            string username = query.Get("username");
+            string badUsername = null;
+
+            if (ids.Length == 0 && !string.IsNullOrWhiteSpace(username))
+            {
+                UUID userID = m_UserManager.GetUserIdByName(username.Replace('.', ' '));
+                if (userID.IsZero())
+                    badUsername = username;
+                else
+                    ids = new[] { userID.ToString() };
+            }
 
             osUTF8 lsl;
             if(ids.Length == 0)
@@ -2296,6 +2307,16 @@ namespace OpenSim.Region.ClientStack.Linden
                     }
                     LLSDxmlEncode2.AddEndArray(lsl);
                 }
+            }
+
+            LLSDxmlEncode2.AddEmptyArray("bad_ids", lsl);
+            if (badUsername is null)
+                LLSDxmlEncode2.AddEmptyArray("bad_usernames", lsl);
+            else
+            {
+                LLSDxmlEncode2.AddArray("bad_usernames", lsl);
+                LLSDxmlEncode2.AddElem(badUsername, lsl);
+                LLSDxmlEncode2.AddEndArray(lsl);
             }
             LLSDxmlEncode2.AddEndMap(lsl);
 
