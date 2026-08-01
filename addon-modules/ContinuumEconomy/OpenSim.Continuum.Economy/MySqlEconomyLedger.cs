@@ -42,6 +42,22 @@ namespace OpenSim.Continuum.Economy
             return value == null || value == DBNull.Value ? 0L : Convert.ToInt64(value, CultureInfo.InvariantCulture);
         }
 
+        public long GetAvailableBalance(Guid accountID)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT a.balance - COALESCE(SUM(CASE WHEN p.state = 1 THEN p.amount ELSE 0 END), 0)
+                FROM continuum_economy_accounts a
+                LEFT JOIN continuum_economy_purchases p ON p.buyer_id = a.account_id
+                WHERE a.account_id = ?account GROUP BY a.balance";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            object value = command.ExecuteScalar();
+            return value == null || value == DBNull.Value ? 0L : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+        }
+
         public LedgerTransferResult Transfer(LedgerTransferRequest request)
         {
             LedgerTransferResult invalid = Validate(request);
@@ -72,8 +88,9 @@ namespace OpenSim.Continuum.Economy
                 long secondBalance = LockBalance(connection, transaction, second);
                 long senderBalance = first == request.SenderID ? firstBalance : secondBalance;
                 long receiverBalance = first == request.ReceiverID ? firstBalance : secondBalance;
+                long senderAvailable = checked(senderBalance - GetHeldAmount(connection, transaction, request.SenderID));
 
-                if (senderBalance < request.Amount)
+                if (senderAvailable < request.Amount)
                 {
                     InsertTransaction(connection, transaction, request, fingerprint, 2, senderBalance, receiverBalance, "Insufficient funds");
                     transaction.Commit();
@@ -138,7 +155,8 @@ namespace OpenSim.Continuum.Economy
                 ReserveOperation(connection, transaction, request.OperationID, fingerprint, 2);
                 EnsureAccount(connection, transaction, request.AccountID);
                 long balance = LockBalance(connection, transaction, request.AccountID);
-                if (request.Kind == LedgerAdjustmentKind.Debit && balance < request.Amount)
+                long available = checked(balance - GetHeldAmount(connection, transaction, request.AccountID));
+                if (request.Kind == LedgerAdjustmentKind.Debit && available < request.Amount)
                 {
                     InsertAdjustment(connection, transaction, request, fingerprint, 2, balance, "Insufficient funds");
                     transaction.Commit();
@@ -395,6 +413,15 @@ namespace OpenSim.Continuum.Economy
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 
+        private static long GetHeldAmount(MySqlConnection connection, MySqlTransaction transaction, Guid accountID)
+        {
+            using MySqlCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = "SELECT COALESCE(SUM(amount), 0) FROM continuum_economy_purchases WHERE buyer_id = ?account AND state = 1";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
         private static void UpdateBalance(MySqlConnection connection, MySqlTransaction transaction, Guid accountID, long balance)
         {
             using MySqlCommand command = connection.CreateCommand();
@@ -502,6 +529,18 @@ CREATE TABLE IF NOT EXISTS continuum_economy_adjustments (
  created_utc TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY (operation_id),
  KEY idx_continuum_economy_adjustment_account_time (account_id, created_utc),
  KEY idx_continuum_economy_adjustment_actor_time (actor_id, created_utc)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS continuum_economy_purchases (
+ purchase_id CHAR(36) NOT NULL, request_hash CHAR(64) NOT NULL,
+ buyer_id CHAR(36) NOT NULL, seller_id CHAR(36) NOT NULL, amount BIGINT NOT NULL,
+ transaction_type INT NOT NULL, region_id CHAR(36) NOT NULL, object_id CHAR(36) NOT NULL,
+ description VARCHAR(255) NOT NULL DEFAULT '', state TINYINT UNSIGNED NOT NULL,
+ buyer_balance BIGINT NOT NULL, seller_balance BIGINT NOT NULL,
+ failure_reason VARCHAR(255) NOT NULL DEFAULT '',
+ created_utc TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+ completed_utc TIMESTAMP(6) NULL, PRIMARY KEY (purchase_id),
+ KEY idx_continuum_economy_purchase_buyer_state (buyer_id, state),
+ KEY idx_continuum_economy_purchase_seller_time (seller_id, created_utc)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
     }
 }

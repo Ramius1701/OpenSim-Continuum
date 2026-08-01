@@ -70,3 +70,9 @@ a non-zero actor UUID and explicit reason, reserve a globally unique operation
 ID, update one account atomically and retain both successful and
 insufficient-funds outcomes for safe retries. Resident transfer calls cannot
 reach this primitive directly, and the zero UUID is never treated as a mint.
+
+Object and land purchases use authorization holds. Authorization reserves
+spendable funds without crediting the seller; successful delivery captures the
+hold atomically, while failed delivery cancels it without a reverse transfer.
+Ordinary transfers subtract active holds when checking available funds, which
+prevents concurrent spending from consuming money reserved for a purchase.

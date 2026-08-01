@@ -79,10 +79,50 @@ namespace OpenSim.Continuum.Economy
         public bool Succeeded => Code == LedgerResultCode.Committed || Code == LedgerResultCode.Replayed;
     }
 
+    public enum LedgerPurchaseState
+    {
+        Authorized = 1,
+        Captured = 2,
+        Cancelled = 3,
+        InsufficientFunds = 4
+    }
+
+    public sealed class LedgerPurchaseRequest
+    {
+        public Guid PurchaseID { get; set; }
+        public Guid BuyerID { get; set; }
+        public Guid SellerID { get; set; }
+        public long Amount { get; set; }
+        public int TransactionType { get; set; }
+        public Guid RegionID { get; set; }
+        public Guid ObjectID { get; set; }
+        public string Description { get; set; } = String.Empty;
+    }
+
+    public sealed class LedgerPurchaseResult
+    {
+        public LedgerResultCode Code { get; set; }
+        public Guid PurchaseID { get; set; }
+        public LedgerPurchaseState State { get; set; }
+        public long BuyerBalance { get; set; }
+        public long BuyerAvailableBalance { get; set; }
+        public long SellerBalance { get; set; }
+        public string Message { get; set; } = String.Empty;
+        public bool Succeeded => Code == LedgerResultCode.Committed || Code == LedgerResultCode.Replayed;
+    }
+
+    public interface IEconomyPurchaseService
+    {
+        LedgerPurchaseResult Authorize(LedgerPurchaseRequest request);
+        LedgerPurchaseResult Capture(Guid purchaseID);
+        LedgerPurchaseResult Cancel(Guid purchaseID);
+    }
+
     public interface IEconomyLedger
     {
         void EnsureSchema();
         long GetBalance(Guid accountID);
+        long GetAvailableBalance(Guid accountID);
         LedgerTransferResult Transfer(LedgerTransferRequest request);
         LedgerAdjustmentResult Adjust(LedgerAdjustmentRequest request);
         IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit);
