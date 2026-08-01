@@ -614,7 +614,7 @@ internal static class MarketplaceInventoryOperations
     private static UUID CreateDeterministicUuid(string purpose, string value)
     {
         // Retained as the v2 compatibility namespace so existing inventory folder UUIDs remain stable.
-        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes("Casperia.Marketplace.v2|" + purpose + "|" + value));
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes("OpenSimMarketplace.v2|" + purpose + "|" + value));
         byte[] uuid = new byte[16];
         Array.Copy(bytes, uuid, 16);
         uuid[6] = (byte)((uuid[6] & 0x0f) | 0x50);

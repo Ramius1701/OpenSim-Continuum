@@ -426,7 +426,7 @@ namespace OpenSim.Services.AuthenticationService
 			Array.Copy( salt, 0, data00, psbytes.Length, salt.Length ); //concatenate the salt bytes
 
 			// ---- do multi-hashing and contatenate results  D1, D2 ...  into keymaterial bytes ----
-			MD5 md5 = new MD5CryptoServiceProvider();
+			using MD5 md5 = MD5.Create();
 			byte[] result = null;
 			byte[] hashtarget = new byte[HASHLENGTH + data00.Length];   //fixed length initial hashtarget
 
