@@ -53,3 +53,9 @@ The `import` operation additionally requires all of these literal flags:
 
 They do not replace operational verification. The importer independently
 rejects invalid legacy accounts and any non-empty target ledger.
+
+The ledger history API is account-scoped, newest-first and capped at 500 rows
+per request. It returns direction, counterparty, resulting balance, status,
+region/object context and failure reason without granting callers direct SQL
+access. Administrative APIs must apply their own authorization before exposing
+this data.

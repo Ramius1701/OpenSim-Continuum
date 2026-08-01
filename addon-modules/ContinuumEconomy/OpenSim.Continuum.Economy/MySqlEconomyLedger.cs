@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -105,6 +106,55 @@ namespace OpenSim.Continuum.Economy
                     Result(request.TransactionID, LedgerResultCode.TransactionConflict, 0, 0,
                         "The transaction ID was committed concurrently with different data");
             }
+        }
+
+        public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit)
+        {
+            if (accountID == Guid.Empty)
+                throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
+            if (limit < 1 || limit > 500)
+                throw new ArgumentOutOfRangeException(nameof(limit), "History limit must be between 1 and 500");
+
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT transaction_id, sender_id, receiver_id, amount, transaction_type,
+                    region_id, object_id, description, status, sender_balance, receiver_balance,
+                    failure_reason, created_utc
+                FROM continuum_economy_transactions
+                WHERE (sender_id = ?account OR receiver_id = ?account)
+                  AND (?before IS NULL OR created_utc < ?before)
+                ORDER BY created_utc DESC, transaction_id DESC
+                LIMIT ?limit";
+            command.Parameters.AddWithValue("?account", accountID.ToString());
+            command.Parameters.AddWithValue("?before", beforeUtc.HasValue ? beforeUtc.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("?limit", limit);
+
+            List<LedgerHistoryEntry> entries = new(limit);
+            using MySqlDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                Guid senderID = Guid.Parse(reader.GetString(1));
+                Guid receiverID = Guid.Parse(reader.GetString(2));
+                bool isCredit = receiverID == accountID;
+                entries.Add(new LedgerHistoryEntry
+                {
+                    TransactionID = Guid.Parse(reader.GetString(0)),
+                    AccountID = accountID,
+                    CounterpartyID = isCredit ? senderID : receiverID,
+                    Amount = reader.GetInt64(3),
+                    TransactionType = reader.GetInt32(4),
+                    RegionID = Guid.Parse(reader.GetString(5)),
+                    ObjectID = Guid.Parse(reader.GetString(6)),
+                    Description = reader.GetString(7),
+                    Succeeded = reader.GetInt32(8) == 1,
+                    ResultingBalance = isCredit ? reader.GetInt64(10) : reader.GetInt64(9),
+                    FailureReason = reader.GetString(11),
+                    CreatedUtc = DateTime.SpecifyKind(reader.GetDateTime(12), DateTimeKind.Utc),
+                    IsCredit = isCredit
+                });
+            }
+            return entries;
         }
 
         private static LedgerTransferResult Validate(LedgerTransferRequest request)
