@@ -9302,6 +9302,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             ScriptSleep(3000);
         }
 
+        // This donor aggregate duplicated implementations integrated earlier in this
+        // file. Keep the earlier, reconciled implementations as the single API surface.
+#if false
         public LSL_Integer llGiveAgentInventory(LSL_Key agentID, LSL_String folderName, LSL_List inventory, LSL_List options)
         {
             if (inventory is null || inventory.Length == 0)
@@ -9763,6 +9766,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             ApplyTransferredOwner(group, target, true, group.OwnerID);
             return ScriptBaseClass.TRANSFER_OK;
         }
+#endif
 
         public void llSetVehicleType(int type)
         {
@@ -26310,6 +26314,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         // entirely on the existing IMaterialsModule.CleanMaterialOverrides/
         // RemoveMaterialEntry API (already used elsewhere in this file for
         // other material-setting functions) rather than new engine logic.
+        // The later block below contains the complete GLTF implementation, including
+        // asset merging and direct PRIM_GLTF setters. Exclude this donor duplicate.
+#if false
         public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
         {
             SceneObjectPart part;
@@ -27170,6 +27177,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
             return values;
         }
+#endif
 
         private void SetRenderMaterial(SceneObjectPart part, LSL_String materialstr, LSL_Integer lsl_face, string originFunc)
         {
@@ -28458,6 +28466,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return textureUris;
         }
 
+        // Primitive-param readback helpers already exist near the parser that uses
+        // them. Exclude the duplicate donor copies retained by the aggregate patch.
+#if false
         private void AddGltfTextureTransformParams(ref LSL_List res, SceneObjectPart part, string data, int textureIndex)
         {
             UUID texture = ReadCompactUuidArrayItem(data, "tex", textureIndex);
@@ -28519,6 +28530,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             else
                 AddUnsetGltfValue(ref res);
         }
+#endif
 
         public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
         {
