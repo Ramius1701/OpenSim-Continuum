@@ -4,6 +4,7 @@ using System.Reflection;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -113,6 +114,27 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
             return m_Enabled &&
                 m_RemoteConnector != null &&
                 m_RemoteConnector.ReportAbuse(report);
+        }
+
+        public AbuseReportData GetReport(int reportID, bool includeImage)
+        {
+            return m_Enabled && m_RemoteConnector != null
+                ? m_RemoteConnector.GetReport(reportID, includeImage)
+                : null;
+        }
+
+        public AbuseReportData[] GetReports(int start, int count, string status)
+        {
+            return m_Enabled && m_RemoteConnector != null
+                ? m_RemoteConnector.GetReports(start, count, status)
+                : Array.Empty<AbuseReportData>();
+        }
+
+        public bool UpdateReport(int reportID, string status, string notes,
+            UUID moderatorID, string moderatorName)
+        {
+            return m_Enabled && m_RemoteConnector != null &&
+                m_RemoteConnector.UpdateReport(reportID, status, notes, moderatorID, moderatorName);
         }
     }
 }

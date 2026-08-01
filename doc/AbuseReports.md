@@ -12,6 +12,8 @@ grid-wide service stack.
 - ROBUST exposes the private `/abuse` service endpoint.
 - Reports are stored centrally through `IAbuseReportsData`.
 - The current storage implementation is MySQL/MariaDB.
+- The authenticated private service supports paginated moderation retrieval and updates.
+- Reports have `Open`, `In Review`, `Resolved`, or `Dismissed` state, moderator notes and audit identity.
 
 This is intentionally a core service integration. It is not a
 region-only addon module.
@@ -75,12 +77,34 @@ be exposed publicly.
 ## Database migration
 
 `OpenSim/Data/MySQL/Resources/AbuseReports.migrations` creates the table
-at version 1 and repairs older Mobius-derived schemas at version 2:
+at version 1, repairs older Mobius-derived schemas at version 2, and adds
+moderation workflow fields and indexes at version 3:
 
 - `Category` is stored as text.
 - `ReportType` is stored as an integer.
 - The table is converted from MyISAM to InnoDB.
 - The table character set is converted to `utf8mb4`.
+- Moderation state, notes, moderator UUID/name and last-update time are stored.
+- Status/time, reported-user and region indexes support bounded moderation queries.
+
+## Moderation console
+
+The commands are registered where the local Abuse Reports service is loaded:
+ROBUST in grid mode and the simulator in Standalone mode.
+
+```text
+show abuse reports [open|in-review|resolved|dismissed|all] [count]
+show abuse report <report-id>
+update abuse report <report-id> <open|in-review|resolved|dismissed> [notes]
+```
+
+List operations never load screenshot blobs. The service also provides authenticated
+private `list`, `get`, and `update` operations on `/abuse` for a later administration
+client. The endpoint must remain on the ROBUST private port; it is not a public Web API.
+
+WhiteCore's complete moderation lifecycle informed this design, but Continuum does not
+copy its password-in-request administration model. Existing ROBUST service authentication
+is required instead.
 
 ## Validation boundaries
 
@@ -94,4 +118,9 @@ cover:
 - Correct region attribution in a multi-region simulator process.
 - Database migration from an existing version-1 table.
 - Service-authenticated private-port routing.
+- Paginated list filtering for every moderation state.
+- Single-report retrieval with screenshots excluded and explicitly included.
+- Moderator notes and state updates, including invalid state and oversized note rejection.
+- Unauthorized access rejection for every private moderation operation.
+- Index-backed query behavior with a large report table.
 - Region shutdown and reload.

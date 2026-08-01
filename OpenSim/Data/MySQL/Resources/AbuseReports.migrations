@@ -38,3 +38,22 @@ ALTER TABLE `AbuseReports`
   CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 COMMIT;
+
+# -----------------
+:VERSION 3
+
+BEGIN;
+
+ALTER TABLE `AbuseReports`
+  ADD COLUMN `Status` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Open',
+  ADD COLUMN `ModeratorNotes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  ADD COLUMN `ModeratorID` char(36) CHARACTER SET ascii COLLATE ascii_general_ci NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  ADD COLUMN `ModeratorName` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  ADD COLUMN `LastUpdated` int(11) NOT NULL DEFAULT 0,
+  ADD INDEX `StatusTime` (`Status`, `Time`),
+  ADD INDEX `AbuserIDIndex` (`AbuserID`),
+  ADD INDEX `AbuseRegionIDIndex` (`AbuseRegionID`);
+
+UPDATE `AbuseReports` SET `LastUpdated` = `Time` WHERE `LastUpdated` = 0;
+
+COMMIT;

@@ -51,6 +51,12 @@ namespace OpenSim.Server.Handlers.AbuseReports
                 method = methodValue.ToString();
                 if (string.Equals(method, "report", StringComparison.OrdinalIgnoreCase))
                     return Report(request);
+                if (string.Equals(method, "get", StringComparison.OrdinalIgnoreCase))
+                    return GetReport(request);
+                if (string.Equals(method, "list", StringComparison.OrdinalIgnoreCase))
+                    return ListReports(request);
+                if (string.Equals(method, "update", StringComparison.OrdinalIgnoreCase))
+                    return UpdateReport(request);
 
                 m_log.WarnFormat(
                     "[ABUSE REPORT HANDLER]: Unknown method request: {0}",
@@ -65,6 +71,53 @@ namespace OpenSim.Server.Handlers.AbuseReports
             }
 
             return FailureResult();
+        }
+
+        private byte[] GetReport(Dictionary<string, object> request)
+        {
+            if (!TryGetInt(request, "report-id", -1, out int reportID) || reportID <= 0)
+                return FailureResult();
+            bool includeImage = GetString(request, "include-image") == "1";
+            AbuseReportData report = m_Service.GetReport(reportID, includeImage);
+            if (report == null)
+                return FailureResult();
+
+            Dictionary<string, object> result = new Dictionary<string, object> { ["result"] = "Success" };
+            AddReport(result, "report-", report, includeImage);
+            return XmlResult(result);
+        }
+
+        private byte[] ListReports(Dictionary<string, object> request)
+        {
+            if (!TryGetInt(request, "start", 0, out int start) || start < 0 ||
+                !TryGetInt(request, "count", 20, out int count) || count < 1 || count > 200)
+            {
+                return FailureResult();
+            }
+
+            AbuseReportData[] reports = m_Service.GetReports(start, count, GetString(request, "status"));
+            Dictionary<string, object> result = new Dictionary<string, object>
+            {
+                ["result"] = "Success",
+                ["report-count"] = reports.Length.ToString()
+            };
+            for (int i = 0; i < reports.Length; i++)
+                AddReport(result, $"report-{i}-", reports[i], false);
+            return XmlResult(result);
+        }
+
+        private byte[] UpdateReport(Dictionary<string, object> request)
+        {
+            if (!TryGetInt(request, "report-id", -1, out int reportID) || reportID <= 0 ||
+                !TryGetUUID(request, "moderator-id", out UUID moderatorID))
+            {
+                return FailureResult();
+            }
+
+            return m_Service.UpdateReport(reportID, GetString(request, "status"),
+                GetString(request, "notes"), moderatorID, GetString(request, "moderator-name"))
+                ? SuccessResult()
+                : FailureResult();
         }
 
         private byte[] Report(Dictionary<string, object> request)
@@ -181,6 +234,39 @@ namespace OpenSim.Server.Handlers.AbuseReports
             root.AppendChild(result);
 
             return Util.DocToBytes(document);
+        }
+
+        private static void AddReport(Dictionary<string, object> data, string prefix,
+            AbuseReportData report, bool includeImage)
+        {
+            data[prefix + "id"] = report.ReportID.ToString();
+            data[prefix + "reporter"] = report.SenderID.ToString();
+            data[prefix + "reporter-name"] = report.SenderName ?? string.Empty;
+            data[prefix + "time"] = report.Time.ToString();
+            data[prefix + "region-id"] = report.AbuseRegionID.ToString();
+            data[prefix + "region-name"] = report.AbuseRegionName ?? string.Empty;
+            data[prefix + "abuser"] = report.AbuserID.ToString();
+            data[prefix + "abuser-name"] = report.AbuserName ?? string.Empty;
+            data[prefix + "category"] = report.Category ?? string.Empty;
+            data[prefix + "check-flags"] = report.CheckFlags.ToString();
+            data[prefix + "details"] = report.Details ?? string.Empty;
+            data[prefix + "object-id"] = report.ObjectID.ToString();
+            data[prefix + "position"] = report.Position ?? string.Empty;
+            data[prefix + "report-type"] = report.ReportType.ToString();
+            data[prefix + "summary"] = report.Summary ?? string.Empty;
+            data[prefix + "version"] = report.Version ?? string.Empty;
+            data[prefix + "status"] = report.Status ?? string.Empty;
+            data[prefix + "notes"] = report.ModeratorNotes ?? string.Empty;
+            data[prefix + "moderator-id"] = report.ModeratorID.ToString();
+            data[prefix + "moderator-name"] = report.ModeratorName ?? string.Empty;
+            data[prefix + "last-updated"] = report.LastUpdated.ToString();
+            if (includeImage)
+                data[prefix + "image-data"] = Convert.ToBase64String(report.ImageData ?? Array.Empty<byte>());
+        }
+
+        private static byte[] XmlResult(Dictionary<string, object> result)
+        {
+            return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
         }
     }
 }

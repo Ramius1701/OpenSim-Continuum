@@ -63,5 +63,47 @@ namespace OpenSim.Data.MySQL
 
             return true;
         }
+
+        public AbuseReportData Get(int reportID, bool includeImage)
+        {
+            AbuseReportData[] reports = Get(nameof(AbuseReportData.ReportID), reportID.ToString());
+            if (reports.Length == 0)
+                return null;
+
+            if (!includeImage)
+                reports[0].ImageData = Array.Empty<byte>();
+            return reports[0];
+        }
+
+        public AbuseReportData[] Get(int start, int count, string status)
+        {
+            start = Math.Max(0, start);
+            count = Math.Clamp(count, 1, 200);
+            string options = $"ORDER BY `ReportID` DESC LIMIT {start},{count}";
+            AbuseReportData[] reports = string.IsNullOrWhiteSpace(status)
+                ? Get("1=1 " + options)
+                : Get(new[] { nameof(AbuseReportData.Status) }, new[] { status }, options);
+
+            foreach (AbuseReportData report in reports)
+                report.ImageData = Array.Empty<byte>();
+            return reports;
+        }
+
+        public bool UpdateModeration(int reportID, string status, string notes,
+            UUID moderatorID, string moderatorName, int lastUpdated)
+        {
+            using MySqlCommand cmd = new MySqlCommand();
+            cmd.CommandText = "UPDATE `AbuseReports` SET `Status`=?Status, " +
+                "`ModeratorNotes`=?ModeratorNotes, `ModeratorID`=?ModeratorID, " +
+                "`ModeratorName`=?ModeratorName, `LastUpdated`=?LastUpdated " +
+                "WHERE `ReportID`=?ReportID";
+            cmd.Parameters.AddWithValue("Status", status);
+            cmd.Parameters.AddWithValue("ModeratorNotes", notes);
+            cmd.Parameters.AddWithValue("ModeratorID", moderatorID.ToString());
+            cmd.Parameters.AddWithValue("ModeratorName", moderatorName);
+            cmd.Parameters.AddWithValue("LastUpdated", lastUpdated);
+            cmd.Parameters.AddWithValue("ReportID", reportID);
+            return ExecuteNonQuery(cmd) > 0;
+        }
     }
 }

@@ -7,6 +7,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+using OpenMetaverse;
 
 namespace OpenSim.Services.Connectors
 {
@@ -73,6 +74,53 @@ namespace OpenSim.Services.Connectors
             return DoSimplePost(ServerUtils.BuildQueryString(sendData), "report");
         }
 
+        public AbuseReportData GetReport(int reportID, bool includeImage)
+        {
+            Dictionary<string, object> request = new Dictionary<string, object>
+            {
+                ["METHOD"] = "get",
+                ["report-id"] = reportID.ToString(),
+                ["include-image"] = includeImage ? "1" : "0"
+            };
+            Dictionary<string, object> reply = DoPost(ServerUtils.BuildQueryString(request), "get");
+            return IsSuccess(reply) ? ParseReport(reply, "report-") : null;
+        }
+
+        public AbuseReportData[] GetReports(int start, int count, string status)
+        {
+            Dictionary<string, object> request = new Dictionary<string, object>
+            {
+                ["METHOD"] = "list",
+                ["start"] = start.ToString(),
+                ["count"] = count.ToString(),
+                ["status"] = status ?? string.Empty
+            };
+            Dictionary<string, object> reply = DoPost(ServerUtils.BuildQueryString(request), "list");
+            if (!IsSuccess(reply) || !TryGetInt(reply, "report-count", out int reportCount))
+                return Array.Empty<AbuseReportData>();
+
+            reportCount = Math.Clamp(reportCount, 0, 200);
+            AbuseReportData[] reports = new AbuseReportData[reportCount];
+            for (int i = 0; i < reportCount; i++)
+                reports[i] = ParseReport(reply, $"report-{i}-");
+            return reports;
+        }
+
+        public bool UpdateReport(int reportID, string status, string notes,
+            UUID moderatorID, string moderatorName)
+        {
+            Dictionary<string, object> request = new Dictionary<string, object>
+            {
+                ["METHOD"] = "update",
+                ["report-id"] = reportID.ToString(),
+                ["status"] = status ?? string.Empty,
+                ["notes"] = notes ?? string.Empty,
+                ["moderator-id"] = moderatorID.ToString(),
+                ["moderator-name"] = moderatorName ?? string.Empty
+            };
+            return IsSuccess(DoPost(ServerUtils.BuildQueryString(request), "update"));
+        }
+
         private void SetServerURI(string serverURI)
         {
             if (string.IsNullOrWhiteSpace(serverURI))
@@ -82,6 +130,11 @@ namespace OpenSim.Services.Connectors
         }
 
         private bool DoSimplePost(string requestString, string method)
+        {
+            return IsSuccess(DoPost(requestString, method));
+        }
+
+        private Dictionary<string, object> DoPost(string requestString, string method)
         {
             try
             {
@@ -97,22 +150,18 @@ namespace OpenSim.Services.Connectors
                         "[ABUSE REPORTS CONNECTOR]: {0} received an empty reply from {1}",
                         method,
                         m_ServerURI);
-                    return false;
+                    return null;
                 }
 
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                if (!replyData.TryGetValue("result", out object result))
+                if (!replyData.ContainsKey("result"))
                 {
                     m_log.WarnFormat(
                         "[ABUSE REPORTS CONNECTOR]: {0} reply did not contain a result field",
                         method);
-                    return false;
+                    return null;
                 }
-
-                return string.Equals(
-                    result.ToString(),
-                    "success",
-                    StringComparison.OrdinalIgnoreCase);
+                return replyData;
             }
             catch (Exception e)
             {
@@ -120,8 +169,57 @@ namespace OpenSim.Services.Connectors
                     "[ABUSE REPORTS CONNECTOR]: Exception contacting {0}: {1}",
                     m_ServerURI,
                     e);
-                return false;
+                return null;
             }
+        }
+
+        private static bool IsSuccess(Dictionary<string, object> reply)
+        {
+            return reply != null && reply.TryGetValue("result", out object result) &&
+                string.Equals(result?.ToString(), "success", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static AbuseReportData ParseReport(Dictionary<string, object> data, string prefix)
+        {
+            AbuseReportData report = new AbuseReportData();
+            TryGetInt(data, prefix + "id", out report.ReportID);
+            TryGetInt(data, prefix + "time", out report.Time);
+            TryGetInt(data, prefix + "check-flags", out report.CheckFlags);
+            TryGetInt(data, prefix + "report-type", out report.ReportType);
+            TryGetInt(data, prefix + "last-updated", out report.LastUpdated);
+            UUID.TryParse(GetString(data, prefix + "reporter"), out report.SenderID);
+            UUID.TryParse(GetString(data, prefix + "abuser"), out report.AbuserID);
+            UUID.TryParse(GetString(data, prefix + "region-id"), out report.AbuseRegionID);
+            UUID.TryParse(GetString(data, prefix + "object-id"), out report.ObjectID);
+            UUID.TryParse(GetString(data, prefix + "moderator-id"), out report.ModeratorID);
+            report.SenderName = GetString(data, prefix + "reporter-name");
+            report.AbuserName = GetString(data, prefix + "abuser-name");
+            report.AbuseRegionName = GetString(data, prefix + "region-name");
+            report.Category = GetString(data, prefix + "category");
+            report.Details = GetString(data, prefix + "details");
+            report.Position = GetString(data, prefix + "position");
+            report.Summary = GetString(data, prefix + "summary");
+            report.Version = GetString(data, prefix + "version");
+            report.Status = GetString(data, prefix + "status");
+            report.ModeratorNotes = GetString(data, prefix + "notes");
+            report.ModeratorName = GetString(data, prefix + "moderator-name");
+            string image = GetString(data, prefix + "image-data");
+            report.ImageData = string.IsNullOrEmpty(image) ? Array.Empty<byte>() : Convert.FromBase64String(image);
+            return report;
+        }
+
+        private static bool TryGetInt(Dictionary<string, object> data, string key, out int value)
+        {
+            value = 0;
+            return data != null && data.TryGetValue(key, out object raw) &&
+                int.TryParse(raw?.ToString(), out value);
+        }
+
+        private static string GetString(Dictionary<string, object> data, string key)
+        {
+            return data != null && data.TryGetValue(key, out object value)
+                ? value?.ToString() ?? string.Empty
+                : string.Empty;
         }
     }
 }

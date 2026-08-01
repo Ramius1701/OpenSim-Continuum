@@ -22,6 +22,11 @@ namespace OpenSim.Framework
         public int ReportType;
         public string Summary = string.Empty;
         public string Version = string.Empty;
+        public string Status = "Open";
+        public string ModeratorNotes = string.Empty;
+        public UUID ModeratorID = UUID.Zero;
+        public string ModeratorName = string.Empty;
+        public int LastUpdated;
         public byte[] ImageData = Array.Empty<byte>();
     }
 }
