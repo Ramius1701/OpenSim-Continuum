@@ -10,6 +10,7 @@ The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808
 - Primary deployment target: Windows, MySQL/MariaDB, grid mode with Robust
 - Baseline build: successful with four known CS9193 compiler warnings
 - Continuum completion build: successful
+- Later LSL/GLTF compatibility reconciliation build: successful with zero warnings and zero errors
 - New public, economy, trust-sensitive, and experimental modules are disabled by default
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
 
@@ -145,6 +146,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 
 ## Further documentation
 
+- [Donor feature inventory and disposition record](doc/donor-feature-inventory.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Abuse Reports](doc/AbuseReports.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)

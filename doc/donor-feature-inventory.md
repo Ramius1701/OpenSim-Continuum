@@ -1,8 +1,29 @@
-# Donor feature audit: checkpoint 1
+# Donor feature audit and integration disposition
 
 Date: 2026-08-01  
 Audit base: `247b9182c1ca0f11743de06a2808f003bc8e2a90` (`baseline/opensim-dev-2026-08-01`)  
-Scope: evidence-led inventory only; no donor implementation has been cherry-picked or ported.
+Scope: checkpoint 1 records the clean-baseline audit. The integration status below records the subsequent implementation candidate on `codex/complete-opensim-feature-set`.
+
+## Integration checkpoint
+
+The initial recommendations in this document are retained as the evidence available before implementation. They are not the current delivery status. The OpenSim-side candidate now includes the accepted production integrations, disabled-by-default addons, and separately isolated experiments described below.
+
+| Candidate family | Current disposition |
+|---|---|
+| Display Names | Integrated from the Mobius lineage with Tranquillity enhancements; MySQL, CAPS, search, cache and Hypergrid runtime tests remain required. |
+| User aliases/OAR identities | Integrated as a Robust service extension with narrow archive compatibility hooks; trust-boundary and migration tests remain required. |
+| Experiences | Tranquillity full service is authoritative; Gunthar script-facing behavior was reconciled without retaining duplicate service implementations. |
+| Abuse Reports | Integrated from the Mobius lineage as viewer, simulator, Robust and MySQL functionality. |
+| Hypergrid identity/crossing repairs | Integrated as narrow compatibility fixes; multi-grid topology and hostile-input tests remain required. |
+| YEngine recovery and script compatibility | Integrated, including the later GLTF/material, identity, transfer, terrain, parcel, environment, damage, sit, attachment and pathfinding surface. Duplicate donor aggregates are compile-excluded in favor of the reconciled implementations. |
+| RegionWeb | Integrated as a disabled-by-default per-region addon; it is not WhiteCore WebUI and not a grid-wide portal. |
+| Recovered operational addons | Gloebit, HoloPhysicsGuard, MoneyServer, Search, Tide and Weather are packaged as optional components. GroupAutoInvite, RegionCurrency and OpenSimMarketplace are also included and disabled by default where applicable. |
+| Warp3D sprites | Integrated behind opt-in renderer settings for visual/performance testing. |
+| ubODE tuning | Kept on `codex/testing-ubode-tuning`; it is not part of the default production candidate. |
+| WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
+| Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
+
+The Release solution build after the later LSL/GLTF duplicate reconciliation completed successfully with zero warnings and zero errors. A prior full regenerated completion build completed with the four known baseline CS9193 warnings. Compilation does not replace the runtime, viewer, Robust, MySQL, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
 
 ## Repository verification
 
