@@ -54,6 +54,11 @@ The `import` operation additionally requires all of these literal flags:
 They do not replace operational verification. The importer independently
 rejects invalid legacy accounts and any non-empty target ledger.
 
+`ContinuumEconomy.Migrate initialize` creates or upgrades only the independent
+`continuum_economy_*` tables and requires
+`--confirm=CREATE-CONTINUUM-ECONOMY-SCHEMA`. It does not alter legacy tables,
+import balances or select the new ledger for MoneyServer.
+
 The ledger history API is account-scoped, newest-first and capped at 500 rows
 per request. It returns direction, counterparty, resulting balance, status,
 region/object context and failure reason without granting callers direct SQL

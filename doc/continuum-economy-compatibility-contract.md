@@ -71,6 +71,9 @@ manifest records source account count, total balance and history-row count.
 The offline tool accepts database credentials only through an environment
 variable, provides a read-only `analyze` mode, and requires explicit stopped
 service, completed snapshot and destructive-import confirmation flags.
+Schema initialization is a separate confirmed command and creates only
+`continuum_economy_*` tables; it neither imports balances nor changes the active
+MoneyServer backend.
 
 ## Donor boundary
 

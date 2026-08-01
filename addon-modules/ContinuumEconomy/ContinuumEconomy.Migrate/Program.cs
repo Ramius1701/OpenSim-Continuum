@@ -7,10 +7,11 @@ namespace ContinuumEconomy.Migrate
     {
         private const string ConnectionVariable = "CONTINUUM_ECONOMY_CONNECTION_STRING";
         private const string ImportConfirmation = "--confirm=IMPORT-LEGACY-MONEYSERVER";
+        private const string SchemaConfirmation = "--confirm=CREATE-CONTINUUM-ECONOMY-SCHEMA";
 
         private static int Main(string[] args)
         {
-            if (args.Length == 0 || (args[0] != "analyze" && args[0] != "import"))
+            if (args.Length == 0 || (args[0] != "analyze" && args[0] != "initialize" && args[0] != "import"))
             {
                 Usage();
                 return 2;
@@ -25,6 +26,20 @@ namespace ContinuumEconomy.Migrate
 
             try
             {
+                if (args[0] == "initialize")
+                {
+                    if (Array.IndexOf(args, SchemaConfirmation) < 0)
+                    {
+                        Console.Error.WriteLine("Schema initialization refused without the literal confirmation flag.");
+                        Usage();
+                        return 2;
+                    }
+
+                    new MySqlEconomyLedger(connectionString).EnsureSchema();
+                    Console.WriteLine("ContinuumEconomy schema is initialized. Legacy MoneyServer tables were not altered.");
+                    return 0;
+                }
+
                 LegacyMoneyServerImporter importer = new(connectionString);
                 if (args[0] == "analyze")
                 {
@@ -75,6 +90,7 @@ namespace ContinuumEconomy.Migrate
         {
             Console.Error.WriteLine("Usage:");
             Console.Error.WriteLine("  ContinuumEconomy.Migrate analyze");
+            Console.Error.WriteLine("  ContinuumEconomy.Migrate initialize {0}", SchemaConfirmation);
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
         }
     }
