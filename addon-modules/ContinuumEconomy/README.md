@@ -59,3 +59,9 @@ per request. It returns direction, counterparty, resulting balance, status,
 region/object context and failure reason without granting callers direct SQL
 access. Administrative APIs must apply their own authorization before exposing
 this data.
+
+Privileged credits and debits use a separate adjustment operation. They require
+a non-zero actor UUID and explicit reason, reserve a globally unique operation
+ID, update one account atomically and retain both successful and
+insufficient-funds outcomes for safe retries. Resident transfer calls cannot
+reach this primitive directly, and the zero UUID is never treated as a mint.

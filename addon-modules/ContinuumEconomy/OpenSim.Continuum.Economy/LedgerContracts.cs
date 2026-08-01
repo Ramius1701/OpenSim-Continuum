@@ -12,6 +12,12 @@ namespace OpenSim.Continuum.Economy
         TransactionConflict = 4
     }
 
+    public enum LedgerAdjustmentKind
+    {
+        Credit = 1,
+        Debit = 2
+    }
+
     public sealed class LedgerTransferRequest
     {
         public Guid TransactionID { get; set; }
@@ -39,6 +45,7 @@ namespace OpenSim.Continuum.Economy
         public Guid TransactionID { get; set; }
         public Guid AccountID { get; set; }
         public Guid CounterpartyID { get; set; }
+        public Guid ActorID { get; set; }
         public long Amount { get; set; }
         public long ResultingBalance { get; set; }
         public int TransactionType { get; set; }
@@ -48,7 +55,28 @@ namespace OpenSim.Continuum.Economy
         public string FailureReason { get; set; } = String.Empty;
         public DateTime CreatedUtc { get; set; }
         public bool IsCredit { get; set; }
+        public bool IsAdjustment { get; set; }
         public bool Succeeded { get; set; }
+    }
+
+    public sealed class LedgerAdjustmentRequest
+    {
+        public Guid OperationID { get; set; }
+        public Guid AccountID { get; set; }
+        public Guid ActorID { get; set; }
+        public long Amount { get; set; }
+        public LedgerAdjustmentKind Kind { get; set; }
+        public int TransactionType { get; set; }
+        public string Reason { get; set; } = String.Empty;
+    }
+
+    public sealed class LedgerAdjustmentResult
+    {
+        public LedgerResultCode Code { get; set; }
+        public Guid OperationID { get; set; }
+        public long Balance { get; set; }
+        public string Message { get; set; } = String.Empty;
+        public bool Succeeded => Code == LedgerResultCode.Committed || Code == LedgerResultCode.Replayed;
     }
 
     public interface IEconomyLedger
@@ -56,6 +84,7 @@ namespace OpenSim.Continuum.Economy
         void EnsureSchema();
         long GetBalance(Guid accountID);
         LedgerTransferResult Transfer(LedgerTransferRequest request);
+        LedgerAdjustmentResult Adjust(LedgerAdjustmentRequest request);
         IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit);
     }
 }
