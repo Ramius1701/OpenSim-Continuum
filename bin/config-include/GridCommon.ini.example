@@ -80,11 +80,11 @@
     ;AuthorizationServices = "RemoteAuthorizationServicesConnector"
 
     ;; Send viewer abuse reports to the grid-wide ROBUST service.
-    ; AbuseReportsService = "RemoteAbuseReportsServicesConnector"
+    AbuseReportsService = "RemoteAbuseReportsServicesConnector"
 
 [AbuseReportsService]
     ;; Private ROBUST endpoint used by RemoteAbuseReportsServicesConnector.
-    ; AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
+    AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
 [AssetService]
     DefaultAssetLoader = "OpenSim.Framework.AssetLoader.Filesystem.dll"

@@ -11,7 +11,8 @@ The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808
 - Baseline build: successful with four known CS9193 compiler warnings
 - Continuum completion build: successful
 - Later LSL/GLTF compatibility reconciliation build: successful with zero warnings and zero errors
-- New public, economy, trust-sensitive, and experimental modules are disabled by default
+- Grid-wide Experiences and Abuse Reports are enabled in the Continuum grid/Robust example profiles
+- Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
 
 Do not replace a running production installation in place. Build a separate test deployment, back up all databases and configuration, and rehearse every migration against a copy of production data.
@@ -77,6 +78,8 @@ The following components require deliberate opt-in:
 - `[OpenSimMarketplace] Enabled = false`
 - Recovered economy, search, environment, and protection modules through their own configuration sections
 - Warp3D flat-card sprite rendering through its renderer flags
+
+`[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
 Never commit production passwords, API keys, database connection strings, marketplace credentials, or external economy credentials. Experience-Lite automatic grants must be restricted to explicit trusted owner or object UUIDs and must not grant debit permission.
 

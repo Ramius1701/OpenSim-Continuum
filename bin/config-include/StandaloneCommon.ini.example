@@ -79,11 +79,11 @@
     ;AuthorizationServices = "LocalAuthorizationServicesConnector"
 
     ;; Store viewer abuse reports in the standalone database.
-    ; AbuseReportsService = "LocalAbuseReportsServicesConnector"
+    AbuseReportsService = "LocalAbuseReportsServicesConnector"
 
 [AbuseReportsService]
     ;; Used when [Modules] selects LocalAbuseReportsServicesConnector.
-    ; LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
     ;; StorageProvider and ConnectionString inherit from [DatabaseService].
     ;; They may be overridden here when a separate abuse-report database is used.
 
