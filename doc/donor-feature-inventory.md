@@ -41,9 +41,9 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 | Priority | Candidate | Classification | Donor commit/checkpoint | Recommendation |
 |---:|---|---|---|---|
-| P0 | YEngine orphaned resumed-event guard | upstream-quality bug fix | Gunthar `af16af08b66c049d81faef423950b5c98f34eb9` | Isolate the two YEngine changes from the unrelated example script and review first. |
-| P0 | Estate connector must not terminate host process | upstream-quality bug fix | Tranquillity `d978ab12b4c0c05a9ff2016bdce7ed569e7e13f8` | Verify current call semantics and port only if the fatal path still exists. |
-| P0 | Warp3D alpha-card rendering | upstream-quality bug fix | Gunthar `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7` | Compare with current renderer; validate transparent/alpha-masked map tiles. |
+| P0 | YEngine orphaned resumed-event guard | upstream-quality bug fix (provisional) | Gunthar `af16af08b66c049d81faef423950b5c98f34eb9` | The throwing path is present; construct a focused state-corruption/restart test before selecting recovery semantics. |
+| Closed | Estate connector must not terminate host process | already present in OpenSim Dev | Tranquillity `d978ab12b4c0c05a9ff2016bdce7ed569e7e13f8`; Dev equivalent `a9be42a304d9113c889a59ef2041bdccfc37c6f3` | No port. Current Dev already returns null without terminating the process. |
+| P2 | Warp3D alpha texture-card sprites | experimental feature | Gunthar initial subsystem `50ff704e14f2114ff2b5613be4aa1252fbad6694`, later black-card fix `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7` | Audit the complete 400-line sprite subsystem as an optional renderer enhancement; the later fix cannot stand alone. |
 | P1 | Display Names | Robust service extension | Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619` plus MySQL case fix `45232b2f318e6f225675047fc92edfd20f54b51a` | Design as an opt-in service/caps slice; do not transplant wholesale. |
 | P1 | User aliases and OAR identity resolution | Robust service extension | Tranquillity `cfd4742a29958781b7778c74fe731fc0be7c9bb6`, negative cache `39aaed76b74c640db62f73ca1f46d42bd299d15b`, config example `d3aac7d244456d74374bbb8446f8188be45ebe96` | Audit API and threat model together with Display Names. |
 | P1 | Experiences | Robust service extension | Tranquillity `26d3971448107725ad30d0abf769175ccb7f2467`; restart fix `0281a9f87b8f0f2c0f54876c3e29eeb0b626bb83` | Split protocol/service/data/script work into milestones; high test burden. |
@@ -61,39 +61,39 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 - **Feature and intended behaviour:** avoid a YEngine crash when a persisted/resumed script event refers to a script instance that is no longer valid.
 - **Donor and commit:** GuntharDeNiro/opensim, `af16af08b66c049d81faef423950b5c98f34eb9`.
-- **Current Dev equivalent / missing behaviour:** current Dev has YEngine resume/event machinery, but not this donor guard as an identifiable feature. A line-level semantic comparison and failing regression fixture are still required.
+- **Current Dev equivalent / missing behaviour:** current Dev `ResumeEx()` explicitly throws when `stackFrames` is null, and `RunOne()` does not catch that call locally. The donor clears event state and returns null, which lets the scheduler continue. The missing resilience is real; whether silently dropping the event is the correct recovery remains unproven.
 - **Affected files and services:** `XMRInstAbstract.cs`, `XMRScriptUThread.cs`; region-side YEngine only. The donor commit also contains an unrelated example LSL file which must be excluded.
 - **Addon versus core:** narrow core bug fix.
 - **Compatibility:** no database impact; Windows-neutral managed code; no intended Robust or Hypergrid impact.
 - **Viewer requirements:** none.
 - **Licensing/provenance:** OpenSim-derived donor; confirm BSD notices and authorship in the source commit before porting.
-- **Tests required:** persisted-state restart, deleted/recompiled script race, event-queue concurrency, existing YEngine unit/integration suite, Debug and Release builds on Windows.
-- **Recommendation:** P0, investigate first and upstream as a minimal regression-tested fix if reproduced.
+- **Tests required:** first create a fixture that reaches `eventCode != None` with `stackFrames == null`; then cover persisted-state restart, deleted/recompiled script race, event-queue concurrency, subsequent queued-event execution, and Debug/Release builds on Windows. Assert that cleanup does not strand suspend/detach state.
+- **Recommendation:** retain at P0 provisionally. Do not port the donor reset sequence until the corrupt-state fixture proves both the crash and safe continuation semantics. Treat the null-safe exception formatter as a separable defensive fix.
 
 ### 2. Estate connector process-termination path
 
 - **Feature and intended behaviour:** a failed estate lookup returns failure to its caller instead of calling `Environment.Exit()` from a library.
 - **Donor and commit:** OpenSim-NGC/OpenSim-Tranquillity, `d978ab12b4c0c05a9ff2016bdce7ed569e7e13f8`.
-- **Current Dev equivalent / missing behaviour:** `EstateDataConnector` exists in Dev; confirm whether the fatal path or an equivalent remains and whether callers correctly handle null/failure.
+- **Current Dev equivalent / missing behaviour:** already present. OpenSim Dev commit `a9be42a304d9113c889a59ef2041bdccfc37c6f3` removed the fatal behaviour on 2024-09-22; the baseline calls `MakeRequest()` and returns null for a null or empty reply. A later cleanup, `0d71b6d871e`, supplies the current `string.IsNullOrEmpty` form.
 - **Affected files and services:** `OpenSim/Services/Connectors/Estate/EstateDataConnector.cs`; region and Robust estate lookup paths.
 - **Addon versus core:** core bug fix.
 - **Compatibility:** datastore-neutral in intent; explicitly test MySQL missing-estate and connector-error cases. Windows-neutral. No direct viewer or HG protocol change, though HG region startup may exercise the connector.
 - **Licensing/provenance:** traceable OpenSim-derived Tranquillity commit; retain BSD provenance.
 - **Tests required:** missing estate, database unavailable, malformed response, standalone/grid/Robust startup, MySQL and SQLite, Windows build/runtime.
-- **Recommendation:** P0 if the path remains; otherwise classify as already present and document the equivalent upstream fix.
+- **Recommendation:** closed as already present in OpenSim Dev. Do not port the Tranquillity patch or its commented-out `Environment.Exit` lines.
 
-### 3. Warp3D transparent-card map rendering
+### 3. Warp3D alpha texture-card sprite rendering
 
-- **Feature and intended behaviour:** render alpha texture cards correctly in Warp3D map tiles instead of producing black cards.
-- **Donor and commit:** GuntharDeNiro/opensim `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7`.
-- **Current Dev equivalent / missing behaviour:** Warp3D map generation exists. Missing behaviour must be confirmed because the audit baseline postdates the donor and may contain a different fix.
-- **Affected files and services:** `Warp3DImageModule.cs`, plus a donor default configuration change.
-- **Addon versus core:** core renderer bug fix; avoid importing donor-specific defaults without justification.
+- **Feature and intended behaviour:** add a sprite pass for flat alpha texture cards in Warp3D map tiles, then prevent those cards from also rendering as black-backed volume geometry.
+- **Donor and commit:** GuntharDeNiro/opensim initial sprite subsystem `50ff704e14f2114ff2b5613be4aa1252fbad6694`; follow-up black-card fix `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7`.
+- **Current Dev equivalent / missing behaviour:** current Dev has Warp3D volume rendering but none of the donor identifiers `m_drawFlatTextureCardSprites`, `IsUsableSpriteFace`, `GetSpriteTexture`, `AlphaCoverage`, or `OpaqueCoverage`. The follow-up fix adds only 29 lines but depends on the initial subsystem, which adds 403 lines and removes 4 in `Warp3DImageModule.cs` plus configuration changes. Therefore the cited black-card commit is not independently portable.
+- **Affected files and services:** `Warp3DImageModule.cs`, `OpenSim.ini.example`, and `OpenSimDefaults.ini`; map-image generation only.
+- **Addon versus core:** experimental core renderer enhancement, preferably behind opt-in configuration during evaluation; avoid importing donor-specific defaults without evidence.
 - **Compatibility:** no Robust/MySQL/HG effect; managed Windows rendering dependencies must be exercised.
 - **Viewer requirements:** none; output is a map image consumed by viewers/web maps.
 - **Licensing/provenance:** OpenSim-derived donor; verify any rendering technique attribution.
-- **Tests required:** golden images for opaque, blended, masked, and fully transparent textures; Linux/Windows parity; memory and map-generation timing.
-- **Recommendation:** P0 visual regression audit, then minimal fix only.
+- **Tests required:** golden images for opaque, blended, masked, and fully transparent texture cards; comparison with baseline volume output; sprite/texture decode budgets; missing assets; Linux/Windows parity; memory and map-generation timing.
+- **Recommendation:** downgrade to P2 experimental. Audit the entire sprite subsystem and its performance/security limits; do not describe or port `c2c30d...` as a standalone upstream bug fix.
 
 ### 4. Display Names
 
@@ -234,7 +234,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 ## Next audit actions
 
-1. Build minimal reproductions for the three P0 fixes and record whether current Dev is affected or already equivalent.
+1. Build the minimal corrupt-state fixture for the remaining provisional P0 YEngine candidate and decide safe recovery semantics.
 2. Produce protocol/data-flow maps for Display Names, aliases, and Experiences, including trust boundaries and MySQL migrations.
 3. Trace RegionWeb and each recovered addon to its original repository/license and enumerate assets separately from code.
 4. Convert each viable item into its own audit checkpoint with exact diff boundaries and test plan. No implementation should be ported until that item's audit is accepted.
