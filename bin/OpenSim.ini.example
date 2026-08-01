@@ -1008,6 +1008,9 @@
     Cap_GetMesh = "localhost"
     Cap_AvatarPickerSearch = "localhost"
     Cap_GetDisplayNames = "localhost"
+    ;; Continuum: enable viewer display-name changes. In grid mode these are
+    ;; persisted by the grid-wide UserAccountService hosted in Robust.
+    Cap_SetDisplayName = "localhost"
 
 
 [SimulatorFeatures]
