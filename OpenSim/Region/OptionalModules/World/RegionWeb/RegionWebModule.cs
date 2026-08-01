@@ -44,7 +44,6 @@ using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
@@ -6726,7 +6725,13 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             foreach (ScriptFunctionDoc doc in ScriptFunctionDocs)
                 documented.Add(doc.Name);
 
-            foreach (MethodInfo method in typeof(ILSL_Api).GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            Type apiType = Type.GetType(
+                "OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ILSL_Api, OpenSim.Region.ScriptEngine.Shared",
+                false);
+            if (apiType == null)
+                return docs.ToArray();
+
+            foreach (MethodInfo method in apiType.GetMethods(BindingFlags.Public | BindingFlags.Instance)
                 .OrderBy(method => method.Name, StringComparer.OrdinalIgnoreCase))
             {
                 if (!method.Name.StartsWith("ll", StringComparison.Ordinal) || documented.Contains(method.Name))

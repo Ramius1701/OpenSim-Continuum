@@ -4151,8 +4151,6 @@ namespace OpenSim.Region.PhysicsModule.ubOde
                 return;
             }
 
-            Vector3 rawWaterNormal = m_parentScene.GetDynamicWaterNormal(pos.X, pos.Y);
-            Vector3 rawFlow = m_parentScene.GetDynamicWaterFlow(pos.X, pos.Y) * m_parentScene.PhysicalPrimWaterDriftScale;
             float alpha = Math.Clamp(m_sceneTimeStep / m_parentScene.PhysicalPrimWaterSmoothingTimescale, 0.015f, 1f);
             bool firstWaterContact = !m_hasWaterDynamicsState;
 
@@ -4236,7 +4234,7 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             if (firstWaterContact && buoyancy > 1f && targetLiftAcceleration > 0f)
             {
                 float equilibriumSubmerged = Math.Clamp(1f / buoyancy, 0.08f, 0.95f);
-                float entryDepth = SmoothStep01(Math.Clamp(trueSubmerged / equilibriumSubmerged, 0f, 1f));
+                float entryDepth = SmoothStep01(Math.Clamp(rawSubmerged / equilibriumSubmerged, 0f, 1f));
                 float preloadScale = 0.55f + 0.30f * entryDepth;
 
                 if (vel.Z < -1f)

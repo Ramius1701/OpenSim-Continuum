@@ -621,6 +621,8 @@ namespace OpenSim.Region.PhysicsModule.ubOde
             contactSharedForJoints.surface.mu = baseMu * PhysicalPrimMicroBounceFrictionBoost;
         }
 
+        private static float SimulatedTime => (float)Util.GetTimeStamp();
+
         internal float GetDynamicWaterHeight(float x, float y)
         {
             if (!BoatWaterDynamicsEnabled)
