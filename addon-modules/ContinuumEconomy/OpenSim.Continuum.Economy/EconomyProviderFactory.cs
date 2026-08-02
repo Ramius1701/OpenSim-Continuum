@@ -1,5 +1,7 @@
 using System;
+using System.Data.SQLite;
 using MySql.Data.MySqlClient;
+using Npgsql;
 
 namespace OpenSim.Continuum.Economy
 {
@@ -64,12 +66,21 @@ namespace OpenSim.Continuum.Economy
 
         public static bool IsDedicatedTestDatabase(string providerName, string connectionString)
         {
-            if (Parse(providerName) != EconomyStorageProvider.MySql)
-                return false;
-            MySqlConnectionStringBuilder builder = new(connectionString);
-            return !String.IsNullOrWhiteSpace(builder.Database) &&
-                builder.Database.IndexOf("test", StringComparison.OrdinalIgnoreCase) >= 0;
+            switch(Parse(providerName))
+            {
+                case EconomyStorageProvider.MySql:
+                    return ContainsTest(new MySqlConnectionStringBuilder(connectionString).Database);
+                case EconomyStorageProvider.PostgreSql:
+                    return ContainsTest(new NpgsqlConnectionStringBuilder(connectionString).Database);
+                case EconomyStorageProvider.SQLite:
+                    SQLiteConnectionStringBuilder sqlite=new(connectionString);
+                    return sqlite.DataSource != ":memory:" && ContainsTest(sqlite.DataSource);
+                default: return false;
+            }
         }
+
+        private static bool ContainsTest(string value) => !String.IsNullOrWhiteSpace(value) &&
+            value.IndexOf("test",StringComparison.OrdinalIgnoreCase)>=0;
 
         private static NotSupportedException MissingProvider(EconomyStorageProvider provider)
         {
