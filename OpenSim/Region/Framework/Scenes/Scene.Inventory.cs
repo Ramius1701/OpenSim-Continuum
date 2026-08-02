@@ -386,13 +386,17 @@ namespace OpenSim.Region.Framework.Scenes
 
             if (experience != UUID.Zero)
             {
-                allowed_to_contribute = ExperienceModule.IsExperienceContributor(remoteClient.AgentId, experience);
+                IExperienceModule experienceModule = ExperienceModule;
+                allowed_to_contribute = experienceModule != null &&
+                    experienceModule.IsExperienceContributor(remoteClient.AgentId, experience);
 
                 if (!allowed_to_contribute)
                 {
                     experience = UUID.Zero;
                     errors = new ArrayList(1);
-                    errors.Add("Access denied to experience!");
+                    errors.Add(experienceModule == null
+                        ? "Experience service is unavailable; the script was saved without an experience and was not started."
+                        : "Access denied to experience!");
                 }
             }
 

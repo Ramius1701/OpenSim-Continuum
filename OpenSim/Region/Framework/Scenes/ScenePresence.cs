@@ -2727,7 +2727,9 @@ namespace OpenSim.Region.Framework.Scenes
                 if (ParentPart != null && !ParentPart.AllowUnsit)
                 {
                     // Check that the experience still has permission to keep the user seated
-                    if(Scene.ExperienceModule.GetExperiencePermission(remoteClient.AgentId, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
+                    IExperienceModule experienceModule = Scene.ExperienceModule;
+                    if(ParentPart.ExperienceUsedForSit != UUID.Zero && experienceModule != null &&
+                        experienceModule.GetExperiencePermission(remoteClient.AgentId, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
                     {
                         ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to stand at this time.", ParentPart.Name), false);
                         return;
@@ -3505,7 +3507,9 @@ namespace OpenSim.Region.Framework.Scenes
 
                 if (!ParentPart.AllowUnsit)
                 {
-                    if (Scene.ExperienceModule.GetExperiencePermission(this.UUID, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
+                    IExperienceModule experienceModule = Scene.ExperienceModule;
+                    if (ParentPart.ExperienceUsedForSit != UUID.Zero && experienceModule != null &&
+                        experienceModule.GetExperiencePermission(this.UUID, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
                     {
                         ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to change your seat at this time.", ParentPart.Name), false);
                         return;
