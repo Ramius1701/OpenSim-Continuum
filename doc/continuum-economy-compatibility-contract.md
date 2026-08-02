@@ -1,21 +1,24 @@
 # ContinuumEconomy compatibility contract
 
-This checkpoint freezes the externally visible behavior that must be preserved
-while the DTL/NSL-compatible MoneyServer is modernized. It does not authorize a
-production cutover and does not alter the legacy tables.
+This checkpoint freezes the externally visible behavior that the new
+ContinuumEconomy must implement independently. The DTL/NSL-compatible
+MoneyServer is maintained separately as MoneyServer Compatibility; it is not
+modernized into, or used as a host for, ContinuumEconomy.
 
 ## Existing component boundary
 
 | Component | Current responsibility | Continuum target |
 |---|---|---|
-| `OpenSim.Modules.Currency` | Region `IMoneyModule`, viewer events, land/object/script payment integration and callbacks. | Thin authenticated region adapter; preserve viewer and simulator behavior. |
-| `MoneyServer` | Service process, XML-RPC/helper endpoints, policy, stipends and orchestration. | Compatibility host over shared Continuum economy services. |
+| `OpenSim.Modules.Currency` | Compatibility region `IMoneyModule`, viewer events, land/object/script payment integration and callbacks. | Preserve for MoneyServer Compatibility; implement a separately named Continuum region connector. |
+| `MoneyServer` | Independent compatibility service, XML-RPC/helper endpoints, policy and stipends. | Preserve as MoneyServer Compatibility; do not load ContinuumEconomy. |
 | `OpenSim.Data.MySQL.MySQLMoneyDataWrapper` | Legacy balances, users, transactions and sales tables. | Read-only import/reconciliation source after cutover; never silently mix ledgers. |
 | RegionCurrency | Optional wallet, purchase and administration presentation. | Client of authenticated economy APIs, never direct ledger owner. |
 
 ## Legacy endpoint surface
 
-The compatibility host currently registers:
+MoneyServer Compatibility currently registers the following endpoints. The new
+Continuum service must provide deliberately versioned equivalents or an
+explicit compatibility facade without sharing the legacy process:
 
 - session and balance: `ClientLogin`, `ClientLogout`, `GetBalance`;
 - transaction lifecycle: `TransferMoney`, `GetTransaction`, `CancelTransfer`;
@@ -73,7 +76,7 @@ variable, provides a read-only `analyze` mode, and requires explicit stopped
 service, completed snapshot and destructive-import confirmation flags.
 Schema initialization is a separate confirmed command and creates only
 `continuum_economy_*` tables; it neither imports balances nor changes the active
-MoneyServer backend.
+MoneyServer configuration or runtime backend.
 
 ## Donor boundary
 

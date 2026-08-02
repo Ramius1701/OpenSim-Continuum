@@ -1,6 +1,9 @@
 # ContinuumEconomy production-test runbook
 
-ContinuumEconomy is a production-test candidate, not an authorization to replace a live ledger without a rehearsed migration. Build from the isolated integration worktree at `S:\Github\OpenSim-Continuum-complete`.
+ContinuumEconomy is an incomplete development module, not currently a
+production-test candidate. This runbook defines the gates it must eventually
+pass after its own service executable and region connector exist. Build from
+the isolated integration worktree at `S:\Github\OpenSim-Continuum-complete`.
 
 ## Required cutover gates
 
@@ -8,9 +11,9 @@ ContinuumEconomy is a production-test candidate, not an authorization to replace
 2. Stop the cloned MoneyServer and all cloned regions, take a database snapshot, and retain the legacy binaries and configuration.
 3. Set `CONTINUUM_ECONOMY_CONNECTION_STRING` only in the service account environment. Do not put credentials in scripts or source control.
 4. Run `ContinuumEconomy.Migrate analyze`, resolve every invalid UUID or reconciliation mismatch, then run the guarded `initialize` and `import` operations described in the addon README.
-5. Run `ContinuumEconomy.Migrate verify`. MoneyServer now performs this same schema/InnoDB check and refuses startup when the schema is incomplete.
+5. Run `ContinuumEconomy.Migrate verify`. This validates only the experimental Continuum ledger; MoneyServer Compatibility neither loads nor validates it.
 6. Against a separate database whose name contains `test`, run `ContinuumEconomy.Migrate self-test --confirm=RUN-ON-DEDICATED-TEST-DATABASE`. It checks audited credit, replay safety, conflicting request detection, concurrent overspend prevention, purchase holds/capture, and history. Unique test rows are retained.
-7. Assign a dedicated, non-zero `ContinuumSystemActor`. Enable `ContinuumEconomyEnabled` on MoneyServer first, then `ContinuumPurchaseRpc` on every test region. Never run two authoritative money modules in one region.
+7. Assign a dedicated, non-zero `ContinuumSystemActor`. Start the separately named ContinuumEconomy service and select its separately named region connector. Never enable MoneyServer Compatibility and ContinuumEconomy as simultaneous authorities in one region.
 8. Register existing group UUIDs with the guarded `register-group` command before testing group balances. New group creation charges are routed through `IMoneyModule`; automatic group-account classification remains a release gate and groups must not be treated as residents.
 
 ## Acceptance matrix

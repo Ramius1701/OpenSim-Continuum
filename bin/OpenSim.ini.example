@@ -1238,11 +1238,6 @@
     ;; Enables selling things for $0.  Default is true.
     ; SellEnabled = true
 
-    ;; Enable only when MoneyServer has ContinuumEconomyEnabled=true and its
-    ;; schema/import cutover is complete on every region. Object sales then use
-    ;; authorization, delivery, and capture/cancel RPCs.
-    ; ContinuumPurchaseRpc = false
-
     ;# {PriceUpload} {} {Price for uploading?} {} 0
     ;; Money Unit fee to upload textures, animations etc.  Default is 0.
     ; PriceUpload = 0

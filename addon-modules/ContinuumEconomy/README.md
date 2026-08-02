@@ -5,8 +5,10 @@ DTL/NSL-compatible MoneyServer stack. It retains OpenSim's `IMoneyModule`
 extension boundary while adding selected WhiteCore economy behaviour through
 independently implemented Continuum services.
 
-The existing MoneyServer remains the deployable compatibility boundary. The
-Continuum ledger is selected only by explicit MoneyServer and region switches.
+The existing MoneyServer remains an independent deployable compatibility
+module. It does not load this assembly and has no ContinuumEconomy switch.
+ContinuumEconomy requires its own service executable, configuration and region
+connector before it can be deployed.
 
 The first assembly provides an atomic MySQL ledger with deterministic account
 locking, unique transaction IDs, request fingerprints, idempotent results,
@@ -29,9 +31,9 @@ Donor lineage:
 Gloebit is excluded. Use a separate production-test deployment and complete
 `doc/continuum-economy-production-test.md` before considering a live cutover.
 
-`ContinuumEconomy.Migrate verify` is a read-only readiness check for all required
-columns and InnoDB tables. MoneyServer runs the same validation and fails startup
-when `ContinuumEconomyEnabled=true` but the schema is incomplete.
+`ContinuumEconomy.Migrate verify` is a read-only readiness check for the current
+experimental MySQL ledger columns and InnoDB tables. It is not run by
+MoneyServer and does not make ContinuumEconomy deployable.
 
 `ContinuumEconomy.Migrate self-test --confirm=RUN-ON-DEDICATED-TEST-DATABASE`
 requires a database name containing `test`. It performs real atomic, replay,
@@ -86,13 +88,11 @@ hold atomically, while failed delivery cancels it without a reverse transfer.
 Ordinary transfers subtract active holds when checking available funds, which
 prevents concurrent spending from consuming money reserved for a purchase.
 
-The compatibility adapter now covers authenticated login and initial balances,
-available-balance queries, resident and forced transfers, scripted transfers,
-object-payment delivery, two-phase object sales, charges, banker credits,
-stipends and viewer currency purchases. Purchase-period and maximum-balance
-limits execute under the same account lock as the credit. Legacy behavior
-remains selected unless both MoneyServer `ContinuumEconomyEnabled` and region
-`ContinuumPurchaseRpc` are deliberately enabled after migration.
+The ledger library contains account, transfer, adjustment, purchase-hold,
+history and migration primitives. It does not yet provide the new authenticated
+service or region connector needed for viewer and simulator operation. Those
+components must be implemented under Continuum names and certified without
+modifying MoneyServer Compatibility.
 
 `ContinuumEconomy.Migrate holds` is a read-only operational report of
 authorized purchases that have not been captured or cancelled. It defaults to

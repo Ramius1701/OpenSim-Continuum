@@ -55,7 +55,8 @@ The extended scripting surface is powerful and has estate/security implications.
 - RegionCurrency
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
-- ContinuumEconomy: a unified MoneyServer successor using the current DTL/NSL-compatible service as its OpenSim base, WhiteCore's integrated currency behavior as its feature reference, and Gunthar's module/portal work as integration guidance; Gloebit is excluded
+- MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
+- ContinuumEconomy: a separate new economy service and region module under development, informed by MoneyServer protocol behavior, selected WhiteCore economy behavior, and Gunthar integration work; Gloebit is excluded
 - HoloPhysicsGuard
 - OpenSimSearch
 - OpenSimTide
@@ -94,8 +95,9 @@ they provide only a MySQL implementation.
 The Experience service, Abuse Reports, and aliases now include SQLite,
 MySQL/MariaDB, and PostgreSQL provider paths; their clean-install and upgrade
 migrations still require runtime certification on every database. MoneyServer
-and ContinuumEconomy remain MySQL-only and are release blockers for deployments
-that select another datastore. Do not assume schema compatibility merely
+Compatibility remains MySQL-specific by design. ContinuumEconomy is incomplete
+until its own service and region module support SQLite for standalone and both
+MySQL/MariaDB and PostgreSQL for grid deployments. Do not assume compatibility merely
 because the solution compiles. For every service migration, test both a clean
 database and an upgrade from the exact schema used by the target deployment.
 
