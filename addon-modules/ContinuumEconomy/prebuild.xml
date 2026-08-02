@@ -8,8 +8,12 @@
   </Configuration>
   <ReferencePath>../../../bin/</ReferencePath>
   <Reference name="MySql.Data" />
+  <Reference name="Npgsql" />
+  <Reference name="System.Data.SQLite" />
   <Files>
     <Match pattern="*.cs" recurse="false" />
+    <Match buildAction="EmbeddedResource" path="../migrations/sqlite" pattern="*.sql" />
+    <Match buildAction="EmbeddedResource" path="../migrations/pgsql" pattern="*.sql" />
     <Exclude name="obj/**" />
     <Exclude name="bin/**" />
   </Files>
