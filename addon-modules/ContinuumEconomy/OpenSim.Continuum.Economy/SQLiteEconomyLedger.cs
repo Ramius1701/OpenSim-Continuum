@@ -12,6 +12,7 @@ namespace OpenSim.Continuum.Economy
     {
         private readonly SQLiteEconomyStore m_store;
         public SQLiteEconomyLedger(string connectionString) { m_store = new(connectionString); }
+        internal SQLiteEconomyLedger(SQLiteEconomyStore store) { m_store = store; }
         public void EnsureSchema() => m_store.EnsureSchema();
         public void ValidateSchema() => m_store.ValidateSchema();
 
@@ -98,8 +99,64 @@ namespace OpenSim.Continuum.Economy
                 return Adjustment(request.OperationID,status==1?LedgerResultCode.Committed:LedgerResultCode.InsufficientFunds,balance,status==1?"Adjustment committed":failure);
             }
         }
-        public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit) =>
-            throw new NotSupportedException("SQLite history is not implemented yet");
+        public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit)
+        {
+            ValidAccount(accountID);
+            if (limit < 1 || limit > 500)
+                throw new ArgumentOutOfRangeException(nameof(limit), "History limit must be between 1 and 500");
+            List<LedgerHistoryEntry> entries = new(limit * 2);
+            lock (m_store.SyncRoot)
+            using (SQLiteConnection c = m_store.Open())
+            {
+                using (SQLiteCommand q = c.CreateCommand())
+                {
+                    q.CommandText = @"SELECT transaction_id,sender_id,receiver_id,amount,transaction_type,
+                            region_id,object_id,description,status,sender_balance,receiver_balance,
+                            failure_reason,created_utc
+                        FROM continuum_economy_transactions
+                        WHERE (sender_id=@account OR receiver_id=@account)
+                          AND (@before IS NULL OR created_utc<@before)
+                        ORDER BY created_utc DESC,transaction_id DESC LIMIT @limit";
+                    SQLiteEconomyStore.Add(q,"@account",accountID.ToString());
+                    SQLiteEconomyStore.Add(q,"@before",beforeUtc.HasValue ? Utc(beforeUtc.Value) : DBNull.Value);
+                    SQLiteEconomyStore.Add(q,"@limit",limit);
+                    using SQLiteDataReader r=q.ExecuteReader();
+                    while(r.Read())
+                    {
+                        Guid sender=Guid.Parse(r.GetString(1)), receiver=Guid.Parse(r.GetString(2));
+                        bool credit=receiver==accountID;
+                        entries.Add(new LedgerHistoryEntry { TransactionID=Guid.Parse(r.GetString(0)), AccountID=accountID,
+                            CounterpartyID=credit?sender:receiver, Amount=r.GetInt64(3), TransactionType=r.GetInt32(4),
+                            RegionID=Guid.Parse(r.GetString(5)), ObjectID=Guid.Parse(r.GetString(6)), Description=r.GetString(7),
+                            Succeeded=r.GetInt32(8)==1, ResultingBalance=credit?r.GetInt64(10):r.GetInt64(9),
+                            FailureReason=r.GetString(11), CreatedUtc=ReadUtc(r,12), IsCredit=credit, IsAdjustment=false });
+                    }
+                }
+                using (SQLiteCommand q = c.CreateCommand())
+                {
+                    q.CommandText = @"SELECT operation_id,actor_id,amount,adjustment_kind,transaction_type,
+                            reason,status,resulting_balance,failure_reason,created_utc
+                        FROM continuum_economy_adjustments
+                        WHERE account_id=@account AND (@before IS NULL OR created_utc<@before)
+                        ORDER BY created_utc DESC,operation_id DESC LIMIT @limit";
+                    SQLiteEconomyStore.Add(q,"@account",accountID.ToString());
+                    SQLiteEconomyStore.Add(q,"@before",beforeUtc.HasValue ? Utc(beforeUtc.Value) : DBNull.Value);
+                    SQLiteEconomyStore.Add(q,"@limit",limit);
+                    using SQLiteDataReader r=q.ExecuteReader();
+                    while(r.Read())
+                    {
+                        Guid actor=Guid.Parse(r.GetString(1));
+                        entries.Add(new LedgerHistoryEntry { TransactionID=Guid.Parse(r.GetString(0)), AccountID=accountID,
+                            CounterpartyID=actor, ActorID=actor, Amount=r.GetInt64(2), IsCredit=r.GetInt32(3)==1,
+                            TransactionType=r.GetInt32(4), Description=r.GetString(5), Succeeded=r.GetInt32(6)==1,
+                            ResultingBalance=r.GetInt64(7), FailureReason=r.GetString(8), CreatedUtc=ReadUtc(r,9), IsAdjustment=true });
+                    }
+                }
+            }
+            entries.Sort((a,b)=> { int byTime=b.CreatedUtc.CompareTo(a.CreatedUtc); return byTime!=0?byTime:b.TransactionID.CompareTo(a.TransactionID); });
+            if(entries.Count>limit) entries.RemoveRange(limit,entries.Count-limit);
+            return entries;
+        }
         public long GetCreditedTotal(Guid accountID, int transactionType, DateTime sinceUtc)
         {
             ValidAccount(accountID); using SQLiteConnection c=m_store.Open(); using SQLiteCommand q=c.CreateCommand();
@@ -107,10 +164,48 @@ namespace OpenSim.Continuum.Economy
             SQLiteEconomyStore.Add(q,"@id",accountID.ToString());SQLiteEconomyStore.Add(q,"@type",transactionType);SQLiteEconomyStore.Add(q,"@since",Utc(sinceUtc));
             return Convert.ToInt64(q.ExecuteScalar(),CultureInfo.InvariantCulture);
         }
-        public long CountHistory(Guid accountID, DateTime? startUtc, DateTime? endUtc) =>
-            throw new NotSupportedException("SQLite history counts are not implemented yet");
-        public LedgerHistoryEntry GetOperation(Guid operationID) =>
-            throw new NotSupportedException("SQLite operation lookup is not implemented yet");
+        public long CountHistory(Guid accountID, DateTime? startUtc, DateTime? endUtc)
+        {
+            ValidAccount(accountID);
+            using SQLiteConnection c=m_store.Open(); using SQLiteCommand q=c.CreateCommand();
+            q.CommandText=@"SELECT
+                (SELECT COUNT(*) FROM continuum_economy_transactions WHERE (sender_id=@account OR receiver_id=@account)
+                    AND (@start IS NULL OR created_utc>=@start) AND (@end IS NULL OR created_utc<=@end)) +
+                (SELECT COUNT(*) FROM continuum_economy_adjustments WHERE account_id=@account
+                    AND (@start IS NULL OR created_utc>=@start) AND (@end IS NULL OR created_utc<=@end))";
+            SQLiteEconomyStore.Add(q,"@account",accountID.ToString());
+            SQLiteEconomyStore.Add(q,"@start",startUtc.HasValue?Utc(startUtc.Value):DBNull.Value);
+            SQLiteEconomyStore.Add(q,"@end",endUtc.HasValue?Utc(endUtc.Value):DBNull.Value);
+            return Convert.ToInt64(q.ExecuteScalar(),CultureInfo.InvariantCulture);
+        }
+        public LedgerHistoryEntry GetOperation(Guid operationID)
+        {
+            if(operationID==Guid.Empty) throw new ArgumentException("A non-zero operation ID is required",nameof(operationID));
+            using SQLiteConnection c=m_store.Open();
+            using(SQLiteCommand q=c.CreateCommand())
+            {
+                q.CommandText=@"SELECT sender_id,receiver_id,amount,transaction_type,region_id,object_id,
+                    description,status,sender_balance,failure_reason,created_utc
+                    FROM continuum_economy_transactions WHERE transaction_id=@operation";
+                SQLiteEconomyStore.Add(q,"@operation",operationID.ToString()); using SQLiteDataReader r=q.ExecuteReader();
+                if(r.Read()) { Guid sender=Guid.Parse(r.GetString(0)); return new LedgerHistoryEntry { TransactionID=operationID,
+                    AccountID=sender,CounterpartyID=Guid.Parse(r.GetString(1)),Amount=r.GetInt64(2),TransactionType=r.GetInt32(3),
+                    RegionID=Guid.Parse(r.GetString(4)),ObjectID=Guid.Parse(r.GetString(5)),Description=r.GetString(6),
+                    Succeeded=r.GetInt32(7)==1,ResultingBalance=r.GetInt64(8),FailureReason=r.GetString(9),
+                    CreatedUtc=ReadUtc(r,10),IsCredit=false,IsAdjustment=false }; }
+            }
+            using(SQLiteCommand q=c.CreateCommand())
+            {
+                q.CommandText=@"SELECT account_id,actor_id,amount,adjustment_kind,transaction_type,reason,
+                    status,resulting_balance,failure_reason,created_utc FROM continuum_economy_adjustments WHERE operation_id=@operation";
+                SQLiteEconomyStore.Add(q,"@operation",operationID.ToString()); using SQLiteDataReader r=q.ExecuteReader();
+                if(!r.Read()) return null; Guid actor=Guid.Parse(r.GetString(1));
+                return new LedgerHistoryEntry { TransactionID=operationID,AccountID=Guid.Parse(r.GetString(0)),
+                    CounterpartyID=actor,ActorID=actor,Amount=r.GetInt64(2),IsCredit=r.GetInt32(3)==1,
+                    TransactionType=r.GetInt32(4),Description=r.GetString(5),Succeeded=r.GetInt32(6)==1,
+                    ResultingBalance=r.GetInt64(7),FailureReason=r.GetString(8),CreatedUtc=ReadUtc(r,9),IsAdjustment=true };
+            }
+        }
 
         private long Scalar(Guid id, string sql)
         {
@@ -129,6 +224,8 @@ namespace OpenSim.Continuum.Economy
         private static LedgerTransferResult Result(Guid id,LedgerResultCode code,long sb,long rb,string message)=>new(){TransactionID=id,Code=code,SenderBalance=sb,ReceiverBalance=rb,Message=message};
         private static LedgerAdjustmentResult Adjustment(Guid id,LedgerResultCode code,long balance,string message)=>new(){OperationID=id,Code=code,Balance=balance,Message=message};
         private static string Utc(DateTime value)=>value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ",CultureInfo.InvariantCulture);
+        private static DateTime ReadUtc(SQLiteDataReader reader,int ordinal) => DateTime.SpecifyKind(
+            Convert.ToDateTime(reader.GetValue(ordinal),CultureInfo.InvariantCulture),DateTimeKind.Utc);
         private static bool Exceeds(SQLiteConnection c,SQLiteTransaction t,Guid id,int type,DateTime since,long limit,long amount){if(limit<=0)return false;using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="SELECT COALESCE(SUM(amount),0) FROM continuum_economy_adjustments WHERE account_id=@id AND transaction_type=@type AND adjustment_kind=1 AND status=1 AND created_utc>=@since";SQLiteEconomyStore.Add(q,"@id",id.ToString());SQLiteEconomyStore.Add(q,"@type",type);SQLiteEconomyStore.Add(q,"@since",Utc(since));return Convert.ToInt64(q.ExecuteScalar(),CultureInfo.InvariantCulture)+amount>limit;}
         private static void InsertAdjustment(SQLiteConnection c,SQLiteTransaction t,LedgerAdjustmentRequest r,string hash,int status,long balance,string failure){using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="INSERT INTO continuum_economy_operations(operation_id,request_hash,operation_kind) VALUES(@id,@hash,2); INSERT INTO continuum_economy_adjustments(operation_id,request_hash,account_id,actor_id,amount,adjustment_kind,transaction_type,reason,status,resulting_balance,failure_reason) VALUES(@id,@hash,@account,@actor,@amount,@kind,@type,@reason,@status,@balance,@failure)";object[]v={r.OperationID.ToString(),hash,r.AccountID.ToString(),r.ActorID.ToString(),r.Amount,(int)r.Kind,r.TransactionType,r.Reason,status,balance,failure};string[]n={"@id","@hash","@account","@actor","@amount","@kind","@type","@reason","@status","@balance","@failure"};for(int i=0;i<n.Length;i++)SQLiteEconomyStore.Add(q,n[i],v[i]);q.ExecuteNonQuery();}
         private static LedgerAdjustmentResult PriorAdjustment(SQLiteConnection c,SQLiteTransaction t,Guid id,string hash){using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="SELECT request_hash,status,resulting_balance,failure_reason FROM continuum_economy_adjustments WHERE operation_id=@id";SQLiteEconomyStore.Add(q,"@id",id.ToString());using SQLiteDataReader r=q.ExecuteReader();if(!r.Read())return null;if(!String.Equals(r.GetString(0),hash,StringComparison.Ordinal))return Adjustment(id,LedgerResultCode.TransactionConflict,0,"Operation ID conflict");int s=r.GetInt32(1);return Adjustment(id,s==1?LedgerResultCode.Replayed:LedgerResultCode.InsufficientFunds,r.GetInt64(2),s==1?"Adjustment already committed":r.GetString(3));}

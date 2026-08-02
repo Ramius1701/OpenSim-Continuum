@@ -50,9 +50,16 @@ namespace OpenSim.Continuum.Economy
                     new MySqlEconomyAccountService(connectionString),
                     new MySqlEconomyPurchaseService(connectionString)),
                 EconomyStorageProvider.PostgreSql => throw MissingProvider(provider),
-                EconomyStorageProvider.SQLite => throw MissingProvider(provider),
+                EconomyStorageProvider.SQLite => CreateSQLite(provider, connectionString),
                 _ => throw new ArgumentOutOfRangeException(nameof(provider))
             };
+        }
+
+        private static EconomyBackend CreateSQLite(EconomyStorageProvider provider,string connectionString)
+        {
+            SQLiteEconomyStore store=new(connectionString);
+            return new EconomyBackend(provider,new SQLiteEconomyLedger(store),
+                new SQLiteEconomyAccountService(store),new SQLiteEconomyPurchaseService(store));
         }
 
         public static bool IsDedicatedTestDatabase(string providerName, string connectionString)

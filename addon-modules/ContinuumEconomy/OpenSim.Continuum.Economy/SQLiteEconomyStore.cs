@@ -2,13 +2,15 @@ using System;
 using System.Data;
 using System.Data.SQLite;
 using System.Globalization;
+using System.Collections.Concurrent;
 
 namespace OpenSim.Continuum.Economy
 {
     internal sealed class SQLiteEconomyStore
     {
         private readonly string m_connectionString;
-        internal object SyncRoot { get; } = new();
+        private static readonly ConcurrentDictionary<string, object> s_locks = new(StringComparer.Ordinal);
+        internal object SyncRoot { get; }
 
         internal SQLiteEconomyStore(string connectionString)
         {
@@ -22,6 +24,7 @@ namespace OpenSim.Continuum.Economy
                 DefaultTimeout = 30
             };
             m_connectionString = builder.ConnectionString;
+            SyncRoot = s_locks.GetOrAdd(m_connectionString, _ => new object());
         }
 
         internal SQLiteConnection Open()
