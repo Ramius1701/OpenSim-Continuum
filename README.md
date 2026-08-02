@@ -2,12 +2,13 @@
 
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The project is a production-test candidate: the complete solution builds, but promotion requires the runtime, viewer, database, Hypergrid, security, and performance tests described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy production-test runbook](doc/continuum-economy-production-test.md).
+The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. This branch is an **alpha integration build**, not a production-test candidate. The complete solution builds, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, and other distributed paths still require donor-regression and multi-service runtime verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
 
-## Project status
+## Project status — alpha
 
 - Target runtime: .NET 8
-- Primary deployment target: Windows, MySQL/MariaDB, grid mode with Robust
+- Required deployment targets: Windows standalone with SQLite; Windows grid mode
+  with Robust using MySQL/MariaDB or PostgreSQL
 - Baseline build: successful with four known CS9193 compiler warnings
 - Continuum completion build: successful
 - Later LSL/GLTF compatibility reconciliation build: successful with zero warnings and zero errors
@@ -85,9 +86,17 @@ Never commit production passwords, API keys, database connection strings, market
 
 ## Database support
 
-OpenSim core retains its normal datastore support. The integrated full Experience service, Display Names, aliases, Abuse Reports, MoneyServer, marketplace, search, and related service extensions are being certified primarily with MySQL/MariaDB.
+OpenSim core retains its normal datastore support. Continuum requires SQLite for
+standalone deployments and both MySQL/MariaDB and PostgreSQL for grid/Robust
+deployments. Imported services must not be described as generally ready while
+they provide only a MySQL implementation.
 
-The full Experience service does not currently include certified SQLite or PostgreSQL data providers. Do not assume schema compatibility merely because the solution compiles. For every service migration, test both a clean database and an upgrade from the exact schema used by the target grid.
+The full Experience service, Abuse Reports, aliases, MoneyServer, and
+ContinuumEconomy currently contain MySQL-only storage paths. Their SQLite and/or
+PostgreSQL providers and migrations are incomplete release blockers. Do not
+assume schema compatibility merely because the solution compiles. For every
+service migration, test both a clean database and an upgrade from the exact
+schema used by the target deployment.
 
 ## Building
 

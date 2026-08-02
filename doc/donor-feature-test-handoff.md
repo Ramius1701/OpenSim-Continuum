@@ -67,7 +67,10 @@ must agree. Repeat reset-to-legacy-name and test an adjacent-region observer.
 Failure of any step blocks promotion.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
-- SQLite and PGSQL providers for the new full Experience service are not present and are not claimed production-ready. The production certification target is MySQL/MariaDB with Robust.
+- SQLite providers are required for standalone operation. MySQL/MariaDB and
+  PostgreSQL providers are both required for grid/Robust operation. The imported
+  Experience, Abuse Report, alias, MoneyServer, and ContinuumEconomy paths are
+  not production-ready while their required providers or migrations are absent.
 
 ## Release gate
 

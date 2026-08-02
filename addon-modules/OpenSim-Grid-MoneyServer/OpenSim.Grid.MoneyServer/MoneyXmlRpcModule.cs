@@ -252,6 +252,16 @@ namespace OpenSim.Grid.MoneyServer
             m_CurrencyGroupName = m_server_config.GetString("CurrencyGroupName", m_CurrencyGroupName);
             m_CurrencyGroupID = m_server_config.GetString("CurrencyGroupID", m_CurrencyGroupID);
 
+            m_log.InfoFormat(
+                "[MONEY XMLRPC]: Viewer currency purchases={0}; daily={1}, weekly={2}, monthly={3}, maximum balance={4} (zero disables a limit).",
+                string.Equals((m_CurrencyOnOff ?? string.Empty).Trim().TrimEnd(';').Trim().Trim('"'), "on", StringComparison.OrdinalIgnoreCase)
+                    ? "enabled"
+                    : "disabled",
+                m_TotalDay,
+                m_TotalWeek,
+                m_TotalMonth,
+                m_CurrencyMaximum);
+
 
             // Hyper Grid Avatar
             m_hg_enable = m_server_config.GetBoolean("EnableHGAvatar", m_hg_enable);

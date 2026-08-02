@@ -114,18 +114,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             {
                 caps.RegisterSimpleHandler("SetDisplayName", new SimpleStreamHandler($"/{UUID.Random()}", (req, resp) => SetDisplayName(agentID, req, resp)));
 
-                // A live name change sends DisplayNameUpdate immediately, but that
-                // update is local to one simulator. Discard this simulator's cached
-                // account before seeding capabilities so crossings, relogs, and a
-                // login on another simulator read the Robust-authoritative value.
+                // Discard this simulator's cached account so capability reads after
+                // a crossing or relog use Robust. Do not enqueue DisplayNameUpdate
+                // here: viewers render it as a fresh rename announcement on every
+                // region capability registration.
                 m_Scene.UserManagementModule.RemoveUser(agentID);
-                UserData userData = m_Scene.UserManagementModule.GetUserData(agentID);
-                if (userData is not null)
-                {
-                    DateTime nextUpdate = userData.NameChanged.AddDays(7);
-                    OSD update = FormatDisplayNameUpdate(userData.LegacyName, userData, nextUpdate);
-                    m_EventQueue.Enqueue(update, agentID);
-                }
             }
         }
 
