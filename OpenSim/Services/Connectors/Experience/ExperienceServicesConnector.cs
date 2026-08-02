@@ -51,10 +51,10 @@ namespace OpenSim.Services.Connectors
 
             if (serviceURI == String.Empty)
             {
-                m_log.Error("[EXPERIENCE CONNECTOR]: No Server URI named in section GridUserService");
+                m_log.Error("[EXPERIENCE CONNECTOR]: ExperienceServerURI is missing from [ExperienceService]");
                 throw new Exception("Experience connector init error");
             }
-            m_ServerURI = serviceURI + "/experience";
+            m_ServerURI = serviceURI.TrimEnd('/') + "/experience";
             base.Initialise(source, "ExperienceService");
         }
 

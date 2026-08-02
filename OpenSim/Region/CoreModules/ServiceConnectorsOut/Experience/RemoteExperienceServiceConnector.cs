@@ -45,11 +45,18 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
                 string name = moduleConfig.GetString("ExperienceService", "");
                 if (name == Name)
                 {
-
-                    m_remoteConnector = new ExperienceServicesConnector(source);
-                    m_Enabled = true;
-
-                    m_log.Info("[EXPERIENCE CONNECTOR]: Remote ExperienceService enabled");
+                    try
+                    {
+                        m_remoteConnector = new ExperienceServicesConnector(source);
+                        m_Enabled = true;
+                        m_log.Info("[EXPERIENCE CONNECTOR]: Remote ExperienceService enabled");
+                    }
+                    catch (Exception e)
+                    {
+                        m_log.ErrorFormat(
+                            "[EXPERIENCE CONNECTOR]: Remote service configuration is invalid; " +
+                            "Experience CAPS will not be registered. {0}", e.Message);
+                    }
                 }
             }
         }

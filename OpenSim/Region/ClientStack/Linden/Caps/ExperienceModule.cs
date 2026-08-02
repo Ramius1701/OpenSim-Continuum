@@ -48,10 +48,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (config == null)
                 return;
 
-            if (config != null && config.GetString("Enabled", "false") == "true")
-            {
-                m_Enabled = true;
-            }
+            m_Enabled = config.GetBoolean("Enabled", false);
 
             if (!m_Enabled)
                 return;
@@ -68,7 +65,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             m_scene = scene;
 
-            m_scene.EventManager.OnAvatarEnteringNewParcel += EventManager_OnAvatarEnteringNewParcel;
         }
 
         private void EventManager_OnAvatarEnteringNewParcel(ScenePresence avatar, int localLandID, UUID regionID)
@@ -78,9 +74,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
-                return;
-
             scene.EventManager.OnRegisterCaps -= RegisterCaps;
             scene.EventManager.OnNewClient -= OnNewClient;
             scene.EventManager.OnClientClosed -= OnClientClosed;
@@ -98,7 +91,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             m_ExperienceService = scene.RequestModuleInterface<IExperienceService>();
             if (m_ExperienceService == null)
             {
-                m_log.Info("[EXPERIENCE]: Module disabled becuase IExperienceService was not found!");
+                m_log.ErrorFormat(
+                    "[EXPERIENCE]: Enabled=true in region {0}, but IExperienceService was not registered. " +
+                    "Load the matching LocalExperienceServicesConnector or RemoteExperienceServicesConnector " +
+                    "and its [ExperienceService] configuration; viewer Experience CAPS and tabs are unavailable.",
+                    scene.RegionInfo.RegionName);
                 return;
             }
 
@@ -109,6 +106,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             scene.EventManager.OnRegisterCaps += RegisterCaps;
             scene.EventManager.OnNewClient += OnNewClient;
             scene.EventManager.OnClientClosed += OnClientClosed;
+            scene.EventManager.OnAvatarEnteringNewParcel += EventManager_OnAvatarEnteringNewParcel;
         }
 
         private void OnNewClient(IClientAPI client)

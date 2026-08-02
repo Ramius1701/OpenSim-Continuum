@@ -51,6 +51,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             m_Scene = scene;
 
             scene.RegisterModuleInterface<IDisplayNameModule>(this);
+            scene.EventManager.OnNewClient += OnNewClient;
         }
 
         public void RemoveRegion(Scene scene)
@@ -59,6 +60,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
 
             scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
+            scene.EventManager.OnNewClient -= OnNewClient;
             scene.UnregisterModuleInterface<IDisplayNameModule>(this);
             m_Scene = null;
             m_EventQueue = null;
@@ -108,17 +110,20 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         #endregion
 
+        private void OnNewClient(IClientAPI client)
+        {
+            // Display names are mutable grid-wide account data. A simulator may
+            // still hold the account value cached before another simulator accepted
+            // a rename, or from before the grid restarted. Refresh it before the
+            // viewer starts resolving nearby avatar names and registering CAPS.
+            m_Scene.UserManagementModule.RemoveUser(client.AgentId);
+        }
+
         private void OnRegisterCaps(UUID agentID, Caps caps)
         {
             if (m_Scene.UserManagementModule.IsLocalGridUser(agentID))
             {
                 caps.RegisterSimpleHandler("SetDisplayName", new SimpleStreamHandler($"/{UUID.Random()}", (req, resp) => SetDisplayName(agentID, req, resp)));
-
-                // Discard this simulator's cached account so capability reads after
-                // a crossing or relog use Robust. Do not enqueue DisplayNameUpdate
-                // here: viewers render it as a fresh rename announcement on every
-                // region capability registration.
-                m_Scene.UserManagementModule.RemoveUser(agentID);
             }
         }
 

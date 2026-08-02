@@ -254,4 +254,4 @@
     ;
     ; Change this to your grid-wide experience server
     ;
-    ExperienceServerURI = "${Const|BaseURL}:${Const|PrivatePort}"
+    ExperienceServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
