@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using OpenSim.Continuum.Economy;
 
@@ -202,55 +201,10 @@ namespace ContinuumEconomy.Migrate
             }
 
             MySqlEconomyLedger ledger = new(connectionString);
-            ledger.ValidateSchema();
-            Guid actor = Guid.NewGuid();
-            Guid buyer = Guid.NewGuid();
-            Guid sellerA = Guid.NewGuid();
-            Guid sellerB = Guid.NewGuid();
-            LedgerAdjustmentResult credit = ledger.Adjust(new LedgerAdjustmentRequest {
-                OperationID=Guid.NewGuid(), AccountID=buyer, ActorID=actor, Amount=100,
-                Kind=LedgerAdjustmentKind.Credit, TransactionType=9000, Reason="Continuum production acceptance self-test",
-                MaximumBalance=1000, DailyCreditLimit=1000, WeeklyCreditLimit=1000, MonthlyCreditLimit=1000 });
-            Require(credit.Code == LedgerResultCode.Committed && ledger.GetBalance(buyer) == 100, "initial audited credit");
-
-            Guid replayID = Guid.NewGuid();
-            LedgerTransferRequest replay = new() { TransactionID=replayID, SenderID=buyer, ReceiverID=sellerA,
-                Amount=10, TransactionType=9001, Description="idempotency self-test" };
-            Require(ledger.Transfer(replay).Code == LedgerResultCode.Committed, "first transfer");
-            Require(ledger.Transfer(replay).Code == LedgerResultCode.Replayed, "idempotent replay");
-            replay.Amount = 11;
-            Require(ledger.Transfer(replay).Code == LedgerResultCode.TransactionConflict, "fingerprint conflict");
-
-            LedgerTransferRequest concurrentA = new() { TransactionID=Guid.NewGuid(), SenderID=buyer, ReceiverID=sellerA,
-                Amount=70, TransactionType=9002, Description="concurrency A" };
-            LedgerTransferRequest concurrentB = new() { TransactionID=Guid.NewGuid(), SenderID=buyer, ReceiverID=sellerB,
-                Amount=70, TransactionType=9002, Description="concurrency B" };
-            Task<LedgerTransferResult> taskA = Task.Run(() => ledger.Transfer(concurrentA));
-            Task<LedgerTransferResult> taskB = Task.Run(() => ledger.Transfer(concurrentB));
-            Task.WaitAll(taskA, taskB);
-            int committed = (taskA.Result.Code == LedgerResultCode.Committed ? 1 : 0) +
-                (taskB.Result.Code == LedgerResultCode.Committed ? 1 : 0);
-            int insufficient = (taskA.Result.Code == LedgerResultCode.InsufficientFunds ? 1 : 0) +
-                (taskB.Result.Code == LedgerResultCode.InsufficientFunds ? 1 : 0);
-            Require(committed == 1 && insufficient == 1 && ledger.GetBalance(buyer) == 20, "concurrent overspend prevention");
-
             MySqlEconomyPurchaseService purchases = new(connectionString);
-            Guid purchaseID = Guid.NewGuid();
-            LedgerPurchaseResult authorized = purchases.Authorize(new LedgerPurchaseRequest { PurchaseID=purchaseID,
-                BuyerID=buyer, SellerID=sellerB, Amount=15, TransactionType=9003, Description="hold self-test" });
-            Require(authorized.State == LedgerPurchaseState.Authorized && ledger.GetAvailableBalance(buyer) == 5, "purchase hold");
-            Require(purchases.Capture(purchaseID, buyer).State == LedgerPurchaseState.Captured && ledger.GetBalance(buyer) == 5,
-                "purchase capture");
-            Require(ledger.CountHistory(buyer, null, null) >= 3, "account history");
+            EconomyAcceptanceSuite.Run(ledger, purchases, Console.WriteLine);
             Console.WriteLine("ContinuumEconomy MySQL acceptance self-test passed. Test rows use unique UUIDs and were intentionally retained for auditability.");
             return 0;
-        }
-
-        private static void Require(bool condition, string test)
-        {
-            if (!condition)
-                throw new InvalidOperationException("Self-test failed: " + test);
-            Console.WriteLine("PASS: {0}", test);
         }
 
         private static string ArgumentValue(string[] args, string prefix)
