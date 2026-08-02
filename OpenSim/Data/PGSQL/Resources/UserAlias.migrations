@@ -1,0 +1,14 @@
+:VERSION 1
+
+BEGIN TRANSACTION;
+
+CREATE TABLE UserAlias (
+  "Id" serial PRIMARY KEY,
+  "AliasID" uuid NOT NULL UNIQUE,
+  "UserID" uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  "Description" varchar(80)
+);
+
+CREATE INDEX "UserAliasUserID" ON UserAlias("UserID");
+
+COMMIT;

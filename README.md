@@ -91,12 +91,13 @@ standalone deployments and both MySQL/MariaDB and PostgreSQL for grid/Robust
 deployments. Imported services must not be described as generally ready while
 they provide only a MySQL implementation.
 
-The full Experience service, Abuse Reports, aliases, MoneyServer, and
-ContinuumEconomy currently contain MySQL-only storage paths. Their SQLite and/or
-PostgreSQL providers and migrations are incomplete release blockers. Do not
-assume schema compatibility merely because the solution compiles. For every
-service migration, test both a clean database and an upgrade from the exact
-schema used by the target deployment.
+The Experience service, Abuse Reports, and aliases now include SQLite,
+MySQL/MariaDB, and PostgreSQL provider paths; their clean-install and upgrade
+migrations still require runtime certification on every database. MoneyServer
+and ContinuumEconomy remain MySQL-only and are release blockers for deployments
+that select another datastore. Do not assume schema compatibility merely
+because the solution compiles. For every service migration, test both a clean
+database and an upgrade from the exact schema used by the target deployment.
 
 ## Building
 

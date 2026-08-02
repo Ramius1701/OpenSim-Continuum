@@ -11,7 +11,8 @@ grid-wide service stack.
 - Grid and GridHypergrid use `RemoteAbuseReportsServicesConnector`.
 - ROBUST exposes the private `/abuse` service endpoint.
 - Reports are stored centrally through `IAbuseReportsData`.
-- The current storage implementation is MySQL/MariaDB.
+- Storage providers are included for SQLite, MySQL/MariaDB, and PostgreSQL.
+  Clean-install and upgrade migration certification remains required.
 - The authenticated private service supports paginated moderation retrieval and updates.
 - Reports have `Open`, `In Review`, `Resolved`, or `Dismissed` state, moderator notes and audit identity.
 
@@ -41,7 +42,8 @@ In the active Standalone configuration:
 ```
 
 The service inherits `StorageProvider` and `ConnectionString` from
-`[DatabaseService]`. The included data provider is MySQL/MariaDB only.
+`[DatabaseService]`. SQLite, MySQL/MariaDB, and PostgreSQL providers are
+included; select the same provider used by the surrounding deployment.
 
 ## Enabling in Grid or GridHypergrid
 

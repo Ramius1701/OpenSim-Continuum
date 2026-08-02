@@ -68,9 +68,11 @@ Failure of any step blocks promotion.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
 - SQLite providers are required for standalone operation. MySQL/MariaDB and
-  PostgreSQL providers are both required for grid/Robust operation. The imported
-  Experience, Abuse Report, alias, MoneyServer, and ContinuumEconomy paths are
-  not production-ready while their required providers or migrations are absent.
+  PostgreSQL providers are both required for grid/Robust operation. Experience,
+  Abuse Report, and alias provider implementations now exist for all three, but
+  clean/upgrade migration and runtime certification remain open. MoneyServer and
+  ContinuumEconomy remain MySQL-only and are not production-ready for SQLite or
+  PostgreSQL deployments.
 
 ## Release gate
 
