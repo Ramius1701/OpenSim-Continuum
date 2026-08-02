@@ -1,5 +1,4 @@
 using System;
-using MySql.Data.MySqlClient;
 using OpenSim.Continuum.Economy;
 
 namespace ContinuumEconomy.Migrate
@@ -7,6 +6,7 @@ namespace ContinuumEconomy.Migrate
     internal static class Program
     {
         private const string ConnectionVariable = "CONTINUUM_ECONOMY_CONNECTION_STRING";
+        private const string ProviderVariable = "CONTINUUM_ECONOMY_STORAGE_PROVIDER";
         private const string ImportConfirmation = "--confirm=IMPORT-LEGACY-MONEYSERVER";
         private const string SchemaConfirmation = "--confirm=CREATE-CONTINUUM-ECONOMY-SCHEMA";
         private const string TestConfirmation = "--confirm=RUN-ON-DEDICATED-TEST-DATABASE";
@@ -23,6 +23,7 @@ namespace ContinuumEconomy.Migrate
             }
 
             string connectionString = Environment.GetEnvironmentVariable(ConnectionVariable);
+            string providerName = Environment.GetEnvironmentVariable(ProviderVariable) ?? "MySQL";
             if (String.IsNullOrWhiteSpace(connectionString))
             {
                 Console.Error.WriteLine("The {0} environment variable is required; credentials are never accepted as command arguments.", ConnectionVariable);
@@ -33,13 +34,14 @@ namespace ContinuumEconomy.Migrate
             {
                 if (args[0] == "verify")
                 {
-                    new MySqlEconomyLedger(connectionString).ValidateSchema();
-                    Console.WriteLine("ContinuumEconomy schema and InnoDB readiness validation succeeded.");
+                    EconomyBackend backend = EconomyProviderFactory.Create(providerName, connectionString);
+                    backend.Ledger.ValidateSchema();
+                    Console.WriteLine("ContinuumEconomy {0} schema readiness validation succeeded.", backend.Provider);
                     return 0;
                 }
 
                 if (args[0] == "self-test")
-                    return SelfTest(connectionString, args);
+                    return SelfTest(providerName, connectionString, args);
 
                 if (args[0] == "holds")
                 {
@@ -54,7 +56,7 @@ namespace ContinuumEconomy.Migrate
                             return 2;
                         }
                     }
-                    var pending = new MySqlEconomyPurchaseService(connectionString)
+                    var pending = EconomyProviderFactory.Create(providerName, connectionString).Purchases
                         .GetPending(DateTime.UtcNow.AddMinutes(-ageMinutes), 500);
                     Console.WriteLine("Pending purchase holds: {0}", pending.Count);
                     foreach (LedgerPendingPurchase hold in pending)
@@ -83,7 +85,8 @@ namespace ContinuumEconomy.Migrate
                         Usage();
                         return 2;
                     }
-                    MySqlEconomyPurchaseService purchases = new(connectionString);
+                    IEconomyPurchaseService purchases =
+                        EconomyProviderFactory.Create(providerName, connectionString).Purchases;
                     LedgerPurchaseResult result = capture
                         ? purchases.Capture(purchaseID, buyerID)
                         : purchases.Cancel(purchaseID, buyerID);
@@ -106,7 +109,7 @@ namespace ContinuumEconomy.Migrate
                         Usage();
                         return 2;
                     }
-                    LedgerResultCode code = new MySqlEconomyAccountService(connectionString).Register(
+                    LedgerResultCode code = EconomyProviderFactory.Create(providerName, connectionString).Accounts.Register(
                         new LedgerAccountRegistrationRequest { OperationID=operationID, AccountID=groupID,
                             ActorID=actorID, AccountType=LedgerAccountType.Group,
                             DisplayName=ArgumentValue(args, "--name=") }, out string registrationMessage);
@@ -124,11 +127,13 @@ namespace ContinuumEconomy.Migrate
                         return 2;
                     }
 
-                    new MySqlEconomyLedger(connectionString).EnsureSchema();
+                    EconomyProviderFactory.Create(providerName, connectionString).Ledger.EnsureSchema();
                     Console.WriteLine("ContinuumEconomy schema is initialized. Legacy MoneyServer tables were not altered.");
                     return 0;
                 }
 
+                if (EconomyProviderFactory.Parse(providerName) != EconomyStorageProvider.MySql)
+                    throw new NotSupportedException("Legacy MoneyServer import currently requires the MySQL/MariaDB provider.");
                 LegacyMoneyServerImporter importer = new(connectionString);
                 if (args[0] == "analyze")
                 {
@@ -189,21 +194,18 @@ namespace ContinuumEconomy.Migrate
             Console.Error.WriteLine("  ContinuumEconomy.Migrate import --moneyserver-stopped --database-snapshot-complete {0}", ImportConfirmation);
         }
 
-        private static int SelfTest(string connectionString, string[] args)
+        private static int SelfTest(string providerName, string connectionString, string[] args)
         {
-            MySqlConnectionStringBuilder builder = new(connectionString);
             if (Array.IndexOf(args, TestConfirmation) < 0 ||
-                String.IsNullOrWhiteSpace(builder.Database) ||
-                builder.Database.IndexOf("test", StringComparison.OrdinalIgnoreCase) < 0)
+                !EconomyProviderFactory.IsDedicatedTestDatabase(providerName, connectionString))
             {
                 Console.Error.WriteLine("Self-test refused. Use a dedicated database whose name contains 'test' and provide the literal confirmation flag.");
                 return 2;
             }
 
-            MySqlEconomyLedger ledger = new(connectionString);
-            MySqlEconomyPurchaseService purchases = new(connectionString);
-            EconomyAcceptanceSuite.Run(ledger, purchases, Console.WriteLine);
-            Console.WriteLine("ContinuumEconomy MySQL acceptance self-test passed. Test rows use unique UUIDs and were intentionally retained for auditability.");
+            EconomyBackend backend = EconomyProviderFactory.Create(providerName, connectionString);
+            EconomyAcceptanceSuite.Run(backend.Ledger, backend.Purchases, Console.WriteLine);
+            Console.WriteLine("ContinuumEconomy {0} acceptance self-test passed. Test rows use unique UUIDs and were intentionally retained for auditability.", backend.Provider);
             return 0;
         }
 

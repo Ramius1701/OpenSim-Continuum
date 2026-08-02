@@ -56,6 +56,14 @@ is empty. The connection string is accepted only through the
 `CONTINUUM_ECONOMY_CONNECTION_STRING` environment variable so credentials do
 not appear in the process command line.
 
+`CONTINUUM_ECONOMY_STORAGE_PROVIDER` selects `MySQL`, `PostgreSQL`, or `SQLite`
+and defaults to `MySQL` for the current migration utility. Provider aliases use
+the same names as OpenSim (`OpenSim.Data.MySQL.dll`,
+`OpenSim.Data.PGSQL.dll`, and `OpenSim.Data.SQLite.dll`). PostgreSQL and SQLite
+currently fail with an explicit unsupported-provider error; there is no silent
+fallback to MySQL. They remain release blockers until their implementations
+pass the shared `EconomyAcceptanceSuite`.
+
 The `import` operation additionally requires all of these literal flags:
 
 - `--moneyserver-stopped`
