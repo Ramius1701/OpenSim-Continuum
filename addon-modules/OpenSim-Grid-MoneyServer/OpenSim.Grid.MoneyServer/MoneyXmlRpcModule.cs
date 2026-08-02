@@ -44,7 +44,6 @@ using static Mono.Security.X509.X520;
 using static OpenMetaverse.DllmapConfigHelper;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Console;
-using OpenSim.Continuum.Economy;
 
 
 namespace OpenSim.Grid.MoneyServer
@@ -137,11 +136,6 @@ namespace OpenSim.Grid.MoneyServer
         private long TicksToEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
 
         private IMoneyDBService m_moneyDBService;
-        private readonly string m_connectionString;
-        private bool m_continuumEconomyEnabled;
-        private IEconomyLedger m_continuumLedger;
-        private IEconomyPurchaseService m_continuumPurchases;
-        private Guid m_continuumSystemActor;
         // Konfig fuer Konsolenbefehle.
         private IConfigSource m_config;
         private IMoneyServiceCore m_moneyCore;
@@ -164,7 +158,6 @@ namespace OpenSim.Grid.MoneyServer
         /// <summary>Initializes a new instance of the <see cref="MoneyXmlRpcModule" /> class.</summary>
         public MoneyXmlRpcModule(string connectionString, int maxDBConnections)
         {
-            m_connectionString = connectionString;
             Initialise(connectionString, maxDBConnections);
         }
 
@@ -210,18 +203,6 @@ namespace OpenSim.Grid.MoneyServer
             m_CurrencyGroupName = serverConfig.GetString("CurrencyGroupName", m_CurrencyGroupName);
             m_CurrencyGroupID = serverConfig.GetString("CurrencyGroupID", m_CurrencyGroupID);
 
-            m_continuumEconomyEnabled = serverConfig.GetBoolean("ContinuumEconomyEnabled", false);
-            if (m_continuumEconomyEnabled)
-            {
-                string actorText = serverConfig.GetString("ContinuumSystemActor", String.Empty);
-                if (!Guid.TryParse(actorText, out m_continuumSystemActor) || m_continuumSystemActor == Guid.Empty)
-                    throw new InvalidOperationException("ContinuumEconomyEnabled=true requires a non-zero ContinuumSystemActor UUID");
-                m_continuumLedger = new MySqlEconomyLedger(m_connectionString);
-                m_continuumLedger.ValidateSchema();
-                m_continuumPurchases = new MySqlEconomyPurchaseService(m_connectionString);
-                m_log.Info("[MONEY XMLRPC]: ContinuumEconomy backend enabled after successful schema validation.");
-            }
-
             // [MoneyServer] Section
             m_defaultBalance = m_server_config.GetInt("DefaultBalance", m_defaultBalance);
 
@@ -251,16 +232,6 @@ namespace OpenSim.Grid.MoneyServer
 
             m_CurrencyGroupName = m_server_config.GetString("CurrencyGroupName", m_CurrencyGroupName);
             m_CurrencyGroupID = m_server_config.GetString("CurrencyGroupID", m_CurrencyGroupID);
-
-            m_log.InfoFormat(
-                "[MONEY XMLRPC]: Viewer currency purchases={0}; daily={1}, weekly={2}, monthly={3}, maximum balance={4} (zero disables a limit).",
-                string.Equals((m_CurrencyOnOff ?? string.Empty).Trim().TrimEnd(';').Trim().Trim('"'), "on", StringComparison.OrdinalIgnoreCase)
-                    ? "enabled"
-                    : "disabled",
-                m_TotalDay,
-                m_TotalWeek,
-                m_TotalMonth,
-                m_CurrencyMaximum);
 
 
             // Hyper Grid Avatar
@@ -365,9 +336,6 @@ namespace OpenSim.Grid.MoneyServer
             m_httpServer.AddXmlRPCHandler("CancelTransfer", handleCancelTransfer);
 
             m_httpServer.AddXmlRPCHandler("TransferMoney", handleTransaction);
-            m_httpServer.AddXmlRPCHandler("AuthorizePurchase", handleAuthorizePurchase);
-            m_httpServer.AddXmlRPCHandler("CapturePurchase", handleCapturePurchase);
-            m_httpServer.AddXmlRPCHandler("CancelPurchase", handleCancelPurchase);
             m_httpServer.AddXmlRPCHandler("ForceTransferMoney", handleForceTransaction);        // added
             m_httpServer.AddXmlRPCHandler("PayMoneyCharge", handlePayMoneyCharge);          // added
             m_httpServer.AddXmlRPCHandler("AddBankerMoney", handleAddBankerMoney);          // added
@@ -760,11 +728,15 @@ namespace OpenSim.Grid.MoneyServer
                         GetHashtableString(parameters, "confirm"));
 
                     string purchaseMessage;
-                    bool purchaseSucceeded = m_continuumEconomyEnabled
-                        ? TryContinuumCurrencyPurchase(purchaseTransactionID, agentId, currencyBuy, out purchaseMessage)
-                        : m_moneyDBService.TryPurchaseCurrency(
-                            purchaseTransactionID, agentId, currencyBuy, m_TotalDay,
-                            m_TotalWeek, m_TotalMonth, m_CurrencyMaximum, out purchaseMessage);
+                    bool purchaseSucceeded = m_moneyDBService.TryPurchaseCurrency(
+                        purchaseTransactionID,
+                        agentId,
+                        currencyBuy,
+                        m_TotalDay,
+                        m_TotalWeek,
+                        m_TotalMonth,
+                        m_CurrencyMaximum,
+                        out purchaseMessage);
 
                     if (purchaseSucceeded)
                     {
@@ -1159,11 +1131,15 @@ namespace OpenSim.Grid.MoneyServer
                     GetHashtableString(requestData, "confirm"));
 
                 string purchaseMessage;
-                bool purchaseSucceeded = m_continuumEconomyEnabled
-                    ? TryContinuumCurrencyPurchase(transactionID, agentId, amount, out purchaseMessage)
-                    : m_moneyDBService.TryPurchaseCurrency(
-                        transactionID, agentId, amount, m_TotalDay,
-                        m_TotalWeek, m_TotalMonth, m_CurrencyMaximum, out purchaseMessage);
+                bool purchaseSucceeded = m_moneyDBService.TryPurchaseCurrency(
+                    transactionID,
+                    agentId,
+                    amount,
+                    m_TotalDay,
+                    m_TotalWeek,
+                    m_TotalMonth,
+                    m_CurrencyMaximum,
+                    out purchaseMessage);
 
                 responseData["success"] = purchaseSucceeded;
                 responseData["message"] = purchaseMessage;
@@ -1182,32 +1158,6 @@ namespace OpenSim.Grid.MoneyServer
             }
 
             return new XmlRpcResponse { Value = responseData };
-        }
-
-        private bool TryContinuumCurrencyPurchase(UUID transactionID, string agentID,
-            int amount, out string message)
-        {
-            if (!Guid.TryParse(agentID, out Guid accountID) || accountID == Guid.Empty || amount <= 0)
-            {
-                message = "Invalid currency purchase request";
-                return false;
-            }
-            LedgerAdjustmentResult result = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-            {
-                OperationID = Guid.Parse(transactionID.ToString()),
-                AccountID = accountID,
-                ActorID = m_continuumSystemActor,
-                Amount = amount,
-                Kind = LedgerAdjustmentKind.Credit,
-                TransactionType = (int)TransactionType.BuyMoney,
-                Reason = "Viewer currency purchase",
-                MaximumBalance = m_CurrencyMaximum,
-                DailyCreditLimit = m_TotalDay,
-                WeeklyCreditLimit = m_TotalWeek,
-                MonthlyCreditLimit = m_TotalMonth
-            });
-            message = result.Message;
-            return result.Succeeded;
         }
 
         private bool ValidateCurrencyPurchaseAccess(string agentId, int amount, out string message)
@@ -1928,41 +1878,6 @@ namespace OpenSim.Grid.MoneyServer
 
             try
             {
-                if (m_continuumEconomyEnabled)
-                {
-                    int initialBalance = m_defaultBalance;
-                    if (avatarClass == (int)AvatarType.HG_AVATAR) initialBalance = m_hg_defaultBalance;
-                    if (avatarClass == (int)AvatarType.GUEST_AVATAR) initialBalance = m_gst_defaultBalance;
-                    Guid accountID = Guid.Parse(clientUUID);
-                    if (!m_continuumLedger.AccountExists(accountID))
-                    {
-                        if (initialBalance > 0)
-                        {
-                            LedgerAdjustmentResult initialized = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-                            {
-                                OperationID = DeterministicOperationID("initial-balance", accountID),
-                                AccountID = accountID,
-                                ActorID = m_continuumSystemActor,
-                                Amount = initialBalance,
-                                Kind = LedgerAdjustmentKind.Credit,
-                                TransactionType = (int)TransactionType.BirthGift,
-                                Reason = "Initial account balance"
-                            });
-                            if (!initialized.Succeeded)
-                                throw new InvalidOperationException("Initial Continuum account credit failed: " + initialized.Message);
-                        }
-                        else
-                        {
-                            m_continuumLedger.EnsureAccount(accountID);
-                        }
-                    }
-                    balance = ToViewerBalance(m_continuumLedger.GetAvailableBalance(accountID));
-                    responseData["success"] = true;
-                    responseData["description"] = "Continuum account ready";
-                    responseData["clientBalance"] = balance;
-                    return response;
-                }
-
                 balance = m_moneyDBService.getBalance(clientUUID);
 
                 //add user to balances table if not exist. (if balance is -1, it means avatar is not exist at balances table)
@@ -2071,13 +1986,6 @@ namespace OpenSim.Grid.MoneyServer
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("transactionID") &&
-                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
-            {
-                responseData["message"] = "Invalid transaction identifier";
-                return response;
-            }
-
             if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
             if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
             if (requestData.ContainsKey("senderSessionID")) senderSessionID = (string)requestData["senderSessionID"];
@@ -2097,11 +2005,6 @@ namespace OpenSim.Grid.MoneyServer
             {
                 if (m_sessionDic[senderID] == senderSessionID && m_secureSessionDic[senderID] == senderSecureSessionID)
                 {
-                    if (m_continuumEconomyEnabled)
-                        return HandleContinuumTransfer(response, responseData, transactionUUID,
-                            senderID, receiverID, amount, transactionType, objectID,
-                            objectName, regionUUID, description, true);
-
                     m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Transfering money from {0} to {1}", senderID, receiverID);
                     int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
                     try
@@ -2188,144 +2091,6 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
-        private XmlRpcResponse handleAuthorizePurchase(XmlRpcRequest request, IPEndPoint remoteClient)
-        {
-            Hashtable responseData = new Hashtable { ["success"] = false };
-            XmlRpcResponse response = new XmlRpcResponse { Value = responseData };
-            if (!m_continuumEconomyEnabled)
-            {
-                responseData["message"] = "ContinuumEconomy is not enabled";
-                return response;
-            }
-            if (request.Params.Count == 0 || request.Params[0] is not Hashtable data ||
-                !TryAuthenticateBuyer(data, out UUID buyerID))
-            {
-                responseData["message"] = "Buyer session authentication failed";
-                return response;
-            }
-            if (!TryUUID(data, "transactionID", out UUID purchaseID) ||
-                !TryUUID(data, "sellerID", out UUID sellerID) ||
-                !TryInt(data, "amount", out int amount) || amount <= 0)
-            {
-                responseData["message"] = "Invalid purchase identifiers or amount";
-                return response;
-            }
-            TryUUID(data, "regionUUID", out UUID regionID);
-            TryUUID(data, "objectID", out UUID objectID);
-            TryInt(data, "transactionType", out int transactionType);
-            string description = data.ContainsKey("description") ? Convert.ToString(data["description"]) : String.Empty;
-            LedgerPurchaseResult result = m_continuumPurchases.Authorize(new LedgerPurchaseRequest
-            {
-                PurchaseID = Guid.Parse(purchaseID.ToString()),
-                BuyerID = Guid.Parse(buyerID.ToString()),
-                SellerID = Guid.Parse(sellerID.ToString()),
-                Amount = amount,
-                TransactionType = transactionType,
-                RegionID = Guid.Parse(regionID.ToString()),
-                ObjectID = Guid.Parse(objectID.ToString()),
-                Description = description
-            });
-            PopulatePurchaseResponse(responseData, result);
-            return response;
-        }
-
-        private XmlRpcResponse handleCapturePurchase(XmlRpcRequest request, IPEndPoint remoteClient)
-        {
-            return CompletePurchase(request, true);
-        }
-
-        private XmlRpcResponse handleCancelPurchase(XmlRpcRequest request, IPEndPoint remoteClient)
-        {
-            return CompletePurchase(request, false);
-        }
-
-        private XmlRpcResponse CompletePurchase(XmlRpcRequest request, bool capture)
-        {
-            Hashtable responseData = new Hashtable { ["success"] = false };
-            XmlRpcResponse response = new XmlRpcResponse { Value = responseData };
-            if (!m_continuumEconomyEnabled)
-            {
-                responseData["message"] = "ContinuumEconomy is not enabled";
-                return response;
-            }
-            if (request.Params.Count == 0 || request.Params[0] is not Hashtable data ||
-                !TryAuthenticateBuyer(data, out UUID buyerID) ||
-                !TryUUID(data, "transactionID", out UUID purchaseID))
-            {
-                responseData["message"] = "Purchase or buyer session authentication failed";
-                return response;
-            }
-            Guid id = Guid.Parse(purchaseID.ToString());
-            Guid buyer = Guid.Parse(buyerID.ToString());
-            LedgerPurchaseResult result = capture
-                ? m_continuumPurchases.Capture(id, buyer)
-                : m_continuumPurchases.Cancel(id, buyer);
-            PopulatePurchaseResponse(responseData, result);
-            return response;
-        }
-
-        private bool TryAuthenticateBuyer(Hashtable data, out UUID buyerID)
-        {
-            buyerID = UUID.Zero;
-            if (!TryUUID(data, "buyerID", out buyerID) || buyerID == UUID.Zero ||
-                !data.ContainsKey("buyerSessionID") || !data.ContainsKey("buyerSecureSessionID"))
-                return false;
-            string buyer = buyerID.ToString();
-            string session = Convert.ToString(data["buyerSessionID"]);
-            string secure = Convert.ToString(data["buyerSecureSessionID"]);
-            lock (m_sessionDic)
-            {
-                lock (m_secureSessionDic)
-                {
-                    return m_sessionDic.TryGetValue(buyer, out string expectedSession) &&
-                        m_secureSessionDic.TryGetValue(buyer, out string expectedSecure) &&
-                        String.Equals(expectedSession, session, StringComparison.Ordinal) &&
-                        String.Equals(expectedSecure, secure, StringComparison.Ordinal);
-                }
-            }
-        }
-
-        private static bool TryUUID(Hashtable data, string key, out UUID value)
-        {
-            value = UUID.Zero;
-            return data.ContainsKey(key) && UUID.TryParse(Convert.ToString(data[key]), out value);
-        }
-
-        private static bool TryInt(Hashtable data, string key, out int value)
-        {
-            value = 0;
-            if (!data.ContainsKey(key)) return false;
-            try { value = Convert.ToInt32(data[key]); return true; }
-            catch (Exception) { return false; }
-        }
-
-        private static void PopulatePurchaseResponse(Hashtable response, LedgerPurchaseResult result)
-        {
-            response["success"] = result.Succeeded;
-            response["state"] = (int)result.State;
-            response["buyerBalance"] = ToViewerBalance(result.BuyerBalance);
-            response["buyerAvailableBalance"] = ToViewerBalance(result.BuyerAvailableBalance);
-            response["sellerBalance"] = ToViewerBalance(result.SellerBalance);
-            response["message"] = result.Message;
-        }
-
-        private static int ToViewerBalance(long balance)
-        {
-            if (balance < 0 || balance > Int32.MaxValue)
-                throw new InvalidOperationException("Economy balance is outside the viewer protocol range");
-            return (int)balance;
-        }
-
-        private static Guid DeterministicOperationID(string operation, Guid accountID)
-        {
-            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(operation + "|" + accountID.ToString("D")));
-            byte[] value = new byte[16];
-            Array.Copy(hash, value, value.Length);
-            value[7] = (byte)((value[7] & 0x0f) | 0x50);
-            value[8] = (byte)((value[8] & 0x3f) | 0x80);
-            return new Guid(value);
-        }
-
         public XmlRpcResponse handleForceTransaction(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             GetSSLCommonName(request);
@@ -2348,13 +2113,6 @@ namespace OpenSim.Grid.MoneyServer
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("transactionID") &&
-                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
-            {
-                responseData["message"] = "Invalid transaction identifier";
-                return response;
-            }
-
             //
             if (!m_forceTransfer)
             {
@@ -2373,11 +2131,6 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
-
-            if (m_continuumEconomyEnabled)
-                return HandleContinuumTransfer(response, responseData, transactionUUID,
-                    senderID, receiverID, amount, transactionType, objectID,
-                    objectName, regionUUID, description, false);
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleForceTransaction: Force transfering money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
             m_log.InfoFormat("[MONEY XMLRPC]: handleForceTransaction: Object ID = {0}, Object Name = {1}", objectID, objectName);
@@ -2462,111 +2215,6 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
-        private XmlRpcResponse HandleContinuumTransfer(XmlRpcResponse response, Hashtable responseData,
-            UUID transactionID, string senderText, string receiverText, int amount,
-            int transactionType, string objectText, string objectName, string regionText,
-            string description, bool notifyObjectPayment)
-        {
-            if (!UUID.TryParse(senderText, out UUID senderID) || senderID == UUID.Zero ||
-                !UUID.TryParse(receiverText, out UUID receiverID) || receiverID == UUID.Zero ||
-                !UUID.TryParse(objectText, out UUID objectID) ||
-                !UUID.TryParse(regionText, out UUID regionID) || amount <= 0)
-            {
-                responseData["message"] = "Invalid Continuum transfer request";
-                return response;
-            }
-
-            Guid operationID = Guid.Parse(transactionID.ToString());
-            Guid sender = Guid.Parse(senderID.ToString());
-            Guid receiver = Guid.Parse(receiverID.ToString());
-            if (notifyObjectPayment && transactionType == (int)TransactionType.PayObject)
-            {
-                LedgerPurchaseResult authorization = m_continuumPurchases.Authorize(new LedgerPurchaseRequest
-                {
-                    PurchaseID = operationID,
-                    BuyerID = sender,
-                    SellerID = receiver,
-                    Amount = amount,
-                    TransactionType = transactionType,
-                    RegionID = Guid.Parse(regionID.ToString()),
-                    ObjectID = Guid.Parse(objectID.ToString()),
-                    Description = description
-                });
-                if (!authorization.Succeeded)
-                {
-                    PopulatePurchaseResponse(responseData, authorization);
-                    return response;
-                }
-                if (authorization.State == LedgerPurchaseState.Captured)
-                {
-                    PopulatePurchaseResponse(responseData, authorization);
-                    return response;
-                }
-                if (!NotifyContinuumObjectPayment(senderID, receiverID, amount,
-                    transactionType, objectID, objectName))
-                {
-                    LedgerPurchaseResult cancelled = m_continuumPurchases.Cancel(operationID, sender);
-                    PopulatePurchaseResponse(responseData, cancelled);
-                    responseData["success"] = false;
-                    responseData["message"] = "Object payment delivery failed; authorization cancelled";
-                    return response;
-                }
-                LedgerPurchaseResult captured = m_continuumPurchases.Capture(operationID, sender);
-                PopulatePurchaseResponse(responseData, captured);
-                if (captured.Succeeded)
-                {
-                    UpdateBalance(senderText, String.Empty);
-                    UpdateBalance(receiverText, String.Empty);
-                }
-                return response;
-            }
-
-            LedgerTransferResult result = m_continuumLedger.Transfer(new LedgerTransferRequest
-            {
-                TransactionID = operationID,
-                SenderID = sender,
-                ReceiverID = receiver,
-                Amount = amount,
-                TransactionType = transactionType,
-                RegionID = Guid.Parse(regionID.ToString()),
-                ObjectID = Guid.Parse(objectID.ToString()),
-                Description = description
-            });
-            responseData["success"] = result.Succeeded;
-            responseData["message"] = result.Message;
-            responseData["transactionID"] = result.TransactionID.ToString();
-            responseData["senderBalance"] = ToViewerBalance(result.SenderBalance);
-            responseData["receiverBalance"] = ToViewerBalance(result.ReceiverBalance);
-            if (result.Succeeded)
-            {
-                UpdateBalance(senderText, String.Empty);
-                UpdateBalance(receiverText, String.Empty);
-            }
-            return response;
-        }
-
-        private bool NotifyContinuumObjectPayment(UUID senderID, UUID receiverID, int amount,
-            int transactionType, UUID objectID, string objectName)
-        {
-            UserInfo sender = m_moneyDBService.FetchUserInfo(senderID.ToString());
-            if (sender == null || !m_sessionDic.TryGetValue(senderID.ToString(), out string sessionID) ||
-                !m_secureSessionDic.TryGetValue(senderID.ToString(), out string secureSessionID))
-                return false;
-            Hashtable request = new Hashtable
-            {
-                ["clientUUID"] = senderID.ToString(),
-                ["receiverUUID"] = receiverID.ToString(),
-                ["clientSessionID"] = sessionID,
-                ["clientSecureSessionID"] = secureSessionID,
-                ["transactionType"] = transactionType,
-                ["amount"] = amount,
-                ["objectID"] = objectID.ToString(),
-                ["objectName"] = objectName ?? String.Empty
-            };
-            Hashtable result = genericCurrencyXMLRPCRequest(request, "OnMoneyTransfered", sender.SimIP);
-            return result != null && result.ContainsKey("success") && Convert.ToBoolean(result["success"]);
-        }
-
         public XmlRpcResponse handleScriptTransaction(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             m_log.InfoFormat("[MONEY XMLRPC]: handleScriptTransaction:");
@@ -2603,12 +2251,6 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
             if (requestData.ContainsKey("secretAccessCode")) secretCode = (string)requestData["secretAccessCode"];
-            if (requestData.ContainsKey("transactionID") &&
-                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
-            {
-                responseData["message"] = "Invalid transaction identifier";
-                return response;
-            }
 
             MD5 md5 = MD5.Create();
             byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(m_scriptAccessKey + "_" + clientIP));
@@ -2621,47 +2263,6 @@ namespace OpenSim.Grid.MoneyServer
                 m_log.Error("[MONEY XMLRPC]: handleScriptTransaction: Not allowed send money to avatar!!");
                 m_log.Error("[MONEY XMLRPC]: handleScriptTransaction: Not match Script Access Key.");
                 responseData["message"] = "not allowed send money to avatar! not match Script Key";
-                return response;
-            }
-
-            if (m_continuumEconomyEnabled)
-            {
-                Guid operationID = Guid.Parse(transactionUUID.ToString());
-                bool hasSender = Guid.TryParse(senderID, out Guid sender) && sender != Guid.Empty;
-                bool hasReceiver = Guid.TryParse(receiverID, out Guid receiver) && receiver != Guid.Empty;
-                if (amount <= 0 || (!hasSender && !hasReceiver))
-                {
-                    responseData["message"] = "Invalid scripted money request";
-                    return response;
-                }
-                if (hasSender && hasReceiver)
-                {
-                    LedgerTransferResult transfer = m_continuumLedger.Transfer(new LedgerTransferRequest
-                    {
-                        TransactionID = operationID, SenderID = sender, ReceiverID = receiver,
-                        Amount = amount, TransactionType = transactionType,
-                        RegionID = Guid.Empty, ObjectID = Guid.Empty, Description = description
-                    });
-                    responseData["success"] = transfer.Succeeded;
-                    responseData["message"] = transfer.Message;
-                }
-                else
-                {
-                    Guid account = hasReceiver ? receiver : sender;
-                    LedgerAdjustmentResult adjustment = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-                    {
-                        OperationID = operationID, AccountID = account, ActorID = m_continuumSystemActor,
-                        Amount = amount, Kind = hasReceiver ? LedgerAdjustmentKind.Credit : LedgerAdjustmentKind.Debit,
-                        TransactionType = transactionType, Reason = description
-                    });
-                    responseData["success"] = adjustment.Succeeded;
-                    responseData["message"] = adjustment.Message;
-                }
-                if (Convert.ToBoolean(responseData["success"]))
-                {
-                    if (hasSender) UpdateBalance(senderID, String.Empty);
-                    if (hasReceiver) UpdateBalance(receiverID, String.Empty);
-                }
                 return response;
             }
 
@@ -2821,29 +2422,6 @@ namespace OpenSim.Grid.MoneyServer
                     {
                         m_log.ErrorFormat("[STIPEND]: Avatar {0} not found in DB, skipping.", receiverID);
                         allSucceeded = false;
-                        continue;
-                    }
-
-                    if (m_continuumEconomyEnabled)
-                    {
-                        LedgerAdjustmentResult stipend = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-                        {
-                            OperationID = Guid.Parse(transactionUUID.ToString()),
-                            AccountID = Guid.Parse(receiverID),
-                            ActorID = m_continuumSystemActor,
-                            Amount = amount,
-                            Kind = LedgerAdjustmentKind.Credit,
-                            TransactionType = (int)TransactionType.StipendBasic,
-                            Reason = String.Format(System.Globalization.CultureInfo.InvariantCulture,
-                                "{0} [cycle {1}]", safeDescription, cycleKey)
-                        });
-                        if (!stipend.Succeeded)
-                        {
-                            m_log.ErrorFormat("[STIPEND]: Continuum credit failed for {0}: {1}", receiverID, stipend.Message);
-                            allSucceeded = false;
-                            continue;
-                        }
-                        UpdateBalance(receiverID, String.Format(m_BalanceMessageReceiveMoney, amount, "SYSTEM", ""));
                         continue;
                     }
 
@@ -3031,13 +2609,6 @@ namespace OpenSim.Grid.MoneyServer
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("transactionID") &&
-                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
-            {
-                responseData["message"] = "Invalid transaction identifier";
-                return response;
-            }
-
             if (requestData.ContainsKey("bankerID")) bankerID = (string)requestData["bankerID"];
             if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
             if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
@@ -3071,26 +2642,6 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
             responseData["banker"] = true;
-
-            if (m_continuumEconomyEnabled)
-            {
-                if (!Guid.TryParse(bankerID, out Guid accountID) || accountID == Guid.Empty || amount <= 0)
-                {
-                    responseData["message"] = "Invalid banker credit request";
-                    return response;
-                }
-                LedgerAdjustmentResult credit = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-                {
-                    OperationID = Guid.Parse(transactionUUID.ToString()), AccountID = accountID,
-                    ActorID = m_continuumSystemActor, Amount = amount, Kind = LedgerAdjustmentKind.Credit,
-                    TransactionType = transactionType, Reason = description
-                });
-                responseData["success"] = credit.Succeeded;
-                responseData["message"] = credit.Message;
-                responseData["balance"] = ToViewerBalance(credit.Balance);
-                if (credit.Succeeded) UpdateBalance(bankerID, String.Format(m_BalanceMessageBuyMoney, amount, "SYSTEM", ""));
-                return response;
-            }
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleAddBankerMoney: Add money to avatar {0}", bankerID);
             int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
@@ -3182,13 +2733,6 @@ namespace OpenSim.Grid.MoneyServer
             responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("transactionID") &&
-                !UUID.TryParse(Convert.ToString(requestData["transactionID"]), out transactionUUID))
-            {
-                responseData["message"] = "Invalid transaction identifier";
-                return response;
-            }
-
             // Parameter aus der Anfrage extrahieren
             if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
             if (requestData.ContainsKey("senderSessionID")) senderSessionID = (string)requestData["senderSessionID"];
@@ -3222,26 +2766,6 @@ namespace OpenSim.Grid.MoneyServer
             {
                 m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Sitzungsprüfung für Sender fehlgeschlagen " + senderID);
                 responseData["message"] = "Session check failure, please re-login later!";
-                return response;
-            }
-
-            if (m_continuumEconomyEnabled)
-            {
-                if (!Guid.TryParse(senderID, out Guid accountID) || accountID == Guid.Empty || amount <= 0)
-                {
-                    responseData["message"] = "Invalid charge request";
-                    return response;
-                }
-                LedgerAdjustmentResult debit = m_continuumLedger.Adjust(new LedgerAdjustmentRequest
-                {
-                    OperationID = Guid.Parse(transactionUUID.ToString()), AccountID = accountID,
-                    ActorID = m_continuumSystemActor, Amount = amount, Kind = LedgerAdjustmentKind.Debit,
-                    TransactionType = transactionType, Reason = description
-                });
-                responseData["success"] = debit.Succeeded;
-                responseData["message"] = debit.Message;
-                responseData["balance"] = ToViewerBalance(debit.Balance);
-                if (debit.Succeeded) UpdateBalance(senderID, m_BalanceMessagePayCharge);
                 return response;
             }
 
@@ -3349,15 +2873,6 @@ namespace OpenSim.Grid.MoneyServer
 
             responseData["success"] = false;
 
-            // Continuum transfers commit atomically and cannot be changed after the fact.
-            // Purchase holds have a separate, buyer-bound cancellation workflow. Never
-            // mutate the legacy transaction database while Continuum is authoritative.
-            if (m_continuumEconomyEnabled)
-            {
-                responseData["message"] = "Committed ContinuumEconomy transfers cannot be cancelled; use the evidence-gated purchase hold workflow for an authorized purchase";
-                return response;
-            }
-
             if (requestData.ContainsKey("secureCode")) secureCode = (string)requestData["secureCode"];
             if (requestData.ContainsKey("transactionID"))
             {
@@ -3433,27 +2948,6 @@ namespace OpenSim.Grid.MoneyServer
 
                     try
                     {
-                        if (m_continuumEconomyEnabled)
-                        {
-                            LedgerHistoryEntry entry = m_continuumLedger.GetOperation(Guid.Parse(transactionUUID.ToString()));
-                            Guid requestingAccount = Guid.Parse(clientID);
-                            if (entry == null || (entry.AccountID != requestingAccount && entry.CounterpartyID != requestingAccount))
-                            {
-                                responseData["description"] = "Invalid Transaction UUID";
-                                return response;
-                            }
-                            Guid sender = entry.IsCredit ? entry.CounterpartyID : entry.AccountID;
-                            Guid receiver = entry.IsCredit ? entry.AccountID : entry.CounterpartyID;
-                            responseData["success"] = true;
-                            responseData["amount"] = ToViewerBalance(entry.Amount);
-                            responseData["time"] = (int)Math.Min(Int32.MaxValue, new DateTimeOffset(entry.CreatedUtc).ToUnixTimeSeconds());
-                            responseData["type"] = entry.TransactionType;
-                            responseData["sender"] = sender.ToString();
-                            responseData["receiver"] = receiver.ToString();
-                            responseData["description"] = entry.Description;
-                            return response;
-                        }
-
                         TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
                         if (transaction != null)
                         {
@@ -3588,9 +3082,7 @@ namespace OpenSim.Grid.MoneyServer
                 {
                     try
                     {
-                        balance = m_continuumEconomyEnabled
-                            ? ToViewerBalance(m_continuumLedger.GetAvailableBalance(Guid.Parse(userID)))
-                            : m_moneyDBService.getBalance(userID);
+                        balance = m_moneyDBService.getBalance(userID);
                         UserInfo user = m_moneyDBService.FetchUserInfo(userID);
                         if (user != null)
                         {
@@ -3656,35 +3148,6 @@ namespace OpenSim.Grid.MoneyServer
                 {
                     try
                     {
-                        if (m_continuumEconomyEnabled)
-                        {
-                            Guid accountID = Guid.Parse(userID);
-                            DateTime? startUtc = startTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(startTime).UtcDateTime : null;
-                            DateTime? endUtc = endTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(endTime).UtcDateTime : null;
-                            long totalCount = m_continuumLedger.CountHistory(accountID, startUtc, endUtc);
-                            int requestedIndex = lastIndex + 1;
-                            if (requestedIndex < 0 || requestedIndex >= 500)
-                            {
-                                responseData["errorMessage"] = "Continuum history index must be between 0 and 499";
-                                return response;
-                            }
-                            IReadOnlyList<LedgerHistoryEntry> history = m_continuumLedger.GetHistory(
-                                accountID, endUtc, Math.Min(500, requestedIndex + 1));
-                            List<LedgerHistoryEntry> filtered = new List<LedgerHistoryEntry>();
-                            foreach (LedgerHistoryEntry historyEntry in history)
-                                if (!startUtc.HasValue || historyEntry.CreatedUtc >= startUtc.Value) filtered.Add(historyEntry);
-                            if (requestedIndex >= filtered.Count)
-                            {
-                                responseData["errorMessage"] = String.Format("Unable to fetch transaction data with the index {0}", requestedIndex);
-                                responseData["isEnd"] = true;
-                                return response;
-                            }
-                            LedgerHistoryEntry entry = filtered[requestedIndex];
-                            PopulateContinuumHistoryResponse(responseData, entry, requestedIndex,
-                                requestedIndex + 1 >= totalCount);
-                            return response;
-                        }
-
                         int total = m_moneyDBService.getTransactionNum(userID, startTime, endTime);
                         TransactionData tran = null;
                         m_log.InfoFormat("[MONEY XMLRPC]: handleWebGetTransaction: Getting transation[{0}] for user {1}", lastIndex + 1, userID);
@@ -3768,12 +3231,7 @@ namespace OpenSim.Grid.MoneyServer
             {
                 if (m_webSessionDic[userID] == webSessionID)
                 {
-                    long count = m_continuumEconomyEnabled
-                        ? m_continuumLedger.CountHistory(Guid.Parse(userID),
-                            startTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(startTime).UtcDateTime : null,
-                            endTime > 0 ? DateTimeOffset.FromUnixTimeSeconds(endTime).UtcDateTime : null)
-                        : m_moneyDBService.getTransactionNum(userID, startTime, endTime);
-                    int it = count > Int32.MaxValue ? Int32.MaxValue : (int)count;
+                    int it = m_moneyDBService.getTransactionNum(userID, startTime, endTime);
                     if (it >= 0)
                     {
                         m_log.InfoFormat("[MONEY XMLRPC]: handleWebGetTransactionNum: Get {0} transactions for user {1}", it, userID);
@@ -3787,29 +3245,6 @@ namespace OpenSim.Grid.MoneyServer
             m_log.Error("[MONEY XMLRPC]: handleWebGetTransactionNum: Session authentication failed when getting transaction number for user " + userID);
             responseData["errorMessage"] = "Session check failure, please re-login";
             return response;
-        }
-
-        private void PopulateContinuumHistoryResponse(Hashtable response, LedgerHistoryEntry entry,
-            int index, bool isEnd)
-        {
-            Guid senderID = entry.IsCredit ? entry.CounterpartyID : entry.AccountID;
-            Guid receiverID = entry.IsCredit ? entry.AccountID : entry.CounterpartyID;
-            UserInfo sender = senderID == Guid.Empty ? null : m_moneyDBService.FetchUserInfo(senderID.ToString());
-            UserInfo receiver = receiverID == Guid.Empty ? null : m_moneyDBService.FetchUserInfo(receiverID.ToString());
-            long unixTime = new DateTimeOffset(entry.CreatedUtc).ToUnixTimeSeconds();
-            response["success"] = true;
-            response["isEnd"] = isEnd;
-            response["transactionIndex"] = index;
-            response["transactionUUID"] = entry.TransactionID.ToString();
-            response["senderID"] = senderID.ToString();
-            response["receiverID"] = receiverID.ToString();
-            response["senderName"] = sender?.Avatar ?? (entry.IsAdjustment ? "SYSTEM" : "unknown user");
-            response["receiverName"] = receiver?.Avatar ?? "unknown user";
-            response["amount"] = ToViewerBalance(entry.Amount);
-            response["type"] = entry.TransactionType;
-            response["time"] = unixTime > Int32.MaxValue ? Int32.MaxValue : (int)unixTime;
-            response["status"] = entry.Succeeded ? (int)Status.SUCCESS_STATUS : (int)Status.FAILED_STATUS;
-            response["description"] = entry.Description;
         }
 
 
@@ -4175,9 +3610,7 @@ namespace OpenSim.Grid.MoneyServer
                 {
                     try
                     {
-                        balance = m_continuumEconomyEnabled
-                            ? ToViewerBalance(m_continuumLedger.GetAvailableBalance(Guid.Parse(clientUUID)))
-                            : m_moneyDBService.getBalance(clientUUID);
+                        balance = m_moneyDBService.getBalance(clientUUID);
                         if (balance == -1) // User not found
                         {
                             responseData["description"] = "user not found";
@@ -4274,12 +3707,10 @@ namespace OpenSim.Grid.MoneyServer
                 secureID = m_secureSessionDic[userID];
 
                 // Aktuelles Guthaben des Benutzers abrufen
-                int currentBalance = m_continuumEconomyEnabled
-                    ? ToViewerBalance(m_continuumLedger.GetAvailableBalance(Guid.Parse(userID)))
-                    : m_moneyDBService.getBalance(userID);
+                int currentBalance = m_moneyDBService.getBalance(userID);
 
                 // Überprüfen, ob das Guthaben über dem Maximum liegt und ggf. abziehen
-                if (!m_continuumEconomyEnabled && m_CurrencyMaximum > 0 && currentBalance > m_CurrencyMaximum)
+                if (m_CurrencyMaximum > 0 && currentBalance > m_CurrencyMaximum)
                 {
                     int excessAmount = currentBalance - m_CurrencyMaximum;
 

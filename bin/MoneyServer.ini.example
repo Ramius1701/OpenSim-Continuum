@@ -29,14 +29,6 @@
     ExpiredTime = 120
     DefaultBalance = 1000
 
-    ;; Production cutover switch for the revisioned Continuum ledger. Leave
-    ;; false until the offline initialize/analyze/import sequence has completed
-    ;; and all regions have been deployed with matching purchase RPC support.
-    ContinuumEconomyEnabled = false
-    ;; Required non-zero service UUID when ContinuumEconomyEnabled=true. It is
-    ;; recorded as the actor for initial balances and other system adjustments.
-    ContinuumSystemActor = "00000000-0000-0000-0000-000000000000"
-
     ;; Administrative/forced transfers.
     EnableForceTransfer = false
     BankerAvatar = "00000000-0000-0000-0000-000000000000"

@@ -31,7 +31,6 @@
   <Reference name="OpenSim.Framework.Servers"/>
   <Reference name="OpenSim.Framework.Servers.HttpServer"/>
   <Reference name="OpenSim.Modules.Currency"/>
-  <Reference name="OpenSim.Continuum.Economy"/>
   <Reference name="OpenSim.Region.Framework"/>
   <Reference name="OpenSim.Server.Base"/>
   <Reference name="OpenSim.Server.Handlers"/>

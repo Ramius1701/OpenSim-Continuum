@@ -1,6 +1,10 @@
 # OpenSim Continuum MoneyServer
 
-This package reconciles the user's uploaded MoneyServer baseline with the current OpenSim Continuum rebuild. The uploaded archive remains the functional baseline; ManfredAabye's repository was used only as a reference.
+This package preserves the reconciled DTL/NSL MoneyServer as an independent,
+working compatibility subsystem. It is not a host for ContinuumEconomy.
+ContinuumEconomy is developed and tested separately and must not alter this
+service or its region module. The uploaded archive remains the functional
+baseline; ManfredAabye's repository was used only as a reference.
 
 ## Included components
 
@@ -69,9 +73,8 @@ Stipend cycles are anchored by `AnchorDateUtc`. With `IntervalDays = 7` and `Anc
 ## Validation boundary
 
 The solution and MoneyServer sources compile in the Continuum integration
-branch. The revised MySQL ledger has an acceptance harness, but viewer tests,
-restart/failure tests, and live PostgreSQL certification remain required before
-production deployment. The legacy DTL/NSL storage wrapper and the current
-Continuum economy backend are still MySQL-specific; SQLite and PostgreSQL must
-not be advertised for MoneyServer until provider implementations pass the same
-transaction and idempotency contract.
+branch, but compilation is not runtime certification. MoneyServer must pass its
+original viewer, transfer, object-sale, stipend, restart, and database contract
+without ContinuumEconomy loaded. Its legacy storage wrapper is MySQL-specific.
+ContinuumEconomy has a separate acceptance harness and remains experimental;
+it must not be deployed as a MoneyServer backend.

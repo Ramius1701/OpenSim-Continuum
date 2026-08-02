@@ -109,7 +109,6 @@ namespace OpenSim.Modules.Currency
         //private bool  m_enabled = true;
         private bool m_sellEnabled = false;
         private bool m_enable_server = true;   // enable Money Server
-        private bool m_continuumPurchaseRpc = false;
 
         private IConfigSource m_config;
 
@@ -232,7 +231,6 @@ namespace OpenSim.Modules.Currency
 
                 m_moneyServURL = economyConfig.GetString("CurrencyServer", m_moneyServURL);
                 m_log.InfoFormat("[MONEY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
-                m_continuumPurchaseRpc = economyConfig.GetBoolean("ContinuumPurchaseRpc", false);
 
                 // Konfiguration für Client-Zertifizierung
                 m_certFilename = economyConfig.GetString("ClientCertFilename", m_certFilename);
@@ -917,52 +915,18 @@ namespace OpenSim.Modules.Currency
                         {
                             if (!string.IsNullOrEmpty(m_moneyServURL))
                             {
-                                if (m_continuumPurchaseRpc)
-                                {
-                                    UUID purchaseID;
-                                    int purchaseState;
-                                    ret = AuthorizeObjectPurchase(remoteClient, receiverId, salePrice,
-                                        (int)TransactionType.PayObject, sceneObj.UUID, regionHandle,
-                                        regionUUID, "Object Buy", out purchaseID, out purchaseState);
-                                    if (ret && purchaseState == 1)
-                                    {
-                                        bool delivered = mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
-                                        if (delivered)
-                                        {
-                                            ret = CompleteObjectPurchase(remoteClient, purchaseID, true);
-                                            if (!ret)
-                                            {
-                                                remoteClient.SendAgentAlertMessage(
-                                                    "The object was delivered, but payment capture is pending. Please contact grid support.", false);
-                                                m_log.ErrorFormat("[MONEY MODULE]: CRITICAL: Purchase {0} delivered but capture was not confirmed", purchaseID);
-                                            }
-                                        }
-                                        else
-                                        {
-                                            CompleteObjectPurchase(remoteClient, purchaseID, false);
-                                            ret = false;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    ret = TransferMoney(remoteClient.AgentId, receiverId, salePrice,
-                                        (int)TransactionType.PayObject, sceneObj.UUID, regionHandle,
-                                        regionUUID, "Object Buy");
-                                    if (ret)
-                                        ret = mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
-                                }
+                                ret = TransferMoney(remoteClient.AgentId, receiverId, salePrice,
+                                                (int)TransactionType.PayObject, sceneObj.UUID, regionHandle, regionUUID, "Object Buy");
                             }
                             else if (salePrice == 0)
                             {    // amount is 0 with No Money Server
                                 ret = true;
                             }
                         }
-                        // Continuum purchases deliver between authorization and
-                        // capture. A legacy zero-price purchase still needs the
-                        // normal object-delivery call.
-                        if (ret && salePrice == 0 && string.IsNullOrEmpty(m_moneyServURL))
+                        if (ret)
+                        {
                             mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                        }
                     }
                 }
                 else
@@ -1521,10 +1485,6 @@ namespace OpenSim.Modules.Currency
 
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
-                // Keep one identifier for every retry of this logical request.  New
-                // Continuum ledgers use it for idempotency; legacy MoneyServer
-                // versions safely ignore the additional field.
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = sender.ToString();
                 paramTable["receiverID"] = receiver.ToString();
                 paramTable["senderSessionID"] = senderClient.SessionId.ToString();
@@ -1554,53 +1514,6 @@ namespace OpenSim.Modules.Currency
             return ret;
         }
 
-        private bool AuthorizeObjectPurchase(IClientAPI buyer, UUID sellerID, int amount,
-            int transactionType, UUID objectID, ulong regionHandle, UUID regionID,
-            string description, out UUID purchaseID, out int purchaseState)
-        {
-            purchaseID = UUID.Random();
-            purchaseState = 0;
-            Hashtable parameters = new Hashtable
-            {
-                ["transactionID"] = purchaseID.ToString(),
-                ["buyerID"] = buyer.AgentId.ToString(),
-                ["buyerSessionID"] = buyer.SessionId.ToString(),
-                ["buyerSecureSessionID"] = buyer.SecureSessionId.ToString(),
-                ["sellerID"] = sellerID.ToString(),
-                ["amount"] = amount,
-                ["transactionType"] = transactionType,
-                ["objectID"] = objectID.ToString(),
-                ["regionHandle"] = regionHandle.ToString(),
-                ["regionUUID"] = regionID.ToString(),
-                ["description"] = description
-            };
-            Hashtable result = genericCurrencyXMLRPCRequest(parameters, "AuthorizePurchase");
-            if (result == null || !result.ContainsKey("success"))
-                return false;
-            if (result.ContainsKey("state"))
-                purchaseState = Convert.ToInt32(result["state"]);
-            return Convert.ToBoolean(result["success"]);
-        }
-
-        private bool CompleteObjectPurchase(IClientAPI buyer, UUID purchaseID, bool capture)
-        {
-            Hashtable parameters = new Hashtable
-            {
-                ["transactionID"] = purchaseID.ToString(),
-                ["buyerID"] = buyer.AgentId.ToString(),
-                ["buyerSessionID"] = buyer.SessionId.ToString(),
-                ["buyerSecureSessionID"] = buyer.SecureSessionId.ToString()
-            };
-            string method = capture ? "CapturePurchase" : "CancelPurchase";
-            for (int attempt = 0; attempt < 3; ++attempt)
-            {
-                Hashtable result = genericCurrencyXMLRPCRequest(parameters, method);
-                if (result != null && result.ContainsKey("success") && Convert.ToBoolean(result["success"]))
-                    return true;
-            }
-            return false;
-        }
-
 
         /// <summary>
         /// Force transfer the money from one user to another.
@@ -1625,7 +1538,6 @@ namespace OpenSim.Modules.Currency
 
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = sender.ToString();
                 paramTable["receiverID"] = receiver.ToString();
                 paramTable["transactionType"] = type;
@@ -1672,7 +1584,6 @@ namespace OpenSim.Modules.Currency
                 // Fill parameters for money transfer XML-RPC.
                 if (type < 0) type = (int)TransactionType.ReferBonus;
                 Hashtable paramTable = new Hashtable();
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["receiverID"] = avatarID.ToString();
                 paramTable["transactionType"] = type;
                 paramTable["amount"] = amount;
@@ -1715,7 +1626,6 @@ namespace OpenSim.Modules.Currency
             {
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = senderID.ToString();
                 paramTable["receiverID"] = receiverID.ToString();
                 paramTable["transactionType"] = (int)TransactionType.MoveMoney;
@@ -1760,7 +1670,6 @@ namespace OpenSim.Modules.Currency
             {
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["bankerID"] = bankerID.ToString();
                 paramTable["transactionType"] = (int)TransactionType.BuyMoney;
                 paramTable["amount"] = amount;
@@ -1827,7 +1736,6 @@ namespace OpenSim.Modules.Currency
             {
                 // Fill parameters for money transfer XML-RPC.
                 Hashtable paramTable = new Hashtable();
-                paramTable["transactionID"] = UUID.Random().ToString();
                 paramTable["senderID"] = sender.ToString();
                 paramTable["senderSessionID"] = senderClient.SessionId.ToString();
                 paramTable["senderSecureSessionID"] = senderClient.SecureSessionId.ToString();
