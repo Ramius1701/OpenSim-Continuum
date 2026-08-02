@@ -50,6 +50,14 @@ This package reconciles the user's uploaded MoneyServer baseline with the curren
 
 `CurrencyOnOff` must be exactly `on` to enable viewer purchases. `TotalDay`, `TotalWeek`, `TotalMonth`, and `CurrencyMaximum` use `0` to disable the corresponding limit. Purchase totals count successful `BuyMoney` ledger entries only.
 
+The region process must also load `DTLNSLMoneyModule`. Copy the settings from
+`addon-modules/OpenSim-Modules-Currency/config/OpenSim.ini.sample` into the
+region's active `OpenSim.ini` (or an included file), set its MoneyServer URL to
+the running service, and confirm the region log contains both
+`Plugin Loaded: DTLNSLMoneyModule` and a successful `LoginMoneyServer` message
+for the avatar. Merely copying newly compiled DLLs does not replace an existing
+`MoneyServer.ini` or enable the region module.
+
 `UserMailLock` checks only for a non-empty `UserAccounts.email` value. It is not email ownership verification.
 
 `CurrencyGroupOnly` requires the group membership table to be available in the database used by MoneyServer. `CurrencyGroupID`, not the descriptive group name, is enforced.
@@ -60,4 +68,10 @@ Stipend cycles are anchored by `AnchorDateUtc`. With `IntervalDays = 7` and `Anc
 
 ## Validation boundary
 
-The source has been statically audited and packaged, but it has not been compiled or runtime-tested in this environment. Build validation and controlled viewer/database tests are required before replacing the production MoneyServer.
+The solution and MoneyServer sources compile in the Continuum integration
+branch. The revised MySQL ledger has an acceptance harness, but viewer tests,
+restart/failure tests, and live PostgreSQL certification remain required before
+production deployment. The legacy DTL/NSL storage wrapper and the current
+Continuum economy backend are still MySQL-specific; SQLite and PostgreSQL must
+not be advertised for MoneyServer until provider implementations pass the same
+transaction and idempotency contract.

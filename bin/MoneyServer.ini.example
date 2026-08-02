@@ -48,9 +48,10 @@
 
     EnableAmountZero = false
 
-    ;; Viewer currency purchase support. This must be exactly "on" to enable.
+    ;; Viewer currency purchase support. The Continuum integration-test profile
+    ;; enables this so quote and purchase behavior can be tested end to end.
     ;; Secure viewer sessions are checked before a quote or purchase is accepted.
-    CurrencyOnOff = "off"
+    CurrencyOnOff = "on"
 
     ;; Successful viewer BuyMoney totals use UTC calendar boundaries.
     ;; Week begins Monday UTC. Zero disables an individual period limit.
