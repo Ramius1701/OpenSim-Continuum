@@ -849,7 +849,18 @@ namespace OpenSim.Modules.ContinuumEconomy
                 }
             }
 
-            TransferMoney(moneyEvent.sender, receiver, moneyEvent.amount, moneyEvent.transactiontype, objectID, regionHandle, regionUUID, "OnMoneyTransfer event");
+            bool transferred = TransferMoney(moneyEvent.sender, receiver, moneyEvent.amount,
+                moneyEvent.transactiontype, objectID, regionHandle, regionUUID,
+                String.IsNullOrWhiteSpace(moneyEvent.description) ? "Viewer money transfer" : moneyEvent.description);
+            IClientAPI payer = GetLocateClient(moneyEvent.sender);
+            if (!transferred)
+            {
+                payer?.SendAgentAlertMessage("Unable to complete the payment.", false);
+                return;
+            }
+
+            if (moneyEvent.transactiontype == (int)TransactionType.PayObject && objectID != UUID.Zero)
+                OnObjectPaid?.Invoke(objectID, moneyEvent.sender, moneyEvent.amount);
             return;
         }
 
@@ -1406,7 +1417,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                             MD5 md5 = MD5.Create();
                             byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                             string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                            m_log.WarnFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: legacy unregistered script-credit path invoked from {0}", scriptIP);
                             ret = SendMoneyTo(agentUUID, amount, type, hash);
                         }
                     }
@@ -1475,7 +1486,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                         MD5 md5 = MD5.Create();
                         byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                         string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                        m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                        m_log.WarnFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: legacy unregistered script-transfer path invoked from {0}", scriptIP);
                         ret = MoveMoneyFromTo(fromUUID, toUUID, amount, hash);
                     }
                     else
@@ -1573,15 +1584,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
-                        if (resultTable.Contains("clientBalance"))
-                            senderClient.SendMoneyBalance(UUID.Random(), true, Array.Empty<byte>(),
-                                Convert.ToInt32(resultTable["clientBalance"]), 0, UUID.Zero, false,
-                                UUID.Zero, false, 0, String.Empty);
-                        IClientAPI receiverClient = GetLocateClient(receiver);
-                        if (receiverClient != null && resultTable.Contains("receiverBalance"))
-                            receiverClient.SendMoneyBalance(UUID.Random(), true, Array.Empty<byte>(),
-                                Convert.ToInt32(resultTable["receiverBalance"]), 0, UUID.Zero, false,
-                                UUID.Zero, false, 0, String.Empty);
+                        NotifyLocalBalance(sender, resultTable, "clientBalance");
+                        NotifyLocalBalance(receiver, resultTable, "receiverBalance");
                     }
                 }
                 else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
@@ -1674,6 +1678,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
+                        NotifyLocalBalance(sender, resultTable, "clientBalance");
+                        NotifyLocalBalance(receiver, resultTable, "receiverBalance");
                     }
                 }
                 else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: ForceTransferMoney: Can not money force transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
@@ -1716,6 +1722,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
+                        NotifyLocalBalance(avatarID, resultTable, "clientBalance");
                     }
                     else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyTo: Fail Message is {0}", resultTable["message"]);
                 }
@@ -1723,6 +1730,20 @@ namespace OpenSim.Modules.ContinuumEconomy
             }
 
             return ret;
+        }
+
+        private void NotifyLocalBalance(UUID agentID, Hashtable response, string balanceKey)
+        {
+            if (response == null || !response.ContainsKey(balanceKey))
+                return;
+
+            IClientAPI client = GetLocateClient(agentID);
+            if (client == null)
+                return;
+
+            client.SendMoneyBalance(UUID.Random(), true, Array.Empty<byte>(),
+                Convert.ToInt32(response[balanceKey]), 0, UUID.Zero, false,
+                UUID.Zero, false, 0, String.Empty);
         }
 
 
@@ -1759,6 +1780,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
+                        NotifyLocalBalance(senderID, resultTable, "clientBalance");
+                        NotifyLocalBalance(receiverID, resultTable, "receiverBalance");
                     }
                     else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyFromTo: Fail Message is {0}", resultTable["message"]);
                 }
@@ -1871,6 +1894,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
+                        NotifyLocalBalance(sender, resultTable, "clientBalance");
                     }
                 }
                 else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: PayMoneyCharge: Can not pay money of charge request from [{0}]", sender.ToString());
