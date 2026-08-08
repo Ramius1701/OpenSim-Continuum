@@ -174,7 +174,7 @@ namespace OpenSim.Region.CoreModules.World.Land
             m_scene.EventManager.OnAvatarEnteringNewParcel += EventManagerOnAvatarEnteringNewParcel;
             m_scene.EventManager.OnClientMovement += EventManagerOnClientMovement;
             m_scene.EventManager.OnValidateLandBuy += EventManagerOnValidateLandBuy;
-            m_scene.EventManager.OnLandBuy += EventManagerOnLandBuy;
+            m_scene.EventManager.OnLandBuyFinalized += EventManagerOnLandBuy;
             m_scene.EventManager.OnNewClient += EventManagerOnNewClient;
             m_scene.EventManager.OnMakeChildAgent += EventMakeChildAgent;
             m_scene.EventManager.OnSignificantClientMovement += EventManagerOnSignificantClientMovement;
@@ -1745,7 +1745,10 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void EventManagerOnLandBuy(Object o, EventManager.LandBuyArgs e)
         {
-            if (e.economyValidated && e.landValidated)
+            // A balance check is not a debit. For paid land, require the economy
+            // module to record the exact committed amount before ownership moves.
+            if (e.economyValidated && e.landValidated &&
+                (e.parcelPrice == 0 || e.amountDebited == e.parcelPrice))
             {
                 ILandObject land;
                 lock (m_landList)

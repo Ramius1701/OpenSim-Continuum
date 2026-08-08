@@ -17,7 +17,7 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 |---|---|---|---|
 | ContinuumEconomy storage | Independent SQLite, MySQL/MariaDB and PostgreSQL ledgers, migrations, account registration, audited adjustments, idempotent transfers, holds and history | Shared acceptance suite passed for SQLite and PostgreSQL; PostgreSQL was repeated from a clean schema on 2026-08-08; MySQL previously passed its provider suite | Repeat the current shared suite against the exact production MySQL/MariaDB version and settings |
 | ContinuumEconomy service | Separate service, authenticated region calls, sessions, transfers, currency purchase controls, object-sale holds and land preparation | SQLite and PostgreSQL XML-RPC wire tests passed; both retained balances and replay safety across a full service stop/start | Outage, concurrency, viewer and multi-region testing on a cloned grid |
-| ContinuumEconomy connector | Separately selected module, viewer events, OpenSim money hooks, delivery-safe object sales and local balance notifications | Connector and complete Release solution build successfully | Exercise every viewer payment/fee path, crossings and remote-simulator recipients |
+| ContinuumEconomy connector | Separately selected module, viewer events, OpenSim money hooks, delivery-safe paid object sales, ledger-free zero-price object delivery, land debit enforcement and local balance notifications | Connector and complete Release solution build successfully; land core regression coverage rejects missing/partial debits and accepts exact/zero-price cases | Exercise every viewer payment/fee path, crossings and remote-simulator recipients |
 | MoneyServer Compatibility | Original service, datastore and DTL/NSL connector remain separately deployable; selection guard prevents registration when unselected | Complete Release build succeeds; ContinuumEconomy does not load or redirect MoneyServer | Run the legacy compatibility matrix against a cloned MoneyServer database |
 | Display Names and aliases | Grid service, CAPS, persistence, search and compatibility paths are integrated | Complete solution builds | Verify nameplates, Nearby, search, relog, restart, crossings, multiple regions and Hypergrid boundaries |
 | Experiences | Grid service, providers, CAPS, region policy and scripting integration are present | SQLite, MySQL/MariaDB and PostgreSQL paths compile | Verify viewer panels, permissions, KVP, estate/parcel policy, restarts and Hypergrid isolation |
@@ -34,9 +34,11 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 - `673e49bb00`: complete PostgreSQL and shared acceptance coverage.
 - `1d71b35924`: add the deployable service and region connector.
 - `21414c2f23`: harden land preparation and safe local balance updates.
+- `ece345a7a5`: record SQLite/PostgreSQL restart certification.
+- `beb337fb9f`: add the reproducible service wire-test client.
 
-The latest complete Release build passed with one known CS9193 warning in
-upstream-derived viewer CAPS code and no errors. Generated
+The latest complete Release build passed with the four known CS9193 warnings
+and no errors. Generated
 `bin/*.runtimeconfig.json` files and `.audit/` material are build/test artifacts
 and intentionally remain untracked.
 

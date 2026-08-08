@@ -11,7 +11,7 @@ The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808
   with Robust using MySQL/MariaDB or PostgreSQL
 - Baseline build: successful with four known CS9193 compiler warnings
 - Continuum completion build: successful
-- Latest complete Release build: successful with one known CS9193 warning and zero errors
+- Latest complete Release build: successful with four known CS9193 warnings and zero errors
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete

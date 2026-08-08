@@ -46,8 +46,8 @@ Record transaction UUIDs, balances, relevant logs, and pass/fail for every row.
 | Login/restart | Balance appears at login and remains identical after ContinuumEconomy.Service, Robust, region, and full-grid restarts. |
 | Resident payment | Pay another resident; verify both balances, viewer notification, history, and safe retry of the same request. |
 | Script payment | Verify `money()` delivery, `llGiveMoney`, debit permission denial, insufficient funds, and duplicate request handling. |
-| Object sale | Buy copy/original/contents; delivery failure cancels the hold, success captures exactly once, and concurrent spend cannot consume held funds. |
-| Land | Test authorized and rejected parcel purchases, ownership delivery, rollback, and history. |
+| Object sale | Buy zero-price and paid copy/original/contents. Zero-price delivery must not create a ledger row. Paid delivery failure cancels the hold, success captures exactly once, and concurrent spend cannot consume held funds. |
+| Land | Test zero-price, authorized, insufficient-funds, service-failure and balance-race parcel purchases. Paid ownership must move only when `amountDebited` exactly equals the validated price; failed or partial debits must leave ownership unchanged. Verify history and seller credit. |
 | Fees | Test upload and group-creation fees at zero and non-zero settings, including insufficient funds. |
 | Currency purchase | Test allowed banker IPs, invalid credentials, per-period credit limits, maximum balance, and audited actor/reason. PayPal or real-money processing is out of scope. |
 | Stipends | Run the same stipend job twice and prove the stable operation ID prevents a second credit. |

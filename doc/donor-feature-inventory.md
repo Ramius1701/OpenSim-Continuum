@@ -23,7 +23,7 @@ The initial recommendations in this document are retained as the evidence availa
 | WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
-The latest complete Release solution build completed successfully with one known CS9193 warning and zero errors. Warning counts can vary between clean and incremental builds; the untouched baseline produced four known CS9193 warnings. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
+The latest complete Release solution build completed successfully with the four known CS9193 warnings and zero errors, matching the untouched baseline warning count. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
 
 ## Repository verification
 

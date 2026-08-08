@@ -864,6 +864,16 @@ namespace OpenSim.Modules.ContinuumEconomy
                 {
                     landBuyEvent.transactionID = Util.UnixTimeSinceEpoch();
 
+                    if (landBuyEvent.parcelPrice == 0)
+                    {
+                        landBuyEvent.amountDebited = 0;
+                        return;
+                    }
+
+                    // Validation only proves that funds were available at an earlier point.
+                    // Do not leave the event authorized if the atomic debit fails.
+                    landBuyEvent.economyValidated = false;
+
                     ulong parcelID = (ulong)landBuyEvent.parcelLocalID;
                     UUID regionUUID = UUID.Zero;
                     if (sender is Scene) regionUUID = ((Scene)sender).RegionInfo.RegionID;
@@ -872,6 +882,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                                       landBuyEvent.parcelPrice, (int)TransactionType.LandSale, regionUUID, parcelID, regionUUID, "Land Purchase"))
                     {
                         landBuyEvent.amountDebited = landBuyEvent.parcelPrice;
+                        landBuyEvent.economyValidated = true;
                     }
                 }
             }
@@ -920,7 +931,12 @@ namespace OpenSim.Modules.ContinuumEconomy
                         UUID regionUUID = sceneObj.RegionID;
                         bool ret = false;
                         //
-                        if (salePrice >= 0)
+                        if (salePrice == 0)
+                        {
+                            mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                            ret = true;
+                        }
+                        else if (salePrice > 0)
                         {
                             if (!string.IsNullOrEmpty(m_moneyServURL))
                             {
@@ -940,10 +956,6 @@ namespace OpenSim.Modules.ContinuumEconomy
                                         throw;
                                     }
                                 }
-                            }
-                            else if (salePrice == 0)
-                            {    // amount is 0 with No Money Server
-                                ret = true;
                             }
                         }
                         if (!ret)
