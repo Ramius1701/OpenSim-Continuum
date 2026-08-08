@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using System.Xml;
 using log4net;
 using OpenMetaverse;
@@ -15,6 +16,9 @@ namespace OpenSim.Server.Handlers.AbuseReports
 {
     public class AbuseReportsServerPostHandler : BaseStreamHandler
     {
+        // A 5 MiB screenshot expands to roughly 6.7 MiB as base64. Leave
+        // bounded room for report fields while rejecting unbounded/chunked data.
+        private const int MaxRequestBodyBytes = 8 * 1024 * 1024;
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -37,8 +41,16 @@ namespace OpenSim.Server.Handlers.AbuseReports
             httpResponse.ContentType = "text/xml";
 
             string body;
-            using (StreamReader reader = new StreamReader(requestData))
-                body = reader.ReadToEnd().Trim();
+            try
+            {
+                body = ReadBoundedBody(requestData, httpRequest).Trim();
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[ABUSE REPORT HANDLER]: Rejected request: {0}", e.Message);
+                httpResponse.StatusCode = 413;
+                return FailureResult();
+            }
 
             string method = string.Empty;
 
@@ -267,6 +279,29 @@ namespace OpenSim.Server.Handlers.AbuseReports
         private static byte[] XmlResult(Dictionary<string, object> result)
         {
             return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+        }
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using (MemoryStream body = new MemoryStream())
+            {
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > MaxRequestBodyBytes)
+                        throw new InvalidDataException("Request body exceeds the service limit.");
+                    body.Write(buffer, 0, read);
+                }
+                return Encoding.UTF8.GetString(body.ToArray());
+            }
         }
     }
 }
