@@ -21,6 +21,12 @@ checks establish test readiness; they do not replace the live matrix below.
 Repeat the current suite on the exact MySQL/MariaDB production-test version
 before promotion.
 
+Focused land-core regressions also pass under .NET 8: missing and partial debits
+leave paid parcel ownership unchanged, an exact committed debit permits the
+transfer, and a zero-price parcel transfers without a ledger debit. Live viewer
+testing must still verify the complete seller credit, parcel update and failure
+messaging path.
+
 The portable wire-test client is
 `addon-modules/ContinuumEconomy/tests/xmlrpc_smoke.py`. It refuses to run without
 an explicitly supplied `CONTINUUM_ECONOMY_TEST_SECRET`; use it only with a
