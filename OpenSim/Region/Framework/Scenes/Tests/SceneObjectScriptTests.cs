@@ -28,6 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using NUnit.Framework;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -69,6 +70,37 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             IList<TaskInventoryItem> primItems = primInventory.GetInventoryItems(itemName);
             Assert.That(primItems.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TestAddScriptPreservesUtf8Source()
+        {
+            TestHelpers.InMethod();
+
+            UUID userId = TestHelpers.ParseTail(0x1);
+            string itemName = "UTF-8 Script Item";
+            string scriptText = "default { state_entry() { llOwnerSay(\"Kia ora — 測試\"); } }";
+
+            Scene scene = new SceneHelpers().SetupScene();
+            SceneObjectGroup so = SceneHelpers.CreateSceneObject(1, userId);
+            scene.AddNewSceneObject(so, true);
+
+            InventoryItemBase itemTemplate = new()
+            {
+                Name = itemName,
+                Folder = so.UUID,
+                InvType = (int)InventoryType.LSL
+            };
+
+            SceneObjectPart partWhereScriptAdded = scene.RezNewScript(userId, itemTemplate, scriptText);
+
+            Assert.That(partWhereScriptAdded, Is.Not.Null);
+            IList<TaskInventoryItem> primItems = partWhereScriptAdded.Inventory.GetInventoryItems(itemName);
+            Assert.That(primItems, Has.Count.EqualTo(1));
+
+            AssetBase storedAsset = scene.AssetService.Get(primItems[0].AssetID.ToString());
+            Assert.That(storedAsset, Is.Not.Null);
+            Assert.That(Encoding.UTF8.GetString(storedAsset.Data), Is.EqualTo(scriptText));
         }
     }
 }

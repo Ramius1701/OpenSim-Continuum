@@ -2165,7 +2165,7 @@ namespace OpenSim.Region.Framework.Scenes
                 AssetBase asset = CreateAsset(
                     itemBase.Name, itemBase.Description,
                     (sbyte)AssetType.LSLText,
-                    Encoding.ASCII.GetBytes(scriptText),
+                    Encoding.UTF8.GetBytes(scriptText),
                     agentID);
 
                 AssetService.Store(asset);
