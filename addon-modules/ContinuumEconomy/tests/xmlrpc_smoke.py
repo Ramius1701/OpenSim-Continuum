@@ -83,6 +83,12 @@ fee_request = {"continuumSecret": secret, "purchaseID": str(fee_reservation),
     "buyerID": str(buyer), "buyerSessionID": str(buyer_session),
     "buyerSecureSessionID": str(buyer_secure), "amount": 7,
     "transactionType": 1101, "description": "Reserved upload fee smoke"}
+invalid_fee_session = dict(fee_request)
+invalid_fee_session["purchaseID"] = str(uuid.uuid4())
+invalid_fee_session["buyerSessionID"] = str(uuid.uuid4())
+invalid_fee_result = service.AuthorizeCharge(invalid_fee_session)
+assert invalid_fee_result["success"] is False
+assert invalid_fee_result["message"] == "Invalid session"
 assert service.AuthorizeCharge(fee_request)["state"] == "Authorized"
 assert service.CapturePurchase({"continuumSecret": secret,
     "purchaseID": str(fee_reservation), "buyerID": str(buyer)})["state"] == "Captured"

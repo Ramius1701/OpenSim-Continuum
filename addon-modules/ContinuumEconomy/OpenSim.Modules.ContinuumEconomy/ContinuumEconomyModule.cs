@@ -663,7 +663,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 ["regionUUID"] = scene.RegionInfo.RegionID.ToString(),
                 ["description"] = description ?? String.Empty
             };
-            Hashtable result = genericCurrencyXMLRPCRequest(parameters, "AuthorizeCharge");
+            Hashtable result = SendAuthenticatedRequest(parameters, "AuthorizeCharge", client);
             if (result != null && result.Contains("success") && (bool)result["success"])
                 return true;
 
@@ -1565,7 +1565,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                     paramTable["transactionID"] = transactionID.ToString();
 
                 // Generate the request for transfer.
-                Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "TransferMoney");
+                Hashtable resultTable = SendAuthenticatedRequest(paramTable, "TransferMoney", senderClient);
 
                 // Handle the return values from Money Server.
                 if (resultTable != null && resultTable.Contains("success"))
@@ -1600,7 +1600,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 ["sellerID"] = seller.ToString(), ["amount"] = amount, ["transactionType"] = type,
                 ["objectID"] = objectID.ToString(), ["regionUUID"] = regionUUID.ToString(), ["description"] = description
             };
-            Hashtable result = genericCurrencyXMLRPCRequest(p, "AuthorizePurchase");
+            Hashtable result = SendAuthenticatedRequest(p, "AuthorizePurchase", buyer);
             return result != null && result.Contains("success") && (bool)result["success"];
         }
 
@@ -1863,7 +1863,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 paramTable["description"] = description;
 
                 // Generate the request for transfer.
-                Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "PayMoneyCharge");
+                Hashtable resultTable = SendAuthenticatedRequest(paramTable, "PayMoneyCharge", senderClient);
 
                 // Handle the return values from Money Server.
                 if (resultTable != null && resultTable.Contains("success"))
@@ -1957,7 +1957,27 @@ namespace OpenSim.Modules.ContinuumEconomy
             string message = response.ContainsKey("message") ? response["message"]?.ToString() : null;
             if (String.IsNullOrEmpty(message) && response.ContainsKey("errorMessage"))
                 message = response["errorMessage"]?.ToString();
-            return String.Equals(message, "Invalid session", StringComparison.OrdinalIgnoreCase);
+            return !String.IsNullOrEmpty(message) &&
+                message.IndexOf("invalid", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                message.IndexOf("session", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private Hashtable SendAuthenticatedRequest(Hashtable parameters, string method, IClientAPI client)
+        {
+            Hashtable result = genericCurrencyXMLRPCRequest(parameters, method);
+            if (!IsInvalidSessionResponse(result) || client == null)
+                return result;
+
+            Scene scene = GetLocateScene(client.AgentId);
+            ScenePresence presence = scene?.GetScenePresence(client.AgentId);
+            if (presence == null || presence.IsChildAgent ||
+                presence.ControllingClient?.SessionId != client.SessionId ||
+                !LoginMoneyServer(presence, out _))
+                return result;
+
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: {0}: restored service session for {1} and is retrying the same operation",
+                method, client.AgentId);
+            return genericCurrencyXMLRPCRequest(parameters, method);
         }
 
 

@@ -229,11 +229,12 @@ namespace ContinuumEconomy.Service
             if (!Secret(p) || !Guid.TryParse(Text(p, "buyerID"), out Guid buyer) || buyer == Guid.Empty ||
                 !Guid.TryParse(Text(p, "buyerSessionID"), out Guid session) ||
                 !Guid.TryParse(Text(p, "buyerSecureSessionID"), out Guid secure) ||
-                !m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure ||
                 !Guid.TryParse(Text(p, "sellerID"), out Guid seller) || seller == Guid.Empty ||
                 !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty ||
                 !Int64.TryParse(Text(p, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount) || amount <= 0)
                 return Failure("Invalid purchase authorization request");
+            if (!m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure)
+                return Failure("Invalid session");
             Int32.TryParse(Text(p, "transactionType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int type);
             Guid.TryParse(Text(p, "regionUUID"), out Guid region);
             Guid.TryParse(Text(p, "objectID"), out Guid obj);
@@ -251,10 +252,11 @@ namespace ContinuumEconomy.Service
             if (!Secret(p) || !Guid.TryParse(Text(p, "buyerID"), out Guid buyer) || buyer == Guid.Empty ||
                 !Guid.TryParse(Text(p, "buyerSessionID"), out Guid session) ||
                 !Guid.TryParse(Text(p, "buyerSecureSessionID"), out Guid secure) ||
-                !m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure ||
                 !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty ||
                 !Int64.TryParse(Text(p, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount) || amount <= 0)
                 return Failure("Invalid charge authorization request");
+            if (!m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure)
+                return Failure("Invalid session");
 
             Int32.TryParse(Text(p, "transactionType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int type);
             Guid.TryParse(Text(p, "regionUUID"), out Guid region);

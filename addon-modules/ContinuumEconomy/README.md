@@ -106,6 +106,12 @@ capture attempts is logged with its reservation UUID and remains visible to the
 operator `holds` report for reconciliation; it is never silently reversed or
 replayed under a new ID.
 
+Authenticated transfers, direct charges, object-purchase authorizations and fee
+reservations recognize the service's explicit `Invalid session` response. A
+still-connected root agent is re-registered once and the identical request,
+including its original transaction or reservation UUID, is retried. Malformed
+requests and transport outages are not treated as expired sessions.
+
 The authenticated service requires a unique shared secret of at least 32
 characters. The connector adds that secret and a UUID operation key to every
 region-originated request. Resident transfers additionally require the avatar's
