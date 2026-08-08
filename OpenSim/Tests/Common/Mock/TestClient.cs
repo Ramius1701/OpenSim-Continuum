@@ -372,6 +372,11 @@ namespace OpenSim.Tests.Common
 
         public float StartFar { get; set; }
 
+        public float FOV { get; set; } = 1.04f;
+        public int viewHeight { get; set; } = 480;
+        public int viewWidth { get; set; } = 640;
+        public ViewerFlags ViewerFlags { get; private set; }
+
         public virtual UUID AgentId
         {
             get { return m_agentId; }
@@ -1188,6 +1193,10 @@ namespace OpenSim.Tests.Common
         {
         }
 
+        public void SendScriptTeleportRequest(string objName, string simName, Vector3 pos, int options)
+        {
+        }
+
         public void SendDirPlacesReply(UUID queryID, DirPlacesReplyData[] data)
         {
         }
@@ -1332,6 +1341,12 @@ namespace OpenSim.Tests.Common
         }
 
         public void SendPickInfoReply(UUID pickID,UUID creatorID, bool topPick, UUID parcelID, string name, string desc, UUID snapshotID, string user, string originalName, string simName, Vector3 posGlobal, int sortOrder, bool enabled)
+        {
+        }
+
+        public void SendPickInfoReply(UUID pickID, UUID creatorID, bool topPick, UUID parcelID,
+            string name, string desc, UUID snapshotID, string user, string originalName,
+            string simName, Vector3d posGlobal, int sortOrder, bool enabled)
         {
         }
 

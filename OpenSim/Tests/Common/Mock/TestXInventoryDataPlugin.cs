@@ -75,6 +75,11 @@ namespace OpenSim.Tests.Common
             return folders;
         }
 
+        public XInventoryFolder[] GetFolder(string field, string val)
+        {
+            return GetFolders(new[] { field }, new[] { val });
+        }
+
         public bool StoreFolder(XInventoryFolder folder)
         {
             m_allFolders[folder.folderID] = folder.Clone();

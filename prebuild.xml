@@ -2321,6 +2321,7 @@
 
       <ReferencePath>../../../bin/</ReferencePath>
       <Reference name="System.Drawing.Common"/>
+      <Reference name="System.Runtime.Caching"/>
       <Reference name="log4net"/>
       <Reference name="Mono.Addins"/>
       <Reference name="Nini"/>
