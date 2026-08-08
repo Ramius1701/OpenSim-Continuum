@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Collections;
 using System.Collections.Generic;
+using CultureInfo = System.Globalization.CultureInfo;
 using System.Reflection;
 using log4net;
 using Nini.Config;
@@ -182,11 +183,13 @@ namespace TideModule
             double tideRange;
             double tideMiddle;
             string tideLevelMsg;
+            DateTime now;
            
          if (((m_frame++ % m_frameUpdateRate) != 0) || !m_ready || m_scene == null) {
                 return;
             }
-            timeStamp = (ulong) (DateTime.Now.Ticks);
+            now = DateTime.UtcNow;
+            timeStamp = (ulong)now.Ticks;
 
             cyclePos = (double)(timeStamp % (m_cycleTime * TICKS_PER_SECOND)) / (m_cycleTime * TICKS_PER_SECOND);
             cycleRadians = cyclePos * Math.PI * 2;
@@ -197,13 +200,13 @@ namespace TideModule
             { //if the tide changes re-calculate the tide times
                 if (cyclePos < 0.5)
                 { // tide just changed to be high->low
-                    m_lowTideTime = DateTime.Now.AddSeconds((double)(m_cycleTime * (0.5 - cyclePos)));
+                    m_lowTideTime = now.AddSeconds((double)(m_cycleTime * (0.5 - cyclePos)));
                     m_highTideTime = m_lowTideTime.AddSeconds((double)(m_cycleTime / 2));
                     m_tideAnnounceMsg = "High Tide";
                 }
                 else
                 {   //tide just changed to be low->high
-                    m_highTideTime = DateTime.Now.AddSeconds((double)(m_cycleTime * (1.0 - cyclePos)));
+                    m_highTideTime = now.AddSeconds((double)(m_cycleTime * (1.0 - cyclePos)));
                     m_lowTideTime = m_highTideTime.AddSeconds((double)(m_cycleTime / 2));
                     m_tideAnnounceMsg = "Low Tide";
                 }
@@ -213,8 +216,8 @@ namespace TideModule
             tideMiddle = (double) m_lowTide + tideRange;
             m_tideLevel = (float) (Math.Cos(cycleRadians) * tideRange + tideMiddle);
 
-            tideLevelMsg = "Current Server Time: " + DateTime.Now.ToString("T") + "\n";
-            tideLevelMsg += "Current Tide Level: " + m_tideLevel.ToString() + "\n";
+            tideLevelMsg = "Current Server Time (UTC): " + now.ToString("T", CultureInfo.InvariantCulture) + "\n";
+            tideLevelMsg += "Current Tide Level: " + m_tideLevel.ToString(CultureInfo.InvariantCulture) + "\n";
             tideLevelMsg += "Low Tide Time: " + m_lowTideTime.ToString("T") + "\n";
             tideLevelMsg += "Low Tide Level: " + m_lowTide.ToString() + "\n";
             tideLevelMsg += "High Tide Time: " + m_highTideTime.ToString("T") + "\n";
@@ -223,7 +226,7 @@ namespace TideModule
             tideLevelMsg += "Cycle Position: " + cyclePos.ToString() + "\n";
             if (m_tideAnnounceMsg != "")
             {
-                if (m_tideAnnounceCounter++ > m_tideAnnounceCount)
+                if (m_tideAnnounceCounter >= m_tideAnnounceCount)
                 {
                     m_tideAnnounceCounter = 0;
                     m_tideAnnounceMsg = "";
@@ -231,6 +234,7 @@ namespace TideModule
                 else
                 {
                     tideLevelMsg += "Tide Warning: " + m_tideAnnounceMsg + "\n";
+                    m_tideAnnounceCounter++;
                 }
             }
 
@@ -245,7 +249,7 @@ namespace TideModule
             if (m_tideInfoBroadcast)
             {
                 m_scene.SimChatBroadcast(tideLevelMsg, ChatTypeEnum.Region, m_tideInfoChannel, m_shoutPos, "TIDE", UUID.Zero, false);
-                m_scene.SimChatBroadcast(m_tideLevel.ToString(), ChatTypeEnum.Region, m_tideLevelChannel, m_shoutPos, "TIDE", UUID.Zero, false);
+                m_scene.SimChatBroadcast(m_tideLevel.ToString(CultureInfo.InvariantCulture), ChatTypeEnum.Region, m_tideLevelChannel, m_shoutPos, "TIDE", UUID.Zero, false);
             }
         }
 
