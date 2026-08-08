@@ -11,7 +11,7 @@ The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808
   with Robust using MySQL/MariaDB or PostgreSQL
 - Baseline build: successful with four known CS9193 compiler warnings
 - Continuum completion build: successful
-- Later LSL/GLTF compatibility reconciliation build: successful with zero warnings and zero errors
+- Latest complete Release build: successful with one known CS9193 warning and zero errors
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
@@ -27,12 +27,12 @@ Do not replace a running production installation in place. Build a separate test
 - Hypergrid stale service-URL, circuit, and cached-identity repair
 - RSA key authentication and Terms of Service acceptance support
 - `InternalPort = MATCHING` region configuration support
-- Viewer Abuse Report submission, screenshot handling, Robust service, and MySQL storage
+- Viewer Abuse Report submission, screenshot handling, Robust service, and SQLite, MySQL/MariaDB, and PostgreSQL storage providers
 - Mobius parcel auto-return details and in-world terrain console commands
 
 ### Experiences and scripting
 
-- Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, MySQL storage, and restart handling
+- Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, SQLite, MySQL/MariaDB, and PostgreSQL providers, and restart handling
 - Gunthar Experience scripting additions reconciled with the authoritative Tranquillity service
 - Experience permission, Combat2 damage, and path-update script events
 - Experience KVP, permission, sit, environment, and information APIs
@@ -165,6 +165,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [Donor feature inventory and disposition record](doc/donor-feature-inventory.md)
 - [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
+- [Current integration progress and release gates](doc/integration-progress.md)
 - [Abuse Reports](doc/AbuseReports.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)
 - [ContinuumEconomy compatibility contract](doc/continuum-economy-compatibility-contract.md)

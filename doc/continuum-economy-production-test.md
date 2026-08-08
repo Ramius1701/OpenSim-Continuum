@@ -7,6 +7,17 @@ This runbook records the live simulator tests still required before cutover.
 Build from the repository root (the Codex integration worktree is
 `S:\Github\OpenSim-Continuum-complete`).
 
+## Automated checkpoint
+
+As of commit `21414c2f23`, the complete Release solution builds and the SQLite
+XML-RPC smoke test covers authenticated login, initial balance, transfer replay
+and conflict handling, balance reads, controlled currency purchase, object-sale
+authorization/capture/cancellation, land preflight and invalid secure-session
+rejection. The shared ledger acceptance suite passed on SQLite and PostgreSQL.
+These checks establish test readiness; they do not replace the live matrix
+below. Repeat the current suite on the exact MySQL/MariaDB production-test
+version before promotion.
+
 ## Required cutover gates
 
 1. Clone the production configuration and databases into an isolated test grid. Never test against the live currency database.

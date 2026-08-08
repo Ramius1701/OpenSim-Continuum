@@ -13,7 +13,7 @@ The initial recommendations in this document are retained as the evidence availa
 | Display Names | Integrated from the Mobius lineage with Tranquillity enhancements; MySQL, CAPS, search, cache and Hypergrid runtime tests remain required. |
 | User aliases/OAR identities | Integrated as a Robust service extension with narrow archive compatibility hooks; trust-boundary and migration tests remain required. |
 | Experiences | Tranquillity full service is authoritative; Gunthar script-facing behavior was reconciled without retaining duplicate service implementations. |
-| Abuse Reports | Integrated from the Mobius lineage as viewer, simulator, Robust and MySQL functionality. |
+| Abuse Reports | Integrated from the Mobius lineage as viewer, simulator and Robust functionality with SQLite, MySQL/MariaDB and PostgreSQL providers; migration and runtime certification remain required. |
 | Hypergrid identity/crossing repairs | Integrated as narrow compatibility fixes; multi-grid topology and hostile-input tests remain required. |
 | YEngine recovery and script compatibility | Integrated, including the later GLTF/material, identity, transfer, terrain, parcel, environment, damage, sit, attachment and pathfinding surface. Duplicate donor aggregates are compile-excluded in favor of the reconciled implementations. |
 | RegionWeb | Integrated as a disabled-by-default per-region addon; it is not WhiteCore WebUI and not a grid-wide portal. |
@@ -23,7 +23,7 @@ The initial recommendations in this document are retained as the evidence availa
 | WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
-The Release solution build after the later LSL/GLTF duplicate reconciliation completed successfully with zero warnings and zero errors. A prior full regenerated completion build completed with the four known baseline CS9193 warnings. Compilation does not replace the runtime, viewer, Robust, MySQL, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
+The latest complete Release solution build completed successfully with one known CS9193 warning and zero errors. Warning counts can vary between clean and incremental builds; the untouched baseline produced four known CS9193 warnings. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
 
 ## Repository verification
 
