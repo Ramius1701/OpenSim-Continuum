@@ -375,6 +375,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                 scene.EventManager.OnValidateLandBuy -= ValidateLandBuy;
                 scene.EventManager.OnLandBuy -= processLandBuy;
 
+                m_sceneList.Remove(scene.RegionInfo.RegionHandle);
+
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
         }
@@ -500,11 +502,13 @@ namespace OpenSim.Modules.ContinuumEconomy
                 UUID regionUUID = sceneObj.RegionID;
                 if (GetLocateClient(fromID) != null)
                 {
-                    ret = TransferMoney(fromID, toID, amount, (int)TransactionType.ObjectPays, objectID, regionHandle, regionUUID, description);
+                    ret = TransferMoney(fromID, toID, amount, (int)TransactionType.ObjectPays,
+                        objectID, regionHandle, regionUUID, description, txn);
                 }
                 else
                 {
-                    ret = ForceTransferMoney(fromID, toID, amount, (int)TransactionType.ObjectPays, objectID, regionHandle, regionUUID, description);
+                    ret = ForceTransferMoney(fromID, toID, amount, (int)TransactionType.ObjectPays,
+                        objectID, regionHandle, regionUUID, description, txn);
                 }
             }
 
@@ -587,8 +591,15 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="text">The text.</param>
         public void ApplyUploadCharge(UUID agentID, int amount, string text)
         {
-            ulong regionHandle = GetLocateScene(agentID).RegionInfo.RegionHandle;
-            UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
+            Scene scene = GetLocateScene(agentID);
+            if (scene == null)
+            {
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE] ApplyUploadCharge: root scene for {0} was not found; charge was not submitted", agentID);
+                return;
+            }
+
+            ulong regionHandle = scene.RegionInfo.RegionHandle;
+            UUID regionUUID = scene.RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)TransactionType.UploadCharge, regionHandle, regionUUID, text);
 
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyUploadCharge: {0} {1} {2}", agentID, amount, text);
@@ -614,8 +625,15 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="text">The text.</param>
         public void ApplyCharge(UUID agentID, int amount, MoneyTransactionType type, string text)
         {
-            ulong regionHandle = GetLocateScene(agentID).RegionInfo.RegionHandle;
-            UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
+            Scene scene = GetLocateScene(agentID);
+            if (scene == null)
+            {
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE] ApplyCharge: root scene for {0} was not found; charge was not submitted", agentID);
+                return;
+            }
+
+            ulong regionHandle = scene.RegionInfo.RegionHandle;
+            UUID regionUUID = scene.RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)type, regionHandle, regionUUID, text);
 
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyCharge: {0} {1} {2} {3}", agentID, amount, type, text);
@@ -1462,7 +1480,8 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <returns>
         /// return true, if successfully.
         /// </returns>
-        private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
+        private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID,
+            ulong regionHandle, UUID regionUUID, string description, UUID transactionID = default)
         {
             bool ret = false;
             IClientAPI senderClient = GetLocateClient(sender);
@@ -1500,6 +1519,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                 paramTable["regionUUID"] = regionUUID.ToString();
                 paramTable["amount"] = amount;
                 paramTable["description"] = description;
+                if (transactionID != UUID.Zero)
+                    paramTable["transactionID"] = transactionID.ToString();
 
                 // Generate the request for transfer.
                 Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "TransferMoney");
@@ -1560,7 +1581,8 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <returns>
         /// return true, if successfully.
         /// </returns>
-        private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
+        private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID,
+            ulong regionHandle, UUID regionUUID, string description, UUID transactionID = default)
         {
             bool ret = false;
 
@@ -1581,6 +1603,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                 paramTable["regionUUID"] = regionUUID.ToString();
                 paramTable["amount"] = amount;
                 paramTable["description"] = description;
+                if (transactionID != UUID.Zero)
+                    paramTable["transactionID"] = transactionID.ToString();
 
                 // Generate the request for transfer.
                 Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "ForceTransferMoney");
