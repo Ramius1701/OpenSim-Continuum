@@ -376,6 +376,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 scene.EventManager.OnLandBuy -= processLandBuy;
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
+                scene.UnregisterModuleInterface<IMoneyModule>(this);
 
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
@@ -450,7 +451,12 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </summary>
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = new List<Scene>(m_sceneList.Values).ToArray();
 
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         /// <summary>Objects the give money.</summary>
