@@ -87,6 +87,9 @@
 [AbuseReportsService]
     ;; Used when [Modules] selects LocalAbuseReportsServicesConnector.
     LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    MaxScreenshotBytes = 5242880
+    MaxSummaryBytes = 4096
+    MaxDetailsBytes = 65536
     ;; StorageProvider and ConnectionString inherit from [DatabaseService].
     ;; They may be overridden here when a separate abuse-report database is used.
 

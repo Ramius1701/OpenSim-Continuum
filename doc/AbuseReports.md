@@ -21,12 +21,9 @@ region-only addon module.
 
 ## Enabling in Standalone
 
-In `OpenSim.ini`:
+The module is enabled by `OpenSimDefaults.ini`. To override it in `OpenSim.ini`:
 
 ```ini
-[Messaging]
-    AbuseReportsModule = AbuseReportsModule
-
 [AbuseReports]
     Enabled = true
 ```
@@ -39,6 +36,9 @@ In the active Standalone configuration:
 
 [AbuseReportsService]
     LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    MaxScreenshotBytes = 5242880
+    MaxSummaryBytes = 4096
+    MaxDetailsBytes = 65536
 ```
 
 The service inherits `StorageProvider` and `ConnectionString` from
@@ -50,9 +50,6 @@ included; select the same provider used by the surrounding deployment.
 On every region simulator:
 
 ```ini
-[Messaging]
-    AbuseReportsModule = AbuseReportsModule
-
 [Modules]
     AbuseReportsService = "RemoteAbuseReportsServicesConnector"
 
@@ -71,10 +68,18 @@ On ROBUST or ROBUST.HG:
 
 [AbuseReportsService]
     LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    MaxScreenshotBytes = 5242880
+    MaxSummaryBytes = 4096
+    MaxDetailsBytes = 65536
 ```
 
 The `/abuse` endpoint belongs on the ROBUST private port. It should not
 be exposed publicly.
+
+`[Modules] AbuseReportsService` is the connector selection. No legacy
+`[Messaging] AbuseReportsModule` switch is required; older Continuum builds
+incorrectly required that undocumented setting and could therefore acknowledge
+a viewer submission without registering the central storage connector.
 
 ## Database migration
 
@@ -124,5 +129,6 @@ cover:
 - Single-report retrieval with screenshots excluded and explicitly included.
 - Moderator notes and state updates, including invalid state and oversized note rejection.
 - Unauthorized access rejection for every private moderation operation.
+- Simulator and ROBUST rejection of oversized metadata and screenshots.
 - Index-backed query behavior with a large report table.
 - Region shutdown and reload.

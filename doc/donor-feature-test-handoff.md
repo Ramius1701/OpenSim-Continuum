@@ -99,6 +99,19 @@ Run the complete matrix in Firestorm and one current official SL-compatible
 viewer on two simulator processes. Crossing must retain the same Owned,
 Allowed, and Blocked results because these are backed by the grid-wide Robust
 service rather than simulator-local state.
+
+### Abuse Reports persistence gate
+
+Do not accept the viewer's submission acknowledgement as proof of storage.
+Confirm the simulator logs that `LocalAbuseReportsServicesConnector` or
+`RemoteAbuseReportsServicesConnector` registered, then retrieve the resulting
+report by its SQL-assigned ID from the Standalone or ROBUST moderation console.
+The connector is selected solely by `[Modules] AbuseReportsService`; the removed
+legacy `[Messaging] AbuseReportsModule` gate was undocumented and prevented the
+shipped profiles from registering storage. Test simulator-side LLSD limits and
+the independent service-side summary, details, and screenshot limits. Repeat
+without screenshots, with screenshots, after a ROBUST restart, and from two
+separate simulator processes.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
 - SQLite providers are required for standalone operation. MySQL/MariaDB and

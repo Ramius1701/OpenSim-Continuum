@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Text;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -26,6 +27,7 @@ namespace OpenSim.Region.ClientStack.Linden
         private IAbuseReportsService m_Connector;
         private IUserManagement m_UserManager;
         private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
+        private int m_MaxReportRequestBytes = 128 * 1024;
 
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
@@ -35,7 +37,11 @@ namespace OpenSim.Region.ClientStack.Linden
             IConfig config = source.Configs["AbuseReports"];
             m_Enabled = config != null && config.GetBoolean("Enabled", false);
             if (config != null)
+            {
                 m_MaxScreenshotBytes = Math.Max(0, config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes));
+                m_MaxReportRequestBytes = Math.Max(1024,
+                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes));
+            }
 
             if (m_Enabled)
                 m_log.Info("[ABUSE REPORTS]: Viewer abuse report CAPS enabled");
@@ -175,6 +181,9 @@ namespace OpenSim.Region.ClientStack.Linden
 
             try
             {
+                if (!IsReportRequestSizeValid(request))
+                    return SerializeState("failed");
+
                 OSDMap map = DeserializeMap(request);
                 AbuseReportData report = AbuseReportDataFromOSD(map);
                 PopulateRegionContext(report, caps.AgentID);
@@ -210,6 +219,9 @@ namespace OpenSim.Region.ClientStack.Linden
 
             try
             {
+                if (!IsReportRequestSizeValid(request))
+                    return SerializeState("failed");
+
                 OSDMap map = DeserializeMap(request);
                 AbuseReportData report = AbuseReportDataFromOSD(map);
                 PopulateRegionContext(report, caps.AgentID);
@@ -299,6 +311,19 @@ namespace OpenSim.Region.ClientStack.Linden
                 throw new FormatException("Abuse report request was not an LLSD map");
 
             return map;
+        }
+
+        private bool IsReportRequestSizeValid(string request)
+        {
+            int bytes = Encoding.UTF8.GetByteCount(request ?? string.Empty);
+            if (bytes <= m_MaxReportRequestBytes)
+                return true;
+
+            m_log.WarnFormat(
+                "[ABUSE REPORTS]: Rejected {0}-byte report request; limit is {1} bytes",
+                bytes,
+                m_MaxReportRequestBytes);
+            return false;
         }
 
         private static void SetLLSDResponse(IOSHttpResponse response)

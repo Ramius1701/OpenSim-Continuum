@@ -28,16 +28,6 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
 
         public void Initialise(IConfigSource source)
         {
-            IConfig messagingConfig = source.Configs["Messaging"];
-            if (messagingConfig == null ||
-                !string.Equals(
-                    messagingConfig.GetString("AbuseReportsModule", "None"),
-                    "AbuseReportsModule",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
             IConfig modulesConfig = source.Configs["Modules"];
             if (modulesConfig == null ||
                 !string.Equals(

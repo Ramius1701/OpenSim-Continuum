@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using System.Text;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
@@ -14,9 +15,21 @@ namespace OpenSim.Services.AbuseReportsService
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+        private readonly int m_MaxScreenshotBytes;
+        private readonly int m_MaxSummaryBytes;
+        private readonly int m_MaxDetailsBytes;
+
         public AbuseReportsService(IConfigSource config)
             : base(config)
         {
+            IConfig serviceConfig = config.Configs["AbuseReportsService"];
+            m_MaxScreenshotBytes = Math.Max(0,
+                serviceConfig?.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024) ?? 5 * 1024 * 1024);
+            m_MaxSummaryBytes = Math.Max(256,
+                serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096);
+            m_MaxDetailsBytes = Math.Max(1024,
+                serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536);
+
             m_log.Debug("[ABUSE REPORTS SERVICE]: Starting abuse reports service");
 
             if (MainConsole.Instance != null)
@@ -40,6 +53,21 @@ namespace OpenSim.Services.AbuseReportsService
         {
             if (report == null)
                 return false;
+
+            if (report.SenderID.IsZero() || report.AbuseRegionID.IsZero() ||
+                Encoding.UTF8.GetByteCount(report.Summary ?? string.Empty) > m_MaxSummaryBytes ||
+                Encoding.UTF8.GetByteCount(report.Details ?? string.Empty) > m_MaxDetailsBytes ||
+                (report.ImageData?.Length ?? 0) > m_MaxScreenshotBytes)
+            {
+                m_log.WarnFormat(
+                    "[ABUSE REPORTS SERVICE]: Rejected invalid or oversized report from {0}; " +
+                    "summary limit {1}, details limit {2}, screenshot limit {3} bytes",
+                    report.SenderID,
+                    m_MaxSummaryBytes,
+                    m_MaxDetailsBytes,
+                    m_MaxScreenshotBytes);
+                return false;
+            }
 
             Normalize(report);
 
