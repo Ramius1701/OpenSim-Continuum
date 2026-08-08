@@ -82,6 +82,9 @@
     ;; Send viewer abuse reports to the grid-wide ROBUST service.
     AbuseReportsService = "RemoteAbuseReportsServicesConnector"
 
+    ;; Register the grid-wide Experience service before ExperienceModule loads.
+    ExperienceService = "RemoteExperienceServicesConnector"
+
 [AbuseReportsService]
     ;; Private ROBUST endpoint used by RemoteAbuseReportsServicesConnector.
     AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
@@ -250,6 +253,7 @@
 
 [ExperienceService]
     LocalServiceModule = "OpenSim.Services.Connectors.dll:RemoteExperienceServiceConnector"
+    Enabled = true
 
     ;
     ; Change this to your grid-wide experience server

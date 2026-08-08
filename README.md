@@ -83,6 +83,11 @@ The following components require deliberate opt-in:
 
 `[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
+The viewer service also requires an explicit `[Modules]` selection. The grid
+example selects `RemoteExperienceServicesConnector`; standalone selects
+`LocalExperienceServicesConnector`. Omitting this selection prevents Experience
+CAPS registration and hides the Parcel and Region Experience tabs.
+
 Never commit production passwords, API keys, database connection strings, marketplace credentials, or external economy credentials. Experience-Lite automatic grants must be restricted to explicit trusted owner or object UUIDs and must not grant debit permission.
 
 ## Database support

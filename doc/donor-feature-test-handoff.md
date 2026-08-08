@@ -44,6 +44,12 @@ Do not deploy either test branch over the running grid in place. Build and confi
 ## Safe configuration gates
 
 - `[ScriptExperiences] Enabled = false` by default. Its KVP store is separate from the full Tranquillity Experience service and must not be treated as the authoritative grid Experience database.
+- The full viewer Experience service is enabled independently: grid simulators
+  select `RemoteExperienceServicesConnector` and standalone simulators select
+  `LocalExperienceServicesConnector` in `[Modules]`. Without that selection no
+  `IExperienceService` exists, Experience CAPS are intentionally withheld, and
+  Parcel/Region Experience tabs will not appear. The corrected example profiles
+  include both the selection and matching `[ExperienceService]` section.
 - `[RegionWeb] Enabled = false` by default. Enabling it creates a public HTTP surface and content files.
 - `[OpenSimMarketplace] Enabled = false` by default. Its HTTP endpoints, service account and delivery ledger require dedicated credentials and storage review.
 - Warp3D flat-card sprite rendering remains disabled unless both renderer options are deliberately enabled.
