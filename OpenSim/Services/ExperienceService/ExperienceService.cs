@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Text;
 using Nini.Config;
 using log4net;
 using OpenSim.Framework;
@@ -21,6 +22,16 @@ namespace OpenSim.Services.ExperienceService
         private IUserAccountService m_UserService = null;
 
         private const int MAX_QUOTA = 1024 * 1024 * 16;
+        private const int MAX_NAME_LENGTH = 42;
+        private const int MAX_DESCRIPTION_LENGTH = 128;
+        private const int MAX_SLURL_LENGTH = 256;
+        private const int MAX_MARKETPLACE_LENGTH = 256;
+        private const int MAX_SEARCH_LENGTH = 256;
+        private const int MAX_SEARCH_RESULTS = 1000;
+
+        // KVP quota accounting and writes must be one operation.  Without this,
+        // concurrent scripts can all pass the size check and exceed the quota.
+        private readonly object m_KeyValueLock = new object();
 
         public ExperienceService(IConfigSource config)
             : base(config)
@@ -190,11 +201,17 @@ namespace OpenSim.Services.ExperienceService
 
         public ExperienceInfo[] FindExperiencesByName(string search)
         {
+            search = (search ?? string.Empty).Trim();
+            if (search.Length == 0 || search.Length > MAX_SEARCH_LENGTH)
+                return Array.Empty<ExperienceInfo>();
+
             List<ExperienceInfo> infos = new List<ExperienceInfo>();
             ExperienceInfoData[] datas = m_Database.FindExperiences(search);
 
             foreach (var data in datas)
             {
+                if (infos.Count >= MAX_SEARCH_RESULTS)
+                    break;
                 ExperienceInfo info = new ExperienceInfo(data.ToDictionary());
                 infos.Add(info);
             }
@@ -209,6 +226,11 @@ namespace OpenSim.Services.ExperienceService
 
         public ExperienceInfo[] GetExperienceInfos(UUID[] experiences)
         {
+            if (experiences == null || experiences.Length == 0)
+                return Array.Empty<ExperienceInfo>();
+            if (experiences.Length > 1000)
+                experiences = experiences[..1000];
+
             ExperienceInfoData[] datas = m_Database.GetExperienceInfos(experiences);
 
             List<ExperienceInfo> infos = new List<ExperienceInfo>();
@@ -223,6 +245,10 @@ namespace OpenSim.Services.ExperienceService
 
         public UUID[] GetExperiencesForGroups(UUID[] groups)
         {
+            if (groups == null || groups.Length == 0)
+                return Array.Empty<UUID>();
+            if (groups.Length > 1000)
+                groups = groups[..1000];
             return m_Database.GetExperiencesForGroups(groups);
         }
 
@@ -233,6 +259,18 @@ namespace OpenSim.Services.ExperienceService
 
         public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
         {
+            if (!IsValidExperienceInfo(info))
+                return null;
+
+            ExperienceInfo[] existing = GetExperienceInfos(new UUID[] { info.public_id });
+            if (existing.Length > 0)
+            {
+                // Ownership is an identity property, not viewer-editable profile
+                // data.  Reject replacement even from a trusted region caller.
+                if (existing[0].owner_id != info.owner_id)
+                    return null;
+            }
+
             ExperienceInfoData data = new ExperienceInfoData();
 
             data.public_id = info.public_id;
@@ -259,6 +297,9 @@ namespace OpenSim.Services.ExperienceService
 
         public bool UpdateExperiencePermissions(UUID agent_id, UUID experience, ExperiencePermission perm)
         {
+            if (agent_id == UUID.Zero || !ExperienceExists(experience))
+                return false;
+
             if (perm == ExperiencePermission.None)
                 return m_Database.ForgetExperiencePermissions(agent_id, experience);
             else return m_Database.SetExperiencePermissions(agent_id, experience, perm == ExperiencePermission.Allowed);
@@ -266,67 +307,133 @@ namespace OpenSim.Services.ExperienceService
 
         public string GetKeyValue(UUID experience, string key)
         {
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key))
+                return null;
             return m_Database.GetKeyValue(experience, key);
         }
 
         public string CreateKeyValue(UUID experience, string key, string value)
         {
-            int current_size = m_Database.GetKeyValueSize(experience);
-            if (current_size + key.Length + value.Length > MAX_QUOTA)
-                return "full";
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || value == null)
+                return "error";
 
-            string get = m_Database.GetKeyValue(experience, key);
-            if (get == null)
+            lock (m_KeyValueLock)
             {
-                if (m_Database.SetKeyValue(experience, key, value))
-                    return "success";
-                else return "error";
+                int current_size = m_Database.GetKeyValueSize(experience);
+                if ((long)current_size + Utf8Size(key) + Utf8Size(value) > MAX_QUOTA)
+                    return "full";
+
+                string get = m_Database.GetKeyValue(experience, key);
+                if (get == null)
+                    return m_Database.SetKeyValue(experience, key, value) ? "success" : "error";
+                return "exists";
             }
-            else return "exists";
         }
 
         public string UpdateKeyValue(UUID experience, string key, string val, bool check, string original)
         {
-            string get = m_Database.GetKeyValue(experience, key);
-            if (get != null)
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || val == null || (check && original == null))
+                return "error";
+
+            lock (m_KeyValueLock)
             {
+                string get = m_Database.GetKeyValue(experience, key);
+                if (get == null)
+                    return "missing";
+
                 if (check && get != original)
                     return "mismatch";
 
                 int current_size = m_Database.GetKeyValueSize(experience);
-                if ((current_size - get.Length) + val.Length > MAX_QUOTA)
+                if ((long)current_size - Utf8Size(get) + Utf8Size(val) > MAX_QUOTA)
                     return "full";
 
-                if (m_Database.SetKeyValue(experience, key, val))
-                    return "success";
-                else return "error";
+                return m_Database.SetKeyValue(experience, key, val) ? "success" : "error";
             }
-            else return "missing";
         }
 
         public string DeleteKey(UUID experience, string key)
         {
-            string get = m_Database.GetKeyValue(experience, key);
-            if (get != null)
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key))
+                return "failed";
+
+            lock (m_KeyValueLock)
             {
-                return m_Database.DeleteKey(experience, key) ? "success" : "failed";
+                string get = m_Database.GetKeyValue(experience, key);
+                if (get != null)
+                {
+                    return m_Database.DeleteKey(experience, key) ? "success" : "failed";
+                }
+                return "missing";
             }
-            return "missing";
         }
 
         public int GetKeyCount(UUID experience)
         {
+            if (!CanUseKeyValueStore(experience))
+                return 0;
             return m_Database.GetKeyCount(experience);
         }
 
         public string[] GetKeys(UUID experience, int start, int count)
         {
+            if (!CanUseKeyValueStore(experience) || start < 0 || count < 1 || count > 1000)
+                return Array.Empty<string>();
             return m_Database.GetKeys(experience, start, count);
         }
 
         public int GetSize(UUID experience)
         {
+            if (!CanUseKeyValueStore(experience))
+                return 0;
             return m_Database.GetKeyValueSize(experience);
         }
+
+        private bool ExperienceExists(UUID experience)
+        {
+            return experience != UUID.Zero && GetExperienceInfos(new UUID[] { experience }).Length == 1;
+        }
+
+        private bool CanUseKeyValueStore(UUID experience)
+        {
+            if (experience == UUID.Zero)
+                return false;
+
+            ExperienceInfo[] infos = GetExperienceInfos(new UUID[] { experience });
+            return infos.Length == 1 &&
+                (infos[0].properties & (int)(ExperienceFlags.Invalid | ExperienceFlags.Disabled | ExperienceFlags.Suspended)) == 0;
+        }
+
+        private static bool IsValidExperienceInfo(ExperienceInfo info)
+        {
+            if (info == null || info.public_id == UUID.Zero || info.owner_id == UUID.Zero)
+                return false;
+
+            info.name = (info.name ?? string.Empty).Trim();
+            info.description ??= string.Empty;
+            info.slurl ??= string.Empty;
+            info.marketplace ??= string.Empty;
+
+            return info.name.Length <= MAX_NAME_LENGTH &&
+                info.description.Length <= MAX_DESCRIPTION_LENGTH &&
+                info.slurl.Length <= MAX_SLURL_LENGTH &&
+                info.marketplace.Length <= MAX_MARKETPLACE_LENGTH &&
+                !ContainsControlCharacters(info.name) &&
+                !ContainsControlCharacters(info.description) &&
+                !ContainsControlCharacters(info.slurl) &&
+                !ContainsControlCharacters(info.marketplace);
+        }
+
+        private static bool ContainsControlCharacters(string value)
+        {
+            foreach (char c in value)
+            {
+                if (char.IsControl(c))
+                    return true;
+            }
+            return false;
+        }
+
+        private static int Utf8Size(string value) => Encoding.UTF8.GetByteCount(value);
     }
 }

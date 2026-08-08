@@ -313,6 +313,9 @@ namespace OpenSim.Server.Handlers.Experience
         {
             UUID experience_id;
 
+            if (!request.ContainsKey("EXPERIENCE"))
+                return FailureResult();
+
             if (!UUID.TryParse(request["EXPERIENCE"].ToString(), out experience_id))
                 return FailureResult();
 
