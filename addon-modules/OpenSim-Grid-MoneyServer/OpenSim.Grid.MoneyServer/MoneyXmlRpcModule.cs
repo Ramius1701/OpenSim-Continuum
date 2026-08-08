@@ -1309,7 +1309,7 @@ namespace OpenSim.Grid.MoneyServer
             httpResponse.RawBuffer = Encoding.UTF8.GetBytes(xmlResponse.ToString());
         }
 
-        public new bool PerformMoneyTransfer(string senderID, string receiverID, int amount)
+        private bool PerformMoneyTransfer(string senderID, string receiverID, int amount)
         {
             //m_log.InfoFormat("[MONEY TRANSFER]: Transferring {0} from {1} to {2}.", amount, senderID, receiverID);
             try
@@ -1343,7 +1343,7 @@ namespace OpenSim.Grid.MoneyServer
             }
         }
 
-        public new void InitializeUserCurrency(string agentId)
+        private void InitializeUserCurrency(string agentId)
         {
             m_log.InfoFormat("[INITIALIZE USER CURRENCY]: Initializing currency for new user: {0}", agentId);
 
@@ -1369,7 +1369,7 @@ namespace OpenSim.Grid.MoneyServer
             }
         }
 
-        public new Hashtable ApplyFallbackCredit(string agentId)
+        private Hashtable ApplyFallbackCredit(string agentId)
         {
             m_log.WarnFormat("[FALLBACK CREDIT]: Applying fallback credit for user {0}", agentId);
 

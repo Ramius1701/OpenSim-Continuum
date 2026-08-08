@@ -32,11 +32,6 @@ namespace OpenSim.Grid.MoneyServer
     public interface IMoneyDBService
     {
         int CheckMaximumMoney(string userID, int m_CurrencyMaximum);
-        Hashtable ApplyFallbackCredit(string agentId);
-
-        void InitializeUserCurrency(string agentId);
-
-        bool PerformMoneyTransfer(string senderID, string receiverID, int amount);
 
         /// <summary>Ruft den Kontostand ab.</summary>
         /// <param name="userID">Die Benutzer-ID.</param>
