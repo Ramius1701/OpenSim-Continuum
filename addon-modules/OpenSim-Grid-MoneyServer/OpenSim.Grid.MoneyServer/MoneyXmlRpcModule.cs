@@ -310,10 +310,10 @@ namespace OpenSim.Grid.MoneyServer
             m_log.Info("[MONEY XMLRPC]: Registering currency.php handlers.");
             m_httpServer.AddSimpleStreamHandler(new CurrencyStreamHandler("/currency.php", CurrencyProcessPHP));
 
-            m_log.Info("[MONEY XMLRPC]: Registering landtool.php handlers.");
-            m_httpServer.AddSimpleStreamHandler(new LandtoolStreamHandler("/landtool.php", LandtoolProcessPHP));
-
-            m_log.InfoFormat("[MONEY MODULE]: Registered /currency.php and /landtool.php handlers on Port: {0}", m_httpServer.Port);
+            // The recovered /landtool.php implementation only simulated a
+            // purchase and could report success without a ledger debit. Land
+            // settlement remains on the established region TransferMoney path.
+            m_log.InfoFormat("[MONEY MODULE]: Registered /currency.php handler on Port: {0}; unsafe prototype /landtool.php is disabled", m_httpServer.Port);
         }
 
         /// <summary>Posts the initialise.</summary>
@@ -350,9 +350,9 @@ namespace OpenSim.Grid.MoneyServer
             m_httpServer.AddXmlRPCHandler("WebGetTransaction", handleWebGetTransaction);
             m_httpServer.AddXmlRPCHandler("WebGetTransactionNum", handleWebGetTransactionNum);
 
-            // Land Buy Test
-            m_httpServer.AddXmlRPCHandler("preflightBuyLandPrep", preflightBuyLandPrep);
-            m_httpServer.AddXmlRPCHandler("buyLandPrep", buyLandPrep);
+            // Do not publish the recovered prototype land-preparation handlers.
+            // They perform no authoritative debit. The DTL/NSL region connector
+            // settles land sales through authenticated TransferMoney instead.
 
             // Currency Buy Test
             // getCurrencyQuote", quote_func
