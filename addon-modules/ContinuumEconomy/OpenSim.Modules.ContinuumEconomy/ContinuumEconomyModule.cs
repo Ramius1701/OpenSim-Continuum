@@ -978,10 +978,14 @@ namespace OpenSim.Modules.ContinuumEconomy
                 //
                 if (m_enable_server)
                 {
-                    balance = QueryBalanceFromMoneyServer(client);
+                    balance = QueryBalanceFromMoneyServer(client, out bool succeeded);
+                    client.SendMoneyBalance(TransactionID, succeeded, new byte[0], Math.Max(0, balance), 0,
+                        UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+                    return;
                 }
 
-                client.SendMoneyBalance(TransactionID, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+                client.SendMoneyBalance(TransactionID, false, new byte[0], balance, 0, UUID.Zero,
+                    false, UUID.Zero, false, 0, String.Empty);
             }
             else
             {
@@ -1828,7 +1832,13 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private int QueryBalanceFromMoneyServer(IClientAPI client)
         {
+            return QueryBalanceFromMoneyServer(client, out _);
+        }
+
+        private int QueryBalanceFromMoneyServer(IClientAPI client, out bool succeeded)
+        {
             int balance = 0;
+            succeeded = false;
 
             if (client != null)
             {
@@ -1848,7 +1858,25 @@ namespace OpenSim.Modules.ContinuumEconomy
                         if ((bool)resultTable["success"] == true)
                         {
                             balance = (int)resultTable["clientBalance"];
+                            succeeded = true;
                             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
+                        }
+                        else if (IsInvalidSessionResponse(resultTable))
+                        {
+                            // The service intentionally keeps sessions in memory. After a
+                            // service restart, recover this still-connected root agent once
+                            // using the simulator-authenticated circuit and return the login
+                            // balance. Do not retry network/outage failures here.
+                            Scene scene = GetLocateScene(client.AgentId);
+                            ScenePresence presence = scene?.GetScenePresence(client.AgentId);
+                            if (presence != null && !presence.IsChildAgent &&
+                                presence.ControllingClient?.SessionId == client.SessionId &&
+                                LoginMoneyServer(presence, out int recoveredBalance))
+                            {
+                                balance = recoveredBalance;
+                                succeeded = true;
+                                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: QueryBalanceFromMoneyServer: restored service session for {0}", client.AgentId);
+                            }
                         }
                     }
                 }
@@ -1857,12 +1885,24 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if (m_moneyServer.ContainsKey(client.AgentId))
                     {
                         balance = m_moneyServer[client.AgentId];
+                        succeeded = true;
                         m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                     }
                 }
             }
 
             return balance;
+        }
+
+        private static bool IsInvalidSessionResponse(Hashtable response)
+        {
+            if (response == null)
+                return false;
+
+            string message = response.ContainsKey("message") ? response["message"]?.ToString() : null;
+            if (String.IsNullOrEmpty(message) && response.ContainsKey("errorMessage"))
+                message = response["errorMessage"]?.ToString();
+            return String.Equals(message, "Invalid session", StringComparison.OrdinalIgnoreCase);
         }
 
 

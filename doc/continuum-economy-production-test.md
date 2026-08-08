@@ -52,7 +52,7 @@ Record transaction UUIDs, balances, relevant logs, and pass/fail for every row.
 
 | Area | Required test |
 |---|---|
-| Login/restart | Balance appears at login and remains identical after ContinuumEconomy.Service, Robust, region, and full-grid restarts. Reject one login (including an NPC or deliberately invalid session) and prove existing and subsequent residents on every region of that simulator can still read balances and transact. |
+| Login/restart | Balance appears at login and remains identical after ContinuumEconomy.Service, Robust, region, and full-grid restarts. Restart only ContinuumEconomy.Service while residents remain connected: the first normal balance request must restore the authenticated service session without a relog, and an actual outage must return a failed balance response rather than a successful zero balance. Reject one login (including an NPC or deliberately invalid session) and prove existing and subsequent residents on every region of that simulator can still read balances and transact. |
 | Resident payment | Pay another resident; verify both balances, viewer notification, history, and safe retry of the same request. |
 | Script payment | Verify `money()` delivery, `llGiveMoney`, debit permission denial and insufficient funds. Force an ambiguous response/timeout, retry the same `llGiveMoney` transaction UUID, and prove the supplied UUID reaches the ledger and prevents a second debit. |
 | Object sale | Buy zero-price and paid copy/original/contents. Zero-price delivery must not create a ledger row. Paid delivery failure cancels the hold, success captures exactly once, and concurrent spend cannot consume held funds. |
