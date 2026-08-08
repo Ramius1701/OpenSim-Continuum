@@ -56,7 +56,7 @@ The extended scripting surface is powerful and has estate/security implications.
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
 - MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
-- ContinuumEconomy: a separate new economy service and region module under development, informed by MoneyServer protocol behavior, selected WhiteCore economy behavior, and Gunthar integration work; Gloebit is excluded
+- ContinuumEconomy: a separately named service and region module with atomic MySQL/MariaDB, PostgreSQL and SQLite providers, idempotent operations, viewer currency purchase controls, and delivery-safe object purchase holds; it is ready for the production-test runbook, not live cutover
 - HoloPhysicsGuard
 - OpenSimSearch
 - OpenSimTide
@@ -95,23 +95,23 @@ they provide only a MySQL implementation.
 The Experience service, Abuse Reports, and aliases now include SQLite,
 MySQL/MariaDB, and PostgreSQL provider paths; their clean-install and upgrade
 migrations still require runtime certification on every database. MoneyServer
-Compatibility remains MySQL-specific by design. ContinuumEconomy is incomplete
-until its own service and region module support SQLite for standalone and both
-MySQL/MariaDB and PostgreSQL for grid deployments. Do not assume compatibility merely
-because the solution compiles. For every service migration, test both a clean
+Compatibility remains MySQL-specific by design. ContinuumEconomy provides its
+own service, region module, migrations and shared acceptance contract for
+SQLite, MySQL/MariaDB and PostgreSQL. It still requires the recorded simulator
+and recovery tests in its production-test runbook. For every service migration, test both a clean
 database and an upgrade from the exact schema used by the target deployment.
 
 ## Building
 
 See [BUILDING.md](BUILDING.md) for the upstream build prerequisites and platform details.
 
-On Windows, generate the Visual Studio 2022 solution for .NET 8 and build Release:
+On Windows, build from the repository root (for this integration worktree,
+`S:\Github\OpenSim-Continuum-complete`):
 
 ```powershell
-Copy-Item bin\System.Drawing.Common.dll.win bin\System.Drawing.Common.dll -Force
-dotnet bin\prebuild.dll /target vs2022 /targetframework net8_0 /excludedir '=' 'obj | bin' /file prebuild.xml
+.\runprebuild.bat
 dotnet restore OpenSim.sln
-dotnet build --configuration Release OpenSim.sln --no-restore
+dotnet build OpenSim.sln --configuration Release --no-restore
 ```
 
 Generated `bin/*.runtimeconfig.json` files are build artifacts and must not be committed unless the build system intentionally begins managing them.

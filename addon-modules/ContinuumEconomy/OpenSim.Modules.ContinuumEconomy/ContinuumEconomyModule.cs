@@ -40,10 +40,10 @@ using NSL.Network.XmlRpc;
 using System.IO;
 
 
-[assembly: Addin("DTLNSLMoneyModule", "1.0")]
+[assembly: Addin("ContinuumEconomyModule", "1.0")]
 [assembly: AddinDependency("OpenSim.Region.Framework", OpenSim.VersionInfo.VersionNumber)]
 
-namespace OpenSim.Modules.Currency
+namespace OpenSim.Modules.ContinuumEconomy
 {
     /// <summary>
     /// Transaction Type
@@ -97,8 +97,8 @@ namespace OpenSim.Modules.Currency
         StipendBasic = 10000
     }
 
-    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DTLNSLMoneyModule")]
-    public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
+    [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ContinuumEconomyModule")]
+    public class ContinuumEconomyModule : IMoneyModule, ISharedRegionModule
     {
         // Constant memebers
         private const int MONEYMODULE_REQUEST_TIMEOUT = 10000;
@@ -113,6 +113,7 @@ namespace OpenSim.Modules.Currency
         private IConfigSource m_config;
 
         private string m_moneyServURL = string.Empty;
+        private string m_continuumSecret = string.Empty;
         public BaseHttpServer HttpServer;
 
         private string m_certFilename = "";
@@ -179,7 +180,7 @@ namespace OpenSim.Modules.Currency
             //if (string.IsNullOrEmpty(m_moneyServURL)) m_enable_server = false;
             if (string.IsNullOrEmpty(m_moneyServURL))
             {
-                m_log.ErrorFormat("[MONEY MODULE]: CurrencyServer URL not set.");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: CurrencyServer URL not set.");
                 m_enable_server = false;
             }
 
@@ -195,12 +196,12 @@ namespace OpenSim.Modules.Currency
         /// <param name="source">A <see cref="T:Nini.Config.IConfigSource" /></param>
         public void Initialise(IConfigSource source)
         {
-            m_log.InfoFormat("[MONEY MODULE]: Initialise started.");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise started.");
 
-            // Überprüfen, ob die Konfigurationsquelle null ist.
+            // ÃœberprÃ¼fen, ob die Konfigurationsquelle null ist.
             if (source == null)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: Initialise aborted - source is null.");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: Initialise aborted - source is null.");
                 return;
             }
 
@@ -212,65 +213,68 @@ namespace OpenSim.Modules.Currency
                 IConfig economyConfig = m_config.Configs["Economy"];
                 if (economyConfig == null)
                 {
-                    m_log.ErrorFormat("[MONEY MODULE]: Initialise aborted - [Economy] section is missing in configuration.");
+                    m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: Initialise aborted - [Economy] section is missing in configuration.");
                     return;
                 }
 
-                // Überprüfen, ob das Modul aktiviert ist
+                // ÃœberprÃ¼fen, ob das Modul aktiviert ist
                 if (economyConfig.GetString("EconomyModule") != Name)
                 {
-                    m_log.InfoFormat("[MONEY MODULE]: Initialise - DTL/NSL MoneyModule is disabled.");
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - DTL/NSL MoneyModule is disabled.");
                     return;
                 }
 
                 m_enabled = true;
 
-                m_log.InfoFormat("[MONEY MODULE]: Initialise - DTL/NSL MoneyModule is enabled.");
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - DTL/NSL MoneyModule is enabled.");
 
-                // Konfiguration für Verkauf und MoneyServer-URL
+                // Konfiguration fÃ¼r Verkauf und MoneyServer-URL
                 m_sellEnabled = economyConfig.GetBoolean("SellEnabled", m_sellEnabled);
-                m_log.InfoFormat("[MONEY MODULE]: SellEnabled set to {0}", m_sellEnabled);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SellEnabled set to {0}", m_sellEnabled);
 
-                m_moneyServURL = economyConfig.GetString("CurrencyServer", m_moneyServURL);
-                m_log.InfoFormat("[MONEY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
+                m_moneyServURL = economyConfig.GetString("ContinuumEconomyServer", economyConfig.GetString("CurrencyServer", m_moneyServURL));
+                m_continuumSecret = economyConfig.GetString("ContinuumEconomySharedSecret", string.Empty);
+                if (m_continuumSecret.Length < 32)
+                    throw new InvalidOperationException("ContinuumEconomySharedSecret must contain at least 32 characters");
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
 
-                // Konfiguration für Client-Zertifizierung
+                // Konfiguration fÃ¼r Client-Zertifizierung
                 m_certFilename = economyConfig.GetString("ClientCertFilename", m_certFilename);
                 m_certPassword = economyConfig.GetString("ClientCertPassword", m_certPassword);
                 if (!string.IsNullOrEmpty(m_certFilename))
                 {
                     m_certVerify.SetPrivateCert(m_certFilename, m_certPassword);
-                    m_log.InfoFormat("[MONEY MODULE]: Client certificate set from file {0}", m_certFilename);
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Client certificate set from file {0}", m_certFilename);
                 }
                 else
                 {
-                    m_log.Warn("[MONEY MODULE]: No client certificate filename provided.");
+                    m_log.Warn("[CONTINUUM ECONOMY MODULE]: No client certificate filename provided.");
                 }
 
-                // Konfiguration für Server-Zertifikatüberprüfung
+                // Konfiguration fÃ¼r Server-ZertifikatÃ¼berprÃ¼fung
                 m_checkServerCert = economyConfig.GetBoolean("CheckServerCert", m_checkServerCert);
                 m_cacertFilename = economyConfig.GetString("CACertFilename", m_cacertFilename);
 
                 if (!string.IsNullOrEmpty(m_cacertFilename))
                 {
                     m_certVerify.SetPrivateCA(m_cacertFilename);
-                    m_log.InfoFormat("[MONEY MODULE]: Server CA certificate loaded from {0}", m_cacertFilename);
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Server CA certificate loaded from {0}", m_cacertFilename);
                 }
                 else
                 {
                     m_checkServerCert = false;
-                    m_log.Warn("[MONEY MODULE]: No CA certificate filename provided; server certificate check disabled.");
+                    m_log.Warn("[CONTINUUM ECONOMY MODULE]: No CA certificate filename provided; server certificate check disabled.");
                 }
 
-                // Konfiguration für Settlement
+                // Konfiguration fÃ¼r Settlement
                 m_use_web_settle = economyConfig.GetBoolean("SettlementByWeb", m_use_web_settle);
-                m_log.InfoFormat("[MONEY MODULE]: SettlementByWeb set to {0}", m_use_web_settle);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SettlementByWeb set to {0}", m_use_web_settle);
 
                 m_settle_url = economyConfig.GetString("SettlementURL", m_settle_url);
-                m_log.InfoFormat("[MONEY MODULE]: SettlementURL set to {0}", m_settle_url);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SettlementURL set to {0}", m_settle_url);
 
                 m_settle_message = economyConfig.GetString("SettlementMessage", m_settle_message);
-                m_log.InfoFormat("[MONEY MODULE]: SettlementMessage set to {0}", m_settle_message);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SettlementMessage set to {0}", m_settle_message);
 
                 // Preise konfigurieren
                 PriceEnergyUnit = economyConfig.GetInt("PriceEnergyUnit", PriceEnergyUnit);
@@ -293,9 +297,9 @@ namespace OpenSim.Modules.Currency
                 TeleportMinPrice = economyConfig.GetInt("TeleportMinPrice", TeleportMinPrice);
                 TeleportPriceExponent = economyConfig.GetFloat("TeleportPriceExponent", TeleportPriceExponent);
                 EnergyEfficiency = economyConfig.GetFloat("EnergyEfficiency", EnergyEfficiency);
-                m_log.InfoFormat("[MONEY MODULE]: Price settings loaded successfully.");
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Price settings loaded successfully.");
 
-                // Konfiguration für HG-Avatar-Typ
+                // Konfiguration fÃ¼r HG-Avatar-Typ
                 string avatarClass = economyConfig.GetString("HGAvatarAs", "HGAvatar").ToLower();
                 m_hg_avatarClass = avatarClass switch
                 {
@@ -306,11 +310,11 @@ namespace OpenSim.Modules.Currency
                     _ => (int)AvatarType.UNKNOWN_AVATAR
                 };
 
-                m_log.InfoFormat("[MONEY MODULE]: Initialise - Configuration loaded successfully.");
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - Configuration loaded successfully.");
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: Initialise - Failed to load configuration. Error: {0}", ex);
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: Initialise - Failed to load configuration. Error: {0}", ex);
             }
         }
 
@@ -322,7 +326,7 @@ namespace OpenSim.Modules.Currency
         public void AddRegion(Scene scene)
         {
             if (!m_enabled) return;
-            m_log.InfoFormat("[MONEY MODULE]: AddRegion:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: AddRegion:");
 
             if (scene == null) return;
 
@@ -377,7 +381,7 @@ namespace OpenSim.Modules.Currency
             scene.EventManager.OnValidateLandBuy += ValidateLandBuy;
             scene.EventManager.OnLandBuy += processLandBuy;
 
-            m_log.InfoFormat("[MONEY MODULE]: AddRegion: {0}", scene.RegionInfo.RegionName);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: AddRegion: {0}", scene.RegionInfo.RegionName);
 
         }
 
@@ -403,7 +407,7 @@ namespace OpenSim.Modules.Currency
                 scene.EventManager.OnValidateLandBuy -= ValidateLandBuy;
                 scene.EventManager.OnLandBuy -= processLandBuy;
 
-                m_log.InfoFormat("[MONEY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
         }
 
@@ -420,7 +424,7 @@ namespace OpenSim.Modules.Currency
         public void RegionLoaded(Scene scene)
         {
             if (!m_enabled) return;
-            m_log.InfoFormat("[MONEY MODULE] region loaded {0}", scene.RegionInfo.RegionID.ToString());
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] region loaded {0}", scene.RegionInfo.RegionID.ToString());
         }
 
 
@@ -457,7 +461,7 @@ namespace OpenSim.Modules.Currency
         /// <value>The name of the module</value>
         public string Name
         {
-            get { return "DTLNSLMoneyModule"; }
+            get { return "ContinuumEconomyModule"; }
         }
 
 
@@ -538,7 +542,7 @@ namespace OpenSim.Modules.Currency
 
             if (!ret) result = "LINDENDOLLAR_INSUFFICIENTFUNDS";
 
-            m_log.InfoFormat("[MONEY MODULE] ObjectGiveMoney: {0} {1} {2} {3} {4} {5} {6}", objectID, fromID, toID, amount, txn, result, ret);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ObjectGiveMoney: {0} {1} {2} {3} {4} {5} {6}", objectID, fromID, toID, amount, txn, result, ret);
 
             return ret;
         }
@@ -584,7 +588,7 @@ namespace OpenSim.Modules.Currency
                 if (balance >= amount) return true;
             }
 
-            m_log.InfoFormat("[MONEY MODULE] UploadCovered: {0} {1}", agentID, amount);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] UploadCovered: {0} {1}", agentID, amount);
 
             return false;
         }
@@ -603,7 +607,7 @@ namespace OpenSim.Modules.Currency
                 if (balance >= amount) return true;
             }
 
-            m_log.InfoFormat("[MONEY MODULE] AmountCovered: {0} {1}", agentID, amount);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] AmountCovered: {0} {1}", agentID, amount);
 
             return false;
         }
@@ -619,7 +623,7 @@ namespace OpenSim.Modules.Currency
             UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)TransactionType.UploadCharge, regionHandle, regionUUID, text);
 
-            m_log.InfoFormat("[MONEY MODULE] ApplyUploadCharge: {0} {1} {2}", agentID, amount, text);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyUploadCharge: {0} {1} {2}", agentID, amount, text);
         }
 
 
@@ -631,7 +635,7 @@ namespace OpenSim.Modules.Currency
         {
             ApplyCharge(agentID, amount, type, string.Empty);
 
-            m_log.InfoFormat("[MONEY MODULE] ApplyCharge: {0} {1} {2}", agentID, amount, type);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyCharge: {0} {1} {2}", agentID, amount, type);
         }
 
 
@@ -646,7 +650,7 @@ namespace OpenSim.Modules.Currency
             UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)type, regionHandle, regionUUID, text);
 
-            m_log.InfoFormat("[MONEY MODULE] ApplyCharge: {0} {1} {2} {3}", agentID, amount, type, text);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyCharge: {0} {1} {2} {3}", agentID, amount, type, text);
         }
 
 
@@ -697,7 +701,7 @@ namespace OpenSim.Modules.Currency
         {
             ForceTransferMoney(fromAgentID, toAgentID, amount, (int)TransactionType.MoveMoney, UUID.Zero, (ulong)0, UUID.Zero, text);
 
-            m_log.InfoFormat("[MONEY MODULE] MoveMoney: {0} {1} {2}", fromAgentID, toAgentID, amount);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] MoveMoney: {0} {1} {2}", fromAgentID, toAgentID, amount);
         }
 
         // for 0.9.1 over
@@ -714,7 +718,7 @@ namespace OpenSim.Modules.Currency
         {
             bool ret = ForceTransferMoney(fromAgentID, toAgentID, amount, (int)type, UUID.Zero, (ulong)0, UUID.Zero, text);
 
-            m_log.InfoFormat("[MONEY MODULE] MoveMoney: {0} {1} {2} {3}", fromAgentID, toAgentID, amount, type);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] MoveMoney: {0} {1} {2} {3}", fromAgentID, toAgentID, amount, type);
 
             return ret;
         }
@@ -732,7 +736,7 @@ namespace OpenSim.Modules.Currency
             client.OnRequestPayPrice += OnRequestPayPrice;
             client.OnObjectBuy += OnObjectBuy;
 
-            m_log.InfoFormat("[MONEY MODULE] OnNewClient: {0}", client.AgentId);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnNewClient: {0}", client.AgentId);
         }
 
 
@@ -746,7 +750,7 @@ namespace OpenSim.Modules.Currency
             m_enable_server = LoginMoneyServer(agent, out balance);
             client.SendMoneyBalance(UUID.Zero, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
 
-            m_log.InfoFormat("[MONEY MODULE] OnMakeRootAgent: {0} {1}", client.AgentId, balance);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnMakeRootAgent: {0} {1}", client.AgentId, balance);
 
         }
 
@@ -760,7 +764,7 @@ namespace OpenSim.Modules.Currency
             {
                 LogoffMoneyServer(client);
 
-                m_log.InfoFormat("[MONEY MODULE] ClientClosed: {0}", client.AgentId);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ClientClosed: {0}", client.AgentId);
             }
         }
 
@@ -887,7 +891,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="salePrice">The sale price.</param>
         public void OnObjectBuy(IClientAPI remoteClient, UUID agentID, UUID sessionID, UUID groupID, UUID categoryID, uint localID, byte saleType, int salePrice)
         {
-            m_log.InfoFormat("[MONEY MODULE]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
 
             // Handle the parameters error.
             if (!m_sellEnabled) return;
@@ -898,7 +902,7 @@ namespace OpenSim.Modules.Currency
             if (balance < salePrice)
             {
                 remoteClient.SendAgentAlertMessage("Unable to buy now. You don't have sufficient funds", false);
-                m_log.InfoFormat("[MONEY MODULE]: OnObjectBuy: agent = {0}, balance = {1}, salePrice = {2}", agentID, balance, salePrice);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnObjectBuy: agent = {0}, balance = {1}, salePrice = {2}", agentID, balance, salePrice);
                 return;
             }
 
@@ -920,24 +924,36 @@ namespace OpenSim.Modules.Currency
                         {
                             if (!string.IsNullOrEmpty(m_moneyServURL))
                             {
-                                ret = TransferMoney(remoteClient.AgentId, receiverId, salePrice,
-                                                (int)TransactionType.PayObject, sceneObj.UUID, regionHandle, regionUUID, "Object Buy");
+                                UUID purchaseID = UUID.Random();
+                                ret = AuthorizePurchase(remoteClient, purchaseID, receiverId, salePrice,
+                                                (int)TransactionType.PayObject, sceneObj.UUID, regionUUID, "Object Buy");
+                                if (ret)
+                                {
+                                    try
+                                    {
+                                        mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                                        ret = CompletePurchase(purchaseID, remoteClient.AgentId, true);
+                                    }
+                                    catch
+                                    {
+                                        CompletePurchase(purchaseID, remoteClient.AgentId, false);
+                                        throw;
+                                    }
+                                }
                             }
                             else if (salePrice == 0)
                             {    // amount is 0 with No Money Server
                                 ret = true;
                             }
                         }
-                        if (ret)
-                        {
-                            mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
-                        }
+                        if (!ret)
+                            remoteClient.SendAgentAlertMessage("Unable to complete the object purchase", false);
                     }
                 }
                 else
                 {
                     remoteClient.SendAgentAlertMessage("Unable to buy now. The object was not found", false);
-                    m_log.InfoFormat("[MONEY MODULE]: OnObjectBuy: Unable to buy now. The object was not found");
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnObjectBuy: Unable to buy now. The object was not found");
                     return;
                 }
             }
@@ -954,7 +970,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="TransactionID"></param>
         private void OnMoneyBalanceRequest(IClientAPI client, UUID agentID, UUID SessionID, UUID TransactionID)
         {
-            m_log.InfoFormat("[MONEY MODULE]: OnMoneyBalanceRequest:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnMoneyBalanceRequest:");
 
             if (client.AgentId == agentID && client.SessionId == SessionID)
             {
@@ -979,7 +995,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="objectID">The object identifier.</param>
         private void OnRequestPayPrice(IClientAPI client, UUID objectID)
         {
-            m_log.InfoFormat("[MONEY MODULE]: OnRequestPayPrice:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnRequestPayPrice:");
 
             Scene scene = GetLocateScene(client.AgentId);
             if (scene == null) return;
@@ -1023,7 +1039,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         public XmlRpcResponse OnMoneyTransferedHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            m_log.InfoFormat("[MONEY MODULE]: OnMoneyTransferedHandler:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnMoneyTransferedHandler:");
 
             bool ret = false;
 
@@ -1044,7 +1060,7 @@ namespace OpenSim.Modules.Currency
                         {
                             if (requestParam.Contains("transactionType") && requestParam.Contains("objectID") && requestParam.Contains("amount"))
                             {
-                                m_log.InfoFormat("[MONEY MODULE]: OnMoneyTransferedHandler: type = {0}", requestParam["transactionType"]);
+                                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: OnMoneyTransferedHandler: type = {0}", requestParam["transactionType"]);
 
                                 // Pay for the object.
                                 if ((int)requestParam["transactionType"] == (int)TransactionType.PayObject)
@@ -1072,7 +1088,7 @@ namespace OpenSim.Modules.Currency
 
             if (!ret)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: OnMoneyTransferedHandler: Transaction is failed. MoneyServer will rollback");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: OnMoneyTransferedHandler: Transaction is failed. MoneyServer will rollback");
             }
             resp.Value = paramTable;
 
@@ -1137,7 +1153,7 @@ namespace OpenSim.Modules.Currency
 
             if (!ret)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: BalanceUpdateHandler: Cannot update client balance from MoneyServer");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: BalanceUpdateHandler: Cannot update client balance from MoneyServer");
             }
             resp.Value = paramTable;
 
@@ -1154,7 +1170,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         public XmlRpcResponse UserAlertHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            m_log.InfoFormat("[MONEY MODULE]: UserAlertHandler:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: UserAlertHandler:");
 
             bool ret = false;
 
@@ -1234,7 +1250,7 @@ namespace OpenSim.Modules.Currency
             // Send the response to caller.
             if (balance < 0)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: GetBalanceHandler: GetBalance transaction is failed");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: GetBalanceHandler: GetBalance transaction is failed");
                 ret = false;
             }
 
@@ -1257,7 +1273,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         public XmlRpcResponse AddBankerMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            m_log.InfoFormat("[MONEY MODULE]: AddBankerMoneyHandler:");
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: AddBankerMoneyHandler:");
 
             bool ret = false;
 
@@ -1300,7 +1316,7 @@ namespace OpenSim.Modules.Currency
                 }
             }
 
-            if (!ret) m_log.ErrorFormat("[MONEY MODULE]: AddBankerMoneyHandler: Add Banker Money transaction is failed");
+            if (!ret) m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: AddBankerMoneyHandler: Add Banker Money transaction is failed");
 
             // Send the response to caller.
             XmlRpcResponse resp = new XmlRpcResponse();
@@ -1347,33 +1363,33 @@ namespace OpenSim.Modules.Currency
                             MD5 md5 = MD5.Create();
                             byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                             string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                            m_log.InfoFormat("[MONEY MODULE]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
                             ret = SendMoneyTo(agentUUID, amount, type, hash);
                         }
                     }
                     else
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: SendMoneyHandler: amount is missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: amount is missed");
                     }
                 }
                 else
                 {
                     if (!requestParam.Contains("agentUUID"))
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: SendMoneyHandler: agentUUID is missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: agentUUID is missed");
                     }
                     if (!requestParam.Contains("secretAccessCode"))
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: SendMoneyHandler: secretAccessCode is missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: secretAccessCode is missed");
                     }
                 }
             }
             else
             {
-                m_log.ErrorFormat("[MONEY MODULE]: SendMoneyHandler: Params count is under 0");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: Params count is under 0");
             }
 
-            if (!ret) m_log.ErrorFormat("[MONEY MODULE]: SendMoneyHandler: Send Money transaction is failed");
+            if (!ret) m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyHandler: Send Money transaction is failed");
 
             // Send the response to caller.
             XmlRpcResponse resp = new XmlRpcResponse();
@@ -1416,32 +1432,32 @@ namespace OpenSim.Modules.Currency
                         MD5 md5 = MD5.Create();
                         byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                         string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                        m_log.InfoFormat("[MONEY MODULE]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                        m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
                         ret = MoveMoneyFromTo(fromUUID, toUUID, amount, hash);
                     }
                     else
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyHandler: amount is missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: amount is missed");
                     }
                 }
                 else
                 {
                     if (!requestParam.Contains("fromUUID") && !requestParam.Contains("toUUID"))
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyHandler: fromUUID and toUUID are missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: fromUUID and toUUID are missed");
                     }
                     if (!requestParam.Contains("secretAccessCode"))
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyHandler: secretAccessCode is missed");
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: secretAccessCode is missed");
                     }
                 }
             }
             else
             {
-                m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyHandler: Params count is under 0");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: Params count is under 0");
             }
 
-            if (!ret) m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyHandler: Move Money transaction is failed");
+            if (!ret) m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyHandler: Move Money transaction is failed");
 
             // Send the response to caller.
             XmlRpcResponse resp = new XmlRpcResponse();
@@ -1472,13 +1488,13 @@ namespace OpenSim.Modules.Currency
             // receiverClient could be null.
             if (senderClient == null)
             {
-                m_log.InfoFormat("[MONEY MODULE]: TransferMoney: Client {0} not found", sender.ToString());
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: TransferMoney: Client {0} not found", sender.ToString());
                 return false;
             }
 
             if (QueryBalanceFromMoneyServer(senderClient) < amount)
             {
-                m_log.InfoFormat("[MONEY MODULE]: TransferMoney: No insufficient balance in client [{0}]", sender.ToString());
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: TransferMoney: No insufficient balance in client [{0}]", sender.ToString());
                 return false;
             }
 
@@ -1513,10 +1529,31 @@ namespace OpenSim.Modules.Currency
                         ret = true;
                     }
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
             }
 
             return ret;
+        }
+
+        private bool AuthorizePurchase(IClientAPI buyer, UUID purchaseID, UUID seller, int amount,
+            int type, UUID objectID, UUID regionUUID, string description)
+        {
+            Hashtable p = new Hashtable
+            {
+                ["purchaseID"] = purchaseID.ToString(), ["buyerID"] = buyer.AgentId.ToString(),
+                ["buyerSessionID"] = buyer.SessionId.ToString(), ["buyerSecureSessionID"] = buyer.SecureSessionId.ToString(),
+                ["sellerID"] = seller.ToString(), ["amount"] = amount, ["transactionType"] = type,
+                ["objectID"] = objectID.ToString(), ["regionUUID"] = regionUUID.ToString(), ["description"] = description
+            };
+            Hashtable result = genericCurrencyXMLRPCRequest(p, "AuthorizePurchase");
+            return result != null && result.Contains("success") && (bool)result["success"];
+        }
+
+        private bool CompletePurchase(UUID purchaseID, UUID buyerID, bool capture)
+        {
+            Hashtable p = new Hashtable { ["purchaseID"] = purchaseID.ToString(), ["buyerID"] = buyerID.ToString() };
+            Hashtable result = genericCurrencyXMLRPCRequest(p, capture ? "CapturePurchase" : "CancelPurchase");
+            return result != null && result.Contains("success") && (bool)result["success"];
         }
 
 
@@ -1564,7 +1601,7 @@ namespace OpenSim.Modules.Currency
                         ret = true;
                     }
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: ForceTransferMoney: Can not money force transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: ForceTransferMoney: Can not money force transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());
             }
 
             return ret;
@@ -1605,9 +1642,9 @@ namespace OpenSim.Modules.Currency
                     {
                         ret = true;
                     }
-                    else m_log.ErrorFormat("[MONEY MODULE]: SendMoneyTo: Fail Message is {0}", resultTable["message"]);
+                    else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyTo: Fail Message is {0}", resultTable["message"]);
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: SendMoneyTo: Money Server is not responce");
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: SendMoneyTo: Money Server is not responce");
             }
 
             return ret;
@@ -1648,9 +1685,9 @@ namespace OpenSim.Modules.Currency
                     {
                         ret = true;
                     }
-                    else m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyFromTo: Fail Message is {0}", resultTable["message"]);
+                    else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyFromTo: Fail Message is {0}", resultTable["message"]);
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: MoveMoneyFromTo: Money Server is not responce");
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: MoveMoneyFromTo: Money Server is not responce");
             }
 
             return ret;
@@ -1697,12 +1734,12 @@ namespace OpenSim.Modules.Currency
                         if (resultTable.Contains("banker"))
                         {
                             m_settle_user = !(bool)resultTable["banker"]; // If avatar is not banker, Web Settlement is used.
-                            if (m_settle_user && m_use_web_settle) m_log.ErrorFormat("[MONEY MODULE]: AddBankerMoney: Avatar is not Banker. Web Settlemrnt is used.");
+                            if (m_settle_user && m_use_web_settle) m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: AddBankerMoney: Avatar is not Banker. Web Settlemrnt is used.");
                         }
-                        else m_log.ErrorFormat("[MONEY MODULE]: AddBankerMoney: Fail Message {0}", resultTable["message"]);
+                        else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: AddBankerMoney: Fail Message {0}", resultTable["message"]);
                     }
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: AddBankerMoney: Money Server is not responce");
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: AddBankerMoney: Money Server is not responce");
             }
 
             return ret;
@@ -1727,13 +1764,13 @@ namespace OpenSim.Modules.Currency
             // receiverClient could be null.
             if (senderClient == null)
             {
-                m_log.InfoFormat("[MONEY MODULE]: PayMoneyCharge: Client {0} is not found", sender.ToString());
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: PayMoneyCharge: Client {0} is not found", sender.ToString());
                 return false;
             }
 
             if (QueryBalanceFromMoneyServer(senderClient) < amount)
             {
-                m_log.InfoFormat("[MONEY MODULE]: PayMoneyCharge: No insufficient balance in client [{0}]", sender.ToString());
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: PayMoneyCharge: No insufficient balance in client [{0}]", sender.ToString());
                 return false;
             }
 
@@ -1761,7 +1798,7 @@ namespace OpenSim.Modules.Currency
                         ret = true;
                     }
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: PayMoneyCharge: Can not pay money of charge request from [{0}]", sender.ToString());
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: PayMoneyCharge: Can not pay money of charge request from [{0}]", sender.ToString());
             }
 
             return ret;
@@ -1795,7 +1832,7 @@ namespace OpenSim.Modules.Currency
                         if ((bool)resultTable["success"] == true)
                         {
                             balance = (int)resultTable["clientBalance"];
-                            m_log.InfoFormat("[MONEY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
+                            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                         }
                     }
                 }
@@ -1804,7 +1841,7 @@ namespace OpenSim.Modules.Currency
                     if (m_moneyServer.ContainsKey(client.AgentId))
                     {
                         balance = m_moneyServer[client.AgentId];
-                        m_log.InfoFormat("[MONEY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
+                        m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                     }
                 }
             }
@@ -1844,7 +1881,7 @@ namespace OpenSim.Modules.Currency
                         if (account != null)
                         {
                             userName = account.FirstName + " " + account.LastName;
-                            m_log.InfoFormat("[MONEY MODULE]: LoginMoneyServer: User {0} logged in.", userName);
+                            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: LoginMoneyServer: User {0} logged in.", userName);
                         }
                     }
                 }
@@ -1883,7 +1920,7 @@ namespace OpenSim.Modules.Currency
                 if (String.IsNullOrEmpty(userName))
                 {
                     userName = firstName + " " + lastName;
-                    m_log.InfoFormat("[MONEY MODULE]: LoginMoneyServer: User {0} logged in.", userName);
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: LoginMoneyServer: User {0} logged in.", userName);
                 }
 
                 //
@@ -1913,13 +1950,13 @@ namespace OpenSim.Modules.Currency
                     if ((bool)resultTable["success"] == true)
                     {
                         balance = (int)resultTable["clientBalance"];
-                        m_log.InfoFormat("[MONEY MODULE]: LoginMoneyServer: Client [{0}] login Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
+                        m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: LoginMoneyServer: Client [{0}] login Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
                         ret = true;
                     }
                 }
-                else m_log.ErrorFormat("[MONEY MODULE]: LoginMoneyServer: Unable to login Money Server {0} for client [{1}]", m_moneyServURL, client.AgentId.ToString());
+                else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: LoginMoneyServer: Unable to login Money Server {0} for client [{1}]", m_moneyServURL, client.AgentId.ToString());
             }
-            else m_log.ErrorFormat("[MONEY MODULE]: LoginMoneyServer: Money Server is not available!!");
+            else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: LoginMoneyServer: Money Server is not available!!");
 
 
             // Notifies the Viewer of the setting.
@@ -1963,7 +2000,7 @@ namespace OpenSim.Modules.Currency
                         ret = true;
                     }
                 }
-                m_log.InfoFormat("[MONEY MODULE]: LogoffMoneyServer: Client [{0}] logoff Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: LogoffMoneyServer: Client [{0}] logoff Money Server {1}", client.AgentId.ToString(), m_moneyServURL);
             }
 
             return ret;
@@ -2008,17 +2045,17 @@ namespace OpenSim.Modules.Currency
                     }
                     else
                     {
-                        m_log.ErrorFormat("[MONEY MODULE]: GetTransactionInfo: GetTransactionInfo: Fail to Request. {0}", (string)resultTable["description"]);
+                        m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: GetTransactionInfo: GetTransactionInfo: Fail to Request. {0}", (string)resultTable["description"]);
                     }
                 }
                 else
                 {
-                    m_log.ErrorFormat("[MONEY MODULE]: GetTransactionInfo: Invalid Response");
+                    m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: GetTransactionInfo: Invalid Response");
                 }
             }
             else
             {
-                m_log.ErrorFormat("[MONEY MODULE]: GetTransactionInfo: Invalid Money Server URL");
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: GetTransactionInfo: Invalid Money Server URL");
             }
 
             return args;
@@ -2035,11 +2072,15 @@ namespace OpenSim.Modules.Currency
         {
             if (reqParams.Count <= 0 || string.IsNullOrEmpty(method)) return null;
 
+            reqParams["continuumSecret"] = m_continuumSecret;
+            if (!reqParams.ContainsKey("transactionID"))
+                reqParams["transactionID"] = UUID.Random().ToString();
+
             if (m_checkServerCert)
             {
                 if (!m_moneyServURL.StartsWith("https://"))
                 {
-                    m_log.InfoFormat("[MONEY MODULE]: genericCurrencyXMLRPCRequest: CheckServerCert is true, but protocol is not HTTPS. Please check INI file");
+                    m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: genericCurrencyXMLRPCRequest: CheckServerCert is true, but protocol is not HTTPS. Please check INI file");
                     //return null;
                 }
             }
@@ -2047,7 +2088,7 @@ namespace OpenSim.Modules.Currency
             {
                 if (!m_moneyServURL.StartsWith("https://") && !m_moneyServURL.StartsWith("http://"))
                 {
-                    m_log.ErrorFormat("[MONEY MODULE]: genericCurrencyXMLRPCRequest: Invalid Money Server URL: {0}", m_moneyServURL);
+                    m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: genericCurrencyXMLRPCRequest: Invalid Money Server URL: {0}", m_moneyServURL);
                     return null;
                 }
             }
@@ -2063,8 +2104,8 @@ namespace OpenSim.Modules.Currency
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[MONEY MODULE]: genericCurrencyXMLRPCRequest: Unable to connect to Money Server {0}", m_moneyServURL);
-                m_log.ErrorFormat("[MONEY MODULE]: genericCurrencyXMLRPCRequest: {0}", ex);
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: genericCurrencyXMLRPCRequest: Unable to connect to Money Server {0}", m_moneyServURL);
+                m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: genericCurrencyXMLRPCRequest: {0}", ex);
 
                 Hashtable ErrorHash = new Hashtable();
                 ErrorHash["success"] = false;
@@ -2115,7 +2156,7 @@ namespace OpenSim.Modules.Currency
                 }
             }
 
-            m_log.DebugFormat("[MONEY MODULE]: GetLocateClient: {0}", client);
+            m_log.DebugFormat("[CONTINUUM ECONOMY MODULE]: GetLocateClient: {0}", client);
 
             return client;
         }
@@ -2146,7 +2187,7 @@ namespace OpenSim.Modules.Currency
                 }
             }
 
-            m_log.DebugFormat("[MONEY MODULE]: GetLocateScene: {0}", scene);
+            m_log.DebugFormat("[CONTINUUM ECONOMY MODULE]: GetLocateScene: {0}", scene);
 
             return scene;
         }

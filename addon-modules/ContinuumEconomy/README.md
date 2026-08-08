@@ -7,17 +7,19 @@ independently implemented Continuum services.
 
 The existing MoneyServer remains an independent deployable compatibility
 module. It does not load this assembly and has no ContinuumEconomy switch.
-ContinuumEconomy requires its own service executable, configuration and region
-connector before it can be deployed.
+ContinuumEconomy is deployed with its own `ContinuumEconomy.Service.exe`,
+`ContinuumEconomy.ini`, and separately selected `ContinuumEconomyModule` region
+connector. It never loads or redirects the compatibility MoneyServer.
 
 The first assembly provides atomic MySQL, PostgreSQL and SQLite ledgers with deterministic
 account locking, unique transaction IDs, request fingerprints, idempotent
 results, 64-bit balances, and independent tables that cannot alter a deployed
 legacy MoneyServer database.
 
-Administrative credits, group accounts, scheduled payments, legacy RPC adapters
-and the region module will be added behind explicit service authorization. A
-zero UUID cannot be used to mint currency through the ordinary transfer API.
+Administrative credits, initial balances, viewer currency purchases and group
+accounts use audited adjustment or registration operations behind explicit
+service authorization. A zero UUID cannot mint currency through the ordinary
+transfer API.
 
 Donor lineage:
 
@@ -31,9 +33,8 @@ Donor lineage:
 Gloebit is excluded. Use a separate production-test deployment and complete
 `doc/continuum-economy-production-test.md` before considering a live cutover.
 
-`ContinuumEconomy.Migrate verify` is a read-only readiness check for the current
-experimental MySQL ledger columns and InnoDB tables. It is not run by
-MoneyServer and does not make ContinuumEconomy deployable.
+`ContinuumEconomy.Migrate verify` is a read-only readiness check for the selected
+provider. It is not run by MoneyServer.
 
 `ContinuumEconomy.Migrate self-test --confirm=RUN-ON-DEDICATED-TEST-DATABASE`
 requires a database name containing `test`. It performs real atomic, replay,
@@ -95,11 +96,30 @@ hold atomically, while failed delivery cancels it without a reverse transfer.
 Ordinary transfers subtract active holds when checking available funds, which
 prevents concurrent spending from consuming money reserved for a purchase.
 
-The ledger library contains account, transfer, adjustment, purchase-hold,
-history and migration primitives. It does not yet provide the new authenticated
-service or region connector needed for viewer and simulator operation. Those
-components must be implemented under Continuum names and certified without
-modifying MoneyServer Compatibility.
+The authenticated service requires a unique shared secret of at least 32
+characters. The connector adds that secret and a UUID operation key to every
+region-originated request. Resident transfers additionally require the avatar's
+current session and secure-session UUIDs. Viewer currency purchase requests do
+not receive the region secret; they are authenticated with the secure session
+recorded during `ClientLogin`.
+
+Object sales use `AuthorizePurchase`, deliver through OpenSim's buy/sell module,
+then call `CapturePurchase`. Exceptions call `CancelPurchase`, leaving the
+seller uncredited and releasing the buyer's hold. Direct transfers remain
+atomic and idempotent.
+
+## Build and deployment
+
+Run `runprebuild.bat`, then build `OpenSim.sln` in Release configuration. Copy
+`ContinuumEconomy.ini.example` to `bin/ContinuumEconomy.ini` and configure the
+provider, connection string, system actor, limits and a new shared secret. Copy
+the `[Economy]` settings from `OpenSim.ini.example` into every simulator and use
+the same secret there.
+
+Initialize the selected provider with the guarded migration command before
+starting `bin/ContinuumEconomy.Service.exe`. Select exactly one authority:
+`EconomyModule = ContinuumEconomyModule` for ContinuumEconomy, or
+`EconomyModule = DTLNSLMoneyModule` for MoneyServer Compatibility—never both.
 
 `ContinuumEconomy.Migrate holds` is a read-only operational report of
 authorized purchases that have not been captured or cancelled. It defaults to
