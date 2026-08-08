@@ -769,6 +769,45 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
     #region Cap HTTP Handlers
 
+    internal static class ExperienceCapsResponse
+    {
+        public static OSDMap ToExperienceMap(ExperienceInfo info)
+        {
+            OSDMap metadata = new()
+            {
+                ["logo"] = info.logo,
+                ["marketplace"] = info.marketplace ?? string.Empty
+            };
+
+            return new OSDMap
+            {
+                ["public_id"] = info.public_id,
+                ["description"] = info.description ?? string.Empty,
+                ["name"] = info.name ?? string.Empty,
+                ["quota"] = info.quota,
+                ["slurl"] = info.slurl ?? string.Empty,
+                ["maturity"] = info.maturity,
+                ["expiration"] = 600,
+                ["extended_metadata"] = OSDParser.SerializeLLSDXmlString(metadata),
+                ["group_id"] = info.group_id,
+                ["properties"] = info.properties,
+                ["agent_id"] = info.owner_id
+            };
+        }
+
+        public static byte[] SerializeExperiences(IEnumerable<ExperienceInfo> infos)
+        {
+            OSDArray experiences = new();
+            foreach (ExperienceInfo info in infos)
+                experiences.Add(ToExperienceMap(info));
+
+            return OSDParser.SerializeLLSDXmlBytes(new OSDMap
+            {
+                ["experience_keys"] = experiences
+            });
+        }
+    }
+
     public class FindExperienceByNameGetHandler : BaseStreamHandler
     {
         //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -802,30 +841,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str);
 
-            string new_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
-
-            foreach(ExperienceInfo info in results)
-            {
-                string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key>{1}</map></llsd>", info.logo, info.marketplace != string.Empty ? string.Format("<string>{0}</string>", info.marketplace) : "<string />");
-
-                new_str += string.Format("<map>" +
-                    "<key>public_id</key><uuid>{0}</uuid>" +
-                    "<key>description</key><string>{1}</string>" +
-                    "<key>name</key><string>{2}</string>" +
-                    "<key>quota</key><integer>{9}</integer>" +
-                    "<key>slurl</key><string>{6}</string>" +
-                    "<key>maturity</key><integer>{7}</integer>" +
-                    "<key>expiration</key><integer>600</integer>" +
-                    "<key>extended_metadata</key><string>{5}</string>" +
-                    "<key>group_id</key><uuid>{3}</uuid>" +
-                    "<key>properties</key><integer>{8}</integer>" +
-                    "<key>agent_id</key><uuid>{4}</uuid>" +
-                    "</map>", info.public_id, info.description, info.name, info.group_id, info.owner_id, HttpUtility.HtmlEncode(extended_meta), info.slurl, info.maturity, info.properties, info.quota);
-            }
-
-            new_str += "</array></map></llsd>";
-
-            return Encoding.UTF8.GetBytes(new_str);
+            return ExperienceCapsResponse.SerializeExperiences(results);
         }
     }
 
@@ -1021,26 +1037,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 }
             }
 
-            string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key>{1}</map></llsd>", currentInfo.logo, currentInfo.marketplace != string.Empty ? string.Format("<string>{0}</string>", currentInfo.marketplace) : "<string />");
-
-            string response_str = string.Format("<llsd><map><key>experience_keys</key><array><map>" +
-                "<key>public_id</key><uuid>{0}</uuid>" +
-                "<key>description</key><string>{1}</string>" +
-                "<key>name</key><string>{2}</string>" +
-                "<key>quota</key><integer>{9}</integer>" +
-                "<key>slurl</key><string>{6}</string>" +
-                "<key>maturity</key><integer>{7}</integer>" +
-                "<key>expiration</key><integer>600</integer>" +
-                "<key>extended_metadata</key><string>{5}</string>" +
-                "<key>group_id</key><uuid>{3}</uuid>" +
-                "<key>properties</key><integer>{8}</integer>" +
-                "<key>agent_id</key><uuid>{4}</uuid>" +
-                "</map></array></map></llsd>", 
-                currentInfo.public_id, currentInfo.description, 
-                currentInfo.name, currentInfo.group_id, currentInfo.owner_id, 
-                HttpUtility.HtmlEncode(extended_meta), currentInfo.slurl, currentInfo.maturity, currentInfo.properties, currentInfo.quota);
-
-            return Encoding.UTF8.GetBytes(response_str);
+            return ExperienceCapsResponse.SerializeExperiences(new[] { currentInfo });
         }
     }
 
@@ -1212,10 +1209,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             string[] ids = query.GetValues("public_id");
             //m_log.InfoFormat("[EXPERIENCE] GetExperienceInfo public_ids = {0}", string.Join(", ", ids));
 
-            string response_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
-
             if (ids == null)
-                return Encoding.UTF8.GetBytes("<llsd><map><key>experience_keys</key><array/></map></llsd>");
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+
+            List<ExperienceInfo> infos = new();
 
             foreach (string id in ids)
             {
@@ -1225,28 +1222,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 ExperienceInfo info = m_ExperienceModule.GetExperienceInfo(experience_id);
 
                 if (info != null)
-                {
-                    string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key><string /></map></llsd>", info.logo);
-
-                    response_str += string.Format("<map>" +
-                        "<key>public_id</key><uuid>{0}</uuid>" +
-                        "<key>description</key><string>{1}</string>" +
-                        "<key>name</key><string>{2}</string>" +
-                        "<key>quota</key><integer>128</integer>" +
-                        "<key>slurl</key><string>{6}</string>" +
-                        "<key>maturity</key><integer>{7}</integer>" +
-                        "<key>expiration</key><integer>600</integer>" +
-                        "<key>extended_metadata</key><string>{5}</string>" +
-                        "<key>group_id</key><uuid>{3}</uuid>" +
-                        "<key>properties</key><integer>{8}</integer>" +
-                        "<key>agent_id</key><uuid>{4}</uuid>" +
-                        "</map>", info.public_id, info.description, info.name, info.group_id, info.owner_id, HttpUtility.HtmlEncode(extended_meta), info.slurl, info.maturity, info.properties);
-                }
+                    infos.Add(info);
             }
 
-            response_str += "</array></map></llsd>";
-
-            return Encoding.UTF8.GetBytes(response_str);
+            return ExperienceCapsResponse.SerializeExperiences(infos);
         }
     }
 
