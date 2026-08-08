@@ -223,15 +223,14 @@ namespace OpenSim.Modules.Currency
                     return;
                 }
 
-                m_enabled = true;
-
-                m_log.InfoFormat("[MONEY MODULE]: Initialise - DTL/NSL MoneyModule is enabled.");
-
                 // Konfiguration für Verkauf und MoneyServer-URL
                 m_sellEnabled = economyConfig.GetBoolean("SellEnabled", m_sellEnabled);
                 m_log.InfoFormat("[MONEY MODULE]: SellEnabled set to {0}", m_sellEnabled);
 
                 m_moneyServURL = economyConfig.GetString("CurrencyServer", m_moneyServURL);
+                if (!Uri.TryCreate(m_moneyServURL, UriKind.Absolute, out Uri currencyServer) ||
+                    (currencyServer.Scheme != Uri.UriSchemeHttp && currencyServer.Scheme != Uri.UriSchemeHttps))
+                    throw new InvalidOperationException("CurrencyServer must be an absolute HTTP or HTTPS URL");
                 m_log.InfoFormat("[MONEY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
 
                 // Konfiguration für Client-Zertifizierung
@@ -306,10 +305,12 @@ namespace OpenSim.Modules.Currency
                     _ => (int)AvatarType.UNKNOWN_AVATAR
                 };
 
-                m_log.InfoFormat("[MONEY MODULE]: Initialise - Configuration loaded successfully.");
+                m_enabled = true;
+                m_log.InfoFormat("[MONEY MODULE]: Initialise - Configuration loaded successfully; compatibility module enabled.");
             }
             catch (Exception ex)
             {
+                m_enabled = false;
                 m_log.ErrorFormat("[MONEY MODULE]: Initialise - Failed to load configuration. Error: {0}", ex);
             }
         }
@@ -751,9 +752,11 @@ namespace OpenSim.Modules.Currency
             int balance = 0;
             IClientAPI client = agent.ControllingClient;
 
-            m_enable_server = LoginMoneyServer(agent, out balance);
+            bool loggedIn = LoginMoneyServer(agent, out balance);
             client.SendMoneyBalance(UUID.Zero, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
 
+            if (!loggedIn)
+                m_log.WarnFormat("[MONEY MODULE] MoneyServer login failed for {0}; other residents and regions remain active", client.AgentId);
             m_log.InfoFormat("[MONEY MODULE] OnMakeRootAgent: {0} {1}", client.AgentId, balance);
 
         }
