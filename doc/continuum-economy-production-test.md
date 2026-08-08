@@ -15,7 +15,10 @@ and conflict handling, balance reads, controlled currency purchase, object-sale
 authorization/capture/cancellation, land preflight and invalid secure-session
 rejection. The shared ledger acceptance suite passed on SQLite and PostgreSQL.
 On 2026-08-08 PostgreSQL was repeated from a clean schema: all 11 acceptance
-checks and the XML-RPC workflow passed. Fixed SQLite and PostgreSQL test balances
+checks and the XML-RPC workflow passed. The PostgreSQL wire test now also covers
+transaction lookup, charges, force/move transfers, controlled region credits,
+banker credits, operation replay, exact final balances and invalid shared-secret
+rejection. Fixed SQLite and PostgreSQL test balances
 plus transaction replay state survived complete service stop/start cycles. These
 checks establish test readiness; they do not replace the live matrix below.
 Repeat the current suite on the exact MySQL/MariaDB production-test version
@@ -59,6 +62,7 @@ Record transaction UUIDs, balances, relevant logs, and pass/fail for every row.
 | Stipends | Run the same stipend job twice and prove the stable operation ID prevents a second credit. |
 | Groups | Register a group, verify account type 100, membership fee behavior, group payments, history, and rejection of an existing resident-class UUID. |
 | Web/API | Verify balance and paged history authorization; no connection string, access key, or unrelated resident data may leak. |
+| Simulator RPC exposure | Probe each simulator public HTTP port and confirm the legacy `SendMoney`, `MoveMoney`, `AddBankerMoney`, `GetBalance`, `UpdateBalance`, `UserAlert`, and `OnMoneyTransfered` XML-RPC methods are not registered. Confirm direct calls to privileged service methods with a missing or invalid region secret fail without changing balances. |
 | Multi-region | Simultaneously spend one balance from two regions; total committed debit must never exceed available funds. Confirm a locally connected recipient receives an immediate balance update and a recipient on another simulator reads the committed balance on its next balance request. |
 | Failure recovery | Interrupt ContinuumEconomy.Service/database during authorize, delivery, capture, transfer, and credit; restart and retry using the same IDs. Inspect old holds with `holds`. |
 | Hypergrid | Confirm the local grid remains currency authority, foreign identities cannot gain banker privileges, and local balances are not disclosed remotely. |

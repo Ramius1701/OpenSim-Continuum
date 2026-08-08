@@ -30,7 +30,6 @@ using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -114,7 +113,6 @@ namespace OpenSim.Modules.ContinuumEconomy
 
         private string m_moneyServURL = string.Empty;
         private string m_continuumSecret = string.Empty;
-        public BaseHttpServer HttpServer;
 
         private string m_certFilename = "";
         private string m_certPassword = "";
@@ -157,9 +155,6 @@ namespace OpenSim.Modules.ContinuumEconomy
         private int PriceLandTax = 0;
         private int PriceLand = 0;
         private int PriceCurrency = 0;
-
-        /// <summary>The m RPC handlers</summary>
-        private Dictionary<string, XmlRpcMethod> m_rpcHandlers;
 
         /// <summary>
         /// Initializes the specified scene.
@@ -334,34 +329,6 @@ namespace OpenSim.Modules.ContinuumEconomy
 
             lock (m_sceneList)
             {
-                if (m_sceneList.Count == 0)
-                {
-                    if (m_enable_server)
-                    {
-                        HttpServer = new BaseHttpServer(9000);
-                        HttpServer.AddStreamHandler(new Region.Framework.Scenes.RegionStatsHandler(scene.RegionInfo));
-
-                        HttpServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-                        HttpServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-                        HttpServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                        HttpServer.AddXmlRPCHandler("GetBalance", GetBalanceHandler);
-                        HttpServer.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);
-                        HttpServer.AddXmlRPCHandler("SendMoney", SendMoneyHandler);
-                        HttpServer.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);
-
-                        m_rpcHandlers = new Dictionary<string, XmlRpcMethod>();
-
-                        MainServer.Instance.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-                        MainServer.Instance.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-                        MainServer.Instance.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                        MainServer.Instance.AddXmlRPCHandler("GetBalance", GetBalanceHandler);
-                        MainServer.Instance.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);
-                        MainServer.Instance.AddXmlRPCHandler("SendMoney", SendMoneyHandler);
-                        MainServer.Instance.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);
-
-                    }
-                }
-
                 if (m_sceneList.ContainsKey(scene.RegionInfo.RegionHandle))
                 {
                     m_sceneList[scene.RegionInfo.RegionHandle] = scene;
@@ -1254,6 +1221,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                         if (client != null && secureid == client.SecureSessionId.ToString() && (sessionid == UUID.Zero.ToString() || sessionid == client.SessionId.ToString()))
                         {
                             balance = QueryBalanceFromMoneyServer(client);
+                            ret = balance >= 0;
                         }
                     }
                 }

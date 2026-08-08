@@ -103,6 +103,14 @@ current session and secure-session UUIDs. Viewer currency purchase requests do
 not receive the region secret; they are authenticated with the secure session
 recorded during `ClientLogin`.
 
+The region connector registers no inbound money XML-RPC handlers. In
+particular, the legacy `SendMoney`, `MoveMoney`, `AddBankerMoney`,
+`GetBalance`, `UpdateBalance`, `UserAlert`, and `OnMoneyTransfered` names are
+not exposed on a simulator's public HTTP port. Trusted force-transfer and
+administrative-credit operations exist only on the separately deployed service
+and require its configured region secret; untrusted callers cannot turn a
+caller-supplied access code into a trusted request.
+
 Object sales use `AuthorizePurchase`, deliver through OpenSim's buy/sell module,
 then call `CapturePurchase`. Exceptions call `CancelPurchase`, leaving the
 seller uncredited and releasing the buyer's hold. Direct transfers remain
@@ -138,7 +146,10 @@ For a disposable test service, set `CONTINUUM_ECONOMY_TEST_SECRET` to the same
 (the default is `http://127.0.0.1:18119/`), then run
 `python addon-modules/ContinuumEconomy/tests/xmlrpc_smoke.py`. It uses only the
 Python standard library, generates unique UUIDs, and intentionally retains its
-audited test rows. Never point it at a production currency service.
+audited test rows. It exercises transaction lookup, charges, force/move
+transfers, controlled credits, replay safety, final balances and invalid-secret
+rejection in addition to the viewer purchase paths. Never point it at a
+production currency service.
 
 `ContinuumEconomy.Migrate holds` is a read-only operational report of
 authorized purchases that have not been captured or cancelled. It defaults to

@@ -69,6 +69,50 @@ cancel_request["amount"] = 10
 assert service.AuthorizePurchase(cancel_request)["state"] == "Authorized"
 assert service.CancelPurchase({"continuumSecret": secret,
     "purchaseID": str(cancel_id), "buyerID": str(buyer)})["state"] == "Cancelled"
+
+transaction_info = service.GetTransaction({"continuumSecret": secret,
+    "clientUUID": str(buyer), "clientSessionID": str(buyer_session),
+    "clientSecureSessionID": str(buyer_secure), "transactionID": str(transaction)})
+assert transaction_info["success"] is True
+assert transaction_info["amount"] == 25
+assert transaction_info["sender"] == str(buyer)
+assert transaction_info["receiver"] == str(seller)
+
+charge = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
+    "senderID": str(buyer), "senderSessionID": str(buyer_session),
+    "senderSecureSessionID": str(buyer_secure), "amount": 5,
+    "transactionType": 1101, "description": "Upload fee smoke"}
+assert service.PayMoneyCharge(charge)["success"] is True
+assert service.PayMoneyCharge(charge)["result"] == "Replayed"
+
+force = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
+    "senderID": str(seller), "receiverID": str(buyer), "amount": 3,
+    "transactionType": 5011, "description": "Trusted force transfer smoke"}
+assert service.ForceTransferMoney(force)["success"] is True
+assert service.ForceTransferMoney(force)["result"] == "Replayed"
+
+move = dict(force)
+move["transactionID"] = str(uuid.uuid4())
+move["amount"] = 2
+assert service.MoveMoney(move)["success"] is True
+
+credit = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
+    "receiverID": str(buyer), "amount": 4, "transactionType": 5012,
+    "description": "Trusted credit smoke"}
+assert service.SendMoney(credit)["success"] is True
+assert service.SendMoney(credit)["result"] == "Replayed"
+
+banker = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
+    "bankerID": str(seller), "amount": 6, "transactionType": 5010,
+    "description": "Trusted banker credit smoke"}
+assert service.AddBankerMoney(banker)["success"] is True
+assert balance(buyer, buyer_session, buyer_secure)["clientBalance"] == buyer_start - 31
+assert balance(seller, seller_session, seller_secure)["clientBalance"] == seller_start + 46
+
+unauthorized = dict(force)
+unauthorized["transactionID"] = str(uuid.uuid4())
+unauthorized["continuumSecret"] = "not-the-region-secret"
+assert service.ForceTransferMoney(unauthorized)["success"] is False
 assert service.ClientLogout({"continuumSecret": secret, "clientUUID": str(buyer),
     "clientSessionID": str(buyer_session),
     "clientSecureSessionID": str(buyer_secure)})["success"] is True
