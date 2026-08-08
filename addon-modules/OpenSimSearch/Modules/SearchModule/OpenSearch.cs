@@ -58,12 +58,17 @@ namespace OpenSimSearch.Modules.OpenSearch
                 return;
             }
 
-            m_SearchServer = searchConfig.GetString("SearchURL", "");
-            if (m_SearchServer == "")
+            m_SearchServer = searchConfig.GetString("SearchURL", "").Trim();
+            if (!Uri.TryCreate(m_SearchServer, UriKind.Absolute, out Uri searchUri) ||
+                (searchUri.Scheme != Uri.UriSchemeHttp && searchUri.Scheme != Uri.UriSchemeHttps))
             {
+                m_log.Error("[SEARCH] SearchURL must be an absolute HTTP or HTTPS URL; module disabled");
                 m_Enabled = false;
                 return;
             }
+
+            if (searchUri.Scheme != Uri.UriSchemeHttps)
+                m_log.Warn("[SEARCH] SearchURL is not HTTPS; queries and results can be observed or modified in transit");
 
             m_RequestTimeoutMs = Math.Clamp(
                 searchConfig.GetInt("RequestTimeoutMs", m_RequestTimeoutMs),
@@ -142,15 +147,36 @@ namespace OpenSimSearch.Modules.OpenSearch
         private void OnNewClient(IClientAPI client)
         {
             // Subscribe to messages
-            client.OnDirPlacesQuery += DirPlacesQuery;
-            client.OnDirFindQuery += DirFindQuery;
-            client.OnDirPopularQuery += DirPopularQuery;
-            client.OnDirLandQuery += DirLandQuery;
-            client.OnDirClassifiedQuery += DirClassifiedQuery;
+            client.OnDirPlacesQuery += (remote, query, text, flags, category, sim, start) =>
+                ExecuteSearchRequest(remote, "places", () => DirPlacesQuery(remote, query, text, flags, category, sim, start));
+            client.OnDirFindQuery += (remote, query, text, flags, start) =>
+                ExecuteSearchRequest(remote, "directory", () => DirFindQuery(remote, query, text, flags, start));
+            client.OnDirPopularQuery += (remote, query, flags) =>
+                ExecuteSearchRequest(remote, "popular", () => DirPopularQuery(remote, query, flags));
+            client.OnDirLandQuery += (remote, query, flags, type, price, area, start) =>
+                ExecuteSearchRequest(remote, "land", () => DirLandQuery(remote, query, flags, type, price, area, start));
+            client.OnDirClassifiedQuery += (remote, query, text, flags, category, start) =>
+                ExecuteSearchRequest(remote, "classifieds", () => DirClassifiedQuery(remote, query, text, flags, category, start));
             // Response after Directory Queries
-            client.OnEventInfoRequest += EventInfoRequest;
-            client.OnClassifiedInfoRequest += ClassifiedInfoRequest;
-            client.OnMapItemRequest += HandleMapItemRequest;
+            client.OnEventInfoRequest += (remote, eventID) =>
+                ExecuteSearchRequest(remote, "event details", () => EventInfoRequest(remote, eventID));
+            client.OnClassifiedInfoRequest += (classifiedID, remote) =>
+                ExecuteSearchRequest(remote, "classified details", () => ClassifiedInfoRequest(classifiedID, remote));
+            client.OnMapItemRequest += (remote, flags, estate, godlike, type, handle) =>
+                ExecuteSearchRequest(remote, "map items", () => HandleMapItemRequest(remote, flags, estate, godlike, type, handle));
+        }
+
+        private static void ExecuteSearchRequest(IClientAPI client, string operation, Action request)
+        {
+            try
+            {
+                request();
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat("[SEARCH]: Rejected malformed {0} response: {1}", operation, e.Message);
+                client.SendAgentAlertMessage("Unable to search at this time.", false);
+            }
         }
 
         //
@@ -202,7 +228,7 @@ namespace OpenSimSearch.Modules.OpenSearch
                     ex);
                 return ErrorResponse();
             }
-            if (Resp.IsFault)
+            if (Resp == null || Resp.IsFault)
                 return ErrorResponse();
             if (Resp.Value is not Hashtable respData)
             {
@@ -213,7 +239,50 @@ namespace OpenSimSearch.Modules.OpenSearch
                 return ErrorResponse();
             }
 
+            if (!TryGetBoolean(respData, "success", out bool success) || !success)
+                return ErrorResponse();
+            if (respData["data"] is not ArrayList responseData)
+            {
+                m_log.ErrorFormat(
+                    "[SEARCH]: Search Server {0} returned invalid data for {1}",
+                    m_SearchServer,
+                    method);
+                return ErrorResponse();
+            }
+
+            // Viewer directory replies use at most 100 entries plus a paging
+            // sentinel. Never allow an external backend to drive unbounded
+            // per-request iteration or allocation in the simulator.
+            if (responseData.Count > 101)
+            {
+                ArrayList bounded = new(101);
+                for (int i = 0; i < 101; ++i)
+                    bounded.Add(responseData[i]);
+                respData["data"] = bounded;
+            }
+
+            respData["success"] = true;
             return respData;
+        }
+
+        private static bool TryGetBoolean(Hashtable data, string key, out bool value)
+        {
+            value = false;
+            if (data == null || !data.ContainsKey(key) || data[key] == null)
+                return false;
+            try
+            {
+                value = Convert.ToBoolean(data[key], CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (InvalidCastException)
+            {
+                return false;
+            }
         }
 
         private static Hashtable ErrorResponse()
@@ -630,7 +699,11 @@ namespace OpenSimSearch.Modules.OpenSearch
 
                     ParcelRegionUUID = d["region_UUID"].ToString();
 
-                    foreach (Scene scene in m_Scenes)
+                    Scene[] scenes;
+                    lock (m_Scenes)
+                        scenes = m_Scenes.ToArray();
+
+                    foreach (Scene scene in scenes)
                     {
                         if (scene.RegionInfo.RegionID.ToString() == ParcelRegionUUID)
                         {
