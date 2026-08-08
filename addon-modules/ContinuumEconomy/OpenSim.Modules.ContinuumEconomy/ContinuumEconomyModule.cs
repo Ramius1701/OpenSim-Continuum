@@ -193,6 +193,10 @@ namespace OpenSim.Modules.ContinuumEconomy
         {
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise started.");
 
+            // Configuration is all-or-nothing. A shared module must not be
+            // registered after an exception leaves partially initialized state.
+            m_enabled = false;
+
             // ÃœberprÃ¼fen, ob die Konfigurationsquelle null ist.
             if (source == null)
             {
@@ -218,10 +222,6 @@ namespace OpenSim.Modules.ContinuumEconomy
                     m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - DTL/NSL MoneyModule is disabled.");
                     return;
                 }
-
-                m_enabled = true;
-
-                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - DTL/NSL MoneyModule is enabled.");
 
                 // Konfiguration fÃ¼r Verkauf und MoneyServer-URL
                 m_sellEnabled = economyConfig.GetBoolean("SellEnabled", m_sellEnabled);
@@ -305,7 +305,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                     _ => (int)AvatarType.UNKNOWN_AVATAR
                 };
 
-                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - Configuration loaded successfully.");
+                m_enabled = true;
+                m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: Initialise - Configuration loaded successfully; ContinuumEconomyModule is enabled.");
             }
             catch (Exception ex)
             {
@@ -714,10 +715,12 @@ namespace OpenSim.Modules.ContinuumEconomy
             int balance = 0;
             IClientAPI client = agent.ControllingClient;
 
-            m_enable_server = LoginMoneyServer(agent, out balance);
-            client.SendMoneyBalance(UUID.Zero, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+            bool loggedIn = LoginMoneyServer(agent, out balance);
+            client.SendMoneyBalance(UUID.Zero, loggedIn, new byte[0], Math.Max(0, balance), 0,
+                UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
 
-            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnMakeRootAgent: {0} {1}", client.AgentId, balance);
+            m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnMakeRootAgent: {0} {1} {2}",
+                client.AgentId, balance, loggedIn);
 
         }
 
