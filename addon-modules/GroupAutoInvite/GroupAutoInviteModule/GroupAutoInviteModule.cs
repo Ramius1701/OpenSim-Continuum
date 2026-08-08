@@ -45,6 +45,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly ConcurrentDictionary<UUID, byte> m_invitedThisSession = new ConcurrentDictionary<UUID, byte>();
+        private readonly ConcurrentDictionary<UUID, Timer> m_pendingInvites = new ConcurrentDictionary<UUID, Timer>();
 
         private Scene m_scene;
         private IGroupsModule m_groupsModule;
@@ -94,6 +95,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
             scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
             scene.EventManager.OnClientClosed -= OnClientClosed;
+            CancelPendingInvites();
             m_invitedThisSession.Clear();
             m_groupsModule = null;
             if (ReferenceEquals(m_scene, scene))
@@ -119,6 +121,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                 scene.EventManager.OnClientClosed -= OnClientClosed;
             }
 
+            CancelPendingInvites();
             m_invitedThisSession.Clear();
             m_groupsModule = null;
             m_scene = null;
@@ -132,22 +135,43 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             if (m_inviteOncePerSession && m_invitedThisSession.ContainsKey(sp.UUID))
                 return;
 
-            Util.FireAndForget(
-                o =>
+            Timer timer = null;
+            timer = new Timer(
+                _ =>
                 {
-                    if (m_inviteDelaySeconds > 0)
-                        Thread.Sleep(m_inviteDelaySeconds * 1000);
-
-                    TryInvite(sp.UUID);
+                    if (m_pendingInvites.TryRemove(sp.UUID, out Timer pending))
+                    {
+                        pending.Dispose();
+                        TryInvite(sp.UUID);
+                    }
                 },
                 null,
-                "GroupAutoInvite",
-                false);
+                Timeout.Infinite,
+                Timeout.Infinite);
+
+            if (!m_pendingInvites.TryAdd(sp.UUID, timer))
+            {
+                timer.Dispose();
+                return;
+            }
+
+            timer.Change(m_inviteDelaySeconds * 1000, Timeout.Infinite);
         }
 
         private void OnClientClosed(UUID agentID, Scene scene)
         {
+            if (m_pendingInvites.TryRemove(agentID, out Timer timer))
+                timer.Dispose();
             m_invitedThisSession.TryRemove(agentID, out _);
+        }
+
+        private void CancelPendingInvites()
+        {
+            foreach (UUID agentID in m_pendingInvites.Keys)
+            {
+                if (m_pendingInvites.TryRemove(agentID, out Timer timer))
+                    timer.Dispose();
+            }
         }
 
         private void TryInvite(UUID agentID)
