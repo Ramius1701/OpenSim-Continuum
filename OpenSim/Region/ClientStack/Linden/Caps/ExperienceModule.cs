@@ -30,6 +30,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         // Dictionary of Agent IDs, with a dictionary of experience permissions and their bools
         private Dictionary<UUID, Dictionary<UUID, bool>> m_ExperiencePermissions = new Dictionary<UUID, Dictionary<UUID, bool>>();
+        private readonly object m_ExperiencePermissionsLock = new object();
 
         private ExpiringCache<UUID, ExperienceInfo> m_ExperienceInfoCache = new ExpiringCache<UUID, ExperienceInfo>();
 
@@ -80,7 +81,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             scene.EventManager.OnClientClosed -= OnClientClosed;
             scene.EventManager.OnAvatarEnteringNewParcel -= EventManager_OnAvatarEnteringNewParcel;
             scene.UnregisterModuleInterface<IExperienceModule>(this);
-            m_ExperiencePermissions.Clear();
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions.Clear();
             m_scene = null;
         }
 
@@ -112,12 +114,16 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void OnNewClient(IClientAPI client)
         {
-            m_ExperiencePermissions[client.AgentId] = m_ExperienceService.FetchExperiencePermissions(client.AgentId);
+            Dictionary<UUID, bool> permissions = m_ExperienceService.FetchExperiencePermissions(client.AgentId)
+                ?? new Dictionary<UUID, bool>();
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions[client.AgentId] = permissions;
         }
 
         private void OnClientClosed(UUID agentID, Scene scene)
         {
-            m_ExperiencePermissions.Remove(agentID);
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions.Remove(agentID);
         }
 
         public void PostInitialise() {}
@@ -409,12 +415,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public ExperiencePermission GetExperiencePermission(UUID avatar_id, UUID experience_id)
         {
-            if(m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                if(m_ExperiencePermissions[avatar_id].ContainsKey(experience_id))
-                {
-                    return m_ExperiencePermissions[avatar_id][experience_id] ? ExperiencePermission.Allowed : ExperiencePermission.Blocked;
-                }
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions) &&
+                    permissions.TryGetValue(experience_id, out bool allowed))
+                    return allowed ? ExperiencePermission.Allowed : ExperiencePermission.Blocked;
             }
             return ExperiencePermission.None;
         }
@@ -424,10 +429,15 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             bool updated = m_ExperienceService.UpdateExperiencePermissions(avatar_id, experience_id, allow ? ExperiencePermission.Allowed : ExperiencePermission.Blocked);
             if(updated)
             {
-                if (m_ExperiencePermissions.ContainsKey(avatar_id) == false)
-                    m_ExperiencePermissions.Add(avatar_id, new Dictionary<UUID, bool>());
-
-                m_ExperiencePermissions[avatar_id][experience_id] = allow;
+                lock (m_ExperiencePermissionsLock)
+                {
+                    if (!m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    {
+                        permissions = new Dictionary<UUID, bool>();
+                        m_ExperiencePermissions[avatar_id] = permissions;
+                    }
+                    permissions[experience_id] = allow;
+                }
 
                 if (!allow)
                 {
@@ -443,53 +453,37 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public bool ForgetExperiencePermissions(UUID avatar_id, UUID experience_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            bool updated = m_ExperienceService.UpdateExperiencePermissions(
+                avatar_id, experience_id, ExperiencePermission.None);
+            if (updated)
             {
-                if (m_ExperiencePermissions[avatar_id].ContainsKey(experience_id))
+                lock (m_ExperiencePermissionsLock)
                 {
-                    bool updated = m_ExperienceService.UpdateExperiencePermissions(avatar_id, experience_id, ExperiencePermission.None);
-                    if(updated)
-                    {
-                        m_ExperiencePermissions[avatar_id].Remove(experience_id);
-                    }
-                    return updated;
+                    if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                        permissions.Remove(experience_id);
                 }
             }
-            return false;
+            return updated;
         }
 
         public UUID[] GetAllowedExperiences(UUID avatar_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                List<UUID> allowed_experiences = new List<UUID>();
-                foreach(var x in m_ExperiencePermissions[avatar_id])
-                {
-                    if(x.Value)
-                    {
-                        allowed_experiences.Add(x.Key);
-                    }
-                }
-                return allowed_experiences.ToArray();
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    return permissions.Where(x => x.Value).Select(x => x.Key).ToArray();
             }
-            return new UUID[0];
+            return Array.Empty<UUID>();
         }
 
         public UUID[] GetBlockedExperiences(UUID avatar_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                List<UUID> allowed_experiences = new List<UUID>();
-                foreach (var x in m_ExperiencePermissions[avatar_id])
-                {
-                    if (x.Value == false)
-                    {
-                        allowed_experiences.Add(x.Key);
-                    }
-                }
-                return allowed_experiences.ToArray();
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    return permissions.Where(x => !x.Value).Select(x => x.Key).ToArray();
             }
-            return new UUID[0];
+            return Array.Empty<UUID>();
         }
 
         public UUID[] GetAgentExperiences(UUID agent_id)
@@ -711,7 +705,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             var blocked_experiences = m_scene.RegionInfo.EstateSettings.BlockedExperiences.Union(
                 land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED).Select(x => x.AgentID));
 
-            var agent_allowed = m_ExperiencePermissions.ContainsKey(avatar.UUID) ? m_ExperiencePermissions[avatar.UUID].Where(x => x.Value == true).Select(x => x.Key) : Enumerable.Empty<UUID>();
+            UUID[] agent_allowed = GetAllowedExperiences(avatar.UUID);
 
             var allowed = estate_experiences.Union(parcel_experiences)
                 .Except(blocked_experiences)
