@@ -48,9 +48,12 @@ namespace OpenSim.Groups
 
         public GroupsServiceHGConnector(string url)
         {
-            m_ServerURI = url;
-            if (!m_ServerURI.EndsWith("/"))
-                m_ServerURI += "/";
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(serverUri.Host))
+                throw new ArgumentException("Hypergrid Groups service URL must be an absolute HTTP or HTTPS URL", nameof(url));
+
+            m_ServerURI = url.Trim().TrimEnd('/') + "/";
 
             m_log.DebugFormat("[Groups.HGConnector]: Groups server at {0}", m_ServerURI);
         }
@@ -272,8 +275,9 @@ namespace OpenSim.Groups
                          m_ServerURI + "hg-groups",
                          ServerUtils.BuildQueryString(sendData));
             }
-            catch
+            catch (Exception ex)
             {
+                m_log.WarnFormat("[Groups.HGConnector]: {0} request failed: {1}", method, ex.Message);
                 return null;
             }
 
@@ -282,9 +286,15 @@ namespace OpenSim.Groups
             if (string.IsNullOrEmpty(reply))
                 return null;
 
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-            return replyData;
+            try
+            {
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[Groups.HGConnector]: {0} response was invalid: {1}", method, ex.Message);
+                return null;
+            }
         }
         #endregion
 

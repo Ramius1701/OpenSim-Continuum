@@ -53,12 +53,12 @@ namespace OpenSim.Groups
         {
             IConfig groupsConfig = config.Configs["Groups"];
             string url = groupsConfig.GetString("GroupsServerURI", string.Empty);
-            if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri serverUri)
+                || (serverUri.Scheme != Uri.UriSchemeHttp && serverUri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(serverUri.Host))
                 throw new Exception(string.Format("[Groups.RemoteConnector]: Malformed groups server URL {0}. Fix it or disable the Groups feature.", url));
 
-            m_ServerURI = url;
-            if (!m_ServerURI.EndsWith("/"))
-                m_ServerURI += "/";
+            m_ServerURI = url.Trim().TrimEnd('/') + "/";
 
             /// This is from BaseServiceConnector
             string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", "Groups" }, "None");
@@ -667,20 +667,25 @@ namespace OpenSim.Groups
         {
             sendData["METHOD"] = method;
 
-            string reply = string.Empty;
-            lock (m_Lock)
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                         m_ServerURI + "groups",
-                         ServerUtils.BuildQueryString(sendData),
-                         m_Auth);
+            try
+            {
+                string reply;
+                lock (m_Lock)
+                    reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                             m_ServerURI + "groups",
+                             ServerUtils.BuildQueryString(sendData),
+                             m_Auth);
 
-            if (reply.Length == 0)
+                if (string.IsNullOrEmpty(reply))
+                    return null;
+
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[Groups.RemoteConnector]: {0} request failed: {1}", method, ex.Message);
                 return null;
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(
-                    reply);
-
-            return replyData;
+            }
         }
 
         #endregion
