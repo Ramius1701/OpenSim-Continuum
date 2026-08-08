@@ -96,6 +96,16 @@ hold atomically, while failed delivery cancels it without a reverse transfer.
 Ordinary transfers subtract active holds when checking available funds, which
 prevents concurrent spending from consuming money reserved for a purchase.
 
+Continuum also implements the additive `IReservedMoneyModule` contract for
+core fees. Upload inventory delivery, both official Groups implementations and
+classified creation reserve the charge before granting the benefit, capture it
+only after the downstream operation succeeds, and cancel it on a reported
+failure. MoneyServer Compatibility and unrelated money modules retain the
+existing `IMoneyModule` behavior. A benefit followed by two failed idempotent
+capture attempts is logged with its reservation UUID and remains visible to the
+operator `holds` report for reconciliation; it is never silently reversed or
+replayed under a new ID.
+
 The authenticated service requires a unique shared secret of at least 32
 characters. The connector adds that secret and a UUID operation key to every
 region-originated request. Resident transfers additionally require the avatar's

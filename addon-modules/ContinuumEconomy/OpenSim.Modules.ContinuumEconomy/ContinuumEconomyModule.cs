@@ -97,7 +97,7 @@ namespace OpenSim.Modules.ContinuumEconomy
     }
 
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ContinuumEconomyModule")]
-    public class ContinuumEconomyModule : IMoneyModule, ISharedRegionModule
+    public class ContinuumEconomyModule : IMoneyModule, IReservedMoneyModule, ISharedRegionModule
     {
         // Constant memebers
         private const int MONEYMODULE_REQUEST_TIMEOUT = 10000;
@@ -638,6 +638,44 @@ namespace OpenSim.Modules.ContinuumEconomy
 
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ApplyCharge: {0} {1} {2} {3}", agentID, amount, type, text);
         }
+
+        public bool ReserveCharge(UUID agentID, int amount, MoneyTransactionType type,
+            string description, out UUID reservationID)
+        {
+            reservationID = UUID.Zero;
+            if (amount <= 0)
+                return amount == 0;
+
+            IClientAPI client = GetLocateClient(agentID);
+            Scene scene = GetLocateScene(agentID);
+            if (client == null || scene == null)
+                return false;
+
+            reservationID = UUID.Random();
+            Hashtable parameters = new Hashtable
+            {
+                ["purchaseID"] = reservationID.ToString(),
+                ["buyerID"] = client.AgentId.ToString(),
+                ["buyerSessionID"] = client.SessionId.ToString(),
+                ["buyerSecureSessionID"] = client.SecureSessionId.ToString(),
+                ["amount"] = amount,
+                ["transactionType"] = (int)type,
+                ["regionUUID"] = scene.RegionInfo.RegionID.ToString(),
+                ["description"] = description ?? String.Empty
+            };
+            Hashtable result = genericCurrencyXMLRPCRequest(parameters, "AuthorizeCharge");
+            if (result != null && result.Contains("success") && (bool)result["success"])
+                return true;
+
+            reservationID = UUID.Zero;
+            return false;
+        }
+
+        public bool CaptureCharge(UUID reservationID, UUID agentID) =>
+            reservationID == UUID.Zero || CompletePurchase(reservationID, agentID, true);
+
+        public bool CancelCharge(UUID reservationID, UUID agentID) =>
+            reservationID == UUID.Zero || CompletePurchase(reservationID, agentID, false);
 
 
         /// <summary>Transfers the specified from identifier.</summary>
@@ -1569,8 +1607,25 @@ namespace OpenSim.Modules.ContinuumEconomy
         private bool CompletePurchase(UUID purchaseID, UUID buyerID, bool capture)
         {
             Hashtable p = new Hashtable { ["purchaseID"] = purchaseID.ToString(), ["buyerID"] = buyerID.ToString() };
-            Hashtable result = genericCurrencyXMLRPCRequest(p, capture ? "CapturePurchase" : "CancelPurchase");
+            string method = capture ? "CapturePurchase" : "CancelPurchase";
+            Hashtable result = genericCurrencyXMLRPCRequest(p, method);
+            if (IsTransientServiceFailure(result))
+            {
+                m_log.WarnFormat("[CONTINUUM ECONOMY MODULE]: {0} returned an ambiguous transport failure for purchase {1}; retrying the same idempotent operation once",
+                    method, purchaseID);
+                result = genericCurrencyXMLRPCRequest(p, method);
+            }
             return result != null && result.Contains("success") && (bool)result["success"];
+        }
+
+        private static bool IsTransientServiceFailure(Hashtable response)
+        {
+            if (response == null || !response.ContainsKey("success") || (bool)response["success"])
+                return false;
+
+            string message = response.ContainsKey("errorMessage") ? response["errorMessage"]?.ToString() : null;
+            return !String.IsNullOrEmpty(message) &&
+                message.IndexOf("Unable to manage your money", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
 

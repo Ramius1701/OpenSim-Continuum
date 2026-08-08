@@ -97,6 +97,7 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("getCurrencyQuote", CurrencyQuote);
             server.AddXmlRPCHandler("buyCurrency", BuyCurrency);
             server.AddXmlRPCHandler("AuthorizePurchase", AuthorizePurchase);
+            server.AddXmlRPCHandler("AuthorizeCharge", AuthorizeCharge);
             server.AddXmlRPCHandler("CapturePurchase", CapturePurchase);
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
             server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
@@ -240,6 +241,28 @@ namespace ContinuumEconomy.Service
             {
                 PurchaseID = purchase, BuyerID = buyer, SellerID = seller, Amount = amount,
                 TransactionType = type, RegionID = region, ObjectID = obj, Description = Text(p, "description")
+            });
+            return PurchaseReply(result);
+        }
+
+        private XmlRpcResponse AuthorizeCharge(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!Secret(p) || !Guid.TryParse(Text(p, "buyerID"), out Guid buyer) || buyer == Guid.Empty ||
+                !Guid.TryParse(Text(p, "buyerSessionID"), out Guid session) ||
+                !Guid.TryParse(Text(p, "buyerSecureSessionID"), out Guid secure) ||
+                !m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure ||
+                !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty ||
+                !Int64.TryParse(Text(p, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount) || amount <= 0)
+                return Failure("Invalid charge authorization request");
+
+            Int32.TryParse(Text(p, "transactionType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int type);
+            Guid.TryParse(Text(p, "regionUUID"), out Guid region);
+            LedgerPurchaseResult result = m_backend.Purchases.Authorize(new LedgerPurchaseRequest
+            {
+                PurchaseID = purchase, BuyerID = buyer, SellerID = m_systemActor, Amount = amount,
+                TransactionType = type, RegionID = region, ObjectID = Guid.Empty,
+                Description = Text(p, "description")
             });
             return PurchaseReply(result);
         }

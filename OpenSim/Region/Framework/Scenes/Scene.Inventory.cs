@@ -99,8 +99,30 @@ namespace OpenSim.Region.Framework.Scenes
         public void AddUploadedInventoryItem(UUID agentID, InventoryItemBase item, uint cost)
         {
             IMoneyModule money = RequestModuleInterface<IMoneyModule>();
-            money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
+            if (money is IReservedMoneyModule reservedMoney && cost > 0)
+            {
+                if (!reservedMoney.ReserveCharge(agentID, (int)cost,
+                    MoneyTransactionType.UploadCharge, "Asset upload", out UUID reservationID))
+                {
+                    m_log.WarnFormat("[AGENT INVENTORY]: Unable to reserve upload charge for agent {0}; inventory item {1} was not granted",
+                        agentID, item.ID);
+                    return;
+                }
 
+                if (AddInventoryItem(item))
+                {
+                    if (!reservedMoney.CaptureCharge(reservationID, agentID))
+                        m_log.ErrorFormat("[AGENT INVENTORY]: Upload item {0} was granted but charge reservation {1} requires reconciliation",
+                            item.ID, reservationID);
+                }
+                else
+                {
+                    reservedMoney.CancelCharge(reservationID, agentID);
+                }
+                return;
+            }
+
+            money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
             AddInventoryItem(item);
         }
 

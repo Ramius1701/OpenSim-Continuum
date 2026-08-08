@@ -78,6 +78,22 @@ assert transaction_info["amount"] == 25
 assert transaction_info["sender"] == str(buyer)
 assert transaction_info["receiver"] == str(seller)
 
+fee_reservation = uuid.uuid4()
+fee_request = {"continuumSecret": secret, "purchaseID": str(fee_reservation),
+    "buyerID": str(buyer), "buyerSessionID": str(buyer_session),
+    "buyerSecureSessionID": str(buyer_secure), "amount": 7,
+    "transactionType": 1101, "description": "Reserved upload fee smoke"}
+assert service.AuthorizeCharge(fee_request)["state"] == "Authorized"
+assert service.CapturePurchase({"continuumSecret": secret,
+    "purchaseID": str(fee_reservation), "buyerID": str(buyer)})["state"] == "Captured"
+
+cancelled_fee = dict(fee_request)
+cancelled_fee["purchaseID"] = str(uuid.uuid4())
+cancelled_fee["amount"] = 8
+assert service.AuthorizeCharge(cancelled_fee)["state"] == "Authorized"
+assert service.CancelPurchase({"continuumSecret": secret,
+    "purchaseID": cancelled_fee["purchaseID"], "buyerID": str(buyer)})["state"] == "Cancelled"
+
 charge = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
     "senderID": str(buyer), "senderSessionID": str(buyer_session),
     "senderSecureSessionID": str(buyer_secure), "amount": 5,
@@ -106,7 +122,7 @@ banker = {"continuumSecret": secret, "transactionID": str(uuid.uuid4()),
     "bankerID": str(seller), "amount": 6, "transactionType": 5010,
     "description": "Trusted banker credit smoke"}
 assert service.AddBankerMoney(banker)["success"] is True
-assert balance(buyer, buyer_session, buyer_secure)["clientBalance"] == buyer_start - 31
+assert balance(buyer, buyer_session, buyer_secure)["clientBalance"] == buyer_start - 38
 assert balance(seller, seller_session, seller_secure)["clientBalance"] == seller_start + 46
 
 unauthorized = dict(force)

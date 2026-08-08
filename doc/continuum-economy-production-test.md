@@ -33,7 +33,8 @@ messaging path.
 The portable wire-test client is
 `addon-modules/ContinuumEconomy/tests/xmlrpc_smoke.py`. It refuses to run without
 an explicitly supplied `CONTINUUM_ECONOMY_TEST_SECRET`; use it only with a
-disposable service/database because generated audit rows are retained.
+disposable service/database because generated audit rows are retained. It also
+proves captured and cancelled fee reservations against the configured provider.
 
 ## Required cutover gates
 
@@ -57,7 +58,7 @@ Record transaction UUIDs, balances, relevant logs, and pass/fail for every row.
 | Script payment | Verify `money()` delivery, `llGiveMoney`, debit permission denial and insufficient funds. Force an ambiguous response/timeout, retry the same `llGiveMoney` transaction UUID, and prove the supplied UUID reaches the ledger and prevents a second debit. |
 | Object sale | Buy zero-price and paid copy/original/contents. Zero-price delivery must not create a ledger row. Paid delivery failure cancels the hold, success captures exactly once, and concurrent spend cannot consume held funds. |
 | Land | Test zero-price, authorized, insufficient-funds, service-failure and balance-race parcel purchases. Paid ownership must move only when `amountDebited` exactly equals the validated price; failed or partial debits must leave ownership unchanged. Verify history and seller credit. |
-| Fees | Test upload and group-creation fees at zero and non-zero settings, including insufficient funds. Cross or log out during a fee request and prove the simulator neither throws nor submits a charge against a stale region presence. |
+| Fees | Test uploads, group creation, group enrollment and new classifieds at zero and non-zero settings, including insufficient funds. For each operation prove the fee is reserved before the benefit, captured once after success, and cancelled after a forced downstream failure. Cross or log out during a fee request and prove the simulator neither throws nor submits a charge against a stale region presence. Force both capture attempts to fail after a benefit and verify the reservation UUID is logged and appears in `holds` for reconciliation. |
 | Currency purchase | Test allowed banker IPs, invalid credentials, per-period credit limits, maximum balance, and audited actor/reason. PayPal or real-money processing is out of scope. |
 | Stipends | Run the same stipend job twice and prove the stable operation ID prevents a second credit. |
 | Groups | Register a group, verify account type 100, membership fee behavior, group payments, history, and rejection of an existing resident-class UUID. |

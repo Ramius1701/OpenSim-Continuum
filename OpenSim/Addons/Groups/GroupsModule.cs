@@ -913,11 +913,21 @@ namespace OpenSim.Groups
             // check funds
             // is there a money module present ?
             IMoneyModule money = scene.RequestModuleInterface<IMoneyModule>();
+            IReservedMoneyModule reservedMoney = money as IReservedMoneyModule;
+            UUID chargeReservation = UUID.Zero;
             if (money != null)
             {
                 // do the transaction, that is if the agent has got sufficient funds
                 if (!money.AmountCovered(remoteClient.AgentId, money.GroupCreationCharge)) {
                     remoteClient.SendCreateGroupReply(UUID.Zero, false, "Insufficient funds to create a group.");
+                    return UUID.Zero;
+                }
+
+                if (reservedMoney != null && money.GroupCreationCharge > 0 &&
+                    !reservedMoney.ReserveCharge(remoteClient.AgentId, money.GroupCreationCharge,
+                        MoneyTransactionType.GroupCreate, name, out chargeReservation))
+                {
+                    remoteClient.SendCreateGroupReply(UUID.Zero, false, "Unable to reserve the group creation fee.");
                     return UUID.Zero;
                 }
             }
@@ -928,7 +938,13 @@ namespace OpenSim.Groups
 
             if (!groupID.IsZero())
             {
-                if (money != null && money.GroupCreationCharge > 0)
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                {
+                    if (!reservedMoney.CaptureCharge(chargeReservation, remoteClient.AgentId))
+                        m_log.ErrorFormat("[Groups]: Group {0} was created but fee reservation {1} requires reconciliation",
+                            groupID, chargeReservation);
+                }
+                else if (money != null && money.GroupCreationCharge > 0)
                     money.ApplyCharge(remoteClient.AgentId, money.GroupCreationCharge, MoneyTransactionType.GroupCreate, name);
 
                 remoteClient.SendCreateGroupReply(groupID, true, "Group created successfully");
@@ -937,7 +953,11 @@ namespace OpenSim.Groups
                 SendAgentGroupDataUpdate(remoteClient, true);
             }
             else
+            {
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                    reservedMoney.CancelCharge(chargeReservation, remoteClient.AgentId);
                 remoteClient.SendCreateGroupReply(groupID, false, reason);
+            }
 
             return groupID;
         }
@@ -1127,7 +1147,15 @@ namespace OpenSim.Groups
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             GroupRecord groupRecord = GetGroupRecord(groupID);
+            if (groupRecord == null)
+            {
+                remoteClient.SendAlertMessage("The group could not be found.");
+                remoteClient.SendJoinGroupReply(groupID, false);
+                return;
+            }
             IMoneyModule money = remoteClient.Scene.RequestModuleInterface<IMoneyModule>();
+            IReservedMoneyModule reservedMoney = money as IReservedMoneyModule;
+            UUID chargeReservation = UUID.Zero;
 
             // Should check to see if there's an outstanding invitation
 
@@ -1140,6 +1168,15 @@ namespace OpenSim.Groups
                     remoteClient.SendJoinGroupReply(groupID, false);
                     return;
                 }
+
+                if (reservedMoney != null && !reservedMoney.ReserveCharge(remoteClient.AgentId,
+                    groupRecord.MembershipFee, MoneyTransactionType.GroupJoin,
+                    groupRecord.GroupName, out chargeReservation))
+                {
+                    remoteClient.SendAlertMessage("Unable to reserve the group enrollment fee.");
+                    remoteClient.SendJoinGroupReply(groupID, false);
+                    return;
+                }
             }
 
             string reason = string.Empty;
@@ -1147,7 +1184,13 @@ namespace OpenSim.Groups
 
             if (m_groupData.AddAgentToGroup(requestingAgentIDStr, requestingAgentIDStr, groupID, UUID.Zero, string.Empty, out reason))
             {
-                if (money != null && groupRecord.MembershipFee > 0)
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                {
+                    if (!reservedMoney.CaptureCharge(chargeReservation, remoteClient.AgentId))
+                        m_log.ErrorFormat("[Groups]: Agent {0} joined group {1} but fee reservation {2} requires reconciliation",
+                            remoteClient.AgentId, groupID, chargeReservation);
+                }
+                else if (money != null && groupRecord.MembershipFee > 0)
                     money.ApplyCharge(remoteClient.AgentId, groupRecord.MembershipFee, MoneyTransactionType.GroupJoin, groupRecord.GroupName);
 
                 remoteClient.SendJoinGroupReply(groupID, true);
@@ -1160,7 +1203,11 @@ namespace OpenSim.Groups
                     remoteClient.SendAlertMessage("Warning: " + reason);
             }
             else
+            {
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                    reservedMoney.CancelCharge(chargeReservation, remoteClient.AgentId);
                 remoteClient.SendJoinGroupReply(groupID, false);
+            }
         }
 
         public void LeaveGroupRequest(IClientAPI remoteClient, UUID groupID)
