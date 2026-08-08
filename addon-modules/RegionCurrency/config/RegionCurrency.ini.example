@@ -1,10 +1,10 @@
-; RegionCurrency - avatar wallet + PayPal token purchases, ported from
-; GuntharDeNiro/opensim's RegionWeb module (the Currency/PayPal system there
-; originally shared a login with the Estate Admin control room; it's been
-; split out here into its own independent module with its own login, at the
-; user's request, since the two features have nothing to do with each
-; other and sharing auth code between them was the main obstacle to
-; separating them cleanly).
+; DEPRECATED COMPATIBILITY MODULE.
+;
+; GuntharDeNiro/opensim supplied this wallet and PayPal portal as part of
+; RegionWeb. Continuum keeps RegionWeb as the canonical combined module.
+; RegionCurrency is retained temporarily for deployments made against the
+; earlier AI-created split; it disables itself whenever RegionWeb is enabled.
+; New deployments must configure the wallet under [RegionWeb] instead.
 ;
 ; This is real, functioning PayPal integration code (OAuth2 client-
 ; credentials flow against PayPal's actual REST API), not a stub - but it
@@ -23,8 +23,7 @@
     ; Master switch. Off by default.
     Enabled = false
 
-    ; Public HTTP path this module serves on. Independent of RegionWeb's
-    ; own PublicPath - they no longer share a path or a login.
+    ; Compatibility-only HTTP path. Do not enable beside RegionWeb.
     PublicPath = /currency
 
     ; Require HTTPS and mark wallet cookies Secure. Set false only on a

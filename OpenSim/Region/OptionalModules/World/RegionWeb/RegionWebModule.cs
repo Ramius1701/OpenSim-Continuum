@@ -116,6 +116,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private bool m_requireHttpsForAuthenticatedRoutes = true;
         private int m_maxRequestBodyBytes = 1024 * 1024;
         private bool m_payPalEnabled;
+        private bool m_allowRealMoneyIntegration;
         private int m_postsPerPage;
         private int m_currencyChallengeMinutes = 10;
         private int m_currencyChallengeCooldownSeconds = 20;
@@ -178,6 +179,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", "disabled"));
             m_currencyPurchaseStoragePath = config.GetString("CurrencyPurchaseStorage", "Currency/regionweb-purchases.tsv").Trim();
             m_payPalEnabled = config.GetBoolean("PayPalEnabled", false);
+            m_allowRealMoneyIntegration = config.GetBoolean("AllowRealMoneyIntegration", false);
             m_payPalEnvironment = NormalizePayPalEnvironment(config.GetString("PayPalEnvironment", "sandbox"));
             m_payPalClientID = config.GetString("PayPalClientID", string.Empty).Trim();
             m_payPalClientSecret = config.GetString("PayPalClientSecret", string.Empty).Trim();
@@ -199,6 +201,18 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 m_currencyPurchaseStoragePath = "Currency/regionweb-purchases.tsv";
             if (string.IsNullOrEmpty(m_payPalOrderStoragePath))
                 m_payPalOrderStoragePath = "Currency/regionweb-paypal-orders.tsv";
+
+            if (m_currencyBuyMode.Equals("paypal", StringComparison.OrdinalIgnoreCase)
+                && (!m_payPalEnabled || !m_allowRealMoneyIntegration))
+            {
+                m_log.Warn("[REGION WEB]: PayPal buy mode requires both PayPalEnabled=true and AllowRealMoneyIntegration=true; purchases disabled.");
+                m_currencyBuyEnabled = false;
+                m_currencyBuyMode = "disabled";
+            }
+
+            IConfig compatibilityConfig = source.Configs["RegionCurrency"];
+            if (m_enabled && compatibilityConfig != null && compatibilityConfig.GetBoolean("Enabled", false))
+                m_log.Warn("[REGION WEB]: RegionCurrency is also enabled. RegionWeb is the canonical combined portal; the compatibility module will disable itself.");
 
             m_absoluteContentDirectory = Path.IsPathRooted(m_contentDirectory)
                 ? m_contentDirectory
@@ -2777,6 +2791,12 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 return false;
             }
 
+            if (!m_allowRealMoneyIntegration)
+            {
+                reason = "PayPal checkout requires AllowRealMoneyIntegration = true in [RegionWeb].";
+                return false;
+            }
+
             if (string.IsNullOrWhiteSpace(m_payPalClientID) || string.IsNullOrWhiteSpace(m_payPalClientSecret))
             {
                 reason = "PayPal checkout needs PayPalClientID and PayPalClientSecret in [RegionWeb].";
@@ -3486,12 +3506,19 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 m_currencyBuyLimit = Math.Max(1, config.GetInt("CurrencyBuyLimit", m_currencyBuyLimit));
                 m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", m_currencyBuyMode));
                 m_payPalEnabled = config.GetBoolean("PayPalEnabled", m_payPalEnabled);
+                m_allowRealMoneyIntegration = config.GetBoolean("AllowRealMoneyIntegration", m_allowRealMoneyIntegration);
                 m_payPalEnvironment = NormalizePayPalEnvironment(config.GetString("PayPalEnvironment", m_payPalEnvironment));
                 m_payPalClientID = config.GetString("PayPalClientID", m_payPalClientID).Trim();
                 m_payPalClientSecret = config.GetString("PayPalClientSecret", m_payPalClientSecret).Trim();
                 m_payPalCurrencyCode = NormalizePayPalCurrency(config.GetString("PayPalCurrencyCode", m_payPalCurrencyCode));
                 m_payPalPricePerToken = ParsePositiveDecimal(config.GetString("PayPalPricePerToken", m_payPalPricePerToken.ToString(CultureInfo.InvariantCulture)), m_payPalPricePerToken);
                 m_payPalReturnBaseUrl = config.GetString("PayPalReturnBaseUrl", m_payPalReturnBaseUrl).Trim();
+                if (m_currencyBuyMode.Equals("paypal", StringComparison.OrdinalIgnoreCase)
+                    && (!m_payPalEnabled || !m_allowRealMoneyIntegration))
+                {
+                    m_currencyBuyEnabled = false;
+                    m_currencyBuyMode = "disabled";
+                }
                 m_defaultEstateTitle = defaultEstateTitle;
                 m_contentDirectory = contentDirectory;
                 m_absoluteContentDirectory = Path.IsPathRooted(m_contentDirectory)

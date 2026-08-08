@@ -2939,6 +2939,13 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 return;
 
             m_enabled = config.GetBoolean("Enabled", false);
+            IConfig regionWebConfig = source.Configs["RegionWeb"];
+            if (m_enabled && regionWebConfig != null && regionWebConfig.GetBoolean("Enabled", false))
+            {
+                m_log.Warn("[REGION CURRENCY]: Disabled because RegionWeb is enabled. RegionWeb is the canonical combined website and currency portal; RegionCurrency is compatibility-only.");
+                m_enabled = false;
+                return;
+            }
             m_basePath = CleanPath(config.GetString("PublicPath", "/currency"));
             m_defaultEstateTitle = config.GetString("EstateTitle", "My OpenSim Estate").Trim();
             if (string.IsNullOrEmpty(m_defaultEstateTitle))

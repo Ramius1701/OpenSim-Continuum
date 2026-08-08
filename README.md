@@ -51,11 +51,10 @@ The extended scripting surface is powerful and has estate/security implications.
 
 ### Optional region modules and services
 
-- Gunthar RegionWeb per-region website and protected estate tools
+- Gunthar RegionWeb combined per-region website, protected estate tools and optional wallet portal
 - GroupAutoInvite
-- RegionCurrency compatibility portal, disabled and fail-closed by default;
-  purchases, transfers, HTTPS exceptions, and experimental PayPal access each
-  require explicit configuration and it is not a currency backend
+- Deprecated RegionCurrency compatibility portal for deployments made against
+  the earlier split; it disables itself when RegionWeb is enabled
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
 - MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
@@ -88,10 +87,12 @@ The following components require deliberate opt-in:
 - Recovered economy, search, environment, and protection modules through their own configuration sections
 - Warp3D flat-card sprite rendering through its renderer flags
 
-RegionWeb is the per-region public site, not WhiteCore WebUI. Its public pages
-may be served independently, but Estate Admin requires HTTPS by default. The
-legacy wallet embedded in the donor module is disabled; use the separately
-packaged RegionCurrency compatibility portal only when explicitly required.
+RegionWeb is the canonical combined Gunthar-derived per-region site, estate
+control room and optional wallet presentation; it is not WhiteCore WebUI and it
+is not an economy backend. Public pages may be served independently, while
+Estate Admin and wallet routes require HTTPS by default. RegionCurrency is only
+a deprecated compatibility path for deployments made against the earlier split
+and automatically disables itself whenever RegionWeb is enabled.
 
 `[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
