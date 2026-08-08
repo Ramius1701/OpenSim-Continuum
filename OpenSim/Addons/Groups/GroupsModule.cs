@@ -185,9 +185,6 @@ namespace OpenSim.Groups
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_groupsEnabled)
-                return;
-
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             scene.EventManager.OnNewClient -= OnNewClient;
@@ -195,6 +192,14 @@ namespace OpenSim.Groups
             scene.EventManager.OnMakeChildAgent -= OnMakeChild;
             scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             scene.EventManager.OnClientClosed -= OnClientClosed;
+            scene.UnregisterModuleInterface<IGroupsModule>(this);
+
+            scene.ForEachClient(client =>
+            {
+                client.OnAgentDataUpdateRequest -= OnAgentDataUpdateRequest;
+                client.OnUUIDGroupNameRequest -= HandleUUIDGroupNameRequest;
+                client.OnInstantMessage -= OnInstantMessage;
+            });
 
             lock (m_sceneList)
             {
@@ -204,10 +209,14 @@ namespace OpenSim.Groups
 
         public void Close()
         {
-            if (!m_groupsEnabled)
-                return;
-
             if (m_debugEnabled) m_log.Debug("[Groups]: Shutting down Groups module.");
+
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = m_sceneList.ToArray();
+
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         public Type ReplaceableInterface

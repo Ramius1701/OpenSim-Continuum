@@ -133,7 +133,11 @@ namespace OpenSim.Groups
                 return;
 
             scene.RegisterModuleInterface<IGroupsMessagingModule>(this);
-            m_sceneList.Add(scene);
+            lock (m_sceneList)
+            {
+                if (!m_sceneList.Contains(scene))
+                    m_sceneList.Add(scene);
+            }
 
             scene.EventManager.OnNewClient += OnNewClient;
             scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
@@ -193,26 +197,30 @@ namespace OpenSim.Groups
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_groupMessagingEnabled)
-                return;
-
             if (m_debugEnabled) m_log.DebugFormat("[Groups.Messaging]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
-            m_sceneList.Remove(scene);
+            lock (m_sceneList)
+                m_sceneList.Remove(scene);
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+            scene.EventManager.OnMakeChildAgent -= OnMakeChildAgent;
             scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             scene.EventManager.OnClientLogin -= OnClientLogin;
             scene.UnregisterModuleInterface<IGroupsMessagingModule>(this);
+
+            scene.ForEachClient(client => client.OnInstantMessage -= OnInstantMessage);
         }
 
         public void Close()
         {
-            if (!m_groupMessagingEnabled)
-                return;
-
             if (m_debugEnabled) m_log.Debug("[Groups.Messaging]: Shutting down GroupsMessagingModule module.");
 
-            m_sceneList.Clear();
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = m_sceneList.ToArray();
+
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
 
             m_groupData = null;
             m_msgTransferModule = null;
