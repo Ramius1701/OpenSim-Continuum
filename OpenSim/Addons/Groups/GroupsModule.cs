@@ -286,6 +286,8 @@ namespace OpenSim.Groups
                 return;
 
             ScenePresence sp = scene.GetScenePresence(AgentId);
+            if (sp == null)
+                return;
             IClientAPI client = sp.ControllingClient;
             if (client != null)
             {
@@ -1268,8 +1270,15 @@ namespace OpenSim.Groups
                 }
                 else
                 {
-                    regionInfo = m_sceneList[0].RegionInfo;
-                    UserAccount acc = m_sceneList[0].UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
+                    Scene scene = GetAnyScene();
+                    if (scene == null)
+                    {
+                        m_log.WarnFormat("[Groups]: Cannot notify eject operation for {0}; no region is available", agentID);
+                        return;
+                    }
+
+                    regionInfo = scene.RegionInfo;
+                    UserAccount acc = scene.UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
 
                     if (acc != null)
                     {
@@ -1286,7 +1295,7 @@ namespace OpenSim.Groups
             if ((groupInfo == null))
                 return;
 
-            UserData udata = m_sceneList[0].UserManagementModule.GetUserData(ejecteeID);
+            UserData udata = m_UserManagement?.GetUserData(ejecteeID);
             IClientAPI ejecteeClient = GetActiveRootClient(ejecteeID);
 
             string ejecteeName;
@@ -1373,7 +1382,13 @@ namespace OpenSim.Groups
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             string agentName = m_UserManagement.GetUserName(agentID);
-            RegionInfo regionInfo = m_sceneList[0].RegionInfo;
+            Scene scene = remoteClient?.Scene as Scene ?? GetAnyScene();
+            if (scene == null)
+            {
+                m_log.WarnFormat("[Groups]: Cannot send invitation for group {0}; no region is available", groupID);
+                return;
+            }
+            RegionInfo regionInfo = scene.RegionInfo;
 
             GroupRecord group = m_groupData.GetGroupRecord(agentID.ToString(), groupID, null);
             if (group == null)
@@ -1437,9 +1452,21 @@ namespace OpenSim.Groups
         #endregion
 
         #region Client/Update Tools
+        private Scene[] GetScenesSnapshot()
+        {
+            lock (m_sceneList)
+                return m_sceneList.ToArray();
+        }
+
+        private Scene GetAnyScene()
+        {
+            lock (m_sceneList)
+                return m_sceneList.Count == 0 ? null : m_sceneList[0];
+        }
+
         private IClientAPI GetActiveRootClient(UUID agentID)
         {
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null && !sp.IsChildAgent && !sp.IsDeleted)
@@ -1458,7 +1485,7 @@ namespace OpenSim.Groups
             IClientAPI child = null;
 
             // Try root avatar first
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null&& !sp.IsDeleted)
@@ -1484,7 +1511,7 @@ namespace OpenSim.Groups
 
             ScenePresence presence = null;
 
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 presence = scene.GetScenePresence(AgentID);
                 if (presence != null)
@@ -1598,7 +1625,8 @@ namespace OpenSim.Groups
                 activeGroupName = membership.GroupName;
             }
 
-            UserAccount account = m_sceneList[0].UserAccountService.GetUserAccount(remoteClient.Scene.RegionInfo.ScopeID, agentID);
+            Scene requestScene = remoteClient.Scene as Scene ?? GetAnyScene();
+            UserAccount account = requestScene?.UserAccountService.GetUserAccount(remoteClient.Scene.RegionInfo.ScopeID, agentID);
             string firstname, lastname;
             if (account != null)
             {

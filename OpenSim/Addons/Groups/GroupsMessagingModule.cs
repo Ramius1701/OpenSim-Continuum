@@ -425,6 +425,12 @@ namespace OpenSim.Groups
 
         #region SimGridEventHandlers
 
+        private Scene[] GetScenesSnapshot()
+        {
+            lock (m_sceneList)
+                return m_sceneList.ToArray();
+        }
+
         void OnClientLogin(IClientAPI client)
         {
             if (m_debugEnabled) m_log.DebugFormat("[Groups.Messaging]: OnInstantMessage registered for {0}", client.Name);
@@ -473,7 +479,11 @@ namespace OpenSim.Groups
 
                 UUID GroupID = new UUID(msg.imSessionID);
 
-                Scene aScene = m_sceneList[0];
+                Scene[] scenes = GetScenesSnapshot();
+                if (scenes.Length == 0)
+                    return;
+
+                Scene aScene = scenes[0];
                 GridRegion regionOfOrigin = aScene.GridService.GetRegionByUUID(aScene.RegionInfo.ScopeID, regionID);
 
                 List<GroupMembersData> groupMembers = m_groupData.GetGroupMembers(UUID.Zero.ToString(), GroupID);
@@ -482,7 +492,7 @@ namespace OpenSim.Groups
                 //    foreach (GroupMembersData m in groupMembers)
                 //        m_log.DebugFormat("[Groups.Messaging]: member {0}", m.AgentID);
 
-                foreach (Scene s in m_sceneList)
+                foreach (Scene s in scenes)
                 {
                     s.ForEachScenePresence(sp =>
                         {
@@ -746,7 +756,7 @@ namespace OpenSim.Groups
             IClientAPI child = null;
 
             // Try root avatar first
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null)
