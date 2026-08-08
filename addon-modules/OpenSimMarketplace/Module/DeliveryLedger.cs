@@ -64,11 +64,22 @@ internal sealed class DeliveryLedger
                 byte[] json = JsonSerializer.SerializeToUtf8Bytes(receipt);
                 using FileStream stream = new(
                     m_path,
-                    FileMode.Append,
-                    FileAccess.Write,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
                     FileShare.Read,
                     4096,
                     FileOptions.WriteThrough);
+
+                // A process or host failure can leave a partial final JSON
+                // record. Preserve it for diagnosis, but never concatenate a
+                // new receipt onto it and thereby lose both records on reload.
+                if (stream.Length > 0)
+                {
+                    stream.Seek(-1, SeekOrigin.End);
+                    if (stream.ReadByte() != (byte)'\n')
+                        stream.WriteByte((byte)'\n');
+                }
+                stream.Seek(0, SeekOrigin.End);
                 stream.Write(json, 0, json.Length);
                 stream.WriteByte((byte)'\n');
                 stream.Flush(true);
@@ -102,7 +113,23 @@ internal sealed class DeliveryLedger
                 DeliveryReceipt? receipt = JsonSerializer.Deserialize<DeliveryReceipt>(line);
                 if (receipt == null || string.IsNullOrWhiteSpace(receipt.DeliveryId))
                     continue;
-                m_receipts[receipt.DeliveryId] = receipt;
+                if (m_receipts.TryGetValue(receipt.DeliveryId, out DeliveryReceipt? existing))
+                {
+                    if (!existing.Matches(
+                        receipt.SellerId,
+                        receipt.SnapshotFolderId,
+                        receipt.RecipientId,
+                        receipt.SnapshotFingerprint))
+                    {
+                        m_log.ErrorFormat(
+                            "[OPENSIM MARKETPLACE]: Ignoring conflicting duplicate delivery ID {0} on ledger line {1}; the first valid receipt remains authoritative",
+                            receipt.DeliveryId,
+                            lineNumber);
+                    }
+                    continue;
+                }
+
+                m_receipts.Add(receipt.DeliveryId, receipt);
             }
             catch (Exception ex)
             {
