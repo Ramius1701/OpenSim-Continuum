@@ -54,7 +54,15 @@ namespace OpenSim.Services.AbuseReportsService
             if (report == null)
                 return false;
 
+            Normalize(report);
+
             if (report.SenderID.IsZero() || report.AbuseRegionID.IsZero() ||
+                report.SenderName.Length > 64 ||
+                report.AbuseRegionName.Length > 45 ||
+                report.AbuserName.Length > 128 ||
+                report.Category.Length > 128 ||
+                report.Position.Length > 45 ||
+                report.Version.Length > 256 ||
                 Encoding.UTF8.GetByteCount(report.Summary ?? string.Empty) > m_MaxSummaryBytes ||
                 Encoding.UTF8.GetByteCount(report.Details ?? string.Empty) > m_MaxDetailsBytes ||
                 (report.ImageData?.Length ?? 0) > m_MaxScreenshotBytes)
@@ -68,8 +76,6 @@ namespace OpenSim.Services.AbuseReportsService
                     m_MaxScreenshotBytes);
                 return false;
             }
-
-            Normalize(report);
 
             try
             {
