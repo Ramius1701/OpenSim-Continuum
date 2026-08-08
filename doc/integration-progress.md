@@ -24,7 +24,10 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 | Abuse Reports | Grid service, providers, CAPS and administrative console workflow are present; shipped connector selection now registers storage without the obsolete undocumented Messaging gate; simulator and Robust independently enforce payload limits | Complete Release build passed with 0 warnings and 0 errors | Runtime certification only: submit with/without screenshot, restart, retrieve/update administratively, exercise two simulators and test malformed/oversized input |
 | Search | Optional OpenSimSearch viewer-directory client is present for places, land, events, classifieds and map requests; request timeout and malformed-response handling are bounded. The historical unlicensed PHP/MySQL crawler is intentionally not bundled | Module and complete Release build required for this checkpoint | A compatible external backend is still required; test places, land, events, classifieds, map, privacy, paging, deletion and propagation. Authenticated native indexing/admin is deferred to OpenSim-Grid-Interface |
 | Weather and Tide | Optional modules are packaged; Weather 0.3.4 is reconciled to the Gunthar 0.3.3 behavior base with bounded timers, serialized transitions, rollback and generated-object cleanup. Tide validates unsafe configuration, restores the original region water height on shutdown and is disabled by default | Complete Release build succeeds with 0 warnings and 0 errors | Run long-duration weather transitions, shutdown/restart cleanup, crossings, viewer rendering, tide-cycle and adjacent-region water-seam tests |
-| Other recovered addons | Documented optional components are packaged | Complete Release build succeeds | Run each addon's handoff matrix and keep it disabled unless selected |
+| GroupAutoInvite | Optional module is packaged; delayed requests are bounded, shutdown unsubscribes events, and failed service requests remain retryable | Complete Release build succeeds with 0 warnings and 0 errors | Verify membership, invitation authorization, crossings, logout, Groups outage/recovery and Hypergrid visitor policy |
+| OpenSimMarketplace | Optional Direct Delivery service is packaged; request/body/inventory limits, operation idempotency, durable receipt ledger, placeholder-secret rejection and handler teardown are present | Complete Release build succeeds with 0 warnings and 0 errors | Deploy behind HTTPS and run forged request, nested inventory, permissions, duplicate delivery, restart, outage and website/MySQL workflow tests |
+| HoloPhysicsGuard | Optional conservative physics sleeper is packaged and disabled/report-only by default; timer re-entry and interval overflow are bounded | Complete Release build succeeds with 0 warnings and 0 errors | PersistSleep remains MySQL/MariaDB-only; run native-physics false-positive, restart, database-loss and multi-region tests before any provider expansion |
+| Other recovered addons | Remaining documented optional components are packaged | Complete Release build succeeds | Run each addon's handoff matrix and keep it disabled unless selected |
 
 ## ContinuumEconomy verified commits
 
@@ -39,8 +42,8 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 - `20f1729fb3`: order land settlement, require an exact committed debit and preserve zero-price sales.
 - `f336752f69`: refresh test-only adapters for current Dev interfaces.
 
-The latest complete Release build passed with the four known CS9193 warnings
-and no errors. Generated
+The latest complete Release build passed with zero warnings and zero errors.
+Generated
 `bin/*.runtimeconfig.json` files and `.audit/` material are build/test artifacts
 and intentionally remain untracked.
 

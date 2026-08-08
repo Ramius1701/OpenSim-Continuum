@@ -26,6 +26,7 @@
     RoleID =
 
     ; Seconds to wait after an avatar arrives before sending the invite.
+    ; Values are constrained to 0-3600 seconds.
     InviteDelaySeconds = 10
 
     ; Only invite each avatar once per session (per login), rather than

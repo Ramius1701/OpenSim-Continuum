@@ -65,6 +65,12 @@ When `ConnectionString` is blank, the module reads the region process's `[Databa
 
 Only the module-owned sleep table is accessed directly. OpenSim remains responsible for persisting object flag changes made through `UpdatePrimFlags()`.
 
+`PersistSleep` is currently MySQL/MariaDB-only because the recovered module uses
+its own MySQL ledger. SQLite and PostgreSQL deployments may use `ReportOnly`, but
+must not select `PersistSleep`. This optional module is therefore not considered
+database-portable until dedicated SQLite and PostgreSQL providers and migrations
+are implemented and certified.
+
 ## Database table
 
 With `AutoCreateTable = true`, the module creates:

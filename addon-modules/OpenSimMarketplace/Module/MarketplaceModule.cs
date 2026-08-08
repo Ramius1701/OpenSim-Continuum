@@ -94,8 +94,15 @@ public sealed class MarketplaceModule : ISharedRegionModule
 
         if (!string.Equals(config.GetString("AuthType", string.Empty).Trim(), "BasicHttpAuthentication", StringComparison.Ordinal))
             throw new Exception("[OpenSimMarketplace] AuthType must be BasicHttpAuthentication.");
-        if (string.IsNullOrWhiteSpace(config.GetString("HttpAuthUsername", string.Empty)) || string.IsNullOrEmpty(config.GetString("HttpAuthPassword", string.Empty)))
+        string authUsername = config.GetString("HttpAuthUsername", string.Empty).Trim();
+        string authPassword = config.GetString("HttpAuthPassword", string.Empty);
+        if (string.IsNullOrWhiteSpace(authUsername) || string.IsNullOrEmpty(authPassword))
             throw new Exception("[OpenSimMarketplace] HttpAuthUsername and HttpAuthPassword are required.");
+        if (string.Equals(authPassword, "CHANGE_THIS_TO_A_LONG_RANDOM_SECRET", StringComparison.Ordinal)
+            || authPassword.Length < 24)
+        {
+            throw new Exception("[OpenSimMarketplace] HttpAuthPassword must be replaced with a random secret of at least 24 characters.");
+        }
 
         m_auth = ServiceAuth.Create(source, ConfigSection)
             ?? throw new Exception("[OpenSimMarketplace] OpenSim service authentication could not be created.");
@@ -155,7 +162,17 @@ public sealed class MarketplaceModule : ISharedRegionModule
     public void Close()
     {
         lock (m_sceneSync)
+        {
             m_serviceScene = null;
+            if (m_registered)
+            {
+                MainServer.Instance.RemoveSimpleStreamHandler(m_inventoryPath);
+                MainServer.Instance.RemoveSimpleStreamHandler(m_inspectPath);
+                MainServer.Instance.RemoveSimpleStreamHandler(m_snapshotPath);
+                MainServer.Instance.RemoveSimpleStreamHandler(m_deliveryPath);
+                m_registered = false;
+            }
+        }
         m_inflight.Clear();
     }
 

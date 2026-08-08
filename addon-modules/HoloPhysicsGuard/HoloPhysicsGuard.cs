@@ -110,15 +110,12 @@ namespace HoloNeon.RegionModules
             m_autoCreateTable = config.GetBoolean("AutoCreateTable", true);
             m_allowAllPhysicalObjects = config.GetBoolean("AllowAllPhysicalObjects", false);
 
-            m_checkIntervalSeconds = Math.Max(
-                5,
-                config.GetInt("CheckIntervalSeconds", 30)
+            m_checkIntervalSeconds = Math.Min(
+                Int32.MaxValue / 1000,
+                Math.Max(5, config.GetInt("CheckIntervalSeconds", 30))
             );
 
-            m_emptyDelaySeconds = Math.Max(
-                0,
-                config.GetInt("EmptyDelaySeconds", 60)
-            );
+            m_emptyDelaySeconds = Math.Max(0, config.GetInt("EmptyDelaySeconds", 60));
 
             string configuredMode = config.GetString("Mode", "ReportOnly").Trim();
             if (m_dryRun)
