@@ -11,12 +11,14 @@ using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework;
 using System.Net;
+using System.IO;
 
 namespace OpenSim.Region.ClientStack.LindenCaps
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "DisplayNameModule")]
     public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
     {
+        private const int MaxSetDisplayNameRequestBytes = 64 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IEventQueue m_EventQueue = null;
@@ -188,7 +190,13 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             OSDMap req;
             try
             {
-                req = OSDParser.DeserializeLLSDXml(httpRequest.InputStream) as OSDMap;
+                req = OSDParser.DeserializeLLSDXml(ReadBoundedBody(httpRequest)) as OSDMap;
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.DebugFormat("[DISPLAY NAMES]: Rejected SetDisplayName request for {0}: {1}", agent_id, e.Message);
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return;
             }
             catch (Exception e)
             {
@@ -240,6 +248,29 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             httpResponse.ContentType = "application/llsd+xml";
             httpResponse.RawBuffer = Utils.StringToBytes("<llsd><undef/></llsd>");
             httpResponse.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private static byte[] ReadBoundedBody(IOSHttpRequest request)
+        {
+            if (request == null || request.InputStream == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request.ContentLength64 > MaxSetDisplayNameRequestBytes)
+                throw new InvalidDataException("Request body exceeds the display-name limit.");
+
+            using (MemoryStream body = new MemoryStream())
+            {
+                byte[] buffer = new byte[4096];
+                int total = 0;
+                int read;
+                while ((read = request.InputStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > MaxSetDisplayNameRequestBytes)
+                        throw new InvalidDataException("Request body exceeds the display-name limit.");
+                    body.Write(buffer, 0, read);
+                }
+                return body.ToArray();
+            }
         }
 
         public OSD FormatDisplayNameUpdate(string oldName, UserData userData, DateTime nextUpdate)

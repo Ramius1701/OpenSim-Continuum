@@ -2260,6 +2260,12 @@ namespace OpenSim.Region.ClientStack.Linden
             string username = query.Get("username");
             string badUsername = null;
 
+            if (ids.Length > 100)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
             if (ids.Length == 0 && !string.IsNullOrWhiteSpace(username))
             {
                 UUID userID = m_UserManager.GetUserIdByName(username.Replace('.', ' '));
