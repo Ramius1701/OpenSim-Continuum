@@ -15,8 +15,8 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 
 | Area | Implemented | Automated evidence | Remaining live gate |
 |---|---|---|---|
-| ContinuumEconomy storage | Independent SQLite, MySQL/MariaDB and PostgreSQL ledgers, migrations, account registration, audited adjustments, idempotent transfers, holds and history | Shared acceptance suite passed for SQLite and PostgreSQL; MySQL previously passed its provider suite | Repeat the current shared suite against the exact production MySQL/MariaDB version and settings |
-| ContinuumEconomy service | Separate service, authenticated region calls, sessions, transfers, currency purchase controls, object-sale holds and land preparation | SQLite XML-RPC wire test passed login, credit, transfer/replay/conflict, balances, currency purchase/replay, object authorize/capture/cancel, land preflight and invalid-session rejection | Restart, outage, concurrency, viewer and multi-region testing on a cloned grid |
+| ContinuumEconomy storage | Independent SQLite, MySQL/MariaDB and PostgreSQL ledgers, migrations, account registration, audited adjustments, idempotent transfers, holds and history | Shared acceptance suite passed for SQLite and PostgreSQL; PostgreSQL was repeated from a clean schema on 2026-08-08; MySQL previously passed its provider suite | Repeat the current shared suite against the exact production MySQL/MariaDB version and settings |
+| ContinuumEconomy service | Separate service, authenticated region calls, sessions, transfers, currency purchase controls, object-sale holds and land preparation | SQLite and PostgreSQL XML-RPC wire tests passed; both retained balances and replay safety across a full service stop/start | Outage, concurrency, viewer and multi-region testing on a cloned grid |
 | ContinuumEconomy connector | Separately selected module, viewer events, OpenSim money hooks, delivery-safe object sales and local balance notifications | Connector and complete Release solution build successfully | Exercise every viewer payment/fee path, crossings and remote-simulator recipients |
 | MoneyServer Compatibility | Original service, datastore and DTL/NSL connector remain separately deployable; selection guard prevents registration when unselected | Complete Release build succeeds; ContinuumEconomy does not load or redirect MoneyServer | Run the legacy compatibility matrix against a cloned MoneyServer database |
 | Display Names and aliases | Grid service, CAPS, persistence, search and compatibility paths are integrated | Complete solution builds | Verify nameplates, Nearby, search, relog, restart, crossings, multiple regions and Hypergrid boundaries |
@@ -39,6 +39,18 @@ The latest complete Release build passed with one known CS9193 warning in
 upstream-derived viewer CAPS code and no errors. Generated
 `bin/*.runtimeconfig.json` files and `.audit/` material are build/test artifacts
 and intentionally remain untracked.
+
+### Provider certification evidence
+
+| Date | Provider | Database | Result |
+|---|---|---|---|
+| 2026-08-08 | SQLite | Disposable local file | Schema initialization, XML-RPC workflow, service restart persistence and replay safety passed |
+| 2026-08-08 | PostgreSQL | Fresh local `continuum_economy_pg_test` database | Initialization, verification, all 11 shared acceptance checks, XML-RPC workflow, service restart persistence and replay safety passed |
+| 2026-08-08 | MariaDB 11.8.8 | Local server on port 3306 | Not rerun: server requires credentials not stored in the repository. Authentication was not weakened and no unrelated secrets were inspected |
+
+The PostgreSQL test database is disposable and contains only generated test
+UUIDs. Acceptance rows are retained until the local test database is explicitly
+removed so the result can be inspected. This is not a production database.
 
 ## Release sequence
 

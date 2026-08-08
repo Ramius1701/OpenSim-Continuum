@@ -14,9 +14,12 @@ XML-RPC smoke test covers authenticated login, initial balance, transfer replay
 and conflict handling, balance reads, controlled currency purchase, object-sale
 authorization/capture/cancellation, land preflight and invalid secure-session
 rejection. The shared ledger acceptance suite passed on SQLite and PostgreSQL.
-These checks establish test readiness; they do not replace the live matrix
-below. Repeat the current suite on the exact MySQL/MariaDB production-test
-version before promotion.
+On 2026-08-08 PostgreSQL was repeated from a clean schema: all 11 acceptance
+checks and the XML-RPC workflow passed. Fixed SQLite and PostgreSQL test balances
+plus transaction replay state survived complete service stop/start cycles. These
+checks establish test readiness; they do not replace the live matrix below.
+Repeat the current suite on the exact MySQL/MariaDB production-test version
+before promotion.
 
 ## Required cutover gates
 
