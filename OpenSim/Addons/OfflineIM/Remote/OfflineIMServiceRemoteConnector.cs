@@ -52,7 +52,7 @@ namespace OpenSim.OfflineIM
 
         public OfflineIMServiceRemoteConnector(string url)
         {
-            m_ServerURI = url;
+            m_ServerURI = ValidateServerUri(url);
             m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
         }
 
@@ -65,7 +65,7 @@ namespace OpenSim.OfflineIM
                 return;
             }
 
-            m_ServerURI = cnf.GetString("OfflineMessageURL", string.Empty);
+            m_ServerURI = ValidateServerUri(cnf.GetString("OfflineMessageURL", string.Empty));
 
             /// This is from BaseServiceConnector
             string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", "Messaging" }, "None");
@@ -166,16 +166,35 @@ namespace OpenSim.OfflineIM
         {
             sendData["METHOD"] = method;
 
-            string reply = string.Empty;
-            lock (m_Lock)
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                         m_ServerURI + "/offlineim",
-                         ServerUtils.BuildQueryString(sendData),
-                         m_Auth);
+            try
+            {
+                string reply;
+                lock (m_Lock)
+                    reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                             m_ServerURI + "/offlineim",
+                             ServerUtils.BuildQueryString(sendData),
+                             m_Auth);
 
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: {0} request failed: {1}", method, ex.Message);
+                return null;
+            }
+        }
 
-            return replyData;
+        private static string ValidateServerUri(string value)
+        {
+            string candidate = (value ?? string.Empty).Trim().TrimEnd('/');
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(uri.Host))
+            {
+                throw new ArgumentException("OfflineMessageURL must be an absolute HTTP or HTTPS URL");
+            }
+
+            return candidate;
         }
         #endregion
 
