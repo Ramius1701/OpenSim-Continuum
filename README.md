@@ -76,7 +76,7 @@ dedicated providers are implemented and certified.
 
 - Warp3D alpha texture-card sprite rendering, disabled by default
 - Dedicated experimental ubODE tuning branch for social collision, contact, bounce, buoyancy, and water behavior
-- Windows first-run setup tooling, retained as experimental until its remaining donor assumptions and operational edge cases are certified
+- Recovered Windows first-run setup tooling, quarantined because it can overwrite configuration and persist credentials; it is not a supported production setup path
 
 ## Safe defaults
 
@@ -143,7 +143,10 @@ Generated `bin/*.runtimeconfig.json` files are build artifacts and must not be c
 6. Inspect logs for repeated exceptions, authentication failures, sensitive data, and migration errors.
 7. Test Robust outage/recovery and Hypergrid boundaries before enabling identity or Experience features on a public grid.
 
-The Windows setup wizard is not a substitute for reviewing production configuration.
+The recovered Windows setup wizard is quarantined and its launcher exits without
+making changes. It is not a supported production setup path. Configure the
+simulator and Robust services manually from the supplied examples and review all
+credentials, service URIs, database providers, and optional-module settings.
 
 ## Branches used for testing
 

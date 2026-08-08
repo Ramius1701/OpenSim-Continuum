@@ -4,20 +4,15 @@ setlocal
 pushd "%~dp0" >nul
 
 echo.
-echo === Vanilla Sim First-Run Setup ===
-echo This opens a local setup wizard at http://127.0.0.1:9090
+echo === Continuum First-Run Setup Quarantined ===
+echo The recovered Vanilla Sim wizard is experimental and is not safe for
+echo production configuration. It can overwrite simulator configuration and
+echo persist setup credentials in plaintext.
 echo.
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0config-profiles\vanilla-first-run-setup.ps1"
-set "SETUP_RESULT=%ERRORLEVEL%"
-
-if not "%SETUP_RESULT%"=="0" (
-    echo.
-    echo === FAILED: Vanilla Sim setup wizard stopped with an error ===
-    popd >nul
-    pause
-    exit /b %SETUP_RESULT%
-)
-
+echo Configure OpenSim.ini, Robust.ini, and Regions.ini manually using the
+echo supplied examples and deployment documentation.
+echo Developers auditing the recovered script may invoke it directly with the
+echo explicit -UnsafeExperimental switch in an isolated disposable environment.
+echo.
 popd >nul
-exit /b 0
+exit /b 1
