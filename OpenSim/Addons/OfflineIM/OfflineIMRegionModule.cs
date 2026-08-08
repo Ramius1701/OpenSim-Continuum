@@ -46,8 +46,10 @@ namespace OpenSim.OfflineIM
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private bool m_Enabled = false;
-        private List<Scene> m_SceneList = new List<Scene>();
+        private readonly List<Scene> m_SceneList = new List<Scene>();
+        private readonly object m_SceneLock = new object();
         IMessageTransferModule m_TransferModule = null;
+        private bool m_TransferSubscribed;
         private bool m_ForwardOfflineGroupMessages = true;
 
         private IOfflineIMService m_OfflineIMService;
@@ -78,7 +80,11 @@ namespace OpenSim.OfflineIM
                 return;
 
             scene.RegisterModuleInterface<IOfflineIMService>(this);
-            m_SceneList.Add(scene);
+            lock (m_SceneLock)
+            {
+                if (!m_SceneList.Contains(scene))
+                    m_SceneList.Add(scene);
+            }
             scene.EventManager.OnNewClient += OnNewClient;
         }
 
@@ -92,13 +98,15 @@ namespace OpenSim.OfflineIM
                 m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
                 if (m_TransferModule == null)
                 {
-                    scene.EventManager.OnNewClient -= OnNewClient;
-
-                    m_SceneList.Clear();
-
                     m_log.Error("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
+                    return;
                 }
+            }
+
+            if (!m_TransferSubscribed)
+            {
                 m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
+                m_TransferSubscribed = true;
             }
         }
 
@@ -107,14 +115,26 @@ namespace OpenSim.OfflineIM
             if (!m_Enabled)
                 return;
 
-            m_SceneList.Remove(scene);
+            lock (m_SceneLock)
+                m_SceneList.Remove(scene);
+
             scene.EventManager.OnNewClient -= OnNewClient;
-            m_TransferModule.OnUndeliveredMessage -= UndeliveredMessage;
+            scene.UnregisterModuleInterface<IOfflineIMService>(this);
 
             scene.ForEachClient(delegate(IClientAPI client)
             {
                 client.OnRetrieveInstantMessages -= RetrieveInstantMessages;
             });
+
+            lock (m_SceneLock)
+            {
+                if (m_SceneList.Count == 0 && m_TransferSubscribed)
+                {
+                    m_TransferModule.OnUndeliveredMessage -= UndeliveredMessage;
+                    m_TransferSubscribed = false;
+                    m_TransferModule = null;
+                }
+            }
         }
 
         public void PostInitialise()
@@ -133,12 +153,21 @@ namespace OpenSim.OfflineIM
 
         public void Close()
         {
-            m_SceneList.Clear();
+            Scene[] scenes;
+            lock (m_SceneLock)
+                scenes = m_SceneList.ToArray();
+
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         private Scene FindScene(UUID agentID)
         {
-            foreach (Scene s in m_SceneList)
+            Scene[] scenes;
+            lock (m_SceneLock)
+                scenes = m_SceneList.ToArray();
+
+            foreach (Scene s in scenes)
             {
                 ScenePresence presence = s.GetScenePresence(agentID);
                 if (presence != null && !presence.IsChildAgent)
@@ -149,7 +178,11 @@ namespace OpenSim.OfflineIM
 
         private IClientAPI FindClient(UUID agentID)
         {
-            foreach (Scene s in m_SceneList)
+            Scene[] scenes;
+            lock (m_SceneLock)
+                scenes = m_SceneList.ToArray();
+
+            foreach (Scene s in scenes)
             {
                 ScenePresence presence = s.GetScenePresence(agentID);
                 if (presence != null && !presence.IsChildAgent)
@@ -167,10 +200,22 @@ namespace OpenSim.OfflineIM
         {
             m_log.DebugFormat("[OfflineIM.V2]: Retrieving stored messages for {0}", client.AgentId);
 
-            List<GridInstantMessage> msglist = m_OfflineIMService.GetMessages(client.AgentId);
+            List<GridInstantMessage> msglist;
+            try
+            {
+                msglist = m_OfflineIMService.GetMessages(client.AgentId);
+            }
+            catch (Exception ex)
+            {
+                m_log.ErrorFormat("[OfflineIM.V2]: Failed retrieving messages for {0}: {1}", client.AgentId, ex.Message);
+                return;
+            }
 
             if (msglist == null)
+            {
                 m_log.DebugFormat("[OfflineIM.V2]: WARNING null message list.");
+                return;
+            }
 
             foreach (GridInstantMessage im in msglist)
             {
@@ -214,7 +259,17 @@ namespace OpenSim.OfflineIM
             }
 
             string reason = string.Empty;
-            bool success = m_OfflineIMService.StoreMessage(im, out reason);
+            bool success;
+            try
+            {
+                success = m_OfflineIMService.StoreMessage(im, out reason);
+            }
+            catch (Exception ex)
+            {
+                success = false;
+                reason = "Offline message service unavailable";
+                m_log.ErrorFormat("[OfflineIM.V2]: Failed storing message for {0}: {1}", new UUID(im.toAgentID), ex.Message);
+            }
 
             if (im.dialog == (byte)InstantMessageDialog.MessageFromAgent)
             {
@@ -252,4 +307,3 @@ namespace OpenSim.OfflineIM
         #endregion
     }
 }
-
