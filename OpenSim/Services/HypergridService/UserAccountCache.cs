@@ -11,7 +11,8 @@ namespace OpenSim.Services.HypergridService
 {
     public class UserAccountCache : IUserAccountService
     {
-        private const double CACHE_EXPIRATION_SECONDS = 120000.0; // 33 hours!
+        private const double ACCOUNT_CACHE_EXPIRATION_SECONDS = 1800.0;
+        private const double NEGATIVE_CACHE_EXPIRATION_SECONDS = 60.0;
 
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
@@ -39,8 +40,13 @@ namespace OpenSim.Services.HypergridService
 
         public void Cache(UUID userID, UserAccount account)
         {
-            // Cache even null accounts
-            m_UUIDCache.AddOrUpdate(userID, account, CACHE_EXPIRATION_SECONDS);
+            // Mutable identity data must not remain stale for more than the
+            // simulator account cache. Keep negative results much shorter so a
+            // newly created/repaired account becomes visible promptly.
+            double expiration = account == null
+                ? NEGATIVE_CACHE_EXPIRATION_SECONDS
+                : ACCOUNT_CACHE_EXPIRATION_SECONDS;
+            m_UUIDCache.AddOrUpdate(userID, account, expiration);
 
             //m_log.DebugFormat("[USER CACHE]: cached user {0}", userID);
         }
