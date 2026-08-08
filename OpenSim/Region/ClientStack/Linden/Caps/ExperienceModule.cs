@@ -1277,19 +1277,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             UUID[] agent_experiences = m_ExperienceModule.GetConributorExperiences(m_AgentID);
 
-            if (agent_experiences.Length > 0)
-            {
-                response_str += "<array>";
+            response_str += "<array>";
 
-                foreach (UUID id in agent_experiences)
-                    response_str += string.Format("<uuid>{0}</uuid>", id);
+            foreach (UUID id in agent_experiences)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
 
-                response_str += "</array>";
-            }
-            else
-            {
-                response_str += "<undef />";
-            }
+            response_str += "</array>";
 
             response_str += "</map></llsd>";
 
@@ -1324,19 +1317,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             UUID[] agent_experiences = m_ExperienceModule.GetAdminExperiences(m_AgentID);
 
-            if (agent_experiences.Length > 0)
-            {
-                response_str += "<array>";
+            response_str += "<array>";
 
-                foreach (UUID id in agent_experiences)
-                    response_str += string.Format("<uuid>{0}</uuid>", id);
+            foreach (UUID id in agent_experiences)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
 
-                response_str += "</array>";
-            }
-            else
-            {
-                response_str += "<undef />";
-            }
+            response_str += "</array>";
 
             response_str += "</map></llsd>";
 
@@ -1371,19 +1357,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             UUID[] agent_experiences = m_ExperienceModule.GetAgentExperiences(m_AgentID);
 
-            if (agent_experiences.Length > 0)
-            {
-                response_str += "<array>";
+            response_str += "<array>";
 
-                foreach (UUID id in agent_experiences)
-                    response_str += string.Format("<uuid>{0}</uuid>", id);
+            foreach (UUID id in agent_experiences)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
 
-                response_str += "</array>";
-            }
-            else
-            {
-                response_str += "<undef />";
-            }
+            response_str += "</array>";
 
             response_str += "</map></llsd>";
 
@@ -1419,35 +1398,21 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             UUID[] allowed = m_ExperienceModule.GetAllowedExperiences(m_AgentID);
             UUID[] blocked = m_ExperienceModule.GetBlockedExperiences(m_AgentID);
 
-            if(blocked.Length > 0)
-            {
-                response_str += "<array>";
+            response_str += "<array>";
 
-                foreach (UUID id in blocked)
-                    response_str += string.Format("<uuid>{0}</uuid>", id);
+            foreach (UUID id in blocked)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
 
-                response_str += "</array>";
-            }
-            else
-            {
-                response_str += "<undef />";
-            }
+            response_str += "</array>";
 
             response_str += "<key>experiences</key>";
 
-            if (allowed.Length > 0)
-            {
-                response_str += "<array>";
+            response_str += "<array>";
 
-                foreach (UUID id in allowed)
-                    response_str += string.Format("<uuid>{0}</uuid>", id);
+            foreach (UUID id in allowed)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
 
-                response_str += "</array>";
-            }
-            else
-            {
-                response_str += "<undef />";
-            }
+            response_str += "</array>";
 
             response_str += "</map></llsd>";
 

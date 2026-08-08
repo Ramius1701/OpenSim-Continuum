@@ -20,7 +20,7 @@ Do not deploy either test branch over the running grid in place. Build and confi
 |---|---|---|---|
 | YEngine orphaned resumed-event recovery | upstream-quality bug fix | Restart a region with persisted scripts, delete/recompile one during queued-event recovery, and verify the engine continues processing later events without a scheduler crash. | No DB/viewer/HG dependency. |
 | Mutable Display Names | Robust service extension | Set a Unicode display name in a compatible viewer, relog, search for the resident, cross a region, and verify account-name fallback in a legacy viewer. Confirm change throttling. | MySQL migration, Robust connector, HG foreign-name trust/cache. |
-| Experiences | Robust service extension | Create/associate an experience, grant and revoke permission, relog, restart region and Robust, exercise region trusted/allowed/blocked and parcel allowed/blocked controls, confirm blocked policy overrides grants, and test KVP persistence. | MySQL and Robust are the supported production target; migration 38 adds estate blocked-Experience persistence. HG experience trust must remain local. SQLite/PGSQL service providers are not certified. |
+| Experiences | Robust service extension | Create/associate an experience, grant and revoke permission, relog, restart region and Robust, exercise region trusted/allowed/blocked and parcel allowed/blocked controls, confirm blocked policy overrides grants, and test KVP persistence. | SQLite standalone plus MySQL/MariaDB and PostgreSQL grid/Robust paths all require runtime certification. HG experience trust must remain local. |
 | Experience-Lite script surface | experimental feature | Enable `[ScriptExperiences]` only in an isolated trusted estate, whitelist explicit owner/object UUIDs, then test permission events, sit/teleport behavior, KVP quotas, restart persistence, and denial for untrusted scripts. | Disabled by default; never include debit permission in automatic grants. |
 | Abuse Reports | Robust service extension | Submit reports with and without screenshot through viewer CAPS, verify persistence and retrieval, reject malformed/oversized requests, and confirm reports are not exposed across HG. | MySQL/Robust; administrative review UI remains external. |
 | User aliases and OAR identity lookup | Robust service extension | Import OARs containing local, aliased, missing, duplicate, and foreign creators; verify no silent identity substitution and no HG impersonation. | MySQL service, Robust/local connectors, negative-result behavior. |
@@ -78,6 +78,27 @@ avatar becomes a root agent and broadcasts an authoritative
 previous failure where Nearby/search showed the persisted name but the
 nameplate reverted after crossing or restart. Runtime testing must confirm both
 surfaces agree; the update is an event-queue message, not a region chat notice.
+
+### Experiences viewer-panel gate
+
+Use the Second Life/Firestorm Experiences floater as the acceptance target. It
+must show Search, Allowed, Blocked, Admin, Contributor, Owned, and Events. The
+server mapping is `FindExperienceByName`, `GetExperiences`,
+`GetAdminExperiences`, `GetCreatorExperiences`, and `AgentExperiences`; Events
+is the viewer's local experience event log. Empty server lists must be LLSD
+arrays, not `undef`, so a new account renders empty tabs without response-type
+errors.
+
+The Region/Estate Experience panel is a separate gate. The official viewer only
+creates it when `RegionExperiences` is present in the seed response. Verify GET
+and authorized POST for trusted, allowed, and blocked lists, persistence across
+simulator and Robust restarts, and denial for ordinary residents. The Parcel
+Experience panel uses parcel access-list flags 8 (allowed) and 16 (blocked);
+verify owner/group authorization, persistence, and that blocked policy wins.
+Run the complete matrix in Firestorm and one current official SL-compatible
+viewer on two simulator processes. Crossing must retain the same Owned,
+Allowed, and Blocked results because these are backed by the grid-wide Robust
+service rather than simulator-local state.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
 - SQLite providers are required for standalone operation. MySQL/MariaDB and

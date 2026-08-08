@@ -33,6 +33,7 @@ Do not replace a running production installation in place. Build a separate test
 ### Experiences and scripting
 
 - Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, SQLite, MySQL/MariaDB, and PostgreSQL providers, and restart handling
+- Second Life-compatible Experiences floater contracts for Search, Allowed, Blocked, Admin, Contributor, and Owned; viewer-local Events remain viewer-managed
 - Gunthar Experience scripting additions reconciled with the authoritative Tranquillity service
 - Experience permission, Combat2 damage, and path-update script events
 - Experience KVP, permission, sit, environment, and information APIs
