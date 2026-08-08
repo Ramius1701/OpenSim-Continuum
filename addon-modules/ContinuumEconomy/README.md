@@ -129,8 +129,16 @@ the same secret there.
 
 Initialize the selected provider with the guarded migration command before
 starting `bin/ContinuumEconomy.Service.exe`. Select exactly one authority:
+
 `EconomyModule = ContinuumEconomyModule` for ContinuumEconomy, or
 `EconomyModule = DTLNSLMoneyModule` for MoneyServer Compatibility—never both.
+
+For a disposable test service, set `CONTINUUM_ECONOMY_TEST_SECRET` to the same
+32-or-more-character test secret. Optionally set `CONTINUUM_ECONOMY_TEST_URL`
+(the default is `http://127.0.0.1:18119/`), then run
+`python addon-modules/ContinuumEconomy/tests/xmlrpc_smoke.py`. It uses only the
+Python standard library, generates unique UUIDs, and intentionally retains its
+audited test rows. Never point it at a production currency service.
 
 `ContinuumEconomy.Migrate holds` is a read-only operational report of
 authorized purchases that have not been captured or cancelled. It defaults to

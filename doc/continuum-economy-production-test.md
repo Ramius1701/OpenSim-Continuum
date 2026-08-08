@@ -21,6 +21,11 @@ checks establish test readiness; they do not replace the live matrix below.
 Repeat the current suite on the exact MySQL/MariaDB production-test version
 before promotion.
 
+The portable wire-test client is
+`addon-modules/ContinuumEconomy/tests/xmlrpc_smoke.py`. It refuses to run without
+an explicitly supplied `CONTINUUM_ECONOMY_TEST_SECRET`; use it only with a
+disposable service/database because generated audit rows are retained.
+
 ## Required cutover gates
 
 1. Clone the production configuration and databases into an isolated test grid. Never test against the live currency database.
