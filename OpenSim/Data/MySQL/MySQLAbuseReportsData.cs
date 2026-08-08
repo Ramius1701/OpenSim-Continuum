@@ -1,56 +1,109 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Reflection;
+using MySql.Data.MySqlClient;
 using OpenMetaverse;
 using OpenSim.Framework;
-using MySql.Data.MySqlClient;
-using System.Reflection;
 
 namespace OpenSim.Data.MySQL
 {
     public class MySqlAbuseReportsData : MySQLGenericTableHandler<AbuseReportData>, IAbuseReportsData
     {
         public MySqlAbuseReportsData(string connectionString)
-                : base(connectionString, "AbuseReports", "AbuseReports")
+            : base(connectionString, "AbuseReports", "AbuseReports")
         {
         }
 
-
         public override bool Store(AbuseReportData row)
         {
-            using (MySqlCommand cmd = new MySqlCommand())
+            if (row == null)
+                throw new ArgumentNullException(nameof(row));
+
+            using MySqlCommand cmd = new MySqlCommand();
+            List<string> names = new List<string>();
+            List<string> values = new List<string>();
+
+            foreach (FieldInfo field in m_Fields.Values)
             {
-                string query = "";
-                List<String> names = new List<String>();
-                List<String> values = new List<String>();
+                if (field.Name == nameof(AbuseReportData.ReportID))
+                    continue;
 
-                foreach (FieldInfo fi in m_Fields.Values)
+                names.Add(field.Name);
+                values.Add("?" + field.Name);
+
+                object value = field.GetValue(row);
+
+                if (field.Name == nameof(AbuseReportData.ImageData))
                 {
-                    names.Add(fi.Name);
-                    values.Add("?" + fi.Name);
-
-                    if (fi.GetValue(row) == null)
-                        throw new NullReferenceException(
-                            string.Format(
-                                "[MYSQL GENERIC TABLE HANDLER]: Trying to store field {0} for {1} which is unexpectedly null",
-                                fi.Name, row));
-
-                    if(fi.Name == "ImageData")
-                        cmd.Parameters.Add("ImageData", MySqlDbType.Blob).Value = fi.GetValue(row);
-                    else
-                        cmd.Parameters.AddWithValue(fi.Name, fi.GetValue(row).ToString());
+                    cmd.Parameters.Add(field.Name, MySqlDbType.Blob).Value =
+                        value as byte[] ?? Array.Empty<byte>();
                 }
-
-                query = String.Format("replace into {0} (`", m_Realm) + String.Join("`,`", names.ToArray()) + "`) values (" + String.Join(",", values.ToArray()) + ")";
-
-                cmd.CommandText = query;
-
-                if (ExecuteNonQuery(cmd) > 0)
-                    return true;
-
-                return false;
+                else if (value is UUID uuid)
+                {
+                    cmd.Parameters.AddWithValue(field.Name, uuid.ToString());
+                }
+                else
+                {
+                    cmd.Parameters.AddWithValue(field.Name, value ?? DBNull.Value);
+                }
             }
+
+            cmd.CommandText = string.Format(
+                "INSERT INTO `{0}` (`{1}`) VALUES ({2})",
+                m_Realm,
+                string.Join("`,`", names),
+                string.Join(",", values));
+
+            if (ExecuteNonQuery(cmd) <= 0)
+                return false;
+
+            if (cmd.LastInsertedId > 0 && cmd.LastInsertedId <= int.MaxValue)
+                row.ReportID = (int)cmd.LastInsertedId;
+
+            return true;
+        }
+
+        public AbuseReportData Get(int reportID, bool includeImage)
+        {
+            AbuseReportData[] reports = Get(nameof(AbuseReportData.ReportID), reportID.ToString());
+            if (reports.Length == 0)
+                return null;
+
+            if (!includeImage)
+                reports[0].ImageData = Array.Empty<byte>();
+            return reports[0];
+        }
+
+        public AbuseReportData[] Get(int start, int count, string status)
+        {
+            start = Math.Max(0, start);
+            count = Math.Clamp(count, 1, 200);
+            string options = $"ORDER BY `ReportID` DESC LIMIT {start},{count}";
+            AbuseReportData[] reports = string.IsNullOrWhiteSpace(status)
+                ? Get("1=1 " + options)
+                : Get(new[] { nameof(AbuseReportData.Status) }, new[] { status }, options);
+
+            foreach (AbuseReportData report in reports)
+                report.ImageData = Array.Empty<byte>();
+            return reports;
+        }
+
+        public bool UpdateModeration(int reportID, string status, string notes,
+            UUID moderatorID, string moderatorName, int lastUpdated)
+        {
+            using MySqlCommand cmd = new MySqlCommand();
+            cmd.CommandText = "UPDATE `AbuseReports` SET `Status`=?Status, " +
+                "`ModeratorNotes`=?ModeratorNotes, `ModeratorID`=?ModeratorID, " +
+                "`ModeratorName`=?ModeratorName, `LastUpdated`=?LastUpdated " +
+                "WHERE `ReportID`=?ReportID";
+            cmd.Parameters.AddWithValue("Status", status);
+            cmd.Parameters.AddWithValue("ModeratorNotes", notes);
+            cmd.Parameters.AddWithValue("ModeratorID", moderatorID.ToString());
+            cmd.Parameters.AddWithValue("ModeratorName", moderatorName);
+            cmd.Parameters.AddWithValue("LastUpdated", lastUpdated);
+            cmd.Parameters.AddWithValue("ReportID", reportID);
+            return ExecuteNonQuery(cmd) > 0;
         }
     }
 }

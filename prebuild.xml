@@ -447,11 +447,35 @@
       <Reference name="OpenSim.Framework.Servers.HttpServer"/>
       <Reference name="OpenSim.Services.Interfaces"/>
       <Reference name="OpenSim.Services.Base"/>
-      <Reference name="OpenSim.Services.Connectors"/>
       <Reference name="OpenSim.Data"/>
       <Reference name="Nini"/>
       <Reference name="log4net"/>
 
+    </Project>
+
+    <Project name="OpenSim.Services.ExperienceService" path="OpenSim/Services/ExperienceService" type="Library">
+      <Configuration name="Debug">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+      <Configuration name="Release">
+        <Options>
+          <OutputPath>../../../bin/</OutputPath>
+        </Options>
+      </Configuration>
+
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="OpenMetaverseTypes"/>
+      <Reference name="OpenMetaverse"/>
+      <Reference name="OpenSim.Framework"/>
+      <Reference name="OpenSim.Framework.Console"/>
+      <Reference name="OpenSim.Services.Interfaces"/>
+      <Reference name="OpenSim.Services.Base"/>
+      <Reference name="OpenSim.Services.Connectors"/>
+      <Reference name="OpenSim.Data"/>
+      <Reference name="Nini"/>
+      <Reference name="log4net"/>
     </Project>
 
     <Project name="OpenSim.Services.FriendsService" path="OpenSim/Services/Friends" type="Library">
@@ -1020,7 +1044,6 @@
       <Reference name="log4net"/>
       <Reference name="DotNetOpenId"/>
       <Reference name="Mono.Addins"/>
-      <Reference name="System.Drawing.Common"/>
 
       <Files>
         <Match pattern="*.cs" recurse="true">
@@ -2298,6 +2321,7 @@
 
       <ReferencePath>../../../bin/</ReferencePath>
       <Reference name="System.Drawing.Common"/>
+      <Reference name="System.Runtime.Caching"/>
       <Reference name="log4net"/>
       <Reference name="Mono.Addins"/>
       <Reference name="Nini"/>

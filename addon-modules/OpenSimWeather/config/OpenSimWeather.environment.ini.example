@@ -1,18 +1,16 @@
-;; OpenSimWeather 0.3.2 environment/wind example
+;; OpenSimWeather 0.3.4 environment/wind example
 ;;
 ;; OpenSim persists region environment changes. Export or record the current
-;; region environment before enabling this example. The profile values may be
-;; copied from OpenSimWeather.ini.example and edited per weather type.
+;; region environment before enabling this example. All four configurable
+;; weather profiles are included below and may be edited per weather type.
 
 [Weather]
     Enabled = false
     CommandChannel = 89
     EstateManagerOnly = true
 
-    CoverageMode = ActiveArea
-    EmitterSpacingMeters = 24.0
-    MaxEmitters = 384
-    ActiveAreaRadiusMeters = 96.0
+    CoverageMode = Region
+    EmitterGrid = 8
 
     RainTexture =
     StormTexture =
@@ -41,6 +39,30 @@
     LightningEnabled = true
     ThunderEnabled = false
     AutoCycleEnabled = false
+
+[Weather.Environment.Sunny]
+    CloudCoverage = 0.05
+    CloudScale = 0.28
+    CloudColor = 1.0,0.98,0.9,1.0
+    CloudXYDensity = 0.38,0.18,0.28
+    CloudDetailXYDensity = 0.34,0.16,0.04
+    CloudScrollX = 0.06
+    CloudScrollY = 0.012
+    Horizon = 0.58,0.72,0.95,1.0
+    BlueDensity = 0.16,0.32,0.68,1.0
+    Ambient = 0.48,0.48,0.42,1.0
+    SunMoonColor = 1.0,0.88,0.52,1.0
+    HazeHorizon = 0.10
+    HazeDensity = 0.18
+    DensityMultiplier = 0.08
+    DistanceMultiplier = 1.15
+    SunGlowFocus = 0.22
+    SunGlowSize = 2.40
+    SceneGamma = 1.16
+    StarBrightness = 0.00
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
 
 [Weather.Environment.Rain]
     CloudCoverage = 0.82
@@ -86,3 +108,30 @@
     SunGlowSize = 1.20
     SceneGamma = 0.72
     StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false
+
+[Weather.Environment.Snow]
+    CloudCoverage = 0.86
+    CloudScale = 0.70
+    CloudColor = 0.38,0.40,0.44,1.0
+    CloudXYDensity = 1.18,0.60,0.96
+    CloudDetailXYDensity = 1.28,0.62,0.22
+    CloudScrollX = 0.14
+    CloudScrollY = 0.035
+    Horizon = 0.26,0.28,0.32,1.0
+    BlueDensity = 0.13,0.15,0.20,1.0
+    Ambient = 0.22,0.23,0.25,1.0
+    SunMoonColor = 0.30,0.31,0.34,1.0
+    HazeHorizon = 0.36
+    HazeDensity = 0.72
+    DensityMultiplier = 0.24
+    DistanceMultiplier = 0.95
+    SunGlowFocus = 0.10
+    SunGlowSize = 1.60
+    SceneGamma = 0.86
+    StarBrightness = 0.02
+    DrawClassicClouds = true
+    CloudScrollXLock = false
+    CloudScrollYLock = false

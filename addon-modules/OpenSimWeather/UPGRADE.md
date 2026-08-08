@@ -20,7 +20,7 @@ OpenSim process. Use a controlled simulator restart.
 3. Copy this package to `addon-modules/OpenSimWeather`.
 4. Compare the old configuration with
    `config/OpenSimWeather.ini.example`. Do not carry forward `AllowDisabled`.
-5. Start with `Enabled = false`, `CoverageMode = ActiveArea`, environment/wind
+5. Start with `Enabled = false`, `CoverageMode = Region`, `EmitterGrid = 8`, environment/wind
    disabled, auto-cycle disabled, and surface effects disabled.
 6. Paste valid particle asset UUIDs where available.
 7. Run `runprebuild.bat` from the OpenSim source root.
@@ -45,8 +45,9 @@ OpenSim process. Use a controlled simulator restart.
 
 - Delete `AllowDisabled`; it no longer exists.
 - Prefer `AdjustEnvironment`; `AdjustClouds` is accepted only as a legacy alias.
-- Set `EmitterGrid = 0` and migrate to `EmitterSpacingMeters` plus
-  `MaxEmitters`.
+- Keep `EmitterGrid = 8` for the compatibility/default full-region layout.
+- Set `EmitterGrid = 0` only when deliberately selecting fixed-metre
+  `EmitterSpacingMeters` plus `MaxEmitters`.
 - Particle and surface assets are OpenSim asset UUIDs.
 - `SurfaceEffectsEnabled = true` still requires nonblank `PuddleTexture` and/or
   `SnowSurfaceTexture`.

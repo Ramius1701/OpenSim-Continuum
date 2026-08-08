@@ -13,43 +13,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-    Die Klasse MySQLSuperManager dient als Wrapper/Manager für einen Thread-Sicherheitsmechanismus (Mutex) und kapselt eine Instanz von MySQLMoneyManager.
-    Sie enthält:
-        Ein Mutex-Objekt für Thread-Synchronisation.
-        Ein Flag Locked zur Statusanzeige.
-        Eine öffentliche Instanz von MySQLMoneyManager namens Manager.
-        Die Methode GetLock() blockiert, bis der Mutex verfügbar ist.
-        Die Methode Release() gibt den Mutex frei und behandelt freigabe-bezogene Fehler.
-        Ein String Running (wird hier aber nicht verwendet).
-
-Null Pointer Checks
-    Manager: Im Konstruktor wird garantiert, dass Manager immer initialisiert ist (niemals null nach Konstruktion).
-    m_lock: Wird direkt beim Feld-Deklaration erstellt, kann also nie null sein.
-    Locked: Ist ein bool, daher nie null.
-    Running: Ist public, aber im Code nicht direkt verwendet. Wenn er von außen auf null gesetzt wird, kann das keinen Fehler verursachen, da er nicht verwendet wird.
-
-Fehlerquellen
-    Mutex-Handling:
-        In Release() wird das Freigeben des Mutex von einem Try-Catch-Block umschlossen. Sollte ein Fehler beim Freigeben auftreten (z.B. Freigabe von einem Thread, der den Mutex nicht besitzt), wird die Exception geloggt und erneut geworfen.
-        In GetLock() wird WaitOne() direkt aufgerufen, was blockiert, bis der Lock verfügbar ist. Es gibt hier keine Exception-Absicherung, aber üblicherweise ist dies sicher, solange das Objekt korrekt verwendet wird.
-
-    Thread-Safety:
-        Die Klasse ist thread-safe bezüglich des Mutex, nicht aber bezüglich der Instanzvariablen (Running ist public ohne Schutz, aber nicht verwendet).
-        Es wird kein expliziter Null-Check auf Manager benötigt, da sie im Konstruktor immer initialisiert wird.
-
-    Unbenutzte Variable:
-        Das Feld Running ist nicht implementiert/genutzt. Das ist kein Fehler, aber ein Hinweis auf evtl. toten Code.
-
-Zusammenfassung
-    Null Pointer: Keine Gefahr für NullPointer-Exceptions im aktuellen Code.
-    Fehlerquellen: Einzige potenzielle Fehlerquelle ist das Freigeben des Mutex in Release(), aber dies wird per Exception abgefangen und geloggt.
-    Funktion: Thread-Safe-Manager/Wrapper für den Zugriff auf einen MySQLMoneyManager.
-
-Fazit:
-Die Klasse ist solide und sicher gegen NullPointer-Fehler. Fehler beim Mutex-Handling werden korrekt behandelt. Es gibt keine offensichtlichen Schwachstellen.
-Lediglich das Feld Running ist ungenutzt und könnte entfernt oder implementiert werden.
  */
 
 using System;
@@ -71,7 +34,7 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
             Manager = new MySQLMoneyManager(connectionString);
         }
 
-        /// <summary>Erwirbt die exklusive Sperre für kritische Operationen.</summary>
+        /// <summary>Erwirbt die exklusive Sperre fÃ¼r kritische Operationen.</summary>
         public void GetLock()
         {
             m_lock.WaitOne();

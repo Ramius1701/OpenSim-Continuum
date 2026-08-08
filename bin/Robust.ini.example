@@ -104,10 +104,6 @@
 
 [ServiceList]
     AssetServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
-    ; Casperia Prime addition (not upstream OpenSim): lets an external web
-    ; front end fetch avatar/snapshot textures as plain PNG, no separate
-    ; OpenJPEG install needed - see [TexturePngService] below.
-    TexturePngServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:TexturePngServiceConnector"
     InventoryInConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     ;; Uncomment if you have set up Freeswitch (see [FreeswitchService] below)
     ;VoiceConnector = "8004/OpenSim.Server.Handlers.dll:FreeswitchServerConnector"
@@ -124,6 +120,8 @@
     FriendsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:FriendsServiceConnector"
     MapAddServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MapAddServiceConnector"
     MapGetServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:MapGetServiceConnector"
+    ;; Continuum: grid-wide Experience service endpoint.
+    ExperienceServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:ExperienceServiceConnector"
     ;; Uncomment this if you want offline IM to work
     ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.OfflineIM.dll:OfflineIMServiceRobustConnector"
     ;; Uncomment this if you want Groups V2 to work
@@ -137,10 +135,8 @@
     ;; Uncomment if you want to have centralized estate data
     ; EstateDataService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:EstateDataRobustConnector"
 
-    ;; Uncomment if you want to have abuse reports (ported from Mobius fork).
-    ;; Also needs a [Modules] AbuseReportsService = RemoteAbuseReportsServicesConnector
-    ;; on the region side, and an [AbuseReportsService] section below.
-    ; AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
+    ;; Continuum: receive grid-wide viewer abuse reports on the private port.
+    AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
 
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
@@ -292,30 +288,6 @@
     AllowRemoteDeleteAllTypes = false
 
 
-; * Casperia Prime addition (not upstream OpenSim).
-; *
-; * Lets an external web front end (a PHP site, for example) fetch avatar/
-; * snapshot textures as plain PNG over a stable, session-independent HTTP
-; * endpoint - no separate OpenJPEG install or exec() call needed. Reuses
-; * the same managed OpenMetaverse.Imaging.OpenJPEG decoder OpenSim's own
-; * GetTexture capability and map tile renderer already use internally.
-; *
-; * Usage: GET http://this-host:${Const|PublicPort}/texture_png?id=<uuid>
-; *   200 + image/png  -> decoded PNG bytes
-; *   400 / 404 / 415   -> bad id / asset not found / not a JPEG2000 texture
-; *
-[TexturePngService]
-    Enabled = true
-
-    ; Must match your [AssetService] LocalServiceModule above exactly.
-    LocalServiceModule = "OpenSim.Services.AssetService.dll:AssetService"
-
-    ; No ConnectionString needed here if [DatabaseService] below already has
-    ; your DB connection string - this falls back to that shared connection,
-    ; same as [AssetService] does. Only set this if you want a different DB.
-    ; ConnectionString = "Data Source=...;"
-
-
 ; * This configuration loads the inventory server modules. It duplicates
 ; * the function of the legacy inventory server
 ; *
@@ -438,12 +410,6 @@
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:UserAccountService"
     ; Realm = "UserAccounts"
-
-    ; Only needed if using Display Names (ported from Mobius): must match
-    ; DisplayNameSecret under [UserAccountService] in every region's
-    ; GridCommon.ini that connects to this grid. Authenticates
-    ; SetDisplayName requests coming in over the network from regions.
-    ; DisplayNameSecret = ""
 
     ; These are for creating new accounts by the service
     AuthenticationService = "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService"
@@ -688,6 +654,15 @@
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
 
+[ExperienceService]
+    LocalServiceModule = "OpenSim.Services.ExperienceService.dll:ExperienceService"
+    ;; ConnectionString = "Data Source=localhost;Database=robust;User ID=robust;Password=*****;Old Guids=true;CharSet=utf8mb4;"
+
+    UserAccountService = "OpenSim.Services.UserAccountService.dll:UserAccountService"
 [AbuseReportsService]
     LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
-    ;; ConnectionString = "Data Source=localhost;Database=robust;User ID=robust;Password=*****;Old Guids=true;CharSet=utf8mb4;"
+    ;; StorageProvider and ConnectionString inherit from [DatabaseService].
+    ;; Override them here only when using a separate abuse-report database.
+    MaxScreenshotBytes = 5242880
+    MaxSummaryBytes = 4096
+    MaxDetailsBytes = 65536

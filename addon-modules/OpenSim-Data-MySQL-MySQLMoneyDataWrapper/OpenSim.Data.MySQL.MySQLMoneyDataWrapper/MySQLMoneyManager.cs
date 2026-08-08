@@ -13,71 +13,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-Die Klasse MySQLMoneyManager implementiert das Interface IMoneyManager und ist das zentrale Datenbank-Backend für das OpenSim-Money-Modul (MySQL). Sie verwaltet:
-
-    Verbindungen zur MySQL-Datenbank
-    Kontostände (balances)
-    Transaktionen (transactions)
-    Benutzerdaten (userinfo)
-    Verkaufstatistiken (totalsales)
-    Methoden zum Ein-/Auszahlen, Übertragen, Anlegen und Aktualisieren von Werten
-
-Null Pointer Checks & Fehlerquellen
-Initialisierung und DB-Verbindung
-    Die Constructoren prüfen per .Any(p => string.IsNullOrEmpty(p)), ob alle benötigten Parameter gesetzt sind. Bei Fehlwerten gibt es einen klaren Exception-Throw.
-    Beim Öffnen der Datenbankverbindung wird jeder Fehler per Exception behandelt.
-    In allen Methoden, die auf die DB-Verbindung zugreifen, wird dbcon verwendet, das zentral initialisiert wird.
-
-Datenbankoperationen
-    Try-Catch-Blöcke sind an allen kritischen Stellen vorhanden, etwa beim Table-Setup, bei der Reconnect-Logik und bei Datenbankzugriffen.
-    Nach jedem Datenbankzugriff wird das Command-Objekt mit Dispose() freigegeben.
-    Beim Lesen von Datenbankwerten wird mit DBNull geprüft, ob ein Wert gesetzt ist, bevor er als String oder int gecastet wird.
-    Bei Methoden, die Objekte zurückgeben (z.B. FetchTransaction, fetchUserInfo), wird im Fehlerfall null zurückgegeben und im Catch geloggt.
-
-Null Pointer Checks
-    Bei Methoden wie addTransaction werden Objekteigenschaften vor Benutzung auf null geprüft und ggf. mit Defaultwerten gefüllt.
-    Bei Übergabeobjekten wie UserInfo wird vor dem Zugriff geprüft, ob z.B. Avatar null ist.
-    Rückgabewerte wie bei fetchUserInfo werden nur dann zurückgegeben, wenn die UserID wirklich gefunden wurde – sonst gibt es null.
-    Bei Methoden, die Listen zurückgeben (z.B. FetchTransaction(string userID, ...)), wird bei DB-Lesefehlern null oder ein leeres Array zurückgegeben.
-
-Fehlerquellen
-    Fehlerhafte oder fehlende DB-Verbindung: Exception und Logging.
-    SQL-Befehle mit Fehlern: Exception und Logging.
-    Ungültige Eingabewerte (z.B. null bei Strings/Objekten): Entweder direkter Return, Exception oder Logging.
-    Potentielle Race-Conditions werden durch lock (dbcon) reduziert.
-    Ressourcenlecks werden durch konsequentes .Dispose() der Commands/Reader vermieden.
-
-Positive Beispiele für Fehlerbehandlung
-
-    Parameter-Checks:
-    C#
-
-if (requiredParameters.Any(p => string.IsNullOrEmpty(p))) { throw new ArgumentException(...); }
-
-DB-Reader mit Exception Handling:
-C#
-
-catch (Exception e) {
-    m_log.Error("[MONEY MANAGER]: Fetching transaction failed 1: " + e.ToString());
-    r.Close(); cmd.Dispose(); return null;
-}
-
-Null/Default-Initialisierung:
-C#
-
-    if (transaction.ObjectUUID == null) transaction.ObjectUUID = UUID.Zero.ToString();
-    if (transaction.ObjectName == null) transaction.ObjectName = string.Empty;
-
-Zusammenfassung/Fazit
-    Null Pointer: Das Risiko ist im Code durch Checks, Defaultwerte und Exception-Handling weitgehend minimiert.
-    Fehlerquellen: Vor allem externe Faktoren (DB-Verbindung, SQL-Syntax). Im Code wird alles sauber abgefangen und geloggt.
-    Funktion: Umfassende Datenbank-Backend-Klasse für OpenSim-Money, mit Methoden für alle wichtigen Operationen (Balance, Transaktionen, User, Verkauf).
-
-Empfehlung:
-Der Code ist für produktiven Einsatz geeignet, robust gegen NullPointer-Fehler und typische Fehlerquellen.
-Bei zukünftigen Erweiterungen empfiehlt sich: Bei allen Methoden, die Objekte oder komplexe Werte zurückgeben, weiterhin konsequent auf null prüfen und Exceptions sauber loggen.
  */
 
 using System;
@@ -117,7 +52,7 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
                 throw new ArgumentException("All connection parameters must be provided.");
             }
 
-            // Pooling-Parameter prüfen und ggf. setzen
+            // Pooling-Parameter prÃ¼fen und ggf. setzen
             string poolingValue = cpooling?.Trim().ToLower();
             if (string.IsNullOrEmpty(poolingValue) || poolingValue == "true" || poolingValue == "yes" || poolingValue == "1")
             {
@@ -147,7 +82,7 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
             // 1. Initialisiere Verbindungen
             InitialiseConnection(connect);
 
-            // 2. Überprüfe und erstelle Tabellen
+            // 2. ÃœberprÃ¼fe und erstelle Tabellen
             CheckAndCreateTables();
         }
 
@@ -166,7 +101,7 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
             }
         }
 
-        // 2. Überprüfe und erstelle Tabellen
+        // 2. ÃœberprÃ¼fe und erstelle Tabellen
         private void CheckAndCreateTables()
         {
             try
@@ -1209,11 +1144,12 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
             {
                 sql = "BEGIN;";
                 sql += "UPDATE " + Table_of_Transactions;
-                sql += " SET receiverBalance = 0, status = ?status WHERE UUID = ?tranid;";
+                sql += " SET receiverBalance = 0, status = ?status WHERE UUID = ?tranid AND status = ?pendingStatus;";
                 sql += "COMMIT;";
 
                 cmd = new MySqlCommand(sql, dbcon);
                 cmd.Parameters.AddWithValue("?status", (int)Status.SUCCESS_STATUS); //Success
+                cmd.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
                 cmd.Parameters.AddWithValue("?tranid", transactionID.ToString());
             }
             else
@@ -1221,13 +1157,14 @@ namespace OpenSim.Data.MySQL.MySQLMoneyDataWrapper
                 sql = "BEGIN;";
                 sql += "UPDATE " + Table_of_Transactions + "," + Table_of_Balances;
                 sql += " SET receiverBalance = balance + ?amount, " + Table_of_Transactions + ".status = ?status, balance = balance + ?amount ";
-                sql += " WHERE UUID = ?tranid AND user = receiver AND user = ?userid;";
+                sql += " WHERE UUID = ?tranid AND " + Table_of_Transactions + ".status = ?pendingStatus AND user = receiver AND user = ?userid;";
                 sql += "COMMIT;";
 
                 cmd = new MySqlCommand(sql, dbcon);
                 cmd.Parameters.AddWithValue("?amount", amount);
                 cmd.Parameters.AddWithValue("?userid", receiverID);
                 cmd.Parameters.AddWithValue("?status", (int)Status.SUCCESS_STATUS); //Success
+                cmd.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
                 cmd.Parameters.AddWithValue("?tranid", transactionID.ToString());
             }
 

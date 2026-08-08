@@ -13,94 +13,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-Diese Klasse ist das zentrale XML-RPC Modul für den OpenSim MoneyServer. Sie erweitert MoneyDBService und implementiert das Interface IMoneyDBService. Ihre Aufgaben:
-
-    Verwaltung und Verarbeitung von XML-RPC-Anfragen für Geldtransaktionen, Landkauf, Session-Management und mehr.
-    Bindung von HTTP- und XML-RPC-Handlern an den HTTP-Server.
-    Zugriff und Manipulation von Benutzerguthaben, Transaktionen und Gruppenmitgliedschaften über die Datenbank.
-    Spezialfunktionen für Cashbook-Ausgaben, Konsolenbefehle und Logging.
-
-Null-Pointer-Checks & Fehlerquellen
-1. Konstruktor & Initialisierung
-    Alle kritischen Dependencies (moneyDBService, moneyCore) werden mit ArgumentNullException.ThrowIfNull() geprüft.
-    Konfigurationswerte werden aus INI geladen und auf null/Fehlwerte geprüft.
-    Dictionaries und andere Felder werden direkt initialisiert oder nachgeladen.
-
-2. HTTP/XML-RPC-Handler
-    Viele Methoden prüfen die Eingabeparameter (z.B. ob ein Request-Objekt null ist).
-    Bei fehlerhaften Requests oder Sessions wird ein Fehler geloggt und eine Standardantwort zurückgegeben.
-    Beispiel:
-    C#
-
-    if (httpRequest == null || httpResponse == null) { ... return; }
-    if (request == null) { ... return new XmlRpcResponse { Value = new Hashtable { { "success", false } } }; }
-
-    Bei Session-Handling wird vor jedem Zugriff geprüft, ob die Dictionary-Schlüssel existieren.
-    Bei Datenbankoperationen werden Exceptions gefangen und führen nicht zu Abstürzen, sondern zu Logging und Fehlerantwort.
-
-3. Datenbankzugriffe
-    Datenbankverbindungen werden immer in einem Try-Catch-Finally-Block verwendet, wobei im finally-Block die Verbindung freigegeben wird (dbm.Release()).
-    Bei Datenbankoperationen wird auf mögliche Null-Rückgaben geachtet (z.B. FetchUserInfo kann null liefern).
-
-4. Spezielle Fehlerquellen
-    Parsen von XML-Requests: Hier können null-Werte entstehen, werden aber meistens abgefangen.
-    Zahlreiche Methoden prüfen, ob Parameter null/leer sind, bevor sie verwendet werden (z.B. agentId, groupId).
-    SQL-Parameter werden mit AddWithValue gesetzt, was SQL-Injection weitgehend verhindert.
-
-5. Allgemeine Fehlerbehandlung
-    Bei Fehlern wird stets ins Log geschrieben.
-    Rückgabewerte für Fehlerfälle sind konsistent (meistens false, null oder ein Hashtable mit "success": false).
-    Fehler in der Verarbeitung führen zu keinen unkontrollierten Null-Pointern oder Abstürzen.
-
-Beispiele für Null-Checks und Fehlerbehandlung
-
-Session-Checks:
-C#
-
-if (m_sessionDic.ContainsKey(senderID) && m_secureSessionDic.ContainsKey(senderID)) { ... }
-else { responseData["message"] = "Session check failure, please re-login later!"; return response; }
-
-Datenbankobjekte:
-C#
-
-UserInfo rcvr = m_moneyDBService.FetchUserInfo(receiverID);
-if (rcvr == null) { m_log.ErrorFormat(...); return response; }
-
-Catch-All für Exceptions:
-C#
-
-catch (Exception ex)
-{
-    m_log.ErrorFormat("[MONEY XMLRPC]: ... Exception occurred: {0}", ex.Message);
-    return new XmlRpcResponse();
-}
-
-Hashtable-Zugriffe:
-C#
-
-Hashtable requestData = (Hashtable)request.Params[0];
-if (requestData == null) { ... }
-
-Verbesserungsmöglichkeiten
-
-    In einigen Methoden werden Werte aus Hashtables direkt abgerufen, ohne vorher zu prüfen,
-    ob sie wirklich existieren oder den erwarteten Typ haben (z.B. int.Parse direkt auf einen String aus einer Hashtable). Hier könnten defensive Checks ergänzt werden.
-    XML-Parsing könnte robuster gestaltet werden, um fehlerhafte oder absichtlich manipulierte Requests besser abzufangen.
-    Teilweise könnten Methoden Parameter noch expliziter auf Plausibilität prüfen (z.B. Range-Checks bei Beträgen).
-
-Fazit
-
-Sehr robust gegen NullPointer-Fehler und allgemeine Fehlerquellen!
-
-    Alle kritischen Zugriffe werden defensiv behandelt.
-    Fehler werden stets geloggt und führen zu konsistenten Fehlerantworten.
-    Ressourcen werden ordentlich freigegeben.
-    Die Funktionalität ist klar: XML-RPC-Endpoint-Management, Geldtransaktionen, User-Sessions, Gruppen-Checks, Logging, Cashbook, etc.
-
-Empfehlung:
-Das Modul ist für produktiven Einsatz gut vorbereitet. Zusätzliche defensive Checks bei Daten aus externen Quellen (z.B. XML/Hashtable) wären sinnvoll, sind aber kein kritischer Mangel.
  */
 
 using log4net;
@@ -155,7 +67,7 @@ namespace OpenSim.Grid.MoneyServer
         // reached by anyone who merely learns/guesses the BankerAvatar UUID over the
         // open network. Widen only to specific, trusted caller IPs if this needs to
         // be reachable from elsewhere.
-        private List<string> m_bankerAllowedIPs = new List<string> { "127.0.0.1", "::1" };
+        private HashSet<string> m_bankerAllowedIPs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "127.0.0.1", "::1" };
 
         // Testbereich
         // Maximum pro Tag:
@@ -307,7 +219,7 @@ namespace OpenSim.Grid.MoneyServer
 
             m_CalculateCurrency = m_server_config.GetInt("CalculateCurrency", m_CalculateCurrency); // New feature
             m_DebugConsole = m_server_config.GetBoolean("DebugConsole", m_DebugConsole); // New feature
-            m_DebugFile = m_server_config.GetBoolean("m_DebugFile", m_DebugFile); // New feature
+            m_DebugFile = m_server_config.GetBoolean("DebugFile", m_server_config.GetBoolean("m_DebugFile", m_DebugFile)); // legacy m_DebugFile alias retained
 
             m_TotalDay = m_server_config.GetInt("TotalDay", m_TotalDay);
             m_TotalWeek = m_server_config.GetInt("TotalWeek", m_TotalWeek);
@@ -484,7 +396,10 @@ namespace OpenSim.Grid.MoneyServer
                 }
 
                 // XML-Daten parsen
-                XmlDocument doc = new XmlDocument();
+                XmlDocument doc = new XmlDocument
+                {
+                    XmlResolver = null
+                };
                 doc.LoadXml(requestBody);
 
                 // Methode extrahieren
@@ -522,7 +437,6 @@ namespace OpenSim.Grid.MoneyServer
                 m_log.InfoFormat("[MONEY XMLRPC MODULE]: billableArea", billableArea);
                 m_log.InfoFormat("[MONEY XMLRPC MODULE]: currencyBuy", currencyBuy);
                 m_log.InfoFormat("[MONEY XMLRPC MODULE]: language", language);
-                m_log.InfoFormat("[MONEY XMLRPC MODULE]: secureSessionId", secureSessionId);
 
                 if (methodName == "preflightBuyLandPrep")
                 {
@@ -706,9 +620,12 @@ namespace OpenSim.Grid.MoneyServer
                 int billableArea = Convert.ToInt32(requestData["billableArea"]);
                 int currencyBuy = Convert.ToInt32(requestData["currencyBuy"]);
 
-                // Log the received data for debugging
-                m_log.InfoFormat("[MONEY XMLRPC]: Received agentId = {0}, secureSessionId = {1}, billableArea = {2}, currencyBuy = {3}",
-                    agentId, secureSessionId, billableArea, currencyBuy);
+                // Do not log the secure session credential.
+                m_log.InfoFormat(
+                    "[MONEY XMLRPC]: Received land purchase request for agentId = {0}, billableArea = {1}, currencyBuy = {2}",
+                    agentId,
+                    billableArea,
+                    currencyBuy);
 
                 if (string.IsNullOrEmpty(agentId) || string.IsNullOrEmpty(secureSessionId))
                 {
@@ -761,7 +678,10 @@ namespace OpenSim.Grid.MoneyServer
                 using (StreamReader reader = new StreamReader(httpRequest.InputStream, Encoding.UTF8))
                     requestBody = reader.ReadToEnd();
 
-                XmlDocument doc = new XmlDocument();
+                XmlDocument doc = new XmlDocument
+                {
+                    XmlResolver = null
+                };
                 doc.LoadXml(requestBody);
 
                 XmlNode methodNameNode = doc.SelectSingleNode("/methodCall/methodName");
@@ -772,12 +692,23 @@ namespace OpenSim.Grid.MoneyServer
                 Hashtable parameters = ExtractXmlRpcParams(doc);
                 string agentId = GetHashtableString(parameters, "agentId");
                 string secureSessionId = GetHashtableString(parameters, "secureSessionId");
+                if (string.IsNullOrWhiteSpace(secureSessionId))
+                    secureSessionId = GetHashtableString(parameters, "clientSecureSessionID");
                 int currencyBuy = GetHashtableInt(parameters, "currencyBuy");
 
                 string accessMessage;
-                if (!ValidateCurrencyPurchaseRequest(agentId, currencyBuy, out accessMessage))
+                if (!ValidateCurrencyPurchaseAccess(agentId, currencyBuy, out accessMessage))
                 {
                     WriteCurrencyXmlRpcResponse(httpResponse, false, accessMessage, null);
+                    return;
+                }
+
+                agentId = UUID.Parse(agentId).ToString();
+
+                string sessionMessage;
+                if (!ValidateCurrencySession(agentId, secureSessionId, out sessionMessage))
+                {
+                    WriteCurrencyXmlRpcResponse(httpResponse, false, sessionMessage, null);
                     return;
                 }
 
@@ -865,16 +796,13 @@ namespace OpenSim.Grid.MoneyServer
 
                     using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
-                        if (reader.Read())
-                        {
+                        if (reader.Read() && !reader.IsDBNull(reader.GetOrdinal("email")))
                             email = reader.GetString("email");
-                            m_log.InfoFormat("[USER MAIL LOCK]: User {0} email address is {1}", userID, email);
-                        }
                     }
                 }
 
                 // Überprüfen, ob die E-Mail-Adresse leer ist oder null
-                if (string.IsNullOrEmpty(email))
+                if (string.IsNullOrWhiteSpace(email))
                 {
                     m_log.InfoFormat("[USER MAIL LOCK]: User {0} does not have a registered email address", userID);
                     return false; // Benutzer hat keine hinterlegte E-Mail-Adresse
@@ -1054,16 +982,18 @@ namespace OpenSim.Grid.MoneyServer
 
         private Hashtable PerformGetCurrencyQuote(string agentId, int currencyBuy, string secureSessionId)
         {
-            m_log.InfoFormat("[PERFORM GET CURRENCY QUOTE]: Generating currency quote for AgentId: {0}", agentId);
+            m_log.InfoFormat(
+                "[PERFORM GET CURRENCY QUOTE]: Generating currency quote for AgentId: {0}",
+                agentId);
 
-            int rate = 100; // 1 = 100L$
+            const double estimatedCostPerUnit = 0.01d;
             return new Hashtable
             {
                 { "success", true },
                 { "currency", new Hashtable
                     {
-                        { "estimatedCost", currencyBuy / rate }, // Kosten in 
-                        { "currencyBuy", currencyBuy }          // Angeforderte Spielwährung
+                        { "estimatedCost", currencyBuy * estimatedCostPerUnit },
+                        { "currencyBuy", currencyBuy }
                     }
                 },
                 { "confirm", Guid.NewGuid().ToString() }
@@ -1101,45 +1031,55 @@ namespace OpenSim.Grid.MoneyServer
         }
         public XmlRpcResponse getCurrencyQuote(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            int amount = 0;
-
-            // Protokolliere die eingehende XML-Anfrage
-            m_log.InfoFormat("[GET CURRENCY QUOTE]: Incoming XML Request: {0}", ToXmlString((Hashtable)request.Params[0]));
+            Hashtable responseData = new Hashtable
+            {
+                { "success", false },
+                { "message", "Currency quote failed." }
+            };
 
             try
             {
-                Hashtable requestData = (Hashtable)request.Params[0];
-                amount = (int)requestData["currencyBuy"];
+                if (request == null || request.Params == null || request.Params.Count == 0 ||
+                    request.Params[0] is not Hashtable requestData)
+                {
+                    responseData["message"] = "Invalid currency quote request.";
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                string agentId = GetHashtableString(requestData, "agentId");
+                int amount = GetHashtableInt(requestData, "currencyBuy");
+                string secureSessionId = GetHashtableString(requestData, "secureSessionId");
+                if (string.IsNullOrWhiteSpace(secureSessionId))
+                    secureSessionId = GetHashtableString(requestData, "clientSecureSessionID");
+
+                string accessMessage;
+                if (!ValidateCurrencyPurchaseAccess(agentId, amount, out accessMessage))
+                {
+                    responseData["message"] = accessMessage;
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                agentId = UUID.Parse(agentId).ToString();
+
+                string sessionMessage;
+                if (!ValidateCurrencySession(agentId, secureSessionId, out sessionMessage))
+                {
+                    responseData["message"] = sessionMessage;
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                return new XmlRpcResponse
+                {
+                    Value = PerformGetCurrencyQuote(agentId, amount, secureSessionId)
+                };
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[GET CURRENCY QUOTE]: Error parsing request: {0}", ex.Message);
+                m_log.ErrorFormat("[GET CURRENCY QUOTE]: Error processing currency quote: {0}", ex);
+                responseData["success"] = false;
+                responseData["message"] = "The currency quote could not be generated.";
+                return new XmlRpcResponse { Value = responseData };
             }
-
-            // Berechnung und Antwortvorbereitung
-            Hashtable currencyResponse = new Hashtable
-            {
-                { "estimatedCost", amount * 0.01 }, // Berechnung für Kosten
-                { "currencyBuy", amount }
-            };
-
-            Hashtable quoteResponse = new Hashtable
-            {
-                { "success", true },
-                { "currency", currencyResponse },
-                { "confirm", Guid.NewGuid().ToString() }
-            };
-
-            // Protokolliere die Antwort, bevor sie zurückgegeben wird
-            m_log.InfoFormat("[GET CURRENCY QUOTE]: XML Response: {0}", ToXmlString(quoteResponse));
-
-            // Erstelle die Antwort
-            XmlRpcResponse returnval = new XmlRpcResponse { Value = quoteResponse };
-
-            // Füge ein weiteres Log hinzu, um sicherzustellen, dass die Antwort korrekt erstellt wurde
-            m_log.InfoFormat("[GET CURRENCY QUOTE]: Returning response for getCurrencyQuote: {0}", ToXmlString((Hashtable)returnval.Value));
-
-            return returnval;
         }
         public XmlRpcResponse buyCurrency(XmlRpcRequest request, IPEndPoint remoteClient)
         {
@@ -1166,10 +1106,23 @@ namespace OpenSim.Grid.MoneyServer
 
                 string agentId = GetHashtableString(requestData, "agentId");
                 int amount = GetHashtableInt(requestData, "currencyBuy");
+                string secureSessionId = GetHashtableString(requestData, "secureSessionId");
+                if (string.IsNullOrWhiteSpace(secureSessionId))
+                    secureSessionId = GetHashtableString(requestData, "clientSecureSessionID");
+
                 string accessMessage;
-                if (!ValidateCurrencyPurchaseRequest(agentId, amount, out accessMessage))
+                if (!ValidateCurrencyPurchaseAccess(agentId, amount, out accessMessage))
                 {
                     responseData["message"] = accessMessage;
+                    return new XmlRpcResponse { Value = responseData };
+                }
+
+                agentId = UUID.Parse(agentId).ToString();
+
+                string sessionMessage;
+                if (!ValidateCurrencySession(agentId, secureSessionId, out sessionMessage))
+                {
+                    responseData["message"] = sessionMessage;
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1207,9 +1160,11 @@ namespace OpenSim.Grid.MoneyServer
             return new XmlRpcResponse { Value = responseData };
         }
 
-        private bool ValidateCurrencyPurchaseRequest(string agentId, int amount, out string message)
+        private bool ValidateCurrencyPurchaseAccess(string agentId, int amount, out string message)
         {
-            if (string.IsNullOrWhiteSpace(agentId))
+            if (string.IsNullOrWhiteSpace(agentId) ||
+                !UUID.TryParse(agentId, out UUID avatarID) ||
+                avatarID == UUID.Zero)
             {
                 message = "A valid avatar ID is required.";
                 return false;
@@ -1229,25 +1184,70 @@ namespace OpenSim.Grid.MoneyServer
                 return false;
             }
 
+            string canonicalAvatarID = avatarID.ToString();
+
             if (m_CurrencyGroupOnly)
             {
                 if (string.IsNullOrWhiteSpace(m_CurrencyGroupID) ||
-                    m_CurrencyGroupID == UUID.Zero.ToString())
+                    !UUID.TryParse(m_CurrencyGroupID, out UUID groupID) ||
+                    groupID == UUID.Zero)
                 {
                     message = "Currency purchasing is restricted, but CurrencyGroupID is not configured.";
                     return false;
                 }
 
-                if (!IsUserInGroup(agentId, m_CurrencyGroupID))
+                if (!IsUserInGroup(canonicalAvatarID, groupID.ToString()))
                 {
                     message = "You are not a member of the group permitted to purchase currency.";
                     return false;
                 }
             }
 
-            if (m_UserMailLock && !UserMailLock(agentId))
+            if (m_UserMailLock && !UserMailLock(canonicalAvatarID))
             {
                 message = "A registered email address is required to purchase currency.";
+                return false;
+            }
+
+            message = string.Empty;
+            return true;
+        }
+
+        private bool ValidateCurrencySession(string agentId, string secureSessionId, out string message)
+        {
+            if (!UUID.TryParse(agentId, out UUID avatarID) || avatarID == UUID.Zero ||
+                !UUID.TryParse(secureSessionId, out UUID suppliedSessionID) || suppliedSessionID == UUID.Zero)
+            {
+                message = "The currency request does not contain a valid secure session.";
+                return false;
+            }
+
+            if (m_secureSessionDic == null)
+            {
+                message = "The currency session service is not available. Please try again later.";
+                return false;
+            }
+
+            string canonicalAvatarID = avatarID.ToString();
+            string expectedSession;
+
+            lock (m_secureSessionDic)
+            {
+                if (!m_secureSessionDic.TryGetValue(canonicalAvatarID, out expectedSession) &&
+                    !m_secureSessionDic.TryGetValue(agentId, out expectedSession))
+                {
+                    message = "Your currency session is not active. Please relog and try again.";
+                    return false;
+                }
+            }
+
+            if (!UUID.TryParse(expectedSession, out UUID expectedSessionID) ||
+                expectedSessionID != suppliedSessionID)
+            {
+                m_log.WarnFormat(
+                    "[CURRENCY SESSION]: Rejected currency request for {0}: secure session mismatch.",
+                    canonicalAvatarID);
+                message = "The currency request could not be authenticated.";
                 return false;
             }
 
@@ -1650,56 +1650,6 @@ namespace OpenSim.Grid.MoneyServer
         }
 
 
-        private void LogXmlRpcRequestFile(IOSHttpRequest request)
-        {
-            try
-            {
-                // Erstelle einen Dateipfad für das Log
-                string logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "xmlrpc_debug.log");
-
-                // Lies den Request-Body
-                string requestBody;
-                using (var reader = new StreamReader(request.InputStream, Encoding.UTF8))
-                {
-                    requestBody = reader.ReadToEnd();
-                }
-
-                // Bereite den Logeintrag vor
-                string logEntry = $"{DateTime.UtcNow}: {request.RawUrl}\n{requestBody}\n\n";
-
-                // Schreibe den Logeintrag in die Datei
-                File.AppendAllText(logFilePath, logEntry);
-            }
-            catch (Exception ex)
-            {
-                m_log.ErrorFormat("[MONEY XML RPC MODULE DEBUG]: Error logging XML-RPC request: {0}", ex.Message);
-            }
-        }
-
-        private void LogXmlRpcRequestConsole(IOSHttpRequest request)
-        {
-            m_log.InfoFormat("[MONEY XML RPC MODULE]: {0}", new StreamReader(request.InputStream).ReadToEnd());  // TODO: test
-
-            try
-            {
-                // Lies den Request-Body
-                string requestBody;
-                using (var reader = new StreamReader(request.InputStream, Encoding.UTF8))
-                {
-                    requestBody = reader.ReadToEnd();
-                }
-
-                // Bereite den Logeintrag vor
-                string logEntry = $"{DateTime.UtcNow}: {request.RawUrl}\n{requestBody}\n\n";
-
-                // Schreibe den Logeintrag in das Log
-                m_log.Info(logEntry);
-            }
-            catch (Exception ex)
-            {
-                m_log.ErrorFormat("[MONEY XML RPC MODULE DEBUG]: Error logging XML-RPC request: {0}", ex.Message);
-            }
-        }
         #endregion
         // ##################     handler         ##################
         #region handler
@@ -2398,50 +2348,72 @@ namespace OpenSim.Grid.MoneyServer
             return response;
         }
 
-        private static List<string> ParseAllowedIPs(string raw)
+        private static HashSet<string> ParseAllowedIPs(string raw)
         {
-            List<string> result = new List<string>();
+            HashSet<string> result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(raw))
                 return result;
 
             foreach (string part in raw.Split(','))
             {
                 string trimmed = part.Trim();
-                if (trimmed.Length > 0)
-                    result.Add(trimmed);
+                if (trimmed.Length == 0)
+                    continue;
+
+                if (IPAddress.TryParse(trimmed, out IPAddress address))
+                {
+                    if (address.IsIPv4MappedToIPv6)
+                        address = address.MapToIPv4();
+                    result.Add(address.ToString());
+                }
+                else
+                {
+                    m_log.WarnFormat(
+                        "[MONEY XMLRPC]: Ignoring invalid BankerAllowedIPs entry: {0}",
+                        trimmed);
+                }
             }
+
             return result;
         }
 
         /// <summary>
-        /// Casperia Prime addition: grants a stipend to each avatar in
-        /// eligibleAvatars. Called on a schedule from MoneyServerBase's
-        /// CheckStipends(), not via an incoming XML-RPC request - there is
-        /// no external caller to authenticate here, unlike
-        /// handleScriptTransaction, since this is triggered internally by
-        /// the server's own timer.
-        ///
-        /// Reuses the exact same addTransaction/DoTransfer/FetchTransaction/
-        /// UpdateBalance sequence handleScriptTransaction uses for SendMoney -
-        /// no new balance-moving logic, just applied to a list of avatars
-        /// instead of one XML-RPC caller's request.
+        /// Grants one scheduled stipend to each configured avatar for a named
+        /// cycle. A deterministic transaction UUID makes each avatar/cycle
+        /// idempotent. System-generated credits use DoAddMoney(), not a funded
+        /// user-to-user transfer.
         /// </summary>
-        public void GrantStipends(int amount, string description, List<string> eligibleAvatars)
+        public bool GrantStipends(
+            int amount,
+            string description,
+            List<string> eligibleAvatars,
+            string cycleKey)
         {
-            if (amount <= 0 || eligibleAvatars == null || eligibleAvatars.Count == 0)
+            if (amount <= 0 || eligibleAvatars == null || eligibleAvatars.Count == 0 ||
+                string.IsNullOrWhiteSpace(cycleKey))
             {
-                return;
+                return false;
             }
 
-            string senderID = UUID.Zero.ToString(); // system-generated money, same convention as elsewhere
+            bool allSucceeded = true;
+            string senderID = UUID.Zero.ToString();
+            string safeDescription = string.IsNullOrWhiteSpace(description)
+                ? "Scheduled stipend"
+                : description.Trim();
 
-            foreach (string receiverID in eligibleAvatars)
+            foreach (string configuredReceiverID in eligibleAvatars)
             {
-                if (!UUID.TryParse(receiverID, out UUID parsedReceiver) || parsedReceiver == UUID.Zero)
+                if (!UUID.TryParse(configuredReceiverID, out UUID parsedReceiver) || parsedReceiver == UUID.Zero)
                 {
-                    m_log.ErrorFormat("[STIPEND]: Skipping invalid avatar UUID in EligibleAvatars: {0}", receiverID);
+                    m_log.ErrorFormat(
+                        "[STIPEND]: Skipping invalid avatar UUID in EligibleAvatars: {0}",
+                        configuredReceiverID);
+                    allSucceeded = false;
                     continue;
                 }
+
+                string receiverID = parsedReceiver.ToString();
+                UUID transactionUUID = CreateStipendTransactionID(cycleKey, receiverID);
 
                 try
                 {
@@ -2449,59 +2421,172 @@ namespace OpenSim.Grid.MoneyServer
                     if (receiverInfo == null)
                     {
                         m_log.ErrorFormat("[STIPEND]: Avatar {0} not found in DB, skipping.", receiverID);
+                        allSucceeded = false;
                         continue;
                     }
 
-                    UUID transactionUUID = UUID.Random();
-                    int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
-
-                    TransactionData transaction = new TransactionData();
-                    transaction.TransUUID = transactionUUID;
-                    transaction.Sender = senderID;
-                    transaction.Receiver = receiverID;
-                    transaction.Amount = amount;
-                    transaction.ObjectUUID = UUID.Zero.ToString();
-                    transaction.RegionHandle = "0";
-                    transaction.Type = 0;
-                    transaction.Time = time;
-                    transaction.SecureCode = UUID.Random().ToString();
-                    transaction.Status = (int)Status.PENDING_STATUS;
-                    transaction.CommonName = GetSSLCommonName();
-                    transaction.Description = description + " " + DateTime.UtcNow.ToString();
-
-                    bool result = m_moneyDBService.addTransaction(transaction);
-                    if (!result)
+                    TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                    if (transaction != null)
                     {
-                        m_log.ErrorFormat("[STIPEND]: addTransaction failed for avatar {0}", receiverID);
-                        continue;
-                    }
+                        bool matchesCyclePayment =
+                            string.Equals(transaction.Receiver, receiverID, StringComparison.OrdinalIgnoreCase) &&
+                            transaction.Amount == amount &&
+                            transaction.Type == (int)TransactionType.StipendBasic;
 
-                    if (m_moneyDBService.DoTransfer(transactionUUID))
-                    {
-                        transaction = m_moneyDBService.FetchTransaction(transactionUUID);
-                        if (transaction != null && transaction.Status == (int)Status.SUCCESS_STATUS)
+                        if (!matchesCyclePayment)
                         {
-                            string message = string.Format(m_BalanceMessageReceiveMoney, amount, "SYSTEM", "");
-                            UpdateBalance(receiverID, message);
-                            m_log.InfoFormat("[STIPEND]: Granted {0} to {1}", amount, receiverID);
+                            m_log.ErrorFormat(
+                                "[STIPEND]: Deterministic transaction {0} exists with conflicting data; {1} was not paid.",
+                                transactionUUID,
+                                receiverID);
+                            allSucceeded = false;
+                            continue;
                         }
-                        else
+
+                        if (transaction.Status == (int)Status.SUCCESS_STATUS)
                         {
-                            m_log.ErrorFormat("[STIPEND]: Transfer did not complete successfully for avatar {0}", receiverID);
+                            m_log.DebugFormat(
+                                "[STIPEND]: Cycle {0} was already paid to {1}; skipping duplicate.",
+                                cycleKey,
+                                receiverID);
+                            continue;
+                        }
+
+                        if (transaction.Status != (int)Status.PENDING_STATUS)
+                        {
+                            m_log.ErrorFormat(
+                                "[STIPEND]: Existing stipend transaction {0} for {1} has terminal status {2}; manual review is required.",
+                                transactionUUID,
+                                receiverID,
+                                transaction.Status);
+                            allSucceeded = false;
+                            continue;
                         }
                     }
                     else
                     {
-                        m_log.ErrorFormat("[STIPEND]: DoTransfer failed for avatar {0}", receiverID);
+                        int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
+                        transaction = new TransactionData
+                        {
+                            TransUUID = transactionUUID,
+                            Sender = senderID,
+                            Receiver = receiverID,
+                            Amount = amount,
+                            ObjectUUID = UUID.Zero.ToString(),
+                            ObjectName = string.Empty,
+                            RegionHandle = "0",
+                            RegionUUID = UUID.Zero.ToString(),
+                            Type = (int)TransactionType.StipendBasic,
+                            Time = time,
+                            SecureCode = UUID.Random().ToString(),
+                            Status = (int)Status.PENDING_STATUS,
+                            CommonName = GetSSLCommonName(),
+                            Description = string.Format(
+                                System.Globalization.CultureInfo.InvariantCulture,
+                                "{0} [cycle {1}]",
+                                safeDescription,
+                                cycleKey)
+                        };
+
+                        if (!m_moneyDBService.addTransaction(transaction))
+                        {
+                            // A second MoneyServer instance could have inserted the
+                            // deterministic row between our fetch and insert. Re-fetch
+                            // once before treating it as a failure.
+                            transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                            if (transaction == null ||
+                                !string.Equals(transaction.Receiver, receiverID, StringComparison.OrdinalIgnoreCase) ||
+                                transaction.Amount != amount ||
+                                transaction.Type != (int)TransactionType.StipendBasic)
+                            {
+                                m_log.ErrorFormat(
+                                    "[STIPEND]: addTransaction failed for avatar {0}, cycle {1}.",
+                                    receiverID,
+                                    cycleKey);
+                                allSucceeded = false;
+                                continue;
+                            }
+
+                            if (transaction.Status == (int)Status.SUCCESS_STATUS)
+                                continue;
+
+                            if (transaction.Status != (int)Status.PENDING_STATUS)
+                            {
+                                allSucceeded = false;
+                                continue;
+                            }
+                        }
                     }
+
+                    // Stipends create system money. DoAddMoney is the established
+                    // MoneyServer path for a UUID.Zero sender; DoTransfer would require
+                    // the system sender to have a balance and can never reliably work.
+                    if (!m_moneyDBService.DoAddMoney(transactionUUID))
+                    {
+                        transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                        if (transaction == null || transaction.Status != (int)Status.SUCCESS_STATUS)
+                        {
+                            m_log.ErrorFormat(
+                                "[STIPEND]: DoAddMoney failed for avatar {0}, cycle {1}.",
+                                receiverID,
+                                cycleKey);
+                            allSucceeded = false;
+                            continue;
+                        }
+                    }
+
+                    transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+                    if (transaction == null || transaction.Status != (int)Status.SUCCESS_STATUS)
+                    {
+                        m_log.ErrorFormat(
+                            "[STIPEND]: Transaction {0} did not finish successfully for avatar {1}.",
+                            transactionUUID,
+                            receiverID);
+                        allSucceeded = false;
+                        continue;
+                    }
+
+                    string message = string.Format(m_BalanceMessageReceiveMoney, amount, "SYSTEM", "");
+                    UpdateBalance(receiverID, message);
+                    m_log.InfoFormat(
+                        "[STIPEND]: Granted {0} to {1} for cycle {2}.",
+                        amount,
+                        receiverID,
+                        cycleKey);
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[STIPEND]: Exception granting stipend to {0}: {1}", receiverID, e.ToString());
-                    // Continue to the next avatar rather than aborting the whole
-                    // batch over one avatar's failure.
+                    m_log.ErrorFormat(
+                        "[STIPEND]: Exception granting stipend to {0} for cycle {1}: {2}",
+                        receiverID,
+                        cycleKey,
+                        e);
+                    allSucceeded = false;
                 }
             }
+
+            return allSucceeded;
+        }
+
+        private static UUID CreateStipendTransactionID(string cycleKey, string receiverID)
+        {
+            string source = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "OpenSimMoneyServer|Stipend|{0}|{1}",
+                cycleKey.Trim(),
+                receiverID.ToLowerInvariant());
+
+            using SHA256 sha256 = SHA256.Create();
+            byte[] digest = sha256.ComputeHash(Encoding.UTF8.GetBytes(source));
+            byte[] guidBytes = new byte[16];
+            Buffer.BlockCopy(digest, 0, guidBytes, 0, guidBytes.Length);
+
+            // Mark the generated value as a name-based UUID while retaining the
+            // deterministic hash payload.
+            guidBytes[7] = (byte)((guidBytes[7] & 0x0f) | 0x50);
+            guidBytes[8] = (byte)((guidBytes[8] & 0x3f) | 0x80);
+
+            return UUID.Parse(new Guid(guidBytes).ToString("D"));
         }
 
         public XmlRpcResponse handleAddBankerMoney(XmlRpcRequest request, IPEndPoint remoteClient)
@@ -2534,7 +2619,10 @@ namespace OpenSim.Grid.MoneyServer
             // Check caller IP first. bankerID alone is not a secret (avatar UUIDs are
             // discoverable in-world), so this endpoint must also be restricted to
             // known, trusted caller addresses - see BankerAllowedIPs in MoneyServer.ini.
-            string callerAddress = remoteClient?.Address?.ToString() ?? string.Empty;
+            IPAddress callerIP = remoteClient?.Address;
+            if (callerIP != null && callerIP.IsIPv4MappedToIPv6)
+                callerIP = callerIP.MapToIPv4();
+            string callerAddress = callerIP?.ToString() ?? string.Empty;
             if (!m_bankerAllowedIPs.Contains(callerAddress))
             {
                 m_log.ErrorFormat("[MONEY XMLRPC]: handleAddBankerMoney: Rejected call from disallowed address {0}", callerAddress);
@@ -3622,7 +3710,7 @@ namespace OpenSim.Grid.MoneyServer
                 int currentBalance = m_moneyDBService.getBalance(userID);
 
                 // Überprüfen, ob das Guthaben über dem Maximum liegt und ggf. abziehen
-                if (currentBalance > m_CurrencyMaximum)
+                if (m_CurrencyMaximum > 0 && currentBalance > m_CurrencyMaximum)
                 {
                     int excessAmount = currentBalance - m_CurrencyMaximum;
 

@@ -344,6 +344,7 @@ namespace OpenSim.Tests.Common
         public event GodUpdateRegionInfoUpdate OnGodUpdateRegionInfoUpdate;
         public event GenericCall2 OnUpdateThrottles;
         public event AgentFOV OnAgentFOV;
+        public event UpdateEstateExperienceDeltaRequest OnUpdateEstateExperienceDeltaRequest;
 
 #pragma warning restore 67
 
@@ -370,6 +371,11 @@ namespace OpenSim.Tests.Common
         }
 
         public float StartFar { get; set; }
+
+        public float FOV { get; set; } = 1.04f;
+        public int viewHeight { get; set; } = 480;
+        public int viewWidth { get; set; } = 640;
+        public ViewerFlags ViewerFlags { get; private set; }
 
         public virtual UUID AgentId
         {
@@ -1187,6 +1193,10 @@ namespace OpenSim.Tests.Common
         {
         }
 
+        public void SendScriptTeleportRequest(string objName, string simName, Vector3 pos, int options)
+        {
+        }
+
         public void SendDirPlacesReply(UUID queryID, DirPlacesReplyData[] data)
         {
         }
@@ -1334,6 +1344,12 @@ namespace OpenSim.Tests.Common
         {
         }
 
+        public void SendPickInfoReply(UUID pickID, UUID creatorID, bool topPick, UUID parcelID,
+            string name, string desc, UUID snapshotID, string user, string originalName,
+            string simName, Vector3d posGlobal, int sortOrder, bool enabled)
+        {
+        }
+
         public bool TryGet<T>(out T iface)
         {
             iface = default(T);
@@ -1412,5 +1428,19 @@ namespace OpenSim.Tests.Common
             return 0x1000;
         }
 
+        public void SendGenericMessageForExperience(UUID experience_id, UUID avatar_id, int action, string obj_name, string parcel, bool is_attachment = false)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendScriptQuestion(UUID taskID, string taskName, string ownerName, UUID itemID, int question, UUID experience)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

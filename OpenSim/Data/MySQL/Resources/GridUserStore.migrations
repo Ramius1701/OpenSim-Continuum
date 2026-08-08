@@ -22,12 +22,3 @@ COMMIT;
 BEGIN;
 
 COMMIT;
-
-:VERSION 3         # --------------------------
-BEGIN;
-
-ALTER TABLE `GridUser`
-	ADD COLUMN `DisplayName` VARCHAR(255) NOT NULL DEFAULT '',
-	ADD COLUMN `NameCached` INT UNSIGNED NOT NULL DEFAULT '0';
-
-COMMIT;

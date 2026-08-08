@@ -1,4 +1,18 @@
-OpenSimWeather 0.3.2 validation
+OpenSimWeather 0.3.4 validation
+
+0.3.4 Gunthar-baseline regression checks
+-----------------------------------------
+
+* Force AddNewSceneObject to reject an emitter after at least one successful
+  insertion. The command must fail and leave zero OpenSimWeather emitters.
+* Start active-area weather while repeatedly entering/leaving the region, then
+  clear and stop the simulator. No disposed-timer exception may be logged.
+* Run the same teardown test with auto-cycle and surface effects independently.
+* Create a temporary user object named "weather rain emitter". Startup cleanup
+  must not delete it. A marked OpenSimWeather object must be removed.
+* Repeat Gunthar's rain, storm, snow, sunny, clear, status, wind, lightning,
+  thunder, auto-cycle, forecast, entry-message, roof suppression, and varregion
+  tests before testing Continuum-only coverage or surface settings.
 Date: 2026-07-19
 
 PASS - C# source parsed with tree-sitter C# grammar; no ERROR or missing nodes.
@@ -6,7 +20,8 @@ PASS - prebuild.xml parsed as XML.
 PASS - Module/OpenSimWeather.Module.csproj parsed as XML.
 PASS - config/OpenSimWeather.autocycle.ini.example parsed and contains [Weather].
 PASS - config/OpenSimWeather.environment.ini.example parsed and contains [Weather].
-PASS - config/OpenSimWeather.ini.example parsed and contains [Weather].
+PASS - config/OpenSimWeather.ini.example parsed and contains the common [Weather] baseline.
+PASS - config/OpenSimWeather.reference.ini.example parsed and contains the complete [Weather] reference.
 PASS - config/OpenSimWeather.manual.ini.example parsed and contains [Weather].
 PASS - config/OpenSimWeather.surface.ini.example parsed and contains [Weather].
 PASS - Complete reference contains all 76 canonical [Weather] keys; AdjustClouds is retained only as an undocumented legacy alias.
@@ -62,3 +77,16 @@ PASS - migration removes addon-modules/Weather before installing OpenSimWeather.
 PASS - stale OpenSim.Addons.Weather.dll removal is documented.
 PASS - generated OpenSimWeather.Module.csproj is omitted from the source package.
 PASS - unused OpenMetaverse.StructuredData prebuild reference is removed.
+
+0.3.3 coverage/configuration checks
+-----------------------------------
+- Confirm missing CoverageMode defaults to Region.
+- Confirm invalid CoverageMode logs a warning and uses Region.
+- Confirm default EmitterGrid=8 requests 64 cells before cover suppression on
+  256x256, rectangular, and larger variable-sized regions.
+- Confirm emitter spacing and radius scale from RegionSizeX/RegionSizeY.
+- Confirm EmitterGrid=0 activates fixed-metre EmitterSpacingMeters mode.
+- Confirm MaxEmitters reductions are logged.
+- Confirm OpenSimWeather.ini.example contains only common settings.
+- Confirm OpenSimWeather.reference.ini.example contains every supported
+  [Weather] setting and all four complete environment profiles.

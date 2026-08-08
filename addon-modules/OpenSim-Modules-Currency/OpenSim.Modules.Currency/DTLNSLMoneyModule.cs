@@ -14,70 +14,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-    DTLNSLMoneyModule ist ein OpenSim-Regionmodul für die Verwaltung eines eigenen Währungssystems und die Anbindung an einen externen MoneyServer.
-    Es implementiert die Schnittstellen IMoneyModule und ISharedRegionModule.
-    Kernfunktionen:
-        Verwaltung von Guthaben (Balance), Transaktionen und Gebühren für verschiedene In-World-Aktionen (z.B. Objektkauf, Landkauf, Uploads).
-        Kommunikation mit einem externen MoneyServer via XML-RPC (Transfer, Login, Logoff, Balance-Abfrage, etc.).
-        Ereignis- und Event-Handling für Inworld-Transaktionen.
-        Zertifikatsverwaltung für sichere Kommunikation.
-
-Null Pointer Checks
-    Konfigurationswerte: Werden mit Defaultwerten initialisiert (string.Empty, false, 0 usw.). Viele Konfigurationswerte werden mit Fallback-Werten geladen.
-    Methoden mit Objektrückgabe wie GetLocateClient, GetLocateScene, GetLocatePrim:
-        Es wird geprüft, ob Rückgabewerte null sind, bevor sie genutzt werden (z.B. in ObjectGiveMoney, Transfer, etc.).
-    Client- und Scene-Objekte:
-        Wird ein Objekt nicht gefunden, wird mit return oder Fehlerwerten sauber abgebrochen.
-    RPC-Handler:
-        Prüfen, ob erforderliche Felder im Parameter-Hashtable existieren, bevor sie genutzt werden.
-    Try-Catch bei XML-RPC:
-        Netzwerkfehler und Exceptions werden sauber abgefangen und führen zu Fehler-Hash als Rückgabe.
-    Event-Handler:
-        Überall wird geprüft, ob das Event-Objekt oder der Client existiert, bevor darauf zugegriffen wird.
-    Beispiel:
-    C#
-
-    SceneObjectPart sceneObj = GetLocatePrim(objectID);
-    if (sceneObj == null) return false;
-
-    Rückgabewerte können null sein:
-        Es wird überall mit null als Fehlerfall gerechnet (besonders bei Lookups und DB/Network-Kommunikation).
-
-Fehlerquellen und deren Behandlung
-    Konfiguration:
-        Fehlende oder falsche Konfiguration wird geloggt und führt zum Abbruch der Initialisierung.
-    RPC-Fehler:
-        Bei Netzwerkproblemen oder fehlerhaften Antworten vom MoneyServer wird immer ein Fehlerobjekt erstellt und ausführlich geloggt.
-    Fehlende Objekte/Clients:
-        Fast überall wird geprüft, ob Objekte, Clients oder Rückgabewerte wirklich existieren, bevor sie verwendet werden.
-    Fehlende Berechtigungen oder unzulässige Aktionen:
-        Z.B. if (!m_sellEnabled) return; – Aktionen werden abgebrochen, wenn sie nicht erlaubt sind.
-    Transaktionsfehler:
-        Jede Transaktion prüft, ob die Übertragung erfolgreich war, und gibt false zurück oder loggt den Fehler.
-
-Typische Pattern für Sicherheit und Fehlervermeidung
-    Locking:
-        Zugriff auf die Szenenliste ist mit lock (m_sceneList) geschützt.
-    Null-Checks:
-        Überall vor der Nutzung von Rückgabewerten, Event-Objekten, Parametern.
-    Logging:
-        Fehler und Sonderfälle werden ausführlich geloggt.
-    Try/Catch:
-        Insbesondere bei externen Netzwerkzugriffen.
-
-Zusammenfassung & Bewertung
-    Null Pointer:
-    Der gesamte Code ist sehr gewissenhaft in Bezug auf Null Pointer – überall werden Objekte auf null geprüft, bevor sie verwendet werden.
-    Fehlerquellen:
-    Externe Fehler (Netzwerk, Konfiguration) werden geloggt und führen zu sauberem Abbruch. Rückgabewerte im Fehlerfall (z.B. null oder false) sind klar definiert und werden behandelt.
-    Funktion:
-    Sehr umfangreiches Modul zur sicheren Verwaltung von Währungen und Transaktionen in OpenSim, mit Anbindung an einen externen Server und vielen Schutzmechanismen.
-
-Fazit:
-Der Code ist robust gegenüber NullPointerException und typischen Fehlern. Fehlerquellen werden gut abgefangen, Logging ist umfassend.
-Die gesamte Struktur entspricht gängiger C#-Best-Practice für modulare, fehlertolerante Server-Module.
  */
 
 using System;
@@ -170,7 +106,7 @@ namespace OpenSim.Modules.Currency
         // Private data members.
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        //private bool  m_enabled = true;
+        private bool m_enabled;
         private bool m_sellEnabled = false;
         private bool m_enable_server = true;   // enable Money Server
 
@@ -261,7 +197,7 @@ namespace OpenSim.Modules.Currency
         {
             m_log.InfoFormat("[MONEY MODULE]: Initialise started.");
 
-            // Überprüfen, ob die Konfigurationsquelle null ist.
+            // ÃœberprÃ¼fen, ob die Konfigurationsquelle null ist.
             if (source == null)
             {
                 m_log.ErrorFormat("[MONEY MODULE]: Initialise aborted - source is null.");
@@ -280,23 +216,25 @@ namespace OpenSim.Modules.Currency
                     return;
                 }
 
-                // Überprüfen, ob das Modul aktiviert ist
+                // ÃœberprÃ¼fen, ob das Modul aktiviert ist
                 if (economyConfig.GetString("EconomyModule") != Name)
                 {
                     m_log.InfoFormat("[MONEY MODULE]: Initialise - DTL/NSL MoneyModule is disabled.");
                     return;
                 }
 
+                m_enabled = true;
+
                 m_log.InfoFormat("[MONEY MODULE]: Initialise - DTL/NSL MoneyModule is enabled.");
 
-                // Konfiguration für Verkauf und MoneyServer-URL
+                // Konfiguration fÃ¼r Verkauf und MoneyServer-URL
                 m_sellEnabled = economyConfig.GetBoolean("SellEnabled", m_sellEnabled);
                 m_log.InfoFormat("[MONEY MODULE]: SellEnabled set to {0}", m_sellEnabled);
 
                 m_moneyServURL = economyConfig.GetString("CurrencyServer", m_moneyServURL);
                 m_log.InfoFormat("[MONEY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
 
-                // Konfiguration für Client-Zertifizierung
+                // Konfiguration fÃ¼r Client-Zertifizierung
                 m_certFilename = economyConfig.GetString("ClientCertFilename", m_certFilename);
                 m_certPassword = economyConfig.GetString("ClientCertPassword", m_certPassword);
                 if (!string.IsNullOrEmpty(m_certFilename))
@@ -309,7 +247,7 @@ namespace OpenSim.Modules.Currency
                     m_log.Warn("[MONEY MODULE]: No client certificate filename provided.");
                 }
 
-                // Konfiguration für Server-Zertifikatüberprüfung
+                // Konfiguration fÃ¼r Server-ZertifikatÃ¼berprÃ¼fung
                 m_checkServerCert = economyConfig.GetBoolean("CheckServerCert", m_checkServerCert);
                 m_cacertFilename = economyConfig.GetString("CACertFilename", m_cacertFilename);
 
@@ -324,7 +262,7 @@ namespace OpenSim.Modules.Currency
                     m_log.Warn("[MONEY MODULE]: No CA certificate filename provided; server certificate check disabled.");
                 }
 
-                // Konfiguration für Settlement
+                // Konfiguration fÃ¼r Settlement
                 m_use_web_settle = economyConfig.GetBoolean("SettlementByWeb", m_use_web_settle);
                 m_log.InfoFormat("[MONEY MODULE]: SettlementByWeb set to {0}", m_use_web_settle);
 
@@ -357,7 +295,7 @@ namespace OpenSim.Modules.Currency
                 EnergyEfficiency = economyConfig.GetFloat("EnergyEfficiency", EnergyEfficiency);
                 m_log.InfoFormat("[MONEY MODULE]: Price settings loaded successfully.");
 
-                // Konfiguration für HG-Avatar-Typ
+                // Konfiguration fÃ¼r HG-Avatar-Typ
                 string avatarClass = economyConfig.GetString("HGAvatarAs", "HGAvatar").ToLower();
                 m_hg_avatarClass = avatarClass switch
                 {
@@ -383,6 +321,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="scene">A <see cref="T:OpenSim.Region.Framework.Scenes.Scene" /></param>
         public void AddRegion(Scene scene)
         {
+            if (!m_enabled) return;
             m_log.InfoFormat("[MONEY MODULE]: AddRegion:");
 
             if (scene == null) return;
@@ -450,6 +389,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="scene">A <see cref="T:OpenSim.Region.Framework.Scenes.Scene" /></param>
         public void RemoveRegion(Scene scene)
         {
+            if (!m_enabled) return;
             if (scene == null) return;
 
             lock (m_sceneList)
@@ -479,6 +419,7 @@ namespace OpenSim.Modules.Currency
         /// <param name="scene">A <see cref="T:OpenSim.Region.Framework.Scenes.Scene" /></param>
         public void RegionLoaded(Scene scene)
         {
+            if (!m_enabled) return;
             m_log.InfoFormat("[MONEY MODULE] region loaded {0}", scene.RegionInfo.RegionID.ToString());
         }
 

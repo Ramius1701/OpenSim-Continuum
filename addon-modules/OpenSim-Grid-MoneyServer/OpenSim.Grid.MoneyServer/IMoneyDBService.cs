@@ -13,19 +13,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-
-IMoneyDBService ist ein Interface f�r Datenbankoperationen rund um ein W�hrungssystem, typischerweise f�r virtuelle �konomien. Es definiert Methoden f�r:
-
-    Nutzerverwaltung (z.B. addUser, DeleteUser, UserExists, UpdateUserInfo)
-    Kontostand- und Geldtransaktionen (getBalance, withdrawMoney, giveMoney, BuyMoney, BuyCurrency, PerformMoneyTransfer)
-    Transaktionsmanagement (addTransaction, updateTransactionStatus, FetchTransaction, GetTransactionHistory, SetTransExpired)
-    Fehlerprotokollierung (LogTransactionError)
-    Authentifizierungen und Validierungen (ValidateTransfer)
-    Verbindungsmanagement (GetLockedConnection)
-
-Die Methoden sind so gestaltet, dass sie in einer konkreten Implementierung mit einer Datenbank (z.B. MySQL) interagieren.
  */
 
 

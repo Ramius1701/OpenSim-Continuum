@@ -1162,18 +1162,59 @@ namespace OpenSim.Services.LLLoginService
 //                    m_log.DebugFormat("[LLLOGIN SERVICE]: found new key {0} {1}", keyName, aCircuit.ServiceURLs[keyName]);
                 }
 
-                if (!string.IsNullOrEmpty(m_GatekeeperURL) && (!account.ServiceURLs.TryGetValue("GatekeeperURI", out object ogate) || !m_GatekeeperURL.Equals((string)ogate)))
+            string homeURI = NormalizeServiceURL(m_LoginServerConfig.GetString("SRV_HomeURI", string.Empty));
+            if (homeURI.Length == 0)
+                homeURI = NormalizeServiceURL(m_GatekeeperURL);
+
+            if (homeURI.Length > 0)
+            {
+                if (!aCircuit.ServiceURLs.TryGetValue("HomeURI", out object currentCircuitHome) ||
+                    IsMissingServiceURL(currentCircuitHome) ||
+                    !string.Equals(homeURI, currentCircuitHome as string, StringComparison.OrdinalIgnoreCase))
                 {
-                    m_log.Debug($"[LLLOGIN SERVICE]: adding gatekeeper uri {m_GatekeeperURL}");
-                    account.ServiceURLs["GatekeeperURI"] = m_GatekeeperURL;
+                    aCircuit.ServiceURLs["HomeURI"] = homeURI;
+                }
+
+                if (!account.ServiceURLs.TryGetValue("HomeURI", out object currentAccountHome) ||
+                    IsMissingServiceURL(currentAccountHome) ||
+                    !string.Equals(homeURI, currentAccountHome as string, StringComparison.OrdinalIgnoreCase))
+                {
+                    account.ServiceURLs["HomeURI"] = homeURI;
                     newUrls = true;
                 }
+            }
+
+            string gatekeeperURI = NormalizeServiceURL(m_GatekeeperURL);
+            if (gatekeeperURI.Length > 0 && (!account.ServiceURLs.TryGetValue("GatekeeperURI", out object ogate) || !gatekeeperURI.Equals(ogate as string)))
+            {
+                m_log.Debug($"[LLLOGIN SERVICE]: adding gatekeeper uri {gatekeeperURI}");
+                account.ServiceURLs["GatekeeperURI"] = gatekeeperURI;
+                newUrls = true;
+            }
 
                 // The grid operator decided to override the defaults in the
                 // [LoginService] configuration. Let's store the correct ones.
                 if (newUrls)
                     m_UserAccountService.StoreUserAccount(account);
             }
+        }
+
+        private static string NormalizeServiceURL(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            value = value.Trim();
+            if (!value.EndsWith('/'))
+                value += '/';
+
+            return value;
+        }
+
+        private static bool IsMissingServiceURL(object value)
+        {
+            string url = value as string;
+            return string.IsNullOrWhiteSpace(url) || url.Trim() == "/";
         }
 
         private bool LaunchAgentDirectly(ISimulationService simConnector, GridRegion region, AgentCircuitData aCircuit, TeleportFlags flags, out string reason)

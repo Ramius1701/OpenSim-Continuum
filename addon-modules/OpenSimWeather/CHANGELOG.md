@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.4
+
+- Re-established GuntharDeNiro/opensim `6c7021cc36fd6890db27200cd65fd4bb37bd60fd`
+  as the runtime and provenance baseline while retaining the intended 0.3.3
+  Continuum extensions.
+- Made partial region-emitter startup atomic by deleting every emitter already
+  created when a later location fails.
+- Made timer rescheduling safe during simultaneous shutdown and weather change.
+- Restricted interrupted-startup cleanup to objects carrying Continuum's
+  generated-object marker, preventing name-based deletion of unrelated builds.
+
+## 0.3.3 — coverage compatibility and configuration reconciliation
+
+- Restored `CoverageMode = Region` as the safe default.
+- Restored the dimension-scaled 8x8 emitter layout that covers standard regions
+  and varregions with a stable 64-object upper baseline before cover suppression.
+- Restored the original `EmitterRadiusScale = 0.62` coverage behavior.
+- Kept `ActiveArea`, fixed-metre spacing, and `MaxEmitters` as explicit advanced
+  options rather than silently changing normal region coverage.
+- Invalid `CoverageMode` values now warn and fall back to `Region`.
+- Simplified `OpenSimWeather.ini.example` to common operational settings.
+- Added `OpenSimWeather.reference.ini.example` for the complete advanced
+  configuration and all environment profiles.
+- Updated focused examples to use full-region coverage unless the operator
+  deliberately selects ActiveArea.
+
 ## 0.3.2 — OpenSim Enhanced replacement packaging
 
 - Replaces the initial `addon-modules/Weather` implementation rather than

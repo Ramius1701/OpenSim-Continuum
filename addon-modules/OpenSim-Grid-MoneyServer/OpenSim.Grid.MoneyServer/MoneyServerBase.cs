@@ -13,58 +13,6 @@
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-Funktion
-    MoneyServerBase ist die zentrale Basisklasse f�r den MoneyServer im OpenSim-Grid.
-    Sie startet die Serverdienste, initialisiert Konfigurationen, verwaltet Datenbankverbindungen und setzt periodisch Transaktionen zur�ck.
-    Sie implementiert das Interface IMoneyServiceCore und erweitert BaseOpenSimServer.
-
-Null-Pointer-Checks & Fehlerquellen
-Initialisierung und Konstruktor
-    Im Konstruktor (MoneyServerBase()) wird eine Konsole (LocalConsole) initialisiert und auf null gepr�ft. Bei Fehlschlag wird eine Exception geworfen.
-    Das Logging (m_log?.Info, m_log?.Error) verwendet sichere Zugriffe (null-conditional operator).
-
-Konfigurationslesung
-    ReadIniConfig() liest Konfigurationen aus einer INI-Datei.
-    Null-Gefahr:
-        Abschnitte wie [MoneyServer] oder [Certificate] k�nnten fehlen. Es gibt aber Fallbacks, z.B. wird bei fehlender [Certificate]-Section auf [MoneyServer] zur�ckgegriffen.
-        Bei Fehlern wird ein Fehler geloggt und das Programm per Environment.Exit(1) beendet � kritische NullPointer werden so abgefangen.
-
-Datenbankservice
-    dbService und m_moneyDBService werden beide korrekt initialisiert und mit Initialise versehen.
-    Null-Check: In der Timer-Callback-Methode CheckTransaction wird gepr�ft, ob m_moneyDBService == null ist, bevor darauf zugegriffen wird.
-
-Timer und Ressourcenmanagement
-    In der Methode Work() wird ein Timer verwendet und im finally-Block sauber gestoppt und freigegeben, falls er noch l�uft. Das verhindert Memory Leaks.
-
-HTTP-Server
-    Der HTTP-Server (m_httpServer) wird je nach Konfiguration mit oder ohne Zertifikat initialisiert.
-    Client-Zertifikatspr�fung wird nur aktiviert, wenn alle n�tigen Parameter gesetzt sind.
-
-Dictionary und Session-Handling
-    Die Dictionary-Properties (m_sessionDic, m_secureSessionDic, m_webSessionDic) werden direkt im Feld initialisiert, k�nnen also nie null sein.
-
-Zusammenfassung m�glicher Fehlerquellen
-    NullPointer:
-        Weitestgehend abgefangen durch Initialisierung und Checks.
-        M�gliche Fehlerquellen werden durch Exceptions und Beenden des Programms abgefangen.
-    Fehlende Konfigurationen:
-        Fallbacks vorhanden, Logging bei Problemen.
-    Datenbank- und Serviceobjekte:
-        Werden immer initialisiert, NullPointer im Laufzeitbetrieb sind unwahrscheinlich.
-    Allgemeine Fehlerbehandlung:
-        Try-Catch-Bl�cke mit Logging in allen kritischen Abschnitten.
-        Im Fehlerfall Exit oder saubere Beendigung.
-
-Funktionale Zusammenfassung
-    Initialisierung: Liest Konfiguration, startet HTTP-Server (mit/ohne SSL), setzt Datenbankdienste auf.
-    Service-Setup: Stellt alle zentralen Services f�r den MoneyServer bereit (Konfiguration, Session, HTTP).
-    Transaktions�berwachung: �berpr�ft regelm��ig per Timer, ob alte Transaktionen abgelaufen sind.
-    Ressourcenmanagement: Saubere Freigabe von Timern, keine offensichtlichen Memory Leaks.
-
-Fazit:
-Der Code ist insgesamt robust gegen NullPointer-Fehler, da alle kritischen Ressourcen direkt initialisiert oder auf null gepr�ft werden. Fehler werden geloggt und f�hren bei kritischen Problemen zum Programmabbruch.
-Die Funktionalit�t ist klar und zweckm��ig f�r einen zentralen Service im OpenSim-MoneyServer.
  */
 
 using log4net;
@@ -84,6 +32,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Security;
 using System.Reflection;
+using System.Threading;
 using System.Timers;
 
 using Timer = System.Timers.Timer;
@@ -102,18 +51,19 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     private uint m_moneyServerPort = 8008;         // 8008 is default server port
     private Timer checkTimer;
 
-    // --- Casperia Prime addition: Stipends ---
-    // Reuses the exact same Timer pattern as checkTimer above, and the same
-    // proven addTransaction/DoTransfer/UpdateBalance path used by
-    // handleScriptTransaction in MoneyXmlRpcModule.cs - no new balance-moving
-    // logic, just a scheduled trigger for the existing, working mechanism.
+    // --- OpenSim Continuum addition: Stipends ---
+    // Uses deterministic per-avatar/per-cycle transaction IDs and the existing
+    // addTransaction/DoAddMoney/UpdateBalance path. The transaction ledger is
+    // authoritative for retry safety; the local state file is only an optimization.
     private Timer m_stipendTimer;
     private bool m_stipendEnabled = false;
     private int m_stipendAmount = 0;
     private int m_stipendIntervalDays = 7;
+    private DateTime m_stipendAnchorDateUtc = new DateTime(1970, 1, 5, 0, 0, 0, DateTimeKind.Utc);
     private string m_stipendDescription = "Weekly stipend";
     private List<string> m_stipendEligibleAvatars = new List<string>();
-    private readonly string m_stipendStateFile = "stipend_lastrun.txt";
+    private readonly string m_stipendStateFile = Path.Combine(AppContext.BaseDirectory, "stipend_lastcycle.txt");
+    private int m_stipendRunActive;
 
     private string m_certFilename = "";
     private string m_certPassword = "";
@@ -196,25 +146,28 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         // Add event handler to check transactions
         checkTimer.Elapsed += CheckTransaction;
 
-        // --- Casperia Prime addition: Stipends ---
-        // Checks hourly whether enough time has passed since the last grant,
-        // rather than trying to schedule for an exact future moment - simpler,
-        // and tolerant of server restarts (won't forget or double-grant).
+        // Stipends are checked hourly. Each avatar/cycle uses a deterministic
+        // transaction UUID, so retries and restarts cannot credit the same cycle twice.
         if (m_stipendEnabled)
         {
             m_stipendTimer = new Timer
             {
-                Interval = 60 * 60 * 1000, // check hourly
-                Enabled = true
+                Interval = 60 * 60 * 1000,
+                AutoReset = true,
+                Enabled = false
             };
             m_stipendTimer.Elapsed += CheckStipends;
         }
 
         try
         {
-            // Start the timer
+            // Start the timers.
             checkTimer.Start();
-            if (m_stipendEnabled) m_stipendTimer.Start();
+            if (m_stipendEnabled)
+            {
+                m_stipendTimer.Start();
+                CheckStipends(null, null);
+            }
 
             // Run the console prompt loop
             while (true)
@@ -270,52 +223,112 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     }
 
     /// <summary>
-    /// Casperia Prime addition: checks hourly whether enough time has passed
-    /// since the last stipend grant, and if so, grants stipends to every
-    /// configured eligible avatar via MoneyXmlRpcModule.GrantStipends(),
-    /// which reuses the same proven addTransaction/DoTransfer/UpdateBalance
-    /// path handleScriptTransaction already uses - no new balance-moving
-    /// logic here, just scheduling.
+    /// Checks the current deterministic stipend cycle hourly. The transaction
+    /// ledger is the idempotency authority; the state file only suppresses work
+    /// after an entire cycle has completed successfully.
     /// </summary>
     private void CheckStipends(object sender, ElapsedEventArgs e)
     {
-        if (!m_stipendEnabled || m_moneyXmlRpcModule == null)
+        if (!m_stipendEnabled || m_moneyXmlRpcModule == null ||
+            m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0)
         {
             return;
         }
-        if (m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0)
+
+        if (Interlocked.Exchange(ref m_stipendRunActive, 1) != 0)
         {
-            return; // already warned about this at startup, don't spam the log every hour
+            m_log.Warn("[STIPEND]: Previous stipend check is still running; this timer tick was skipped.");
+            return;
         }
 
         try
         {
-            DateTime lastRun = DateTime.MinValue;
-            if (File.Exists(m_stipendStateFile))
+            string cycleKey = GetCurrentStipendCycleKey(DateTime.UtcNow);
+            string completedCycle = ReadCompletedStipendCycle();
+            if (string.Equals(completedCycle, cycleKey, StringComparison.Ordinal))
+                return;
+
+            m_log.InfoFormat(
+                "[STIPEND]: Processing cycle {0}: {1} for {2} avatar(s).",
+                cycleKey,
+                m_stipendAmount,
+                m_stipendEligibleAvatars.Count);
+
+            bool completed = m_moneyXmlRpcModule.GrantStipends(
+                m_stipendAmount,
+                m_stipendDescription,
+                m_stipendEligibleAvatars,
+                cycleKey);
+
+            if (completed)
             {
-                string raw = File.ReadAllText(m_stipendStateFile).Trim();
-                DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.RoundtripKind, out lastRun);
+                WriteCompletedStipendCycle(cycleKey);
+                m_log.InfoFormat("[STIPEND]: Cycle {0} completed.", cycleKey);
             }
-
-            if (DateTime.UtcNow - lastRun < TimeSpan.FromDays(m_stipendIntervalDays))
+            else
             {
-                return; // not due yet
+                m_log.WarnFormat(
+                    "[STIPEND]: Cycle {0} was not fully completed and will be retried. " +
+                    "Already-successful avatar transactions will be skipped safely.",
+                    cycleKey);
             }
-
-            m_log.InfoFormat("[STIPEND]: Granting {0} to {1} avatar(s)", m_stipendAmount, m_stipendEligibleAvatars.Count);
-            m_moneyXmlRpcModule.GrantStipends(m_stipendAmount, m_stipendDescription, m_stipendEligibleAvatars);
-
-            // Record this run BEFORE the next check, regardless of individual
-            // per-avatar failures inside GrantStipends (those are logged
-            // there) - we don't want a single bad avatar entry to cause the
-            // whole grant to be retried repeatedly every hour.
-            File.WriteAllText(m_stipendStateFile, DateTime.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[STIPEND]: Error in CheckStipends: {0}", ex.Message);
+            m_log.ErrorFormat("[STIPEND]: Error in CheckStipends: {0}", ex);
         }
+        finally
+        {
+            Interlocked.Exchange(ref m_stipendRunActive, 0);
+        }
+    }
+
+    private string GetCurrentStipendCycleKey(DateTime utcNow)
+    {
+        DateTime anchor = m_stipendAnchorDateUtc.Date;
+        int intervalDays = Math.Max(1, m_stipendIntervalDays);
+        long elapsedDays = (long)Math.Floor((utcNow.Date - anchor).TotalDays);
+        long cycleIndex;
+
+        if (elapsedDays >= 0)
+            cycleIndex = elapsedDays / intervalDays;
+        else
+            cycleIndex = -((-elapsedDays + intervalDays - 1) / intervalDays);
+
+        DateTime cycleStart = anchor.AddDays(cycleIndex * intervalDays);
+        return string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "{0:yyyy-MM-dd}/{1}d",
+            cycleStart,
+            intervalDays);
+    }
+
+    private string ReadCompletedStipendCycle()
+    {
+        try
+        {
+            if (!File.Exists(m_stipendStateFile))
+                return string.Empty;
+
+            return File.ReadAllText(m_stipendStateFile).Trim();
+        }
+        catch (Exception ex)
+        {
+            // The transaction ledger remains the idempotency authority. A missing
+            // or unreadable state file can cause a retry, but not a duplicate credit.
+            m_log.WarnFormat(
+                "[STIPEND]: Could not read state file {0}: {1}",
+                m_stipendStateFile,
+                ex.Message);
+            return string.Empty;
+        }
+    }
+
+    private void WriteCompletedStipendCycle(string cycleKey)
+    {
+        string temporaryFile = m_stipendStateFile + ".tmp";
+        File.WriteAllText(temporaryFile, cycleKey + Environment.NewLine);
+        File.Move(temporaryFile, m_stipendStateFile, true);
     }
 
     /// <summary>
@@ -415,7 +428,8 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
             m_CurrencyGroupName = m_server_config.GetString("CurrencyGroupName", m_CurrencyGroupName);
 
             //
-            // [Stipend] - Casperia Prime addition, off by default.
+            // [Stipend] - off by default. Each configured cycle is recorded
+            // with deterministic per-avatar transaction IDs.
             IConfig stipend_config = moneyConfig.m_config.Configs["Stipend"];
             if (stipend_config != null)
             {
@@ -424,24 +438,66 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
                 m_stipendIntervalDays = stipend_config.GetInt("IntervalDays", 7);
                 m_stipendDescription = stipend_config.GetString("Description", "Weekly stipend");
 
-                string avatarList = stipend_config.GetString("EligibleAvatars", "");
-                m_stipendEligibleAvatars = new List<string>();
-                foreach (string uuid in avatarList.Split(','))
+                string anchorValue = stipend_config.GetString("AnchorDateUtc", "1970-01-05").Trim();
+                if (!DateTime.TryParseExact(
+                    anchorValue,
+                    "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal |
+                        System.Globalization.DateTimeStyles.AdjustToUniversal,
+                    out m_stipendAnchorDateUtc))
                 {
-                    string trimmed = uuid.Trim();
-                    if (trimmed.Length > 0) m_stipendEligibleAvatars.Add(trimmed);
+                    m_log.WarnFormat(
+                        "[MONEY SERVER]: Invalid [Stipend] AnchorDateUtc '{0}'; using 1970-01-05.",
+                        anchorValue);
+                    m_stipendAnchorDateUtc = new DateTime(1970, 1, 5, 0, 0, 0, DateTimeKind.Utc);
                 }
 
-                if (m_stipendEnabled && (m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0))
+                HashSet<string> uniqueAvatars = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string avatarList = stipend_config.GetString("EligibleAvatars", "");
+                foreach (string configuredUUID in avatarList.Split(','))
                 {
-                    m_log.Warn("[MONEY SERVER]: [Stipend] Enabled=true but Amount is 0 or EligibleAvatars is empty - stipends will not actually grant anything until both are set.");
+                    string trimmed = configuredUUID.Trim();
+                    if (trimmed.Length == 0)
+                        continue;
+
+                    if (!OpenMetaverse.UUID.TryParse(trimmed, out OpenMetaverse.UUID avatarID) ||
+                        avatarID == OpenMetaverse.UUID.Zero)
+                    {
+                        m_log.WarnFormat(
+                            "[MONEY SERVER]: Ignoring invalid [Stipend] EligibleAvatars UUID: {0}",
+                            trimmed);
+                        continue;
+                    }
+
+                    uniqueAvatars.Add(avatarID.ToString());
+                }
+                m_stipendEligibleAvatars = new List<string>(uniqueAvatars);
+
+                if (m_stipendIntervalDays < 1)
+                {
+                    m_log.Error("[MONEY SERVER]: [Stipend] IntervalDays must be at least 1; stipends have been disabled.");
+                    m_stipendEnabled = false;
+                }
+
+                if (m_stipendEnabled &&
+                    (m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0))
+                {
+                    m_log.Error(
+                        "[MONEY SERVER]: [Stipend] Enabled=true requires Amount > 0 and at least one valid EligibleAvatars UUID; stipends have been disabled.");
+                    m_stipendEnabled = false;
                 }
                 else if (m_stipendEnabled)
                 {
-                    m_log.InfoFormat("[MONEY SERVER]: Stipends enabled: {0} every {1} day(s) for {2} avatar(s)",
-                        m_stipendAmount, m_stipendIntervalDays, m_stipendEligibleAvatars.Count);
+                    m_log.InfoFormat(
+                        "[MONEY SERVER]: Stipends enabled: {0} every {1} day(s), anchored at {2:yyyy-MM-dd} UTC, for {3} avatar(s).",
+                        m_stipendAmount,
+                        m_stipendIntervalDays,
+                        m_stipendAnchorDateUtc,
+                        m_stipendEligibleAvatars.Count);
                 }
             }
+
 
 
             //

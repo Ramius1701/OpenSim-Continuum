@@ -537,7 +537,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
             {"SOPAnims", ProcessSOPAnims },
 
-            {"SitActRange", ProcessSitActRange }
+            {"SitActRange", ProcessSitActRange },
+            {"AllowUnsit", ProcessAllowUnsit },
+            {"ScriptedSitOnly", ProcessScriptedSitOnly }
         }.ToFrozenDictionary();
 
         private static readonly FrozenDictionary<string, Action<TaskInventoryItem, XmlReader>> m_TaskInventoryXmlProcessors = new Dictionary<string, Action<TaskInventoryItem, XmlReader>>()
@@ -835,6 +837,16 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
         private static void ProcessSitActRange(SceneObjectPart obj, XmlReader reader)
         {
             obj.SitActiveRange = reader.ReadElementContentAsFloat("SitActRange", string.Empty);
+        }
+
+        private static void ProcessAllowUnsit(SceneObjectPart obj, XmlReader reader)
+        {
+            obj.AllowUnsit = Util.ReadBoolean(reader);
+        }
+
+        private static void ProcessScriptedSitOnly(SceneObjectPart obj, XmlReader reader)
+        {
+            obj.ScriptedSitOnly = Util.ReadBoolean(reader);
         }
 
         private static void ProcessVehicle(SceneObjectPart obj, XmlReader reader)
@@ -1690,6 +1702,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             }
             if(Math.Abs(sop.SitActiveRange) > 1e-5)
                 writer.WriteElementString("SitActRange", sop.SitActiveRange.ToString(Culture.FormatProvider));
+            writer.WriteElementString("AllowUnsit", sop.AllowUnsit.ToString().ToLower());
+            writer.WriteElementString("ScriptedSitOnly", sop.ScriptedSitOnly.ToString().ToLower());
             writer.WriteEndElement();
         }
 

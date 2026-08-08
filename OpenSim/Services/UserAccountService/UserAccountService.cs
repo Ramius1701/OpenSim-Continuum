@@ -56,6 +56,8 @@ namespace OpenSim.Services.UserAccountService
         protected IGridUserService m_GridUserService;
         protected IInventoryService m_InventoryService;
         protected IAvatarService m_AvatarService;
+        protected string m_DefaultHomeURI;
+        protected string m_DefaultGatekeeperURI;
 
         public UserAccountService(IConfigSource config)
             : base(config)
@@ -85,6 +87,12 @@ namespace OpenSim.Services.UserAccountService
                 m_AvatarService = LoadPlugin<IAvatarService>(avatarServiceDll, [config]);
 
             m_CreateDefaultAvatarEntries = userConfig.GetBoolean("CreateDefaultAvatarEntries", false);
+            m_DefaultGatekeeperURI = NormalizeServiceURL(Util.GetConfigVarFromSections<string>(config, "GatekeeperURI",
+                new string[] { "Startup", "Hypergrid", "LoginService", "UserAgentService" }, string.Empty));
+            m_DefaultHomeURI = NormalizeServiceURL(Util.GetConfigVarFromSections<string>(config, "HomeURI",
+                new string[] { "Startup", "Hypergrid", "LoginService", "UserAgentService" }, string.Empty));
+            if (m_DefaultHomeURI.Length == 0)
+                m_DefaultHomeURI = m_DefaultGatekeeperURI;
 
             if (m_RootInstance == null)
             {
@@ -145,6 +153,17 @@ namespace OpenSim.Services.UserAccountService
                             "show account",
                             "show account <first> <last>",
                             "Show account details for the given user", HandleShowAccount);
+
+                    MainConsole.Instance.Commands.AddCommand("Users", false,
+                            "set display name",
+                            "set display name <first> <last> <new display name>",
+                            "Sets the display name for the given user", HandleSetDisplayName);
+
+                    MainConsole.Instance.Commands.AddCommand("Users", false,
+                            "repair user service urls",
+                            "repair user service urls <first> <last> [<home-uri>]",
+                            "Rewrite an account's Hypergrid HomeURI and GatekeeperURI to the configured or supplied canonical domain.",
+                            HandleRepairUserServiceURLs);
                 }
             }
         }
@@ -199,12 +218,6 @@ namespace OpenSim.Services.UserAccountService
             else
                 u.Email = string.Empty;
             u.Created = Convert.ToInt32(d.Data["Created"].ToString());
-            if (d.Data.TryGetValue("TOSDate", out string valuetos) && valuetos != null)
-                Int32.TryParse(valuetos, out u.TOSDate);
-            if (d.Data.TryGetValue("DisplayName", out string valuedn) && !string.IsNullOrWhiteSpace(valuedn))
-                u.DisplayName = valuedn;
-            if (d.Data.TryGetValue("NameChanged", out string valuenc) && valuenc != null)
-                Int32.TryParse(valuenc, out u.NameChanged);
             if (d.Data.TryGetValue("UserTitle", out string valueut) && valueut != null)
                 u.UserTitle = valueut;
             else
@@ -233,6 +246,14 @@ namespace OpenSim.Services.UserAccountService
                         System.Web.HttpUtility.UrlDecode(parts[1]);
                 }
             }
+            if (d.Data.TryGetValue("DisplayName", out string displayName) && displayName != null)
+                u.DisplayName = displayName;
+            else
+                u.DisplayName = string.Empty;
+
+            if (d.Data.TryGetValue("NameChanged", out string nameChanged) && nameChanged != null)
+                uint.TryParse(nameChanged, out u.NameChanged);
+
             return u;
         }
 
@@ -317,10 +338,7 @@ namespace OpenSim.Services.UserAccountService
                     ["Email"] = data.Email,
                     ["Created"] = data.Created.ToString(),
                     ["UserLevel"] = data.UserLevel.ToString(),
-                    ["UserFlags"] = data.UserFlags.ToString(),
-                    ["TOSDate"] = data.TOSDate.ToString(),
-                    ["DisplayName"] = data.DisplayName ?? string.Empty,
-                    ["NameChanged"] = data.NameChanged.ToString()
+                    ["UserFlags"] = data.UserFlags.ToString()
                 }
             };
             if (!string.IsNullOrEmpty(data.UserTitle))
@@ -345,40 +363,11 @@ namespace OpenSim.Services.UserAccountService
             else
                 d.Data["ServiceURLs"] = string.Empty;
 
+            d.Data["DisplayName"] = data.DisplayName;
+            d.Data["NameChanged"] = data.NameChanged.ToString();
+
             return m_Database.Store(d);
         }
-
-        /// <summary>
-        /// Sets an account's display name, ported from Mobius. Enforces the
-        /// same 7-day cooldown between changes as the real SL display name
-        /// feature (an empty displayName resets to the default name and
-        /// isn't rate-limited). This is the one place the actual logic
-        /// lives: both LocalUserAccountServicesConnector (in-process) and
-        /// the ROBUST-side UserAccountServerPostHandler (over the network,
-        /// once its MAGIC signature check passes) call through to this
-        /// rather than each re-implementing the rate-limit/reset rules.
-        /// </summary>
-        public bool SetDisplayName(UUID userID, string displayName)
-        {
-            UserAccount account = GetUserAccount(UUID.Zero, userID);
-            if (account is null)
-                return false;
-
-            bool resetting = string.IsNullOrWhiteSpace(displayName);
-            if (string.IsNullOrWhiteSpace(account.DisplayName) && resetting)
-                return false;
-
-            DateTime lastChanged = Util.ToDateTime(account.NameChanged);
-            int nowUnix = Util.UnixTimeSinceEpoch();
-            if (!resetting && lastChanged.AddDays(7) > Util.ToDateTime(nowUnix))
-                return false;
-
-            account.DisplayName = resetting ? string.Empty : displayName;
-            account.NameChanged = nowUnix;
-
-            return StoreUserAccount(account);
-        }
-
 
         public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
         {
@@ -408,6 +397,19 @@ namespace OpenSim.Services.UserAccountService
                 ret.Add(MakeUserAccount(data));
 
             return ret;
+        }
+
+        public bool SetDisplayName(UUID agentID, string displayName)
+        {
+            var account = GetUserAccount(UUID.Zero, agentID);
+
+            if (account is null)
+                return false;
+
+            account.DisplayName = displayName;
+            account.NameChanged = Utils.GetUnixTime();
+
+            return StoreUserAccount(account);
         }
 
         #endregion
@@ -498,7 +500,7 @@ namespace OpenSim.Services.UserAccountService
                 return;
             }
 
-            MainConsole.Instance.Output("Name:    {0}", ua.Name);
+            MainConsole.Instance.Output("Name:    {0}", ua.FormattedName);
             MainConsole.Instance.Output("ID:      {0}", ua.PrincipalID);
             MainConsole.Instance.Output("Title:   {0}", ua.UserTitle);
             MainConsole.Instance.Output("E-mail:  {0}", ua.Email);
@@ -507,6 +509,60 @@ namespace OpenSim.Services.UserAccountService
             MainConsole.Instance.Output("Flags:   {0}", ua.UserFlags);
             foreach (KeyValuePair<string, Object> kvp in ua.ServiceURLs)
                 MainConsole.Instance.Output("{0}: {1}", kvp.Key, kvp.Value);
+        }
+
+        protected void HandleRepairUserServiceURLs(string module, string[] cmdparams)
+        {
+            if (cmdparams.Length != 6 && cmdparams.Length != 7)
+            {
+                MainConsole.Instance.Output("Usage: repair user service urls <first-name> <last-name> [<home-uri>]");
+                return;
+            }
+
+            string firstName = cmdparams[4];
+            string lastName = cmdparams[5];
+            bool explicitHomeURI = cmdparams.Length == 7;
+            string homeURI = explicitHomeURI ? NormalizeServiceURL(cmdparams[6]) : m_DefaultHomeURI;
+
+            if (homeURI.Length == 0)
+            {
+                MainConsole.Instance.Output("No HomeURI is configured. Supply it explicitly, for example:");
+                MainConsole.Instance.Output("repair user service urls {0} {1} http://vanilla-sim.com:9000", firstName, lastName);
+                return;
+            }
+
+            string gatekeeperURI = explicitHomeURI || m_DefaultGatekeeperURI.Length == 0 ? homeURI : m_DefaultGatekeeperURI;
+            UserAccount account = GetUserAccount(UUID.Zero, firstName, lastName);
+
+            if (account == null)
+            {
+                MainConsole.Instance.Output("No user named {0} {1}", firstName, lastName);
+                return;
+            }
+
+            if (account.ServiceURLs == null)
+                account.ServiceURLs = new Dictionary<string, object>();
+
+            string oldHomeURI = account.ServiceURLs.TryGetValue("HomeURI", out object oldHome)
+                ? oldHome?.ToString() ?? string.Empty
+                : string.Empty;
+            string oldGatekeeperURI = account.ServiceURLs.TryGetValue("GatekeeperURI", out object oldGatekeeper)
+                ? oldGatekeeper?.ToString() ?? string.Empty
+                : string.Empty;
+
+            account.ServiceURLs["HomeURI"] = homeURI;
+            account.ServiceURLs["GatekeeperURI"] = gatekeeperURI;
+
+            if (!StoreUserAccount(account))
+            {
+                MainConsole.Instance.Output("Unable to repair ServiceURLs for {0} {1}", firstName, lastName);
+                return;
+            }
+
+            MainConsole.Instance.Output("Repaired ServiceURLs for {0} {1}", firstName, lastName);
+            MainConsole.Instance.Output("HomeURI:       {0} -> {1}", oldHomeURI, homeURI);
+            MainConsole.Instance.Output("GatekeeperURI: {0} -> {1}", oldGatekeeperURI, gatekeeperURI);
+            MainConsole.Instance.Output("Log out from foreign grids and teleport again so they receive the new Hypergrid identity.");
         }
 
         protected void HandleResetUserPassword(string module, string[] cmdparams)
@@ -618,6 +674,40 @@ namespace OpenSim.Services.UserAccountService
                 MainConsole.Instance.Output("Unable to set user level for account {0} {1}.", firstName, lastName);
             else
                 MainConsole.Instance.Output("User level set for user {0} {1} to {2}", firstName, lastName, level);
+        }
+
+        protected void HandleSetDisplayName(string module, string[] cmdparams)
+        {
+            string firstName;
+            string lastName;
+            string displayName;
+
+            if (cmdparams.Length < 4)
+                firstName = MainConsole.Instance.Prompt("First name");
+            else firstName = cmdparams[3];
+
+            if (cmdparams.Length < 5)
+                lastName = MainConsole.Instance.Prompt("Last name");
+            else lastName = cmdparams[4];
+
+            if (cmdparams.Length < 6)
+                displayName = MainConsole.Instance.Prompt("Display name");
+            else displayName = cmdparams[5];
+
+            UserAccount account = GetUserAccount(UUID.Zero, firstName, lastName);
+            if (account == null)
+            {
+                MainConsole.Instance.Output("No such user as {0} {1}", firstName, lastName);
+                return;
+            }
+
+            account.DisplayName = displayName;
+            account.NameChanged = Utils.GetUnixTime();
+
+            if (StoreUserAccount(account))
+                MainConsole.Instance.Output("Display name updated!");
+            else
+                MainConsole.Instance.Output("Unable to set DisplayName for account {0} {1}.", firstName, lastName);
         }
 
         #endregion
@@ -1099,6 +1189,18 @@ namespace OpenSim.Services.UserAccountService
             item.CurrentPermissions &= item.NextPermissions;
             item.BasePermissions &= item.NextPermissions;
             item.EveryOnePermissions &= item.NextPermissions;
+        }
+
+        private static string NormalizeServiceURL(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            value = value.Trim();
+            if (!value.EndsWith("/"))
+                value += "/";
+
+            return value;
         }
     }
 }

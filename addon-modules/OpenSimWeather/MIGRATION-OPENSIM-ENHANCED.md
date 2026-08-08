@@ -7,7 +7,7 @@ addon-modules/Weather
 bin/OpenSim.Addons.Weather.dll
 ```
 
-OpenSimWeather 0.3.2 uses:
+OpenSimWeather 0.3.3 uses:
 
 ```text
 addon-modules/OpenSimWeather

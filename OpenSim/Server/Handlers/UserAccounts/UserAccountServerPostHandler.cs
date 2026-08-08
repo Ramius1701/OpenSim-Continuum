@@ -54,11 +54,6 @@ namespace OpenSim.Server.Handlers.UserAccounts
         private bool m_AllowCreateUser = false;
         private bool m_AllowSetAccount = false;
 
-        // Shared secret for authenticating SetDisplayName requests - see
-        // the long comment in UserAccountServicesConnector.cs for why this
-        // is configurable rather than Mobius's original hardcoded value.
-        private string m_DisplayNameSecret = string.Empty;
-
         public UserAccountServerPostHandler(IUserAccountService service)
             : this(service, null, null) {}
 
@@ -71,7 +66,6 @@ namespace OpenSim.Server.Handlers.UserAccounts
             {
                 m_AllowCreateUser = config.GetBoolean("AllowCreateUser", m_AllowCreateUser);
                 m_AllowSetAccount = config.GetBoolean("AllowSetAccount", m_AllowSetAccount);
-                m_DisplayNameSecret = config.GetString("DisplayNameSecret", m_DisplayNameSecret);
             }
         }
 
@@ -110,13 +104,13 @@ namespace OpenSim.Server.Handlers.UserAccounts
                         return GetAccounts(request);
                     case "getmultiaccounts":
                         return GetMultiAccounts(request);
+                    case "setdisplayname":
+                        return SetDisplayName(request);
                     case "setaccount":
                         if (m_AllowSetAccount)
                             return StoreAccount(request);
                         else
                             return FailureResult();
-                    case "setdisplayname":
-                        return SetDisplayName(request);
                 }
 
                 m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
@@ -264,6 +258,28 @@ namespace OpenSim.Server.Handlers.UserAccounts
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
         }
 
+        byte[] SetDisplayName(Dictionary<string, object> request)
+        {
+            object otmp;
+            UUID principalID = UUID.Zero;
+            if (request.TryGetValue("PrincipalID", out otmp) && !UUID.TryParse(otmp.ToString(), out principalID))
+                return FailureResult();
+
+            UserAccount existingAccount = m_UserAccountService.GetUserAccount(UUID.Zero, principalID);
+            if (existingAccount == null)
+                return FailureResult();
+
+            if (!request.TryGetValue("DisplayName", out otmp))
+                return FailureResult();
+            
+            if (!m_UserAccountService.SetDisplayName(principalID, otmp.ToString()))
+                return FailureResult();
+
+            Dictionary<string, object> result = new Dictionary<string, object>();
+            result["result"] = "success";
+            return ResultToBytes(result);
+        }
+
         byte[] StoreAccount(Dictionary<string, object> request)
         {
             object otmp;
@@ -386,39 +402,6 @@ namespace OpenSim.Server.Handlers.UserAccounts
         */
 
         private static byte[] ResultFailureBytes = osUTF8.GetASCIIBytes("<?xml version =\"1.0\"?><ServerResponse><result>Failure</result></ServerResponse>");
-
-        // Ported from Mobius, ROBUST-side endpoint for the SetDisplayName
-        // CAPS request (Region -> here). Unlike Mobius's version, the
-        // rate-limit/reset rules aren't duplicated here - they live once,
-        // in UserAccountService.SetDisplayName, and this only adds the
-        // MAGIC signature check needed because this request crosses a
-        // network boundary (region -> ROBUST) that a local/standalone
-        // in-process call doesn't have to cross.
-        byte[] SetDisplayName(Dictionary<string, object> request)
-        {
-            if (!request.ContainsKey("MAGIC") || !request.ContainsKey("USERID") || !request.ContainsKey("NAME"))
-                return FailureResult();
-
-            if (!UUID.TryParse(request["USERID"].ToString(), out UUID userID))
-                return FailureResult();
-
-            string newName = request["NAME"].ToString();
-            string magic = request["MAGIC"].ToString();
-
-            string expectedMagic = Utils.SHA256String(string.Format("{0}-{1}-{2}", userID.ToString(), newName, m_DisplayNameSecret));
-            if (magic != expectedMagic)
-            {
-                m_log.Warn("[USER ACCOUNT SERVER POST HANDLER]: SetDisplayName request with a bad MAGIC signature was rejected - check DisplayNameSecret matches between this ROBUST instance and the requesting region.");
-                return FailureResult();
-            }
-
-            if (!m_UserAccountService.SetDisplayName(userID, newName))
-                return FailureResult();
-
-            Dictionary<string, object> result = new Dictionary<string, object>();
-            result["result"] = "success";
-            return ResultToBytes(result);
-        }
 
         private byte[] FailureResult()
         {

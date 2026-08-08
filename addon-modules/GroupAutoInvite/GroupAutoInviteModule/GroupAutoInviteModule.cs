@@ -72,7 +72,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             m_groupName = config.GetString("GroupName", string.Empty).Trim();
             UUID.TryParse(config.GetString("InviterID", string.Empty), out m_inviterID);
             UUID.TryParse(config.GetString("RoleID", string.Empty), out m_roleID);
-            m_inviteDelaySeconds = Math.Max(0, config.GetInt("InviteDelaySeconds", 10));
+            m_inviteDelaySeconds = Math.Min(3600, Math.Max(0, config.GetInt("InviteDelaySeconds", 10)));
             m_inviteOncePerSession = config.GetBoolean("InviteOncePerSession", true);
             m_inviteMessage = config.GetString("InviteMessage", m_inviteMessage).Trim();
         }
@@ -89,14 +89,15 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_enabled || m_scene == null)
+            if (!m_enabled || scene == null)
                 return;
 
-            m_scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-            m_scene.EventManager.OnClientClosed -= OnClientClosed;
+            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+            scene.EventManager.OnClientClosed -= OnClientClosed;
             m_invitedThisSession.Clear();
             m_groupsModule = null;
-            m_scene = null;
+            if (ReferenceEquals(m_scene, scene))
+                m_scene = null;
         }
 
         public void RegionLoaded(Scene scene)
@@ -111,6 +112,13 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         public void Close()
         {
+            Scene scene = m_scene;
+            if (scene != null)
+            {
+                scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                scene.EventManager.OnClientClosed -= OnClientClosed;
+            }
+
             m_invitedThisSession.Clear();
             m_groupsModule = null;
             m_scene = null;
@@ -156,6 +164,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             if (groups == null)
                 return;
 
+            bool recordedInvite = false;
             try
             {
                 GroupRecord group = ResolveGroup(groups);
@@ -177,8 +186,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                     return;
                 }
 
-                if (m_inviteOncePerSession && !m_invitedThisSession.TryAdd(agentID, 0))
-                    return;
+                if (m_inviteOncePerSession)
+                {
+                    if (!m_invitedThisSession.TryAdd(agentID, 0))
+                        return;
+                    recordedInvite = true;
+                }
 
                 string inviteMessage = FormatInviteMessage(sp, group);
                 groups.InviteGroup(null, inviterID, group.GroupID, agentID, m_roleID, inviteMessage);
@@ -189,6 +202,11 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             }
             catch (Exception e)
             {
+                // A service outage or rejected request is not a successful
+                // invitation. Permit a later arrival to retry in this login.
+                if (recordedInvite)
+                    m_invitedThisSession.TryRemove(agentID, out _);
+
                 m_log.WarnFormat(
                     "[GROUP AUTO INVITE]: Failed to invite {0} in {1}: {2}",
                     sp.Name, scene.RegionInfo.RegionName, e.Message);

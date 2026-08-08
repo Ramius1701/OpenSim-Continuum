@@ -1,15 +1,15 @@
-using log4net;
-using Mono.Addins;
-using Nini.Config;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using log4net;
+using Mono.Addins;
+using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework;
-using OpenSim.Server.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
-using OpenMetaverse;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
 {
@@ -17,84 +17,66 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
     public class LocalAbuseReportsServicesConnector : ISharedRegionModule, IAbuseReportsService
     {
         private static readonly ILog m_log =
-                LogManager.GetLogger(
-                MethodBase.GetCurrentMethod().DeclaringType);
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private List<Scene> m_Scenes = new List<Scene>();
-        protected IAbuseReportsService m_service = null;
+        private readonly List<Scene> m_Scenes = new List<Scene>();
+        private IAbuseReportsService m_Service;
+        private bool m_Enabled;
 
-        private bool m_Enabled = false;
-
-         #region ISharedRegionModule
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
-        }
-
-        public string Name
-        {
-            get { return "LocalAbuseReportsServicesConnector"; }
-        }
+        public Type ReplaceableInterface => null;
+        public string Name => "LocalAbuseReportsServicesConnector";
 
         public void Initialise(IConfigSource source)
         {
-            // only active for core mute lists module
-            IConfig moduleConfig = source.Configs["Messaging"];
-            if (moduleConfig == null)
-                return;
-
-            if (moduleConfig.GetString("AbuseReportsModule", "None") != "AbuseReportsModule")
-                return;
-
-            moduleConfig = source.Configs["Modules"];
-
-            if (moduleConfig == null)
-                return;
-
-            string name = moduleConfig.GetString("AbuseReportsService", "");
-            if(name != Name)
-                return;
-
-            IConfig userConfig = source.Configs["AbuseReportsService"];
-            if (userConfig == null)
+            IConfig modulesConfig = source.Configs["Modules"];
+            if (modulesConfig == null ||
+                !string.Equals(
+                    modulesConfig.GetString("AbuseReportsService", string.Empty),
+                    Name,
+                    StringComparison.OrdinalIgnoreCase))
             {
-                m_log.Error("[ABUSE REPORTS LOCALCONNECTOR]: AbuseReportsService missing from configuration");
                 return;
             }
 
-            string serviceDll = userConfig.GetString("LocalServiceModule",
-                    String.Empty);
-
-            if (serviceDll == String.Empty)
+            IConfig serviceConfig = source.Configs["AbuseReportsService"];
+            if (serviceConfig == null)
             {
-                m_log.Error("[ABUSE REPORTS LOCALCONNECTOR]: No LocalServiceModule named in section AbuseReportsService");
+                m_log.Error("[ABUSE REPORTS LOCAL CONNECTOR]: Missing [AbuseReportsService] configuration");
                 return;
             }
 
-            Object[] args = new Object[] { source };
+            string serviceDll = serviceConfig.GetString("LocalServiceModule", string.Empty);
+            if (string.IsNullOrWhiteSpace(serviceDll))
+            {
+                m_log.Error("[ABUSE REPORTS LOCAL CONNECTOR]: LocalServiceModule is not configured");
+                return;
+            }
+
             try
             {
-                m_service = ServerUtils.LoadPlugin<IAbuseReportsService>(serviceDll, args);
+                m_Service = ServerUtils.LoadPlugin<IAbuseReportsService>(
+                    serviceDll,
+                    new object[] { source });
             }
-            catch
+            catch (Exception e)
             {
-                m_log.Error("[ABUSE REPORTS LOCALCONNECTOR]: Failed to load mute service");
+                m_log.ErrorFormat(
+                    "[ABUSE REPORTS LOCAL CONNECTOR]: Failed to load service {0}: {1}",
+                    serviceDll,
+                    e);
                 return;
             }
 
-            if (m_service == null)
+            if (m_Service == null)
             {
-                m_log.Error("[ABUSE REPORTS LOCALCONNECTOR]: Can't load MuteList service");
+                m_log.ErrorFormat(
+                    "[ABUSE REPORTS LOCAL CONNECTOR]: Could not load IAbuseReportsService from {0}",
+                    serviceDll);
                 return;
             }
 
             m_Enabled = true;
-            m_log.Info("[ABUSE REPORTS LOCALCONNECTOR]: enabled");
-        }
-
-        public void Close()
-        {
+            m_log.Info("[ABUSE REPORTS LOCAL CONNECTOR]: Enabled");
         }
 
         public void AddRegion(Scene scene)
@@ -102,11 +84,21 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
             if (!m_Enabled)
                 return;
 
-            lock(m_Scenes)
+            lock (m_Scenes)
             {
-                m_Scenes.Add(scene);
-                scene.RegisterModuleInterface<IAbuseReportsService>(this);
+                if (!m_Scenes.Contains(scene))
+                    m_Scenes.Add(scene);
             }
+
+            scene.RegisterModuleInterface<IAbuseReportsService>(this);
+        }
+
+        public void RemoveRegion(Scene scene)
+        {
+            scene.UnregisterModuleInterface<IAbuseReportsService>(this);
+
+            lock (m_Scenes)
+                m_Scenes.Remove(scene);
         }
 
         public void RegionLoaded(Scene scene)
@@ -117,30 +109,44 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
         {
         }
 
-        public void RemoveRegion(Scene scene)
+        public void Close()
         {
-            if (!m_Enabled)
-                return;
-
-            lock(m_Scenes)
+            lock (m_Scenes)
             {
-                if (m_Scenes.Contains(scene))
-                {
-                    m_Scenes.Remove(scene);
+                foreach (Scene scene in m_Scenes)
                     scene.UnregisterModuleInterface<IAbuseReportsService>(this);
-                }
+
+                m_Scenes.Clear();
             }
+
+            m_Enabled = false;
+            m_Service = null;
         }
 
-        #endregion ISharedRegionModule
-
-        #region IAbuseReportsService
         public bool ReportAbuse(AbuseReportData report)
         {
-            if (!m_Enabled)
-                return false;
-            return m_service.ReportAbuse(report);
+            return m_Enabled && m_Service != null && m_Service.ReportAbuse(report);
         }
-        #endregion IAbuseReportsService
+
+        public AbuseReportData GetReport(int reportID, bool includeImage)
+        {
+            return m_Enabled && m_Service != null
+                ? m_Service.GetReport(reportID, includeImage)
+                : null;
+        }
+
+        public AbuseReportData[] GetReports(int start, int count, string status)
+        {
+            return m_Enabled && m_Service != null
+                ? m_Service.GetReports(start, count, status)
+                : Array.Empty<AbuseReportData>();
+        }
+
+        public bool UpdateReport(int reportID, string status, string notes,
+            UUID moderatorID, string moderatorName)
+        {
+            return m_Enabled && m_Service != null &&
+                m_Service.UpdateReport(reportID, status, notes, moderatorID, moderatorName);
+        }
     }
 }

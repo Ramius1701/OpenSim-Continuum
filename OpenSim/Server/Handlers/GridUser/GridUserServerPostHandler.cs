@@ -91,8 +91,6 @@ namespace OpenSim.Server.Handlers.GridUser
                         return GetGridUserInfo(request);
                     case "getgriduserinfos":
                         return GetGridUserInfos(request);
-                    case "setdisplayname":
-                        return SetDisplayName(request);
                 }
                 m_log.DebugFormat("[GRID USER HANDLER]: unknown method request: {0}", method);
             }
@@ -152,17 +150,6 @@ namespace OpenSim.Server.Handlers.GridUser
                 return FailureResult();
 
             if (m_GridUserService.SetHome(user, region, position, look))
-                return SuccessResult();
-
-            return FailureResult();
-        }
-
-        byte[] SetDisplayName(Dictionary<string, object> request)
-        {
-            if (!request.TryGetValue("USERID", out object useridObj) || !request.TryGetValue("NAME", out object nameObj))
-                return FailureResult();
-
-            if (m_GridUserService.SetDisplayName(useridObj.ToString(), nameObj.ToString()))
                 return SuccessResult();
 
             return FailureResult();
@@ -231,11 +218,7 @@ namespace OpenSim.Server.Handlers.GridUser
 
             userIDs = ((List<string>)request["AgentIDs"]).ToArray();
 
-            bool update_name = request.ContainsKey("UPDATE_NAME") && request["UPDATE_NAME"].ToString() == "true";
-
-            GridUserInfo[] pinfos = update_name
-                ? m_GridUserService.GetGridUserInfo(userIDs, true)
-                : m_GridUserService.GetGridUserInfo(userIDs);
+            GridUserInfo[] pinfos = m_GridUserService.GetGridUserInfo(userIDs);
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if ((pinfos == null) || ((pinfos != null) && (pinfos.Length == 0)))

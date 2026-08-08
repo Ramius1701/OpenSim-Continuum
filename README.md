@@ -1,325 +1,190 @@
 # OpenSim Continuum
 
-[![OpenSim Continuum Build](https://github.com/Ramius1701/OpenSim-Continuum/actions/workflows/msbuildnet.yml/badge.svg)](https://github.com/Ramius1701/OpenSim-Continuum/actions/workflows/msbuildnet.yml)
+OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-OpenSim Continuum is a maintained downstream fork of the official
-[OpenSimulator](https://github.com/opensim/opensim) development branch.
+The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. This branch is an **alpha integration build**, not a production-test candidate. The complete solution builds, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, and other distributed paths still require donor-regression and multi-service runtime verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
 
-It combines current OpenSimulator development code with selected grid,
-identity, scripting, environment, simulator, web, economy, and reliability
-enhancements. Official OpenSimulator remains the authoritative upstream
-baseline.
+## Project status — alpha
 
-## Project status
+- Target runtime: .NET 8
+- Required deployment targets: Windows standalone with SQLite; Windows grid mode
+  with Robust using MySQL/MariaDB or PostgreSQL
+- Baseline build: successful with four known CS9193 compiler warnings
+- Continuum completion build: successful
+- Latest complete Release build: successful with zero warnings and zero errors
+- Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
+- Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
+- OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
 
-| Item | Status |
-|---|---|
-| Upstream baseline | `upstream/master` |
-| Maintained branch | `master` |
-| Repository model | GitHub-recognized fork of `opensim/opensim` |
-| Initial consolidation checkpoint | `continuum-initial-build-clean` |
-| Windows build | Successful |
-| GitHub Actions | Build-only validation on .NET 8 |
+Do not replace a running production installation in place. Build a separate test deployment, back up all databases and configuration, and rehearse every migration against a copy of production data.
 
-The complete solution has been generated and compiled successfully, including
-OpenSim, Robust, MoneyServer, and the included add-on modules.
+## Integrated functionality
 
-A successful compile confirms source integration. It does not automatically
-confirm that every optional service or feature is ready for production.
-Database migrations, viewer CAPS, Hypergrid behavior, economy services, and
-region modules should be tested in a controlled environment before deployment.
+### Identity, accounts, and grid services
 
-## Project goals
+- Mutable Display Names with persistence, CAPS, search, caching, and Hypergrid handling
+- User alias service and compatible OAR identity resolution
+- Hypergrid stale service-URL, circuit, and cached-identity repair
+- RSA key authentication and Terms of Service acceptance support
+- `InternalPort = MATCHING` region configuration support
+- Viewer Abuse Report submission, screenshot handling, Robust service, and SQLite, MySQL/MariaDB, and PostgreSQL storage providers
+- Mobius parcel auto-return details and in-world terrain console commands
 
-- Stay close enough to official OpenSimulator to accept continuing upstream work.
-- Preserve useful enhancements that are difficult to maintain as loose patches.
-- Keep optional functionality in `addon-modules` whenever practical.
-- Avoid grid-specific hardcoding.
-- Support standalone and Robust/grid deployments.
-- Retain Windows build and deployment support.
-- Provide configuration examples without silently enabling services.
+### Experiences and scripting
 
-## Included enhancements
-
-### Display Names and identity
-
-- Viewer-compatible Display Names for local users.
-- Display Name CAPS and viewer protocol handling.
-- Display Name storage and account-service integration.
-- Hypergrid Display Name lookup and federation.
-- Single-name and `username` login handling.
-- Terms-of-service acceptance during login.
-- RSA-key authentication support.
-- `InternalPort = MATCHING` region configuration support.
-
-### Abuse Reports
-
-- Viewer Abuse Reports CAPS.
-- Local and remote service connectors.
-- Robust handlers.
-- MySQL storage and migrations.
-- Region-side submission support.
-
-### Parcel, terrain, inventory, and object control
-
+- Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, SQLite, MySQL/MariaDB, and PostgreSQL providers, and restart handling
+- Second Life-compatible Experiences floater contracts for Search, Allowed, Blocked, Admin, Contributor, and Owned; viewer-local Events remain viewer-managed
+- Gunthar Experience scripting additions reconciled with the authoritative Tranquillity service
+- Experience permission, Combat2 damage, and path-update script events
+- Experience KVP, permission, sit, environment, and information APIs
+- EEP region, parcel, and agent environment functions
+- Pathfinding character APIs and compatibility behavior
+- Combat2 damage functions
+- RSA signing and verification functions
+- GLTF and render-material overrides
+- Scripted sit, inventory transfer, ownership transfer, estate return, terrain, parcel-sale, attachment-filter, notecard-search, sculpt-animation, sound, and region-time helpers
 - `osTriggerSoundAtPos`
-- Parcel auto-return access through `PARCEL_DETAILS_OBJECT_RETURN`
-- In-world terrain console commands
-- Script-controlled terrain textures and height ranges
-- Script-controlled parcel sale state
-- Object return by object ID or owner
-- Scripted ownership transfer
-- Direct inventory delivery to an avatar
-- Nested destination-folder support
-- Active-group matching
-- Filtered attachment queries
-- Synchronous notecard text searching
-- Sculpt-map animation support
+- YEngine orphaned resumed-event recovery
+- Region crossing, attachment recovery, movement-animation resend, and background map-generation fixes
 
-### Expanded LSL and OSSL compatibility
+The extended scripting surface is powerful and has estate/security implications. Test permission checks and failure paths before enabling scripts from untrusted owners.
 
-Additional functions include:
+### Optional region modules and services
 
-- `llSignRSA`
-- `llVerifyRSA`
-- `llGetRegionTimeOfDay`
-- `llSetAgentRot`
-- `llTransferOwnership`
-- `llReturnObjectsByID`
-- `llReturnObjectsByOwner`
-- `llSetGroundTexture`
-- `llGiveAgentInventory`
-- `llMatchGroup`
-- `llSetParcelForSale`
-- `llGetAttachedListFiltered`
-- `llFindNotecardTextSync`
-- `llSetSculptAnim`
-- `llSetLinkRenderMaterial`
-- `llSetLinkGLTFOverrides`
+- Gunthar RegionWeb per-region website and protected estate tools
+- GroupAutoInvite
+- RegionCurrency
+- OpenSimMarketplace direct-delivery addon
+- Gloebit money module
+- MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
+- ContinuumEconomy: a separately named service and region module with atomic MySQL/MariaDB, PostgreSQL and SQLite providers, idempotent operations, viewer currency purchase controls, and delivery-safe object purchase holds; it is ready for the production-test runbook, not live cutover
+- HoloPhysicsGuard
+- OpenSimSearch viewer-directory compatibility client (requires a separately deployed compatible search service)
+- OpenSimTide
+- OpenSimWeather
+- Viewer Abuse Reports
 
-The GLTF override support includes per-face overrides, base-color and alpha,
-metallic and roughness, emissive state, double-sided state, extension JSON,
-compact LLSD encoding, and supporting asset parsing.
+These are independent optional components. They are not all required for a grid, and enabling multiple economy modules simultaneously is not supported unless their interaction has been explicitly designed and tested.
 
-The separate `PRIM_GLTF_*` primitive-parameter subsystem is not included.
+HoloPhysicsGuard `PersistSleep` remains MySQL/MariaDB-only; SQLite and
+PostgreSQL deployments are limited to its non-persistent `ReportOnly` mode until
+dedicated providers are implemented and certified.
 
-### Combat2 scripting
+### Rendering, physics, and tooling
 
-- `llDamage`
-- `llAdjustDamage`
-- `llDetectedDamage`
-- `llDetectedRezzer`
-- Object-health support
-- `on_damage`
-- `final_damage`
-- `on_death`
+- Warp3D alpha texture-card sprite rendering, disabled by default
+- Dedicated experimental ubODE tuning branch for social collision, contact, bounce, buoyancy, and water behavior
+- Windows first-run setup tooling, retained as experimental until its remaining donor assumptions and operational edge cases are certified
 
-### EEP environment scripting
+## Safe defaults
 
-- `llGetEnvironment`
-- `llReplaceEnvironment`
-- `llSetEnvironment`
-- `llReplaceAgentEnvironment`
-- `llSetAgentEnvironment`
-- Region and parcel sky/water access
-- Per-agent environment overrides for trusted Experience-Lite scripts
+The following components require deliberate opt-in:
 
-### Pathfinding
+- `[RegionWeb] Enabled = false`
+- `[ScriptExperiences] Enabled = false`
+- `[OpenSimMarketplace] Enabled = false`
+- Recovered economy, search, environment, and protection modules through their own configuration sections
+- Warp3D flat-card sprite rendering through its renderer flags
 
-- `llCreateCharacter`
-- `llUpdateCharacter`
-- `llDeleteCharacter`
-- `llExecCharacterCmd`
-- `llNavigateTo`
-- `llWanderWithin`
-- `llPatrolPoints`
-- `llPursue`
-- `llEvade`
-- `llFleeFrom`
-- `llGetStaticPath`
-- `llGetClosestNavPoint`
+`[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
-The implementation provides approximate region-local A* navigation using
-terrain, scene queries, obstacle bounds, and OpenSim keyframe motion. It is not
-a physics-engine-native navigation service.
+The viewer service also requires an explicit `[Modules]` selection. The grid
+example selects `RemoteExperienceServicesConnector`; standalone selects
+`LocalExperienceServicesConnector`. Omitting this selection prevents Experience
+CAPS registration and hides the Parcel and Region Experience tabs.
 
-### Experience-Lite
+Never commit production passwords, API keys, database connection strings, marketplace credentials, or external economy credentials. Experience-Lite automatic grants must be restricted to explicit trusted owner or object UUIDs and must not grant debit permission.
 
-Experience-Lite provides configurable grid-local trust and persistent
-per-region/per-owner key-value storage. It is intentionally smaller than the
-complete Second Life Experience service.
+## Database support
 
-Supported functions include experience permissions, trust checks, key-value
-storage, `llSitOnLink`, and `llOpenFloater`.
+OpenSim core retains its normal datastore support. Continuum requires SQLite for
+standalone deployments and both MySQL/MariaDB and PostgreSQL for grid/Robust
+deployments. Imported services must not be described as generally ready while
+they provide only a MySQL implementation.
 
-`llOpenFloater` remains a stub because OpenSimulator does not currently provide
-the required viewer-hosted floater service.
-
-### Sit targets and avatar animation
-
-- Enforcement of scripted-only sit targets
-- Storage and lookup for LSL sit flags
-- Configurable male and female walk-animation overrides
-- Movement-animation resend protection
-
-### Region crossing and attachment reliability
-
-- Configurable transfer and cleanup timeouts
-- Optional preservation of crossing velocity
-- Configurable velocity limits
-- Reduced attachment detach/reattach flashing
-- Script-state restoration protection
-- Duplicate and failed attachment cleanup
-- Coordinated queued attachment-script restarts
-
-### Background map-tile generation
-
-- Background rendering
-- Non-blocking region startup and grid registration
-- Configurable startup delay
-- Configurable rendering-thread stack size
-- Optional wait-for-empty behavior
-
-## Included add-on modules
-
-All modules are under `addon-modules`. They are generated into the solution but
-are not necessarily enabled by default.
-
-- **Gloebit** — optional Gloebit economy integration.
-- **GroupAutoInvite** — configurable automatic group invitations.
-- **HoloPhysicsGuard** — reduces idle physics load when regions are empty.
-- **OpenSim Marketplace** — portable Direct Delivery marketplace system.
-- **OpenSimMutelist** — external mute-list service integration.
-- **OpenSimSearch** — external viewer search integration.
-- **OpenSimTide** — configurable tide and water-level simulation.
-- **OpenSimWeather** — experimental rain, snow, storms, lightning, thunder,
-  wind, clouds, textures, emitters, and environmental settings.
-- **RegionCurrency** — optional web front end for an existing `IMoneyModule`.
-- **RegionWeb** — per-region web pages and protected estate administration.
-
-Detailed Marketplace documentation is located at:
-
-```text
-addon-modules/OpenSimMarketplace/README.md
-```
-
-## MoneyServer enhancements
-
-The included MoneyServer integration provides:
-
-- MoneyServer, region currency module, and MySQL data wrapper.
-- Viewer currency purchases without an external `currency.php` helper.
-- Configurable daily, weekly, and monthly purchase limits.
-- Accounting based only on successful purchases.
-- Atomic balance credit and transaction-ledger recording.
-- Idempotent confirmation UUID handling.
-- `CurrencyMaximum` enforcement.
-- Retained banker, transfer, group, email-lock, object-payment, upload-charge,
-  and land-sale controls.
-- Correct console redraw behavior for the `MoneyServer #` prompt.
-
-The repository does not replace a live `bin/MoneyServer.ini`. Review the
-included examples and validation documents before production use.
+The Experience service, Abuse Reports, and aliases now include SQLite,
+MySQL/MariaDB, and PostgreSQL provider paths; their clean-install and upgrade
+migrations still require runtime certification on every database. MoneyServer
+Compatibility remains MySQL-specific by design. ContinuumEconomy provides its
+own service, region module, migrations and shared acceptance contract for
+SQLite, MySQL/MariaDB and PostgreSQL. It still requires the recorded simulator
+and recovery tests in its production-test runbook. For every service migration, test both a clean
+database and an upgrade from the exact schema used by the target deployment.
 
 ## Building
 
-### Requirements
+See [BUILDING.md](BUILDING.md) for the upstream build prerequisites and platform details.
 
-- .NET 8 SDK or a newer SDK capable of targeting .NET 8
-- Visual Studio 2022 or later is optional on Windows
+On Windows, build from the repository root (for this integration worktree,
+`S:\Github\OpenSim-Continuum-complete`):
 
-### Windows
-
-```bat
-runprebuild.bat
-compile.bat
+```powershell
+.\runprebuild.bat
+dotnet restore OpenSim.sln
+dotnet build OpenSim.sln --configuration Release --no-restore
 ```
 
-Equivalent direct build:
+Generated `bin/*.runtimeconfig.json` files are build artifacts and must not be committed unless the build system intentionally begins managing them.
 
-```bat
-runprebuild.bat
-dotnet build OpenSim.sln --configuration Release
-```
+## Running a test deployment
 
-### Linux or macOS
+1. Create a separate copy of the built `bin` directory and configuration.
+2. Start with all Continuum optional features disabled.
+3. Confirm login, inventory, assets, scripts, teleport, region crossing, shutdown, and restart against the upstream baseline behavior.
+4. Enable one service or module at a time.
+5. Run the acceptance tests in [doc/donor-feature-test-handoff.md](doc/donor-feature-test-handoff.md).
+6. Inspect logs for repeated exceptions, authentication failures, sensitive data, and migration errors.
+7. Test Robust outage/recovery and Hypergrid boundaries before enabling identity or Experience features on a public grid.
 
-```bash
-./runprebuild.sh
-dotnet build OpenSim.sln --configuration Release
-```
+The Windows setup wizard is not a substitute for reviewing production configuration.
 
-See `BUILDING.md` for the official base requirements.
+## Branches used for testing
 
-## Configuration
+- `codex/complete-opensim-feature-set`: complete OpenSim-side feature candidate
+- `codex/production-feature-integration`: earlier conservative integration checkpoint
+- `codex/testing-ubode-tuning`: experimental ubODE series on the integration candidate
+- `audit/donor-feature-inventory`: donor audit and provenance checkpoint
+- `fix/continuum-runtime-stabilization`: preserved unfinished historical stabilization work; not a deployment recommendation
 
-OpenSim Continuum does not install live configuration automatically.
+## Donors and provenance
 
-Review:
+The integration draws on work from:
 
-- `bin/OpenSim.ini.example`
-- `bin/Robust.ini.example`
-- `bin/Robust.HG.ini.example`
-- `bin/config-include/GridCommon.ini.example`
-- module-specific `.ini.example` files under `addon-modules`
+- OpenSimulator upstream
+- GuntharDeNiro/opensim
+- Mobius-Team/Mobius
+- OpenSim-NGC/OpenSim-Tranquillity
+- WhiteCoreSim/WhiteCore-Dev as a first-class behavioural and viewer-protocol reference; its divergent architecture still rules out wholesale source-tree ports
+- WhiteCore directory/search behaviour as the completeness reference for hardening OpenSimSearch across people, places, land, events, classifieds, map results, privacy, paging, and grid-scale indexing
+- Previous OpenSim Continuum and opensim-enhanced branches
+- Original repositories for Gloebit, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, OpenSimWeather, and recovered addons
 
-Optional modules should remain disabled until dependencies, database schema,
-service endpoints, credentials, and runtime behavior have been validated.
+Mobius is the original lineage for Display Names, Experiences, and Abuse Reports. Tranquillity provides the traceable enhanced Experience and identity service implementation used as the production base. Gunthar provides the closest active OpenSim-derived fixes, scripting work, RegionWeb, rendering changes, physics experiments, and optional modules.
 
-## Keeping current with official OpenSimulator
+Licensing and attribution must be reviewed per addon and asset. The OpenSimulator-derived code is BSD licensed; third-party modules, media, fonts, JavaScript, service SDKs, and external APIs may carry separate terms. See [LICENSE.txt](LICENSE.txt), [CONTRIBUTORS.txt](CONTRIBUTORS.txt), `ThirdPartyLicenses`, and the license files inside individual addons.
 
-The maintained branch is `master`. Official OpenSimulator is tracked through
-the `upstream` remote.
+## Deliberately deferred or excluded
 
-```bat
-git checkout master
-git status
-git fetch upstream --prune
-git tag -a continuum-pre-upstream-YYYYMMDD -m "Checkpoint before upstream merge"
-git merge --no-ff upstream/master
-runprebuild.bat
-dotnet build OpenSim.sln --configuration Release
-```
+- OpenSim-Grid-Interface and WhiteCore WebUI are deferred to a later portal phase.
+- WhiteCore WebUI is not copied into Robust because its service, persistence, authentication, and page architecture is incompatible with current OpenSim.
+- Donor-specific endpoints, credentials, forced defaults, curated destinations, destructive update/reset scripts, and obsolete architecture rewrites are excluded.
+- The separate local checkout explicitly excluded from this work was not used.
 
-Resolve and test upstream conflicts rather than replacing Continuum history.
+## Further documentation
 
-## Repository model
+- [Donor feature inventory and disposition record](doc/donor-feature-inventory.md)
+- [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
+- [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
+- [Current integration progress and release gates](doc/integration-progress.md)
+- [Abuse Reports](doc/AbuseReports.md)
+- [OpenSimSearch deployment boundary and runtime gate](doc/OpenSimSearch.md)
+- [MoneyServer documentation](docs/MoneyServer/README.md)
+- [ContinuumEconomy compatibility contract](doc/continuum-economy-compatibility-contract.md)
+- [ContinuumEconomy production-test runbook](doc/continuum-economy-production-test.md)
+- [ContinuumEconomy development package](addon-modules/ContinuumEconomy/README.md)
+- [OpenSimWeather documentation](addon-modules/OpenSimWeather/README.md)
+- [OpenSimTide documentation](addon-modules/OpenSimTide/README.md)
+- [HoloPhysicsGuard documentation](addon-modules/HoloPhysicsGuard/README.md)
+- [OpenSimMarketplace documentation](addon-modules/OpenSimMarketplace/README.md)
 
-| Reference | Purpose |
-|---|---|
-| `master` | Maintained OpenSim Continuum integration |
-| `origin/master` | Published Continuum branch |
-| `upstream/master` | Official OpenSimulator development branch |
-| `continuum-initial-build-clean` | Initial consolidation/build checkpoint |
-| `continuum-original-fork-master` | Preserved pre-consolidation fork state |
-| `continuum-region-scripting-archive` | Preserved region/scripting history |
-
-Historical donor and feature branches are not part of the active branch model.
-Relevant source history remains available through Git history and preservation
-tags.
-
-## Known limitations
-
-- Some added database migrations are MySQL-specific.
-- Experience-Lite is not full Second Life Experience compatibility.
-- `llOpenFloater` is currently a stub.
-- `PRIM_GLTF_*` primitive parameters are not included.
-- Pathfinding is region-local and approximate.
-- Weather remains experimental.
-- PayPal return handling is not a server-to-server webhook flow.
-- A listed feature may still be disabled in configuration.
-- Build success does not replace controlled runtime testing.
-
-## Attribution and support
-
-OpenSim Continuum retains the OpenSimulator license and source history.
-Historical source provenance remains available in Git history.
-
-Report Continuum-specific problems in this repository. Problems reproducible
-on an unmodified official OpenSimulator build should be reported to the
-official OpenSimulator project.
-
-## License
-
-OpenSim Continuum is distributed under the same BSD-style license as
-OpenSimulator. See `LICENSE.txt`.
+For upstream OpenSimulator configuration and operational documentation, see [opensimulator.org](http://opensimulator.org/).

@@ -1,0 +1,34 @@
+:VERSION 1
+
+BEGIN TRANSACTION;
+
+CREATE TABLE AbuseReports (
+  "ReportID" serial PRIMARY KEY,
+  "SenderID" varchar(36) NOT NULL,
+  "SenderName" varchar(64),
+  "Time" integer,
+  "AbuseRegionID" varchar(36),
+  "AbuseRegionName" varchar(45),
+  "AbuserID" varchar(36) NOT NULL,
+  "AbuserName" varchar(128),
+  "Category" varchar(128),
+  "CheckFlags" integer,
+  "Details" text,
+  "ObjectID" varchar(36),
+  "Position" varchar(45),
+  "ReportType" integer,
+  "Summary" text,
+  "Version" varchar(256),
+  "Status" varchar(32) NOT NULL DEFAULT 'Open',
+  "ModeratorNotes" text,
+  "ModeratorID" varchar(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  "ModeratorName" varchar(128) NOT NULL DEFAULT '',
+  "LastUpdated" integer NOT NULL DEFAULT 0,
+  "ImageData" bytea
+);
+
+CREATE INDEX "AbuseReportsStatusTime" ON AbuseReports("Status", "Time");
+CREATE INDEX "AbuseReportsAbuserID" ON AbuseReports("AbuserID");
+CREATE INDEX "AbuseReportsRegionID" ON AbuseReports("AbuseRegionID");
+
+COMMIT;

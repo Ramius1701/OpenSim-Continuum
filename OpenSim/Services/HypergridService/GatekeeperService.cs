@@ -531,7 +531,6 @@ namespace OpenSim.Services.HypergridService
             {
                 aCircuit.firstname = account.FirstName;
                 aCircuit.lastname = account.LastName;
-                aCircuit.displayname = account.DisplayName;
             }
             if (account is null)
             {
@@ -589,13 +588,6 @@ namespace OpenSim.Services.HypergridService
 
                     userId += ";" + aCircuit.ServiceURLs["HomeURI"] + ";" + first + " " + last;
                     m_GridUserService.LoggedIn(userId);
-
-                    if (aCircuit.hasDisplayName)
-                    {
-                        m_log.InfoFormat("[GATEKEEPER SERVICE]: {0} {1} has arrived with a display name -> {2}",
-                            aCircuit.firstname, aCircuit.lastname, aCircuit.displayname);
-                        m_GridUserService.SetDisplayName(userId, aCircuit.displayname);
-                    }
                 }
             }
 

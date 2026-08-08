@@ -99,18 +99,35 @@ namespace OpenSim.Services.Interfaces
 
         public int Created;
 
+        public string DisplayName;
+        public uint NameChanged;
+
         // Unix timestamp of the TOS version this account last agreed to,
         // ported from Mobius. Compared against LLLoginService's configured
         // TOS_Date to decide whether the user needs to re-accept.
         public int TOSDate;
 
-        // Display Names support, ported from Mobius.
-        public string DisplayName = string.Empty;
-        public int NameChanged;
-
         public string Name
         {
             get { return FirstName + " " + LastName; }
+        }
+
+        public string FormattedName
+        {
+            get
+            {
+                bool is_resident = LastName.ToLower() == "resident";
+
+                if (string.IsNullOrWhiteSpace(DisplayName))
+                {
+                    return is_resident ? FirstName : $"{FirstName} {LastName}";
+                }
+                else
+                {
+                    var username = is_resident ? FirstName : $"{FirstName}.{LastName}";
+                    return $"{DisplayName} ({username.ToLower()})";
+                }
+            }
         }
 
         public UserAccount(Dictionary<string, object> kvp)
@@ -136,15 +153,15 @@ namespace OpenSim.Services.Interfaces
                 UserCountry = otmp.ToString();
             if (kvp.TryGetValue("LocalToGrid", out otmp))
                 _ = bool.TryParse(otmp.ToString(), out LocalToGrid);
+            if (kvp.TryGetValue("DisplayName", out otmp))
+                DisplayName = otmp.ToString();
+            if (kvp.TryGetValue("NameChanged", out otmp))
+                NameChanged = Convert.ToUInt32(otmp.ToString());
 
             if (kvp.TryGetValue("Created", out otmp))
                 Created = Convert.ToInt32(otmp.ToString());
             if (kvp.TryGetValue("TOSDate", out otmp) && otmp is not null)
                 TOSDate = Convert.ToInt32(otmp.ToString());
-            if (kvp.TryGetValue("DisplayName", out otmp) && otmp is not null && !string.IsNullOrWhiteSpace(otmp.ToString()))
-                DisplayName = otmp.ToString();
-            if (kvp.TryGetValue("NameChanged", out otmp) && otmp is not null)
-                NameChanged = Convert.ToInt32(otmp.ToString());
             if (kvp.TryGetValue("ServiceURLs", out otmp) && otmp is string str)
             {
                 ServiceURLs = new Dictionary<string, object>();
@@ -172,13 +189,13 @@ namespace OpenSim.Services.Interfaces
                 ["ScopeID"] = ScopeID.ToString(),
                 ["Created"] = Created.ToString(),
                 ["TOSDate"] = TOSDate.ToString(),
-                ["DisplayName"] = DisplayName,
-                ["NameChanged"] = NameChanged.ToString(),
                 ["UserLevel"] = UserLevel.ToString(),
                 ["UserFlags"] = UserFlags.ToString(),
                 ["UserTitle"] = UserTitle,
                 ["UserCountry"] = UserCountry,
-                ["LocalToGrid"] = LocalToGrid.ToString()
+                ["LocalToGrid"] = LocalToGrid.ToString(),
+                ["DisplayName"] = DisplayName,
+                ["NameChanged"] = NameChanged.ToString()
             };
 
             if(ServiceURLs.Count == 0)
@@ -207,6 +224,8 @@ namespace OpenSim.Services.Interfaces
         UserAccount GetUserAccount(UUID scopeID, string FirstName, string LastName);
         UserAccount GetUserAccount(UUID scopeID, string Email);
 
+        bool SetDisplayName(UUID agentID, string displayName);
+
         /// <summary>
         /// Returns the list of avatars that matches both the search criterion and the scope ID passed
         /// </summary>
@@ -225,11 +244,5 @@ namespace OpenSim.Services.Interfaces
         bool StoreUserAccount(UserAccount data);
 
         void InvalidateCache(UUID userID);
-
-        /// <summary>
-        /// Sets the account's display name and stamps NameChanged to now.
-        /// Ported from Mobius.
-        /// </summary>
-        bool SetDisplayName(UUID userID, string displayName);
     }
 }

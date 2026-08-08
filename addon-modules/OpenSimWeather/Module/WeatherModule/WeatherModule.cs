@@ -149,7 +149,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private bool m_estateManagerOnly;
         private int m_commandChannel;
         private CoverageMode m_coverageMode;
-        private int m_legacyEmitterGrid;
+        private int m_emitterGrid;
         private float m_emitterSpacingMeters;
         private int m_maxEmitters;
         private float m_activeAreaRadiusMeters;
@@ -277,13 +277,13 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             }
 
             m_estateManagerOnly = config.GetBoolean("EstateManagerOnly", true);
-            m_coverageMode = ParseCoverageMode(config.GetString("CoverageMode", "ActiveArea"));
-            m_legacyEmitterGrid = Clamp(config.GetInt("EmitterGrid", 0), 0, 128);
+            m_coverageMode = ParseCoverageMode(config.GetString("CoverageMode", "Region"));
+            m_emitterGrid = Clamp(config.GetInt("EmitterGrid", 8), 0, 128);
             m_emitterSpacingMeters = Clamp(config.GetFloat("EmitterSpacingMeters", 24f), 6f, 512f);
             m_maxEmitters = Clamp(config.GetInt("MaxEmitters", 384), 1, 16384);
             m_activeAreaRadiusMeters = Clamp(config.GetFloat("ActiveAreaRadiusMeters", 96f), 16f, 1024f);
             m_activeAreaRefreshSeconds = Clamp(config.GetInt("ActiveAreaRefreshSeconds", 3), 1, 300);
-            m_emitterRadiusScale = Clamp(config.GetFloat("EmitterRadiusScale", 0.48f), 0.1f, 0.75f);
+            m_emitterRadiusScale = Clamp(config.GetFloat("EmitterRadiusScale", 0.62f), 0.1f, 1.25f);
             m_emitterHeight = Clamp(config.GetFloat("EmitterHeight", 18f), 4f, 4096f);
             m_intensity = Clamp(config.GetFloat("Intensity", 1f), 0.1f, 10f);
             m_rainTexture = ReadTexture(config, "RainTexture", Util.BLANK_TEXTURE_UUID);
@@ -421,11 +421,12 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             LoadEnvironmentProfiles(source);
 
-            if (m_legacyEmitterGrid > 0)
+            if (m_emitterGrid > 0)
             {
-                m_log.Warn(
-                    "[WEATHER]: EmitterGrid is a legacy fixed-axis setting and is not var-region aware. "
-                    + "Use EmitterSpacingMeters with MaxEmitters instead.");
+                m_log.InfoFormat(
+                    "[WEATHER]: Region coverage uses an {0}x{0} emitter grid scaled to the actual region dimensions. "
+                    + "Set EmitterGrid=0 to use fixed-metre EmitterSpacingMeters instead.",
+                    m_emitterGrid);
             }
 
             if (!m_restoreCloudsOnClear && m_adjustClouds)
@@ -695,26 +696,36 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             GetEmitterLayout(sizeX, sizeY, out int countX, out int countY, out float spacingX, out float spacingY);
             float radius = Math.Max(spacingX, spacingY) * m_emitterRadiusScale;
 
-            for (int x = 0; x < countX; x++)
+            try
             {
-                for (int y = 0; y < countY; y++)
+                for (int x = 0; x < countX; x++)
                 {
-                    float posX = JitteredCellPosition(x, spacingX, sizeX);
-                    float posY = JitteredCellPosition(y, spacingY, sizeY);
-                    float ground = scene.GetGroundHeight(posX, posY);
-                    Vector3 position = new Vector3(posX, posY, ground + JitterHeight());
-                    float openSky = GetOpenSkyFraction(posX, posY, spacingX * 0.45f, spacingY * 0.45f, position.Z);
-                    if (openSky < m_minOpenSkyFraction)
-                        continue;
+                    for (int y = 0; y < countY; y++)
+                    {
+                        float posX = JitteredCellPosition(x, spacingX, sizeX);
+                        float posY = JitteredCellPosition(y, spacingY, sizeY);
+                        float ground = scene.GetGroundHeight(posX, posY);
+                        Vector3 position = new Vector3(posX, posY, ground + JitterHeight());
+                        float openSky = GetOpenSkyFraction(posX, posY, spacingX * 0.45f, spacingY * 0.45f, position.Z);
+                        if (openSky < m_minOpenSkyFraction)
+                            continue;
 
-                    SceneObjectGroup emitter = CreateEmitter(ownerId, weather, position, radius * (float)Math.Sqrt(Math.Max(0.15f, openSky)));
-                    if (!scene.AddNewSceneObject(emitter, false))
-                        throw new InvalidOperationException("OpenSim rejected a weather emitter.");
+                        SceneObjectGroup emitter = CreateEmitter(ownerId, weather, position, radius * (float)Math.Sqrt(Math.Max(0.15f, openSky)));
+                        if (!scene.AddNewSceneObject(emitter, false))
+                            throw new InvalidOperationException("OpenSim rejected a weather emitter.");
 
-                    emitter.RootPart.SendFullUpdateToAllClients();
-                    emitter.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
-                    created.Add(emitter);
+                        emitter.RootPart.SendFullUpdateToAllClients();
+                        emitter.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
+                        created.Add(emitter);
+                    }
                 }
+            }
+            catch
+            {
+                // The caller cannot see a list whose construction threw. Roll back
+                // here, matching Gunthar's all-or-nothing emitter startup behavior.
+                DeleteEmitters(created);
+                throw;
             }
 
             return created;
@@ -722,10 +733,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void GetEmitterLayout(int sizeX, int sizeY, out int countX, out int countY, out float spacingX, out float spacingY)
         {
-            if (m_legacyEmitterGrid > 0)
+            if (m_emitterGrid > 0)
             {
-                countX = m_legacyEmitterGrid;
-                countY = m_legacyEmitterGrid;
+                countX = m_emitterGrid;
+                countY = m_emitterGrid;
             }
             else
             {
@@ -733,6 +744,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 countY = Math.Max(1, (int)Math.Ceiling(sizeY / m_emitterSpacingMeters));
             }
 
+            int requestedCountX = countX;
+            int requestedCountY = countY;
             long requested = (long)countX * countY;
             if (requested > m_maxEmitters)
             {
@@ -761,6 +774,18 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 {
                     countY++;
                 }
+
+                m_log.WarnFormat(
+                    "[WEATHER]: Requested emitter layout {0}x{1} ({2} objects) for a {3}x{4} region exceeds MaxEmitters={5}; "
+                    + "using {6}x{7}. Increase MaxEmitters only after testing simulator and viewer load.",
+                    requestedCountX,
+                    requestedCountY,
+                    requested,
+                    sizeX,
+                    sizeY,
+                    m_maxEmitters,
+                    countX,
+                    countY);
             }
 
             spacingX = sizeX / (float)countX;
@@ -788,7 +813,16 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         {
             Timer timer = m_activeAreaTimer;
             if (timer != null)
-                timer.Change(0, m_activeAreaRefreshSeconds * 1000);
+            {
+                try
+                {
+                    timer.Change(0, m_activeAreaRefreshSeconds * 1000);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Region shutdown or a simultaneous weather transition won.
+                }
+            }
         }
 
         private void ActiveAreaTimerElapsed(object state)
@@ -1019,7 +1053,14 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             dueTimeMS = Math.Max(1000, dueTimeMS);
             m_nextAutoCycleTicks = DateTime.Now.Ticks + dueTimeMS * 10000L;
-            timer.Change(dueTimeMS, Timeout.Infinite);
+            try
+            {
+                timer.Change(dueTimeMS, Timeout.Infinite);
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
 
             ScheduleAutoCycleWarning(dueTimeMS);
         }
@@ -1034,11 +1075,23 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             int warningDueMS = dueTimeMS - warningLeadMS;
             if (warningDueMS <= 0)
             {
-                warningTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                try
+                {
+                    warningTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
                 return;
             }
 
-            warningTimer.Change(warningDueMS, Timeout.Infinite);
+            try
+            {
+                warningTimer.Change(warningDueMS, Timeout.Infinite);
+            }
+            catch (ObjectDisposedException)
+            {
+            }
         }
 
         private void AutoCycleForecastWarningElapsed(object state)
@@ -1804,7 +1857,16 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             Timer timer = m_surfaceTimer;
             if (timer != null && immediate)
-                timer.Change(0, m_surfaceUpdateSeconds * 1000);
+            {
+                try
+                {
+                    timer.Change(0, m_surfaceUpdateSeconds * 1000);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Region shutdown or weather teardown won the race.
+                }
+            }
         }
 
         private void SurfaceTimerElapsed(object state)
@@ -2169,18 +2231,15 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 return false;
 
             string name = group.Name ?? string.Empty;
-            if (name.StartsWith(GeneratedNamePrefix, StringComparison.OrdinalIgnoreCase))
+            if (name.StartsWith(GeneratedNamePrefix, StringComparison.OrdinalIgnoreCase)
+                && group.RootPart.Description == GeneratedDescription)
                 return true;
 
-            if (group.RootPart.Description == GeneratedDescription)
+            if (group.RootPart.Description == GeneratedDescription
+                && (group.TemporaryInstance || (group.RootPart.Flags & PrimFlags.TemporaryOnRez) != 0))
                 return true;
 
-            return string.Equals(name, "weather lightning flash", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather rain emitter", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather storm emitter", StringComparison.OrdinalIgnoreCase)
-                || name.StartsWith("weather snow emitter", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(name, "weather puddle", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(name, "weather snow accumulation", StringComparison.OrdinalIgnoreCase);
+            return false;
         }
 
         private void RefreshExclusionVolumes(bool force)
@@ -2749,11 +2808,24 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             }
         }
 
-        private static CoverageMode ParseCoverageMode(string value)
+        private CoverageMode ParseCoverageMode(string value)
         {
-            return string.Equals((value ?? string.Empty).Trim(), "Region", StringComparison.OrdinalIgnoreCase)
-                ? CoverageMode.Region
-                : CoverageMode.ActiveArea;
+            string normalized = (value ?? string.Empty).Trim();
+
+            if (string.Equals(normalized, "Region", StringComparison.OrdinalIgnoreCase))
+                return CoverageMode.Region;
+
+            if (string.Equals(normalized, "ActiveArea", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "Active-Area", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalized, "Active_Area", StringComparison.OrdinalIgnoreCase))
+            {
+                return CoverageMode.ActiveArea;
+            }
+
+            m_log.WarnFormat(
+                "[WEATHER]: CoverageMode '{0}' is invalid; using Region coverage.",
+                normalized);
+            return CoverageMode.Region;
         }
 
         private UUID ReadTexture(IConfig config, string key, UUID fallback)

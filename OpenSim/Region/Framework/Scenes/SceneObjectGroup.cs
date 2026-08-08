@@ -90,7 +90,6 @@ namespace OpenSim.Region.Framework.Scenes
 
         path_update = 40,
         linkset_data = 41,
-
         // Combat2/Experience script events, added retroactively - needed
         // for these events (already dispatched by the Combat2/Experience
         // functions ported earlier) to actually reach scripts, since this
@@ -331,6 +330,12 @@ namespace OpenSim.Region.Framework.Scenes
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set;
         }
+
+        /// <summary>
+        /// What experience temp attached this item
+        /// This will not be set if the object wasn't temp attached
+        /// </summary>
+        public UUID AttachedExperienceID { get; set; }
 
         /// <summary>
         /// The avatar to which this scene object is attached.

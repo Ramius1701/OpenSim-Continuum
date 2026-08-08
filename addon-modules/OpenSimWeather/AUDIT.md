@@ -1,11 +1,35 @@
-# OpenSimWeather production audit — 0.3.2
+# OpenSimWeather production audit — 0.3.4
+
+## 0.3.4 Gunthar-baseline correction
+
+GuntharDeNiro/opensim commit
+`6c7021cc36fd6890db27200cd65fd4bb37bd60fd` is the authoritative runtime
+baseline. Continuum 0.3.3 had incorrectly described a combined AI rewrite as
+authoritative. Version 0.3.4 treats the enhanced coverage, assets, environment
+profiles, indoor suppression, generated-object safeguards, and experimental
+surface effects as bounded extensions of Gunthar's weather lifecycle.
+
+The correction fixes three concrete 0.3.3 production faults: partial region
+emitter construction now rolls back at its creation boundary; disposed
+auto-cycle, active-area, and surface timers cannot escape teardown; and startup
+cleanup requires Continuum's generated-object marker instead of deleting
+unrelated temporary objects by legacy-looking names.
+
+## 0.3.3 reconciliation result
+
+Gunthar's current weather module remains the authoritative behavioral source.
+The audit found that the expanded configuration settings are implemented, but
+the 0.3.2 emitter defaults changed established behavior: ActiveArea became the
+default and the original dimension-scaled grid was demoted. Version 0.3.3
+restores Region plus an 8x8 scaled grid as the normal path, retains the newer
+advanced modes, and separates the common example from the complete reference.
 
 ## Result
 
 The supplied module contained production-breaking configuration behavior,
 non-portable build paths, incomplete rollback, fixed-density assumptions, and
 visual/environment behavior that was either hard-coded or misleadingly
-documented. Version 0.3.2 keeps the useful multi-emitter design but rebuilds the
+documented. Version 0.3.3 keeps the useful multi-emitter design but rebuilds the
 configuration and runtime controls around production-safe defaults.
 
 ## Critical faults corrected from the supplied production copy
@@ -31,9 +55,11 @@ configuration and runtime controls around production-safe defaults.
    the region environment interface stores region settings. The feature now
    defaults off and requires `AllowPersistentEnvironmentChanges = true`.
 
-6. **The fixed emitter grid did not scale realistically.** The preferred layout
-   now uses region dimensions and `EmitterSpacingMeters`. `MaxEmitters` is a
-   global safety ceiling, with proportional layout reduction for var-regions.
+6. **The 0.3.2 default changed established coverage.** The fixed-axis grid
+   already used the actual region dimensions for spacing, position, and particle
+   radius. Making `ActiveArea` the default removed full-region weather. Version
+   0.3.3 restores `Region` with an 8x8 scaled grid and retains spacing mode as an
+   explicit advanced alternative.
 
 ## 0.3.2 realism and configurability work
 
@@ -41,7 +67,7 @@ configuration and runtime controls around production-safe defaults.
 
 - Added `CoverageMode = ActiveArea|Region`.
 - Added var-region-aware `EmitterSpacingMeters`.
-- Retained `EmitterGrid` only as a documented legacy migration setting.
+- Retained `EmitterGrid` as the compatibility/default full-region layout.
 - Added `MaxEmitters`, active-area radius/refresh, radius scale, and emitter
   height controls.
 - Active-area emitters are created and removed as root agents move.

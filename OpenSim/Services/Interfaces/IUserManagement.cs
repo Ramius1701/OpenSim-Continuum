@@ -53,14 +53,6 @@ namespace OpenSim.Framework
         void UserWebFailed(UUID id);
 
         /// <summary>
-        /// Batch fetch full UserData records (rather than just names) for a
-        /// set of agent ID strings. Used by the Display Names module.
-        /// Ported from Mobius. If update_name is true, cached entries with a
-        /// stale name are refreshed before being returned.
-        /// </summary>
-        Dictionary<UUID, UserData> GetUserDatas(string[] ids, UUID scopeID, bool update_name = false);
-
-        /// <summary>
         /// Get user ID by the given name.
         /// </summary>
         /// <param name="name"></param>
@@ -100,5 +92,7 @@ namespace OpenSim.Framework
         void AddUser(UUID uuid, string firstName, string lastName, string homeURL);
         bool RemoveUser(UUID uuid);
         bool IsLocalGridUser(UUID uuid);
+
+        bool SetDisplayName(UUID agentID, string displayName);
     }
 }

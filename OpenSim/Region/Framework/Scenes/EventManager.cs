@@ -1050,6 +1050,12 @@ namespace OpenSim.Region.Framework.Scenes
         public event LandBuy OnLandBuy;
 
         /// <summary>
+        /// Triggered after all <see cref="OnLandBuy"/> economy handlers have
+        /// completed, so ownership finalization never depends on module load order.
+        /// </summary>
+        public event LandBuy OnLandBuyFinalized;
+
+        /// <summary>
         /// Triggered to allow or prevent a real estate transaction
         /// </summary>
         /// <remarks>
@@ -2196,6 +2202,24 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         m_log.ErrorFormat(
                             "[EVENT MANAGER]: Delegate for TriggerLandBuy failed - continuing.  {0} {1}",
+                            e.Message, e.StackTrace);
+                    }
+                }
+            }
+
+            LandBuy handlerLandBuyFinalized = OnLandBuyFinalized;
+            if (handlerLandBuyFinalized != null)
+            {
+                foreach (LandBuy d in handlerLandBuyFinalized.GetInvocationList())
+                {
+                    try
+                    {
+                        d(sender, args);
+                    }
+                    catch (Exception e)
+                    {
+                        m_log.ErrorFormat(
+                            "[EVENT MANAGER]: Delegate for finalizing TriggerLandBuy failed - continuing.  {0} {1}",
                             e.Message, e.StackTrace);
                     }
                 }

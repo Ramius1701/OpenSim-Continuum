@@ -223,6 +223,17 @@ namespace OpenSim.Data.SQLite
             }
         }
 
+        public virtual T[] Get(string where, SQLiteParameter parameter)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand())
+            {
+                cmd.CommandText = String.Format("select * from {0} where {1}",
+                    m_Realm, where);
+                cmd.Parameters.Add(parameter);
+                return DoQuery(cmd);
+            }
+        }
+
         public virtual bool Store(T row)
         {
             using (SQLiteCommand cmd = new SQLiteCommand())

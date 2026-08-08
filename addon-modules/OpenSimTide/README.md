@@ -26,7 +26,7 @@ Here is an example config:
 		;; Anything else will produce wierd results where you may see a big
 		;; vertical 'step' in the ocean
 
-		TideEnabled = True
+		TideEnabled = False
 
 		;; update the tide every x simulator frames
 		TideUpdateRate = 50
@@ -37,6 +37,9 @@ Here is an example config:
 
 		;; how long in seconds for a complete cycle time low->high->low et
 		TideCycleTime = 900
+
+		;; restore the configured region water height when the module stops
+		TideRestoreWaterOnStop = True
 
 		;; provide tide information on the console?
 		TideInfoDebug = False
@@ -60,6 +63,12 @@ git clone https://github.com/JakDaniels/OpenSimTide.git
 
 Rerun the prebuild script in the main opensim directory and rebuild with xbuild or nant.
 Remember you need an .ini file in bin/addon-modules/OpenSimTide/config/
+
+Continuum validates `TideUpdateRate` and `TideCycleTime`, swaps reversed low/high
+marks with a warning, and restores the original region water height on module
+shutdown by default. Keep the module disabled until it has been tested on the
+exact region topology; adjacent regions with different water levels retain the
+viewer-visible vertical seam limitation described above.
 
 How do I use the tide data in scripts?
 Here is an example script. Rez a spherical prim above the water and place this script in it.

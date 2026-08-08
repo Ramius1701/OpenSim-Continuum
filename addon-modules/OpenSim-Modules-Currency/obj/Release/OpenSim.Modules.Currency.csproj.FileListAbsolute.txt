@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\OpenSim.Modules.Currency.dll
-S:\Github\opensim-enhanced\bin\OpenSim.Modules.Currency.pdb
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim..098B660B.Up2Date
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.dll
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Modules-Currency\obj\Release\OpenSim.Modules.Currency.pdb

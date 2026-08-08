@@ -1,0 +1,34 @@
+:VERSION 1
+
+BEGIN TRANSACTION;
+
+CREATE TABLE AbuseReports (
+  ReportID INTEGER PRIMARY KEY AUTOINCREMENT,
+  SenderID CHAR(36) NOT NULL,
+  SenderName VARCHAR(64),
+  Time INTEGER,
+  AbuseRegionID CHAR(36),
+  AbuseRegionName VARCHAR(45),
+  AbuserID CHAR(36) NOT NULL,
+  AbuserName VARCHAR(128),
+  Category VARCHAR(128),
+  CheckFlags INTEGER,
+  Details TEXT,
+  ObjectID CHAR(36),
+  Position VARCHAR(45),
+  ReportType INTEGER,
+  Summary TEXT,
+  Version VARCHAR(256),
+  Status VARCHAR(32) NOT NULL DEFAULT 'Open',
+  ModeratorNotes TEXT,
+  ModeratorID CHAR(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  ModeratorName VARCHAR(128) NOT NULL DEFAULT '',
+  LastUpdated INTEGER NOT NULL DEFAULT 0,
+  ImageData BLOB
+);
+
+CREATE INDEX AbuseReportsStatusTime ON AbuseReports(Status, Time);
+CREATE INDEX AbuseReportsAbuserID ON AbuseReports(AbuserID);
+CREATE INDEX AbuseReportsRegionID ON AbuseReports(AbuseRegionID);
+
+COMMIT;

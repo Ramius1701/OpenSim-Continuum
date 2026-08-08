@@ -1,6 +1,6 @@
-# OpenSimWeather 0.3.2
+# OpenSimWeather 0.3.4
 
-OpenSimWeather is an experimental but production-conscious OpenSimulator region
+OpenSimWeather is a Gunthar-based, experimental but production-conscious OpenSimulator region
 module that provides Clear, Sunny, Rain, Storm, and Snow conditions. It uses
 viewer-visible particle systems and can optionally coordinate wind,
 LightShare/EEP-style region environment profiles, lightning, thunder, forecast
@@ -31,7 +31,7 @@ The complete reference is intentionally conservative:
 - a missing `[Weather]` section leaves the module disabled;
 - `Enabled = false` always disables it;
 - the private command channel defaults to 89 and channel 0 is rejected;
-- `CoverageMode = ActiveArea` limits weather objects to areas near avatars;
+- `CoverageMode = Region` with `EmitterGrid = 8` restores full-region coverage across standard and variable-sized regions;
 - automatic cycling, entry IMs, thunder, wind changes, environment changes,
   puddles, and snow accumulation are opt-in;
 - environment changes require a second explicit persistence acknowledgement;
@@ -70,7 +70,8 @@ into a running simulator process.
 
 ## Configuration examples
 
-- `config/OpenSimWeather.ini.example` — complete disabled reference.
+- `config/OpenSimWeather.ini.example` — common disabled installation baseline.
+- `config/OpenSimWeather.reference.ini.example` — complete disabled reference.
 - `config/OpenSimWeather.manual.ini.example` — controlled first test.
 - `config/OpenSimWeather.autocycle.ini.example` — automatic particle weather.
 - `config/OpenSimWeather.environment.ini.example` — persistent environment and
@@ -104,28 +105,40 @@ temperature, and auto-cycle state.
 `weather clear` clears the active condition but does not disable an enabled
 auto-cycle timer.
 
-## Var-region coverage
+## Region and varregion coverage
 
-`EmitterGrid` is retained only as a migration setting. A fixed grid does not
-preserve weather density when the region dimensions change.
-
-The preferred settings are:
+The compatibility/default layout restores the behavior that worked before the
+active-area redesign:
 
 ```ini
-CoverageMode = ActiveArea
-EmitterSpacingMeters = 24.0
-MaxEmitters = 384
-EmitterGrid = 0
+CoverageMode = Region
+EmitterGrid = 8
+EmitterRadiusScale = 0.62
 ```
 
-The module calculates the X and Y cell counts from `RegionSizeX` and
-`RegionSizeY`. If full-region coverage would exceed `MaxEmitters`, the layout is
-reduced proportionally while preserving the region aspect ratio as closely as
-possible.
+`EmitterGrid` is a count per axis, not a metre measurement. The module uses the
+actual `RegionSizeX` and `RegionSizeY` to recalculate each cell's spacing,
+position, and particle burst radius. An 8x8 layout therefore remains 64
+temporary emitter objects on a standard region or a varregion while scaling the
+coverage to the full dimensions.
 
-`ActiveArea` creates cells near root agents and removes cells no longer needed.
-`Region` attempts full standard-region or var-region coverage. `MaxEmitters` is
-a safety ceiling, not a fixed per-axis grid.
+Advanced operators can instead select fixed-metre spacing:
+
+```ini
+CoverageMode = Region
+EmitterGrid = 0
+EmitterSpacingMeters = 24.0
+MaxEmitters = 384
+```
+
+In spacing mode, independent X and Y counts are calculated from the region
+dimensions. When the requested count exceeds `MaxEmitters`, the layout is
+reduced proportionally and the reduction is logged.
+
+`ActiveArea` remains available as an explicit optimization that creates cells
+near root agents and removes cells no longer needed. It is no longer the
+implicit or documented production default because it changes full-region
+behavior and can leave unoccupied portions of a region without weather.
 
 ## Particle textures
 
@@ -300,7 +313,7 @@ Use a duplicate/non-public region process first:
 2. Start with `OpenSimWeather.manual.ini.example` and `Enabled = false`.
 3. Add valid particle texture UUIDs, then enable the module.
 4. Verify `weather status`, rain, storm, snow, sunny, and clear.
-5. Confirm emitter counts remain below `MaxEmitters` on each var-region size.
+5. Confirm the default 8x8 Region layout produces 64 or fewer emitters after cover suppression on each region size.
 6. Test a building with sky probes, then add `Weather Exclusion` volumes where
    needed.
 7. Restart once while particle weather is active and verify no generated objects

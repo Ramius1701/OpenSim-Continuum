@@ -40,6 +40,7 @@ namespace OpenSimSearch.Modules.OpenSearch
         private List<Scene> m_Scenes = new();
         private string m_SearchServer = "";
         private bool m_Enabled = true;
+        private int m_RequestTimeoutMs = 5000;
 
         #region IRegionModuleBase implementation
         public void Initialise(IConfigSource config)
@@ -64,7 +65,15 @@ namespace OpenSimSearch.Modules.OpenSearch
                 return;
             }
 
-            m_log.Info("[SEARCH] OpenSimSearch module is active");
+            m_RequestTimeoutMs = Math.Clamp(
+                searchConfig.GetInt("RequestTimeoutMs", m_RequestTimeoutMs),
+                1000,
+                30000);
+
+            m_log.InfoFormat(
+                "[SEARCH] OpenSimSearch module is active; endpoint {0}, timeout {1}ms",
+                m_SearchServer,
+                m_RequestTimeoutMs);
             m_Enabled = true;
         }
 
@@ -123,7 +132,7 @@ namespace OpenSimSearch.Modules.OpenSearch
             get { return "OpenSimSearch"; }
         }
 
-        public static bool IsSharedModule
+        public bool IsSharedModule
         {
             get { return true; }
         }
@@ -159,21 +168,14 @@ namespace OpenSimSearch.Modules.OpenSearch
             try
             {
                 XmlRpcRequest Req = new(method, SendParams);
-                Resp = Req.Send(m_SearchServer, 30000);
+                Resp = Req.Send(m_SearchServer, m_RequestTimeoutMs);
             }
             catch (WebException ex)
             {
                 m_log.ErrorFormat("[SEARCH]: Unable to connect to Search " +
                         "Server {0}.  Exception {1}", m_SearchServer, ex);
 
-                Hashtable ErrorHash = new()
-                {
-                    ["success"] = false,
-                    ["errorMessage"] = "Unable to search at this time. ",
-                    ["errorURI"] = ""
-                };
-
-                return ErrorHash;
+                return ErrorResponse();
             }
             catch (SocketException ex)
             {
@@ -181,14 +183,7 @@ namespace OpenSimSearch.Modules.OpenSearch
                         "[SEARCH]: Unable to connect to Search Server {0}. " +
                         "Exception {1}", m_SearchServer, ex);
 
-                Hashtable ErrorHash = new()
-                {
-                    ["success"] = false,
-                    ["errorMessage"] = "Unable to search at this time. ",
-                    ["errorURI"] = ""
-                };
-
-                return ErrorHash;
+                return ErrorResponse();
             }
             catch (XmlException ex)
             {
@@ -196,28 +191,39 @@ namespace OpenSimSearch.Modules.OpenSearch
                         "[SEARCH]: Unable to connect to Search Server {0}. " +
                         "Exception {1}", m_SearchServer, ex);
 
-                Hashtable ErrorHash = new()
-                {
-                    ["success"] = false,
-                    ["errorMessage"] = "Unable to search at this time. ",
-                    ["errorURI"] = ""
-                };
-
-                return ErrorHash;
+                return ErrorResponse();
+            }
+            catch (Exception ex)
+            {
+                m_log.ErrorFormat(
+                    "[SEARCH]: Invalid or failed {0} response from Search Server {1}: {2}",
+                    method,
+                    m_SearchServer,
+                    ex);
+                return ErrorResponse();
             }
             if (Resp.IsFault)
+                return ErrorResponse();
+            if (Resp.Value is not Hashtable respData)
             {
-                Hashtable ErrorHash = new()
-                {
-                    ["success"] = false,
-                    ["errorMessage"] = "Unable to search at this time. ",
-                    ["errorURI"] = ""
-                };
-                return ErrorHash;
+                m_log.ErrorFormat(
+                    "[SEARCH]: Search Server {0} returned an invalid {1} response",
+                    m_SearchServer,
+                    method);
+                return ErrorResponse();
             }
-            Hashtable RespData = (Hashtable)Resp.Value;
 
-            return RespData;
+            return respData;
+        }
+
+        private static Hashtable ErrorResponse()
+        {
+            return new Hashtable
+            {
+                ["success"] = false,
+                ["errorMessage"] = "Unable to search at this time. ",
+                ["errorURI"] = ""
+            };
         }
 
         protected void DirPlacesQuery(IClientAPI remoteClient, UUID queryID,
@@ -523,7 +529,7 @@ namespace OpenSimSearch.Modules.OpenSearch
                 amount = Convert.ToUInt32(d["coveramount"]),
                 simName = d["simname"].ToString()
             };
-            data.globalPos = (Vector3.TryParse(d["globalposition"].ToString(), out data.globalPos)) ? data.globalPos : new();
+            Vector3.TryParse(d["globalposition"].ToString(), out data.globalPos);
             data.eventFlags = Convert.ToUInt32(d["eventflags"]);
 
             remoteClient.SendEventInfoReply(data);
@@ -560,7 +566,8 @@ namespace OpenSimSearch.Modules.OpenSearch
 
             Hashtable d = (Hashtable)dataArray[0];
 
-            Vector3 globalPos = (Vector3.TryParse(d["posglobal"].ToString(), out globalPos)) ? globalPos : new();
+            Vector3 globalPos = new();
+            Vector3.TryParse(d["posglobal"].ToString(), out globalPos);
 
             remoteClient.SendClassifiedInfoReply(
                     new UUID(d["classifieduuid"].ToString()),

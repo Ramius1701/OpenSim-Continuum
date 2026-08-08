@@ -50,6 +50,9 @@ namespace TideModule
         private int m_tideAnnounceCount = 5; //how many times do we announce the turning tide
         private int m_tideAnnounceCounter = 0; //counter we use to count announcements of low or high tide
         private string m_tideAnnounceMsg = "";
+        private bool m_restoreWaterOnStop = true;
+        private double m_originalWaterHeight;
+        private bool m_hasOriginalWaterHeight;
 
         public Scene m_scene;
         public IConfigSource m_config;
@@ -69,9 +72,9 @@ namespace TideModule
 
         public void Close ()
         {
-            if (m_enabled) {
-                    m_scene.EventManager.OnFrame -= TideUpdate;
-            }
+            Scene scene = m_scene;
+            if (scene != null)
+                StopTide(scene);
         }
 
 
@@ -81,7 +84,9 @@ namespace TideModule
             m_log.InfoFormat("[{0}]: Adding region '{1}' to this module", m_name, scene.RegionInfo.RegionName);
 
             cnf = m_config.Configs["Startup"];
-            m_regionConfigDir = cnf.GetString("regionload_regionsdir", Path.Combine(Util.configDir(), "bin/Regions/"));
+            m_regionConfigDir = cnf == null
+                ? Path.Combine(Util.configDir(), "bin/Regions/")
+                : cnf.GetString("regionload_regionsdir", Path.Combine(Util.configDir(), "bin/Regions/"));
 
             cnf = m_config.Configs[scene.RegionInfo.RegionName];
             
@@ -113,15 +118,28 @@ namespace TideModule
             
             if (m_enabled)
             {
-                m_frameUpdateRate = cnf.GetInt("TideUpdateRate", 150);
+                m_frameUpdateRate = Math.Max(1, cnf.GetInt("TideUpdateRate", 150));
                 m_lowTide = cnf.GetFloat("TideLowWater", 18.0f);
                 m_highTide = cnf.GetFloat("TideHighWater", 22.0f);
-                m_cycleTime = (ulong)cnf.GetInt("TideCycleTime", 3600);
+                int configuredCycleTime = cnf.GetInt("TideCycleTime", 3600);
+                m_cycleTime = (ulong)Math.Max(10, configuredCycleTime);
                 m_tideInfoDebug = cnf.GetBoolean("TideInfoDebug", false);
                 m_tideInfoBroadcast = cnf.GetBoolean("TideInfoBroadcast", true);
                 m_tideInfoChannel = cnf.GetInt("TideInfoChannel", 5555);
                 m_tideLevelChannel = cnf.GetInt("TideLevelChannel", 5556);
-                m_tideAnnounceCount = cnf.GetInt("TideAnnounceCount", 5);
+                m_tideAnnounceCount = Math.Max(0, cnf.GetInt("TideAnnounceCount", 5));
+                m_restoreWaterOnStop = cnf.GetBoolean("TideRestoreWaterOnStop", true);
+
+                if (m_highTide < m_lowTide)
+                {
+                    float swap = m_lowTide;
+                    m_lowTide = m_highTide;
+                    m_highTide = swap;
+                    m_log.WarnFormat(
+                        "[{0}]: TideHighWater was below TideLowWater in {1}; values were swapped",
+                        m_name,
+                        scene.RegionInfo.RegionName);
+                }
 
                 m_log.InfoFormat("[{0}]: Enabled with an update rate every {1} frames, Low Water={2}m, High Water={3}m, Cycle Time={4} secs", m_name, m_frameUpdateRate, m_lowTide, m_highTide, m_cycleTime);
                 m_log.InfoFormat("[{0}]: Info Channel={1}, Water Level Channel={2}, Info Broadcast is {3}, Announce Count={4}", m_name, m_tideInfoChannel, m_tideLevelChannel, m_tideInfoBroadcast, m_tideAnnounceCounter);
@@ -129,8 +147,10 @@ namespace TideModule
                 m_frame = 0;
                 m_ready = true; // Mark Module Ready for duty
                 m_shoutPos = new Vector3(scene.RegionInfo.RegionSizeX / 2f, scene.RegionInfo.RegionSizeY / 2f, 30f);
-                scene.EventManager.OnFrame += TideUpdate;
                 m_scene = scene;
+                m_originalWaterHeight = scene.RegionInfo.RegionSettings.WaterHeight;
+                m_hasOriginalWaterHeight = true;
+                scene.EventManager.OnFrame += TideUpdate;
             }
             else
             {
@@ -141,10 +161,7 @@ namespace TideModule
         public void RemoveRegion (Scene scene)
         {
             m_log.InfoFormat("[{0}]: Removing region '{1}' from this module", m_name, scene.RegionInfo.RegionName);
-            if (m_enabled)
-            {
-                scene.EventManager.OnFrame -= TideUpdate;
-            }
+            StopTide(scene);
         }
 
 
@@ -166,7 +183,7 @@ namespace TideModule
             double tideMiddle;
             string tideLevelMsg;
            
-        	if (((m_frame++ % m_frameUpdateRate) != 0) || !m_ready) {
+         if (((m_frame++ % m_frameUpdateRate) != 0) || !m_ready || m_scene == null) {
                 return;
             }
             timeStamp = (ulong) (DateTime.Now.Ticks);
@@ -219,22 +236,40 @@ namespace TideModule
 
             if (m_tideInfoDebug) m_log.InfoFormat("[{0}]: Sea Level currently at {1}m in Region: {2}", m_name, m_tideLevel, m_scene.RegionInfo.RegionName);
 
-            if (m_tideInfoBroadcast && m_tideDirection)
-            {
-                m_scene.SimChatBroadcast(tideLevelMsg, ChatTypeEnum.Region, m_tideInfoChannel, m_shoutPos, "TIDE", UUID.Zero, false);
-                m_scene.SimChatBroadcast(m_tideLevel.ToString(), ChatTypeEnum.Region, m_tideLevelChannel, m_shoutPos, "TIDE", UUID.Zero, false);
-            }
             if (m_tideInfoDebug) m_log.InfoFormat("[{0}]: Updating Region: {1}", m_name, m_scene.RegionInfo.RegionName);
 
             m_scene.RegionInfo.RegionSettings.WaterHeight = m_tideLevel;
             m_scene.EventManager.TriggerRequestChangeWaterHeight(m_tideLevel);
             m_scene.EventManager.TriggerTerrainTick();
             
-            if (m_tideInfoBroadcast && !m_tideDirection)
+            if (m_tideInfoBroadcast)
             {
                 m_scene.SimChatBroadcast(tideLevelMsg, ChatTypeEnum.Region, m_tideInfoChannel, m_shoutPos, "TIDE", UUID.Zero, false);
                 m_scene.SimChatBroadcast(m_tideLevel.ToString(), ChatTypeEnum.Region, m_tideLevelChannel, m_shoutPos, "TIDE", UUID.Zero, false);
             }
+        }
+
+        private void StopTide(Scene scene)
+        {
+            m_ready = false;
+            scene.EventManager.OnFrame -= TideUpdate;
+
+            if (m_restoreWaterOnStop && m_hasOriginalWaterHeight)
+            {
+                float original = (float)m_originalWaterHeight;
+                scene.RegionInfo.RegionSettings.WaterHeight = original;
+                scene.EventManager.TriggerRequestChangeWaterHeight(original);
+                scene.EventManager.TriggerTerrainTick();
+                m_log.InfoFormat(
+                    "[{0}]: Restored water height to {1:0.###}m in Region: {2}",
+                    m_name,
+                    original,
+                    scene.RegionInfo.RegionName);
+            }
+
+            m_hasOriginalWaterHeight = false;
+            if (ReferenceEquals(m_scene, scene))
+                m_scene = null;
         }
         #endregion
     }

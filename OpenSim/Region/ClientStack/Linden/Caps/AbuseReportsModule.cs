@@ -1,252 +1,345 @@
+using System;
+using System.Reflection;
+using System.Text;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
 using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
+using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-//using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Services.Interfaces;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Net;
-using System.Net.Sockets;
-using System.Reflection;
-using System.Timers;
-using System.Xml;
 using Caps = OpenSim.Framework.Capabilities.Caps;
-using OpenSim.Framework.Servers.HttpServer;
-using OpenMetaverse.StructuredData;
-using OpenSim.Services;
 
 namespace OpenSim.Region.ClientStack.Linden
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "AbuseReports")]
-    public class AbuseReportsModule : ISharedRegionModule
+    public class AbuseReportsModule : INonSharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILog m_log =
+            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private bool enabled = true;
+        private bool m_Enabled;
+        private bool m_CapsEventRegistered;
         private Scene m_Scene;
+        private IAbuseReportsService m_Connector;
+        private IUserManagement m_UserManager;
+        private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
+        private int m_MaxReportRequestBytes = 128 * 1024;
 
-        private IAbuseReportsService m_Connector = null;
+        public string Name => "AbuseReportsModule";
+        public Type ReplaceableInterface => null;
 
-        private IUserManagement m_UserManager = null;
-
-        #region IRegionModuleBase implementation
-
-        public void Initialise(IConfigSource config)
+        public void Initialise(IConfigSource source)
         {
-            IConfig cnf = config.Configs["AbuseReports"];
-            if (cnf == null)
+            IConfig config = source.Configs["AbuseReports"];
+            m_Enabled = config != null && config.GetBoolean("Enabled", false);
+            if (config != null)
             {
-                enabled = false;
-                return;
+                m_MaxScreenshotBytes = Math.Max(0, config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes));
+                m_MaxReportRequestBytes = Math.Max(1024,
+                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes));
             }
 
-            if (cnf != null && cnf.GetString("Enabled", "false") != "true")
-            {
-                enabled = false;
-                return;
-            }
-
-            if (!enabled)
-                return;
-
-            m_log.Info("[AbuseReports] Plugin enabled!");
+            if (m_Enabled)
+                m_log.Info("[ABUSE REPORTS]: Viewer abuse report CAPS enabled");
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!enabled)
-                return;
-
-            m_Scene = scene;
+            if (m_Enabled)
+                m_Scene = scene;
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!enabled)
+            if (!m_Enabled)
                 return;
 
+            m_Scene = scene;
             m_UserManager = scene.RequestModuleInterface<IUserManagement>();
-
-            if(m_UserManager == null)
+            if (m_UserManager == null)
             {
-                m_log.Info("[AbuseReports] Plugin disabled because IUserManagement was not found!");
-                enabled = false;
+                m_log.ErrorFormat(
+                    "[ABUSE REPORTS]: IUserManagement is unavailable in region {0}; module disabled",
+                    scene.RegionInfo.RegionName);
+                m_Enabled = false;
                 return;
             }
 
             m_Connector = scene.RequestModuleInterface<IAbuseReportsService>();
-            if(m_Connector == null)
+            if (m_Connector == null)
             {
-                m_log.ErrorFormat("[AbuseReports]: AbuseReportsService not availble in region {0}. Module Disabled", scene.Name);
-                enabled = false;
+                m_log.ErrorFormat(
+                    "[ABUSE REPORTS]: IAbuseReportsService is unavailable in region {0}; module disabled",
+                    scene.RegionInfo.RegionName);
+                m_Enabled = false;
                 return;
             }
-            
+
             scene.EventManager.OnRegisterCaps += RegisterCaps;
+            m_CapsEventRegistered = true;
+
+            m_log.InfoFormat(
+                "[ABUSE REPORTS]: Enabled in region {0}",
+                scene.RegionInfo.RegionName);
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!enabled)
-                return;
-        }
+            if (m_CapsEventRegistered)
+            {
+                scene.EventManager.OnRegisterCaps -= RegisterCaps;
+                m_CapsEventRegistered = false;
+            }
 
-        public void PostInitialise()
-        {
-        }
-
-        public string Name
-        {
-            get { return "AbuseReportsModule"; }
-        }
-
-        public Type ReplaceableInterface
-        {
-            get { return null; }
+            if (ReferenceEquals(m_Scene, scene))
+            {
+                m_Scene = null;
+                m_Connector = null;
+                m_UserManager = null;
+            }
         }
 
         public void Close()
         {
+            Scene scene = m_Scene;
+            if (scene != null)
+                RemoveRegion(scene);
         }
 
-        #endregion
-
-        #region Event Handlers
-
-        public void RegisterCaps(UUID agentID, Caps caps)
+        private void RegisterCaps(UUID agentID, Caps caps)
         {
-            IRequestHandler SendUserReportHandler = new RestStreamHandler(
-                "POST", "/CAPS/" + UUID.Random(), (v, w, x, y, z) => SendUserReport(v, w, x, y, z, caps), "SendUserReportHandler", null);
-            caps.RegisterHandler("SendUserReport", SendUserReportHandler);
+            IRequestHandler sendUserReportHandler = new RestStreamHandler(
+                "POST",
+                "/CAPS/" + UUID.Random(),
+                (request, path, param, httpRequest, httpResponse) =>
+                    SendUserReport(request, path, param, httpRequest, httpResponse, caps),
+                "SendUserReportHandler",
+                null);
 
-            IRequestHandler SendUserReportWithScreenshotHandler = new RestStreamHandler(
-                "POST", "/CAPS/" + UUID.Random(), (v, w, x, y, z) => SendUserReportWithScreenshot(v, w, x, y, z, caps), "SendUserReportWithScreenshot", null);
-            caps.RegisterHandler("SendUserReportWithScreenshot", SendUserReportWithScreenshotHandler);
+            caps.RegisterHandler("SendUserReport", sendUserReportHandler);
+
+            IRequestHandler sendUserReportWithScreenshotHandler = new RestStreamHandler(
+                "POST",
+                "/CAPS/" + UUID.Random(),
+                (request, path, param, httpRequest, httpResponse) =>
+                    SendUserReportWithScreenshot(request, path, param, httpRequest, httpResponse, caps),
+                "SendUserReportWithScreenshot",
+                null);
+
+            caps.RegisterHandler(
+                "SendUserReportWithScreenshot",
+                sendUserReportWithScreenshotHandler);
         }
-
-        #endregion
-
-        #region Cap Handles
 
         private AbuseReportData AbuseReportDataFromOSD(OSDMap map)
         {
-            AbuseReportData abuse_report = new AbuseReportData();
+            AbuseReportData report = new AbuseReportData();
 
-            if(map.ContainsKey("abuser-id"))
-                abuse_report.AbuserID = map["abuser-id"].AsUUID();
-            
-            if(map.ContainsKey("category"))
-                abuse_report.Category = map["category"].ToString();
+            if (map.ContainsKey("abuser-id"))
+                report.AbuserID = map["abuser-id"].AsUUID();
 
-            if(map.ContainsKey("check-flags"))
-                abuse_report.CheckFlags = map["check-flags"].AsInteger();
+            if (map.ContainsKey("category"))
+                report.Category = map["category"].ToString();
 
-            if(map.ContainsKey("details"))
-                abuse_report.Details = map["details"].ToString();
+            if (map.ContainsKey("check-flags"))
+                report.CheckFlags = map["check-flags"].AsInteger();
 
-            if(map.ContainsKey("object-id"))
-                abuse_report.ObjectID = map["object-id"].AsUUID();
+            if (map.ContainsKey("details"))
+                report.Details = map["details"].ToString();
 
-            if(map.ContainsKey("position"))
-                abuse_report.Position = map["position"].AsVector3().ToString();
+            if (map.ContainsKey("object-id"))
+                report.ObjectID = map["object-id"].AsUUID();
 
-            if(map.ContainsKey("report-type"))
-                abuse_report.ReportType = map["report-type"].AsInteger();
+            if (map.ContainsKey("position"))
+                report.Position = map["position"].AsVector3().ToString();
 
-            if(map.ContainsKey("summary"))
-                abuse_report.Summary = map["summary"].ToString();
+            if (map.ContainsKey("report-type"))
+                report.ReportType = map["report-type"].AsInteger();
 
-            if(map.ContainsKey("version-string"))
-                abuse_report.Version = map["version-string"].ToString();
-            
-            return abuse_report;
+            if (map.ContainsKey("summary"))
+                report.Summary = map["summary"].ToString();
+
+            if (map.ContainsKey("version-string"))
+                report.Version = map["version-string"].ToString();
+
+            return report;
         }
 
-        public string SendUserReport(string request, string path,
-                string param, IOSHttpRequest httpRequest,
-                IOSHttpResponse httpResponse, Caps caps)
+        public string SendUserReport(
+            string request,
+            string path,
+            string param,
+            IOSHttpRequest httpRequest,
+            IOSHttpResponse httpResponse,
+            Caps caps)
         {
-            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.OK;
-            httpResponse.ContentType = "text/html";
+            SetLLSDResponse(httpResponse);
 
-            OSDMap response = new OSDMap();
-
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(request);
-
-            AbuseReportData abuse_report = AbuseReportDataFromOSD(map);
-            abuse_report.SenderID = caps.AgentID;
-            abuse_report.SenderName = m_UserManager.GetUserName(caps.AgentID);
-            abuse_report.AbuseRegionID = m_Scene.RegionInfo.RegionID;
-            abuse_report.AbuseRegionName = m_Scene.RegionInfo.RegionName;
-            abuse_report.AbuserName = m_UserManager.GetUserName(abuse_report.AbuserID);
-            
-            if(m_Connector.ReportAbuse(abuse_report))
+            try
             {
-                m_log.InfoFormat("[AbuseReports] {0} has reported {1}", abuse_report.SenderName, abuse_report.AbuserName);
-                response.Add("state", "complete");
-            }
-            else
-            {
-                response.Add("state", "failed");
-            }
+                if (!IsReportRequestSizeValid(request))
+                    return SerializeState("failed");
 
-            return OSDParser.SerializeLLSDXmlString(response); ;
+                OSDMap map = DeserializeMap(request);
+                AbuseReportData report = AbuseReportDataFromOSD(map);
+                PopulateRegionContext(report, caps.AgentID);
+
+                if (m_Connector.ReportAbuse(report))
+                {
+                    m_log.InfoFormat(
+                        "[ABUSE REPORTS]: {0} reported {1} in {2}",
+                        report.SenderName,
+                        report.AbuserName,
+                        report.AbuseRegionName);
+                    return SerializeState("complete");
+                }
+
+                return SerializeState("failed");
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat("[ABUSE REPORTS]: Failed to process report: {0}", e);
+                return SerializeState("failed");
+            }
         }
 
-        public string SendUserReportWithScreenshot(string request, string path,
-                string param, IOSHttpRequest httpRequest,
-                IOSHttpResponse httpResponse, Caps caps)
+        public string SendUserReportWithScreenshot(
+            string request,
+            string path,
+            string param,
+            IOSHttpRequest httpRequest,
+            IOSHttpResponse httpResponse,
+            Caps caps)
         {
-            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.OK;
-            httpResponse.ContentType = "text/html";
+            SetLLSDResponse(httpResponse);
 
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(request);
+            try
+            {
+                if (!IsReportRequestSizeValid(request))
+                    return SerializeState("failed");
 
-            AbuseReportData abuse_report = AbuseReportDataFromOSD(map);
-            abuse_report.SenderID = caps.AgentID;
-            abuse_report.SenderName = m_UserManager.GetUserName(caps.AgentID);
-            abuse_report.AbuseRegionID = m_Scene.RegionInfo.RegionID;
-            abuse_report.AbuseRegionName = m_Scene.RegionInfo.RegionName;
-            abuse_report.AbuserName = m_UserManager.GetUserName(abuse_report.AbuserID);
-            
-            UUID screenshot_id = map["screenshot-id"].AsUUID();
+                OSDMap map = DeserializeMap(request);
+                AbuseReportData report = AbuseReportDataFromOSD(map);
+                PopulateRegionContext(report, caps.AgentID);
 
-            BinaryStreamHandler uploader = new BinaryStreamHandler(
-                    "POST", "/CAPS/" + UUID.Random(), (byte[] data, string p, string pa) => {
-                        caps.HttpListener.RemoveStreamHandler("POST", p);
+                UUID screenshotID = map.ContainsKey("screenshot-id")
+                    ? map["screenshot-id"].AsUUID()
+                    : UUID.Zero;
 
-                        OSDMap upload_response = new OSDMap();
+                BinaryStreamHandler uploader = null;
+                uploader = new BinaryStreamHandler(
+                    "POST",
+                    "/CAPS/" + UUID.Random(),
+                    (data, uploadPath, uploadParam) =>
+                    {
+                        caps.HttpListener.RemoveStreamHandler("POST", uploadPath);
 
-                        abuse_report.ImageData = data;
-                        
-						if(m_Connector.ReportAbuse(abuse_report))
+                        report.ImageData = data ?? Array.Empty<byte>();
+
+                        OSDMap uploadResponse = new OSDMap();
+                        if (report.ImageData.Length > m_MaxScreenshotBytes)
                         {
-                            m_log.InfoFormat("[AbuseReports] {0} has reported {1}", abuse_report.SenderName, abuse_report.AbuserName);
+                            m_log.WarnFormat(
+                                "[ABUSE REPORTS]: Rejected {0}-byte screenshot from {1}; limit is {2} bytes",
+                                report.ImageData.Length,
+                                report.SenderName,
+                                m_MaxScreenshotBytes);
+                            uploadResponse["state"] = "failed";
+                        }
+                        else if (m_Connector.ReportAbuse(report))
+                        {
+                            m_log.InfoFormat(
+                                "[ABUSE REPORTS]: {0} reported {1} with screenshot in {2}",
+                                report.SenderName,
+                                report.AbuserName,
+                                report.AbuseRegionName);
 
-                            upload_response.Add("state", "complete");
-                            upload_response.Add("new_asset", screenshot_id);
+                            uploadResponse["state"] = "complete";
+                            uploadResponse["new_asset"] = screenshotID;
                         }
                         else
                         {
-                            upload_response.Add("state", "failed");
+                            uploadResponse["state"] = "failed";
                         }
-                        
-                        return OSDParser.SerializeLLSDXmlString(upload_response);
-                    }, "", null);
-            caps.HttpListener.AddStreamHandler(uploader);
 
-            OSDMap response = new OSDMap();
-            response.Add("state", "upload");
-            response.Add("uploader", "http://" + caps.HostName + ":" + caps.Port + uploader.Path);
+                        return OSDParser.SerializeLLSDXmlString(uploadResponse);
+                    },
+                    "AbuseReportScreenshotUploader",
+                    null);
 
-            return OSDParser.SerializeLLSDXmlString(response); ;
+                caps.HttpListener.AddStreamHandler(uploader);
+
+                OSDMap response = new OSDMap
+                {
+                    ["state"] = "upload",
+                    ["uploader"] = (caps.SSLCaps ? "https://" : "http://") +
+                        (caps.SSLCaps ? caps.SSLCommonName : caps.HostName) + ":" + caps.Port + uploader.Path
+                };
+
+                return OSDParser.SerializeLLSDXmlString(response);
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[ABUSE REPORTS]: Failed to prepare screenshot report: {0}",
+                    e);
+                return SerializeState("failed");
+            }
         }
 
-        #endregion
+        private void PopulateRegionContext(AbuseReportData report, UUID senderID)
+        {
+            Scene scene = m_Scene;
+            if (scene == null || m_Connector == null || m_UserManager == null)
+                throw new InvalidOperationException("Abuse reports module is not fully initialized");
+
+            report.SenderID = senderID;
+            report.SenderName = m_UserManager.GetUserName(senderID) ?? string.Empty;
+            report.AbuseRegionID = scene.RegionInfo.RegionID;
+            report.AbuseRegionName = scene.RegionInfo.RegionName ?? string.Empty;
+            report.AbuserName = m_UserManager.GetUserName(report.AbuserID) ?? string.Empty;
+        }
+
+        private static OSDMap DeserializeMap(string request)
+        {
+            OSD data = OSDParser.DeserializeLLSDXml(request);
+            if (data is not OSDMap map)
+                throw new FormatException("Abuse report request was not an LLSD map");
+
+            return map;
+        }
+
+        private bool IsReportRequestSizeValid(string request)
+        {
+            int bytes = Encoding.UTF8.GetByteCount(request ?? string.Empty);
+            if (bytes <= m_MaxReportRequestBytes)
+                return true;
+
+            m_log.WarnFormat(
+                "[ABUSE REPORTS]: Rejected {0}-byte report request; limit is {1} bytes",
+                bytes,
+                m_MaxReportRequestBytes);
+            return false;
+        }
+
+        private static void SetLLSDResponse(IOSHttpResponse response)
+        {
+            response.StatusCode = 200;
+            response.ContentType = "application/llsd+xml";
+        }
+
+        private static string SerializeState(string state)
+        {
+            OSDMap response = new OSDMap
+            {
+                ["state"] = state
+            };
+
+            return OSDParser.SerializeLLSDXmlString(response);
+        }
     }
 }

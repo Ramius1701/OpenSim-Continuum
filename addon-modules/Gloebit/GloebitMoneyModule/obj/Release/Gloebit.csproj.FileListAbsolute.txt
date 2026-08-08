@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\Gloebit.dll
-S:\Github\opensim-enhanced\bin\Gloebit.pdb
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.csproj.Up2Date
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.dll
-S:\Github\opensim-enhanced\addon-modules\Gloebit\GloebitMoneyModule\obj\Release\Gloebit.pdb

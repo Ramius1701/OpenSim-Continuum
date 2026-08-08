@@ -1,0 +1,37 @@
+:VERSION 1
+
+BEGIN TRANSACTION;
+
+CREATE TABLE experiences (
+  public_id varchar(36) PRIMARY KEY,
+  owner_id varchar(36) NOT NULL,
+  name varchar(42) NOT NULL,
+  description varchar(128) NOT NULL,
+  group_id varchar(36) NOT NULL,
+  logo varchar(36) NOT NULL,
+  marketplace varchar(256) NOT NULL,
+  slurl varchar(256) NOT NULL,
+  maturity integer NOT NULL,
+  properties integer NOT NULL
+);
+
+CREATE INDEX experiences_owner ON experiences(owner_id);
+CREATE INDEX experiences_group ON experiences(group_id);
+
+CREATE TABLE experience_permissions (
+  experience varchar(36) NOT NULL,
+  avatar varchar(36) NOT NULL,
+  allow boolean NOT NULL,
+  PRIMARY KEY (experience, avatar)
+);
+
+CREATE INDEX experience_permissions_avatar ON experience_permissions(avatar);
+
+CREATE TABLE experience_kv (
+  experience varchar(36) NOT NULL,
+  key varchar(1011) NOT NULL,
+  value varchar(4095) NOT NULL,
+  PRIMARY KEY (experience, key)
+);
+
+COMMIT;

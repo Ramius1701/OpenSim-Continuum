@@ -79,6 +79,16 @@
     ;; Authorization is not on by default, as it depends on external php
     ;AuthorizationServices = "RemoteAuthorizationServicesConnector"
 
+    ;; Send viewer abuse reports to the grid-wide ROBUST service.
+    AbuseReportsService = "RemoteAbuseReportsServicesConnector"
+
+    ;; Register the grid-wide Experience service before ExperienceModule loads.
+    ExperienceService = "RemoteExperienceServicesConnector"
+
+[AbuseReportsService]
+    ;; Private ROBUST endpoint used by RemoteAbuseReportsServicesConnector.
+    AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
+
 [AssetService]
     DefaultAssetLoader = "OpenSim.Framework.AssetLoader.Filesystem.dll"
     AssetLoaderArgs = "assets/AssetSets.xml"
@@ -158,10 +168,11 @@
     ;
     UserAccountServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
-    ; Only needed if using Display Names (ported from Mobius, see
-    ; [DisplayNames] in OpenSim.ini): must match DisplayNameSecret under
-    ; [UserAccountService] in this grid's Robust.ini.
-    ; DisplayNameSecret = ""
+[UserAliasService]
+    ;
+    ; Change this to your grid-wide user accounts server
+    ;
+    UserAliasServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
 [GridUserService]
     ;
@@ -239,3 +250,12 @@
 
 [MuteListService]
     MuteListServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
+
+[ExperienceService]
+    LocalServiceModule = "OpenSim.Services.Connectors.dll:RemoteExperienceServiceConnector"
+    Enabled = true
+
+    ;
+    ; Change this to your grid-wide experience server
+    ;
+    ExperienceServerURI = "${Const|PrivURL}:${Const|PrivatePort}"

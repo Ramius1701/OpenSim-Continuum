@@ -239,11 +239,6 @@ namespace OpenSim.Services.Connectors
 
         public GridUserInfo[] GetGridUserInfo(string[] userIDs)
         {
-            return GetGridUserInfo(userIDs, false);
-        }
-
-        public GridUserInfo[] GetGridUserInfo(string[] userIDs, bool update_name)
-        {
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -251,8 +246,6 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "getgriduserinfos";
 
             sendData["AgentIDs"] = new List<string>(userIDs);
-            if (update_name)
-                sendData["UPDATE_NAME"] = "true";
 
             string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
@@ -310,37 +303,6 @@ namespace OpenSim.Services.Connectors
         protected virtual GridUserInfo Create(Dictionary<string, object> griduser)
         {
             return new GridUserInfo(griduser);
-        }
-
-        public bool SetDisplayName(string userID, string displayName)
-        {
-            Dictionary<string, object> sendData = new Dictionary<string, object>
-            {
-                ["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString(),
-                ["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString(),
-                ["METHOD"] = "setdisplayname",
-                ["USERID"] = userID,
-                ["NAME"] = displayName
-            };
-
-            string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/griduser";
-            try
-            {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                    return false;
-
-                Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                return replyData is not null && replyData.TryGetValue("result", out object result)
-                    && result.ToString().ToLower() == "success";
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[GRID USER CONNECTOR]: Exception when contacting grid user server at {0}: {1}", uri, e.Message);
-            }
-
-            return false;
         }
     }
 }

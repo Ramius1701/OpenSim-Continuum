@@ -48,4 +48,17 @@ namespace OpenSim.Framework
 
         event ObjectPaid OnObjectPaid;
     }
+
+    /// <summary>
+    /// Optional transactional fee contract. Modules implementing this interface
+    /// can reserve a resident charge before a benefit is granted, then capture
+    /// or cancel that exact reservation after the operation finishes.
+    /// </summary>
+    public interface IReservedMoneyModule
+    {
+        bool ReserveCharge(UUID agentID, int amount, MoneyTransactionType type,
+            string description, out UUID reservationID);
+        bool CaptureCharge(UUID reservationID, UUID agentID);
+        bool CancelCharge(UUID reservationID, UUID agentID);
+    }
 }

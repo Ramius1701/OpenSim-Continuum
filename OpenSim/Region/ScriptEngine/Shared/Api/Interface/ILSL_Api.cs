@@ -595,5 +595,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces
         LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
          LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);
                void llSetRenderMaterial(LSL_String material, LSL_Integer face);
+
     }
 }

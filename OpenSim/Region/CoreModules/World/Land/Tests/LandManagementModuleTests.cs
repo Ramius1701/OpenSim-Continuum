@@ -262,5 +262,66 @@ namespace OpenSim.Region.CoreModules.World.Land.Tests
                 Assert.That(loAtCoord.LandData.GlobalID, Is.EqualTo(lo.LandData.GlobalID));
             }
         }
+
+        [Test]
+        public void TestPaidLandSaleRequiresExactCommittedDebit()
+        {
+            UUID seller = TestHelpers.ParseTail(0x101);
+            UUID buyer = TestHelpers.ParseTail(0x102);
+            LandManagementModule lmm = new LandManagementModule();
+            Scene scene = new SceneHelpers().SetupScene();
+            SceneHelpers.SetupSceneModules(scene, lmm);
+            ILandObject land = new LandObject(seller, false, scene);
+            land.SetLandBitmap(land.GetSquareLandBitmap(0, 0,
+                (int)Constants.RegionSize, (int)Constants.RegionSize));
+            land = lmm.AddLandObject(land);
+
+            EventManager.LandBuyArgs sale = new(buyer, UUID.Zero, true, false,
+                false, land.LandData.LocalID, land.LandData.Area, 100, true)
+            {
+                economyValidated = true,
+                landValidated = true,
+                transactionID = 123,
+                amountDebited = 0
+            };
+
+            scene.EventManager.TriggerLandBuy(scene, sale);
+            Assert.That(land.LandData.OwnerID, Is.EqualTo(seller),
+                "Balance validation without a committed debit must not transfer land");
+
+            sale.amountDebited = 99;
+            scene.EventManager.TriggerLandBuy(scene, sale);
+            Assert.That(land.LandData.OwnerID, Is.EqualTo(seller),
+                "A partial or mismatched debit must not transfer land");
+
+            scene.EventManager.OnLandBuy += (_, args) => args.amountDebited = 100;
+            scene.EventManager.TriggerLandBuy(scene, sale);
+            Assert.That(land.LandData.OwnerID, Is.EqualTo(buyer));
+        }
+
+        [Test]
+        public void TestFreeLandSaleDoesNotRequireLedgerDebit()
+        {
+            UUID seller = TestHelpers.ParseTail(0x201);
+            UUID buyer = TestHelpers.ParseTail(0x202);
+            LandManagementModule lmm = new LandManagementModule();
+            Scene scene = new SceneHelpers().SetupScene();
+            SceneHelpers.SetupSceneModules(scene, lmm);
+            ILandObject land = new LandObject(seller, false, scene);
+            land.SetLandBitmap(land.GetSquareLandBitmap(0, 0,
+                (int)Constants.RegionSize, (int)Constants.RegionSize));
+            land = lmm.AddLandObject(land);
+            EventManager.LandBuyArgs sale = new(buyer, UUID.Zero, true, false,
+                false, land.LandData.LocalID, land.LandData.Area, 0, true)
+            {
+                economyValidated = true,
+                landValidated = true,
+                transactionID = 124,
+                amountDebited = 0
+            };
+
+            scene.EventManager.TriggerLandBuy(scene, sale);
+            Assert.That(land.LandData.OwnerID, Is.EqualTo(buyer));
+        }
     }
 }

@@ -99,8 +99,30 @@ namespace OpenSim.Region.Framework.Scenes
         public void AddUploadedInventoryItem(UUID agentID, InventoryItemBase item, uint cost)
         {
             IMoneyModule money = RequestModuleInterface<IMoneyModule>();
-            money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
+            if (money is IReservedMoneyModule reservedMoney && cost > 0)
+            {
+                if (!reservedMoney.ReserveCharge(agentID, (int)cost,
+                    MoneyTransactionType.UploadCharge, "Asset upload", out UUID reservationID))
+                {
+                    m_log.WarnFormat("[AGENT INVENTORY]: Unable to reserve upload charge for agent {0}; inventory item {1} was not granted",
+                        agentID, item.ID);
+                    return;
+                }
 
+                if (AddInventoryItem(item))
+                {
+                    if (!reservedMoney.CaptureCharge(reservationID, agentID))
+                        m_log.ErrorFormat("[AGENT INVENTORY]: Upload item {0} was granted but charge reservation {1} requires reconciliation",
+                            item.ID, reservationID);
+                }
+                else
+                {
+                    reservedMoney.CancelCharge(reservationID, agentID);
+                }
+                return;
+            }
+
+            money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
             AddInventoryItem(item);
         }
 
@@ -343,7 +365,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="isScriptRunning">Indicates whether the script to update is currently running</param>
         /// <param name="data"></param>
         public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
-                                                       UUID primId, bool isScriptRunning, byte[] data)
+                                                       UUID primId, bool isScriptRunning, UUID experience, byte[] data)
         {
             if (!Permissions.CanEditScript(itemId, primId, remoteClient.AgentId))
             {
@@ -380,16 +402,40 @@ namespace OpenSim.Region.Framework.Scenes
 
             part.Inventory.RemoveScriptInstance(item.ItemID, false);
 
+            ArrayList errors = new ArrayList();
+
+            bool allowed_to_contribute = true;
+
+            if (experience != UUID.Zero)
+            {
+                IExperienceModule experienceModule = ExperienceModule;
+                allowed_to_contribute = experienceModule != null &&
+                    experienceModule.IsExperienceContributor(remoteClient.AgentId, experience);
+
+                if (!allowed_to_contribute)
+                {
+                    experience = UUID.Zero;
+                    errors = new ArrayList(1);
+                    errors.Add(experienceModule == null
+                        ? "Experience service is unavailable; the script was saved without an experience and was not started."
+                        : "Access denied to experience!");
+                }
+            }
+
             // Update item with new asset
             item.AssetID = asset.FullID;
+            item.ExperienceID = experience;
             group.UpdateInventoryItem(item);
             group.InvalidateEffectivePerms();
 
             part.SendPropertiesToClient(remoteClient);
 
-            // Trigger rerunning of script (use TriggerRezScript event, see RezScript)
-            // Needs to determine which engine was running it and use that
-            ArrayList errors = part.Inventory.CreateScriptInstanceEr(item.ItemID, 0, false, DefaultScriptEngine, 1);
+            if (allowed_to_contribute)
+            {
+                // Trigger rerunning of script (use TriggerRezScript event, see RezScript)
+                // Needs to determine which engine was running it and use that
+                errors = part.Inventory.CreateScriptInstanceEr(item.ItemID, 0, false, DefaultScriptEngine, 1);
+            }
 
             // Tell anyone managing scripts that a script has been reloaded/changed
             EventManager.TriggerUpdateScript(remoteClient.AgentId, itemId, primId, isScriptRunning, item.AssetID);
@@ -402,12 +448,12 @@ namespace OpenSim.Region.Framework.Scenes
         /// <see>CapsUpdateTaskInventoryScriptAsset(IClientAPI, UUID, UUID, bool, byte[])</see>
         /// </summary>
         public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
-                                                        UUID primId, bool isScriptRunning, byte[] data)
+                                                        UUID primId, bool isScriptRunning, UUID experience, byte[] data)
         {
             if (TryGetScenePresence(avatarId, out ScenePresence avatar))
             {
                 return CapsUpdateTaskInventoryScriptAsset(
-                    avatar.ControllingClient, itemId, primId, isScriptRunning, data);
+                    avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data);
             }
             else
             {
@@ -1631,6 +1677,73 @@ namespace OpenSim.Region.Framework.Scenes
             }
         }
 
+        private static bool IsDisallowedInventoryTransferFolder(InventoryFolderBase folder)
+        {
+            if (folder is null)
+                return true;
+
+            return folder.Type == (short)FolderType.Root ||
+                    folder.Type == (short)FolderType.Trash ||
+                    folder.Type == (short)FolderType.LostAndFound ||
+                    folder.Type == (short)FolderType.CurrentOutfit ||
+                    folder.Type == (short)FolderType.Inbox ||
+                    folder.Type == (short)FolderType.Outbox ||
+                    folder.Type == (short)FolderType.Suitcase;
+        }
+
+        private InventoryFolderBase FindOrCreateChildFolder(UUID ownerID, InventoryFolderBase parent, string name)
+        {
+            if (parent is null || string.IsNullOrEmpty(name))
+                return null;
+
+            InventoryCollection contents = InventoryService.GetFolderContent(ownerID, parent.ID);
+            if (contents is not null)
+            {
+                foreach (InventoryFolderBase folder in contents.Folders)
+                {
+                    if (folder.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        return folder;
+                }
+            }
+
+            UUID folderID = UUID.Random();
+            InventoryFolderBase newFolder = new(folderID, name, ownerID, -1, parent.ID, parent.Version);
+            return InventoryService.AddFolder(newFolder) ? newFolder : null;
+        }
+
+        private InventoryFolderBase ResolveTaskInventoryDestinationRoot(UUID destID, InventoryFolderBase rootFolder,
+                string category, out string finalFolderName)
+        {
+            finalFolderName = category;
+            if (rootFolder is null || string.IsNullOrEmpty(category))
+                return null;
+
+            string[] rawSegments = category.Split('|');
+            List<string> segments = new(rawSegments.Length);
+            foreach (string rawSegment in rawSegments)
+            {
+                string segment = rawSegment.Trim();
+                if (string.IsNullOrEmpty(segment))
+                    continue;
+                segments.Add(segment);
+            }
+
+            if (segments.Count == 0)
+                return null;
+
+            finalFolderName = segments[segments.Count - 1];
+            InventoryFolderBase parent = rootFolder;
+            for (int i = 0; i < segments.Count - 1; i++)
+            {
+                InventoryFolderBase child = FindOrCreateChildFolder(destID, parent, segments[i]);
+                if (IsDisallowedInventoryTransferFolder(child))
+                    return null;
+                parent = child;
+            }
+
+            return parent;
+        }
+
         public UUID MoveTaskInventoryItems(UUID destID, string category, SceneObjectPart host, List<UUID> items, bool sendUpdates = true)
         {
             SceneObjectPart destPart = GetSceneObjectPart(destID);
@@ -1655,9 +1768,14 @@ namespace OpenSim.Region.Framework.Scenes
             if(rootFolder is null)
                 return UUID.Zero;
 
+            InventoryFolderBase parentFolder = ResolveTaskInventoryDestinationRoot(destID, rootFolder, category, out string finalFolderName);
+            if (parentFolder is null)
+                return UUID.Zero;
+
             UUID newFolderID = UUID.Random();
-            InventoryFolderBase newFolder = new(newFolderID, category, destID, -1, rootFolder.ID, rootFolder.Version);
-            InventoryService.AddFolder(newFolder);
+            InventoryFolderBase newFolder = new(newFolderID, finalFolderName, destID, -1, parentFolder.ID, parentFolder.Version);
+            if (!InventoryService.AddFolder(newFolder))
+                return UUID.Zero;
 
             foreach (UUID itemID in items)
             {
@@ -1677,6 +1795,8 @@ namespace OpenSim.Region.Framework.Scenes
             if(sendUpdates)
             {
                 SendInventoryUpdate(remoteClient, rootFolder, true, false);
+                if (parentFolder.ID.NotEqual(rootFolder.ID))
+                    SendInventoryUpdate(remoteClient, parentFolder, true, false);
                 SendInventoryUpdate(remoteClient, newFolder, false, true);
             }
 

@@ -1,36 +1,44 @@
 using System;
 using Nini.Config;
-using OpenSim.Server.Base;
-using OpenSim.Services.Interfaces;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Server.Handlers.AbuseReports
 {
     public class AbuseReportsServiceConnector : ServiceConnector
     {
-        private IAbuseReportsService m_AbuseReportsService;
-        private string m_ConfigName = "AbuseReportsService";
-
-        public AbuseReportsServiceConnector(IConfigSource config, IHttpServer server, string configName) :
-                base(config, server, configName)
+        public AbuseReportsServiceConnector(
+            IConfigSource config,
+            IHttpServer server,
+            string configName)
+            : base(config, server, configName)
         {
-            IConfig serverConfig = config.Configs[m_ConfigName];
+            string sectionName = string.IsNullOrWhiteSpace(configName)
+                ? "AbuseReportsService"
+                : configName;
+
+            IConfig serverConfig = config.Configs[sectionName];
             if (serverConfig == null)
-                throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
+                throw new Exception("No [" + sectionName + "] section in configuration");
 
-            string service = serverConfig.GetString("LocalServiceModule", String.Empty);
+            string service = serverConfig.GetString("LocalServiceModule", string.Empty);
+            if (string.IsNullOrWhiteSpace(service))
+                throw new Exception("LocalServiceModule is not configured in [" + sectionName + "]");
 
-            if (service == String.Empty)
-                throw new Exception("LocalServiceModule not present in AbuseReportsService config file AbuseReportsService section");
+            IAbuseReportsService abuseReportsService =
+                ServerUtils.LoadPlugin<IAbuseReportsService>(
+                    service,
+                    new object[] { config });
 
-            Object[] args = new Object[] { config };
-            m_AbuseReportsService = ServerUtils.LoadPlugin<IAbuseReportsService>(service, args);
+            if (abuseReportsService == null)
+                throw new Exception("Could not load IAbuseReportsService from " + service);
 
-            IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
-
-            server.AddStreamHandler(new AbuseReportsServerPostHandler(m_AbuseReportsService, auth));
+            IServiceAuth auth = ServiceAuth.Create(config, sectionName);
+            server.AddStreamHandler(
+                new AbuseReportsServerPostHandler(abuseReportsService, auth));
         }
     }
 }

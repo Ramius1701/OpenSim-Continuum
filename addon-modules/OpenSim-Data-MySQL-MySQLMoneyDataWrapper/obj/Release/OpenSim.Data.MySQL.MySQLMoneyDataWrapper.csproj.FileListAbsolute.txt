@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.dll
-S:\Github\opensim-enhanced\bin\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.pdb
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim..2311ADEB.Up2Date
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.dll
-S:\Github\opensim-enhanced\addon-modules\OpenSim-Data-MySQL-MySQLMoneyDataWrapper\obj\Release\OpenSim.Data.MySQL.MySQLMoneyDataWrapper.pdb

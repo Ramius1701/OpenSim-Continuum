@@ -402,17 +402,40 @@
     ;; both to set this to false and comment out the [Modules] MapImageServiceModule setting in config-include/
     ; GenerateMaptiles = true
 
-    ;# {MapImageModule} {} {The map image module to use} {MapImageModule Warp3DImageModule} MapImageModule
+    ;# {MapImageModule} {} {The map image module to use} {MapImageModule Warp3DImageModule} Warp3DImageModule
     ;; The module to use in order to generate map images.
-    ;; MapImageModule is the default.  Warp3DImageModule is an alternative experimental module that can
-    ;; generate better images.
-    ;MapImageModule = "MapImageModule"
+    ;; Warp3DImageModule renders a real top-down 3D aerial view with z-buffered objects.
+    ;MapImageModule = "Warp3DImageModule"
 
     ;# {MaptileRefresh} {GenerateMaptiles} {Maptile refresh period?} {} 0
     ;; If desired, a running region can update the map tiles periodically
     ;; to reflect building activity. This names no sense of you don't have
     ;; prims on maptiles. Value is in seconds.
     ; MaptileRefresh = 0
+
+    ;# {GenerateMaptilesInBackground} {GenerateMaptiles} {Generate initial map tiles in the background during startup?} {true false} true
+    ;; Keep region startup fast while still allowing high-quality map rendering and upload to finish shortly after registration.
+    ; GenerateMaptilesInBackground = true
+
+    ;# {MaptileStartupDelaySeconds} {GenerateMaptilesInBackground} {Delay initial background maptile generation after startup?} {} 180
+    ;; Delay expensive high-quality map rendering so scripts, physics and packet threads settle before map work starts.
+    ; MaptileStartupDelaySeconds = 180
+
+    ;# {MaptileThreadStackSizeKB} {GenerateMaptilesInBackground} {Background maptile thread stack size in KB?} {} 8192
+    ;; Mesh and JPEG2000 decoding can use deeper call stacks than ordinary simulator threads on Windows.
+    ; MaptileThreadStackSizeKB = 8192
+
+    ;# {MaptileDeferIfAgentsPresent} {GenerateMaptilesInBackground} {Defer background maptile generation while avatars are in this simulator?} {true false} true
+    ;; Prevent expensive background map work from competing with active avatar sessions in any local region.
+    ; MaptileDeferIfAgentsPresent = true
+
+    ;# {MaptileForceGC} {GenerateMaptiles} {Force full GC after generating maptiles?} {true false} false
+    ;; Disabled by default because full GC pauses the simulator and can trigger watchdog warnings.
+    ; MaptileForceGC = false
+
+    ;# {StoreLegacyMaptileAssets} {GenerateMaptiles} {Store old V1 TerrainImageID/ParcelImageID maptile assets in the asset service?} {true false} false
+    ;; Leave this off when MapImageService is enabled. Remote asset POSTs can timeout and stall the simulator after the map image is already generated.
+    ; StoreLegacyMaptileAssets = false
 
     ;# {MaptileStaticUUID} {} {Asset ID for static map texture} {} 00000000-0000-0000-0000-000000000000
     ;; If not generating maptiles, use this static texture asset ID
@@ -428,6 +451,162 @@
     ;; got a large number of objects, so you can turn it off here if you'd like.
     ; DrawPrimOnMapTile = true
 
+    ;# {PrettyPrimVolumeOnMapTile} {DrawPrimOnMapTile} {Use softer cartographic object overlays?} {true false} true
+    ;; Avoid legacy inverted-color solid blocks for large prims on map tiles.
+    ; PrettyPrimVolumeOnMapTile = true
+
+    ;# {MapObjectVolumeOpacity} {PrettyPrimVolumeOnMapTile} {Object overlay opacity} {} 175
+    ; MapObjectVolumeOpacity = 175
+
+    ;# {MapObjectVolumeLargeOpacity} {PrettyPrimVolumeOnMapTile} {Large object overlay opacity} {} 120
+    ; MapObjectVolumeLargeOpacity = 120
+
+    ;# {MapObjectVolumeUseTextureAlpha} {PrettyPrimVolumeOnMapTile} {Use prim texture alpha for map overlays?} {true false} true
+    ; MapObjectVolumeUseTextureAlpha = true
+
+    ;# {MapObjectVolumeSkipAlphaMaskedFaces} {MapObjectVolumeUseTextureAlpha} {Skip large texture-alpha cutout/card faces instead of drawing their transparent pixels as solid rectangles?} {true false} true
+    ; MapObjectVolumeSkipAlphaMaskedFaces = true
+
+    ;# {MapObjectVolumeSkipFlatTextureCards} {MapObjectVolumeSkipAlphaMaskedFaces} {Skip large thin texture-card geometry unless it can be drawn as real sampled pixels instead of a solid slab?} {true false} true
+    ; MapObjectVolumeSkipFlatTextureCards = true
+
+    ;# {MapObjectVolumeAlphaMaskedFaceMaxAlpha} {MapObjectVolumeSkipAlphaMaskedFaces} {Average sampled texture alpha below this is treated as alpha-masked/cutout geometry; flat texture cards with a JPEG2000 alpha channel are also protected} {} 0.90
+    ; MapObjectVolumeAlphaMaskedFaceMaxAlpha = 0.90
+
+    ;# {MapObjectVolumeAlphaMaskedFaceMinArea} {MapObjectVolumeSkipAlphaMaskedFaces} {Minimum projected triangle area in map pixels before alpha-masked faces are skipped} {} 6
+    ; MapObjectVolumeAlphaMaskedFaceMinArea = 6
+
+    ;# {MapObjectVolumeTextureBlend} {MapObjectVolumeSampleTextureAssets} {How strongly sampled texture colors influence object map colors} {} 1.00
+    ; MapObjectVolumeTextureBlend = 1.00
+
+    ;# {MapObjectVolumeColorSaturation} {PrettyPrimVolumeOnMapTile} {Object map color saturation multiplier} {} 1.18
+    ; MapObjectVolumeColorSaturation = 1.18
+
+    ;# {MapObjectVolumeColorContrast} {PrettyPrimVolumeOnMapTile} {Object map color contrast multiplier} {} 1.12
+    ; MapObjectVolumeColorContrast = 1.12
+
+    ;# {MapObjectVolumeFaceShading} {PrettyPrimVolumeOnMapTile} {Shade individual object faces for sharper geographic relief?} {true false} true
+    ; MapObjectVolumeFaceShading = true
+
+    ;# {MapObjectVolumeSkipWithAgentsPresent} {PrettyPrimVolumeOnMapTile} {Skip or abort the expensive object overlay pass while avatars are present in this simulator?} {true false} true
+    ; MapObjectVolumeSkipWithAgentsPresent = true
+
+    ;# {MapObjectVolumeRenderMeshGeometry} {PrettyPrimVolumeOnMapTile} {Use exact mesh/sculpt/prim geometry for object map rendering?} {true false} true
+    ; MapObjectVolumeRenderMeshGeometry = true
+
+    ;# {MapObjectVolumeDrawPrimFallback} {MapObjectVolumeRenderMeshGeometry} {Draw the old box/OBB prim fallback when exact map geometry cannot be rendered?} {true false} false
+    ;; Disabled by default so unavailable exact geometry never becomes fake rectangular slabs on the map.
+    ; MapObjectVolumeDrawPrimFallback = false
+
+    ;# {MapObjectVolumeMeshDetailLevel} {MapObjectVolumeRenderMeshGeometry} {Mesh and sculpt map detail level: 0=Low, 1=Medium, 2=High, 3=Highest} {} 1
+    ; MapObjectVolumeMeshDetailLevel = 1
+
+    ;# {MapObjectVolumeExactGeometryTimeBudgetMS} {MapObjectVolumeRenderMeshGeometry} {Maximum time spent drawing exact mesh/sculpt geometry per region map tile before remaining external geometry is skipped} {} 8000
+    ; MapObjectVolumeExactGeometryTimeBudgetMS = 8000
+
+    ;# {MapObjectVolumeUseCachedAssetsOnly} {MapObjectVolumeRenderMeshGeometry} {Only use locally cached mesh/sculpt/texture assets while rendering map objects, avoiding blocking remote asset fetches during map generation?} {true false} true
+    ; MapObjectVolumeUseCachedAssetsOnly = true
+
+    ;# {MapObjectVolumeDrawMissingGeometryFootprints} {MapObjectVolumeRenderMeshGeometry} {Draw bounded fallback footprints when exact sculpt/mesh assets are unavailable? This is off by default so missing geometry never becomes fake map shapes.} {true false} false
+    ; MapObjectVolumeDrawMissingGeometryFootprints = false
+
+    ;# {MapObjectVolumeMissingGeometryMaxArea} {MapObjectVolumeDrawMissingGeometryFootprints} {Maximum map-pixel footprint area allowed for unavailable exact geometry; larger objects are skipped to avoid giant fake slabs} {} 4096
+    ; MapObjectVolumeMissingGeometryMaxArea = 4096
+
+    ;# {MapObjectVolumeMissingGeometryOpacity} {MapObjectVolumeDrawMissingGeometryFootprints} {Opacity for bounded missing-geometry footprints} {} 55
+    ; MapObjectVolumeMissingGeometryOpacity = 55
+
+    ;# {MapObjectVolumeMissingGeometryMinAlpha} {MapObjectVolumeDrawMissingGeometryFootprints} {Skip missing-geometry footprints when sampled texture alpha is at or below this value} {} 0.08
+    ; MapObjectVolumeMissingGeometryMinAlpha = 0.08
+
+    ;# {MapObjectVolumeMaxTextureSamples} {PrettyPrimVolumeOnMapTile} {Maximum uncached texture assets sampled per map tile object pass; 0 means unlimited} {} 128
+    ; MapObjectVolumeMaxTextureSamples = 128
+
+    ;# {MapObjectVolumeMinimumOpacity} {PrettyPrimVolumeOnMapTile} {Minimum opacity after texture alpha is applied} {} 35
+    ; MapObjectVolumeMinimumOpacity = 35
+
+    ;# {MapObjectVolumeLargeArea} {PrettyPrimVolumeOnMapTile} {Footprint area where large-object opacity starts} {} 1800
+    ; MapObjectVolumeLargeArea = 1800
+
+    ;# {MapObjectVolumeOutlines} {PrettyPrimVolumeOnMapTile} {Draw subtle object outlines?} {true false} true
+    ; MapObjectVolumeOutlines = true
+
+    ;# {MapObjectVolumeOutlineOpacity} {PrettyPrimVolumeOnMapTile} {Object outline opacity} {} 85
+    ; MapObjectVolumeOutlineOpacity = 85
+
+    ;# {MapObjectVolumeMeshTriangleOutlines} {MapObjectVolumeRenderMeshGeometry} {Draw outlines around every exact mesh triangle?} {true false} false
+    ;; Disabled by default because per-triangle GDI strokes are expensive and noisy on 256px map tiles.
+    ; MapObjectVolumeMeshTriangleOutlines = false
+
+    ;# {MapObjectVolumeShadows} {PrettyPrimVolumeOnMapTile} {Draw soft map shadows under objects?} {true false} true
+    ; MapObjectVolumeShadows = true
+
+    ;# {MapObjectVolumeShadowOpacity} {MapObjectVolumeShadows} {Object shadow opacity} {} 24
+    ; MapObjectVolumeShadowOpacity = 24
+
+    ;# {MapObjectVolumeShadowOffset} {MapObjectVolumeShadows} {Object shadow offset in map pixels} {} 2
+    ; MapObjectVolumeShadowOffset = 2
+
+    ;# {MapObjectVolumeMinimumBrightness} {PrettyPrimVolumeOnMapTile} {Minimum object overlay brightness} {} 72
+    ; MapObjectVolumeMinimumBrightness = 72
+
+    ;# {MapObjectVolumeMaximumBrightness} {PrettyPrimVolumeOnMapTile} {Maximum object overlay brightness} {} 235
+    ; MapObjectVolumeMaximumBrightness = 235
+
+    ;# {MapObjectVolumeKeepMeshCache} {MapObjectVolumeRenderMeshGeometry} {Keep decoded mesh/sculpt geometry cached after each map pass?} {true false} false
+    ;; Disabled by default so high-quality map rendering does not retain large mesh geometry in memory.
+    ; MapObjectVolumeKeepMeshCache = false
+
+    ;# {MapObjectVolumeKeepMissingGeometryCache} {MapObjectVolumeRenderMeshGeometry} {Remember missing or undecodable sculpt/mesh assets between map passes so they are not retried every generation?} {true false} true
+    ; MapObjectVolumeKeepMissingGeometryCache = true
+
+    ;# {MapTileAerialStyle} {} {Apply final aerial-photo style tone and softening pass?} {true false} true
+    ; MapTileAerialStyle = true
+
+    ;# {MapTileAerialSoften} {MapTileAerialStyle} {Aerial softening amount} {} 0.02
+    ; MapTileAerialSoften = 0.02
+
+    ;# {MapTileAerialSaturation} {MapTileAerialStyle} {Aerial saturation amount} {} 0.98
+    ; MapTileAerialSaturation = 0.98
+
+    ;# {MapTileAerialContrast} {MapTileAerialStyle} {Aerial contrast amount} {} 1.08
+    ; MapTileAerialContrast = 1.08
+
+    ;# {MapTileAerialBrightness} {MapTileAerialStyle} {Aerial brightness adjustment} {} 1
+    ; MapTileAerialBrightness = 1
+
+    ;# {MapTileAerialSharpen} {MapTileAerialStyle} {Final aerial detail sharpening amount} {} 0.45
+    ; MapTileAerialSharpen = 0.45
+
+    ;# {MapWaterDepthShading} {TextureOnMapTile} {Shade water by terrain depth?} {true false} true
+    ; MapWaterDepthShading = true
+
+    ;# {MapWaterShallowColor} {MapWaterDepthShading} {Water color for shallow coastlines} {} "#6C8791"
+    ; MapWaterShallowColor = "#6C8791"
+
+    ;# {MapWaterDeepColor} {MapWaterDepthShading} {Water color for deep water} {} "#244B5A"
+    ; MapWaterDeepColor = "#244B5A"
+
+    ;# {MapWaterDepthRange} {MapWaterDepthShading} {Depth in meters used to reach deep water color} {} 36
+    ; MapWaterDepthRange = 36
+
+    ;# {MapWaterNoiseStrength} {MapWaterDepthShading} {Subtle water variation strength} {} 0.025
+    ; MapWaterNoiseStrength = 0.025
+
+    ;# {MapLandDetailStrength} {TextureOnMapTile} {Subtle heightmap detail added to land colors} {} 0.10
+    ; MapLandDetailStrength = 0.10
+
+    ;# {MapLandShoreBlendMeters} {TextureOnMapTile} {Meters above water where land blends into a shoreline tone} {} 4.5
+    ; MapLandShoreBlendMeters = 4.5
+
+    ;# {MapObjectVolumeSampleTextureAssets} {PrettyPrimVolumeOnMapTile} {Decode valid texture assets for object map colors?} {true false} true
+    ;; Improves map quality by sampling texture colors. Invalid texture assets are skipped before OpenJPEG is called.
+    ; MapObjectVolumeSampleTextureAssets = true
+
+    ;# {MapTileDecodeTerrainTextureAssets} {TextureOnMapTile} {Decode valid terrain texture assets for terrain map colors?} {true false} true
+    ;; Improves terrain map quality by deriving colors from valid terrain texture assets.
+    ; MapTileDecodeTerrainTextureAssets = true
+
     ;# {TexturePrims} {} {Texture prims on map tiles?} {true false} true
     ;; Texture the faces of the prims that are rendered on the map tiles.
     ; TexturePrims = true
@@ -436,9 +615,55 @@
     ;; Only texture prims that have a diagonal size greater than this number
     ; TexturePrimSize = 48
 
-    ;# {RenderMeshes} {} {Render meshes and sculpties on map tiles?} {true false} false
+    ;# {RenderMeshes} {} {Render meshes and sculpties on map tiles?} {true false} true
     ;; Attempt to render meshes and sculpties on the map.
     ; RenderMeshes = false
+
+    ;# {Map3DUseCachedAssetsOnly} {RenderMeshes} {Use only cached mesh/sculpt/texture assets while rendering 3D maptiles?} {true false} true
+    ;; Keeps maptile generation from blocking simulator threads on remote asset fetches.
+    ; Map3DUseCachedAssetsOnly = true
+
+    ;# {Map3DSkipMissingExternalGeometry} {RenderMeshes} {Skip mesh/sculpt objects whose exact geometry is unavailable instead of drawing box fallbacks?} {true false} true
+    ; Map3DSkipMissingExternalGeometry = true
+
+    ;# {Map3DSkipFlatTextureCardsWithoutTexture} {TexturePrims} {Skip flat texture-card faces when their texture is unavailable so trees/cards do not become solid rectangles?} {true false} true
+    ; Map3DSkipFlatTextureCardsWithoutTexture = true
+
+    ;# {Map3DRenderTimeBudgetMS} {RenderMeshes} {Maximum time budget for the 3D object rendering pass per region maptile} {} 30000
+    ; Map3DRenderTimeBudgetMS = 30000
+
+    ;# {Map3DMaxMeshAssetDecodes} {RenderMeshes} {Maximum mesh/sculpt assets decoded per 3D maptile pass; 0 means unlimited} {} 2048
+    ; Map3DMaxMeshAssetDecodes = 2048
+
+    ;# {Map3DMaxTextureAssetDecodes} {TexturePrims} {Maximum texture assets decoded per 3D maptile pass; 0 means unlimited} {} 192
+    ; Map3DMaxTextureAssetDecodes = 192
+
+    ;# {Map3DTextureDownsample} {TexturePrims} {Warp3D texture downsample level; higher values use less memory} {} 8
+    ; Map3DTextureDownsample = 8
+
+    ;# {Map3DForceGC} {} {Force full GC after 3D maptile generation?} {true false} false
+    ; Map3DForceGC = false
+
+    ;# {Map3DDrawFlatTextureCardSprites} {TexturePrims} {Draw alpha-textured flat cards as real texture sprites after the 3D pass so vertical billboard trees/decorations remain visible from the map view?} {true false} false
+    ; Map3DDrawFlatTextureCardSprites = false
+
+    ;# {Map3DTextureCardSpriteBudgetMS} {Map3DDrawFlatTextureCardSprites} {Maximum time budget for the texture-card sprite overlay pass per region maptile} {} 12000
+    ; Map3DTextureCardSpriteBudgetMS = 12000
+
+    ;# {Map3DMaxSpriteTextureDecodes} {Map3DDrawFlatTextureCardSprites} {Maximum texture assets decoded by the texture-card sprite overlay pass; 0 means unlimited} {} 512
+    ; Map3DMaxSpriteTextureDecodes = 512
+
+    ;# {Map3DSpriteTextureMaxSize} {Map3DDrawFlatTextureCardSprites} {Maximum decoded sprite texture side in pixels before drawing onto the maptile} {} 256
+    ; Map3DSpriteTextureMaxSize = 256
+
+    ;# {Map3DSpriteMinAlphaCoverage} {Map3DDrawFlatTextureCardSprites} {Minimum visible alpha coverage required before a texture-card sprite is drawn} {} 0.02
+    ; Map3DSpriteMinAlphaCoverage = 0.02
+
+    ;# {Map3DSpriteMaxOpaqueCoverage} {Map3DDrawFlatTextureCardSprites} {Maximum fully opaque coverage allowed before a texture-card sprite is skipped to avoid solid rectangles} {} 0.98
+    ; Map3DSpriteMaxOpaqueCoverage = 0.98
+
+    ;# {Map3DSpriteMaxSizeMeters} {Map3DDrawFlatTextureCardSprites} {Maximum object card width/height in meters that can be drawn by the sprite overlay pass} {} 32
+    ; Map3DSpriteMaxSizeMeters = 32
 
     ;# {MapColorWater} {} {Water color for textured and shaded maps} {"#1D475F"}
     ; MapColorWater = "#3399FF"
@@ -747,6 +972,18 @@
     ;; DO NOT MODIFY OpenSimDefaults.ini, as your changes would be lost
     ;; with the next update!
 
+    ;# {SendSimulatorVersionToViewer} {} {Send simulator build/runtime string to viewers?} {true false} false
+    ;; If false, viewers will not receive the simulator build hash/runtime in
+    ;; AgentMovementComplete. This avoids noisy "different simulator version"
+    ;; notices when teleporting or crossing between regions with different
+    ;; local builds or operating systems.
+    ; SendSimulatorVersionToViewer = false
+
+    ;# {ViewerSimulatorVersionOverride} {SendSimulatorVersionToViewer} {Fixed simulator version string for viewers} {} OpenSim
+    ;; Optional fixed string to send instead of the full build/runtime string.
+    ;; Only used when SendSimulatorVersionToViewer is true.
+    ; ViewerSimulatorVersionOverride = "OpenSim"
+
     ;# {DisableFacelights} {} {Stop facelights from working?} {true false} false
     ;; Quash and remove any light properties from attachments not on the
     ;; hands. This allows flashlights and lanterns to function, but kills
@@ -771,6 +1008,9 @@
     Cap_GetMesh = "localhost"
     Cap_AvatarPickerSearch = "localhost"
     Cap_GetDisplayNames = "localhost"
+    ;; Continuum: enable viewer display-name changes. In grid mode these are
+    ;; persisted by the grid-wide UserAccountService hosted in Robust.
+    Cap_SetDisplayName = "localhost"
 
 
 [SimulatorFeatures]
@@ -835,51 +1075,10 @@
     ; Disabled by default
     ; MuteListModule = MuteListModule
 
-    ; Abuse reports handler (ported from Mobius). Also requires
-    ; [Modules] AbuseReportsService and an [AbuseReportsService] section
-    ; below, plus [AbuseReports] Enabled = true.
-    ;# {AbuseReportsModule} {AbuseReportsModule:AbuseReportsModule} {} {} None
-    ; Disabled by default
-    ; AbuseReportsModule = AbuseReportsModule
-
     ;; Control whether group invites and notices are stored for offline users.
     ;; Default is true.
     ;; This applies to both core groups module.
     ; ForwardOfflineGroupMessages = true
-
-
-[Modules]
-    ;; Selects which connector AbuseReportsModule (above, under [Messaging])
-    ;; uses. For a standalone or single-region setup, use the Local
-    ;; connector; for a grid where abuse reports should be centralized on
-    ;; ROBUST, use the Remote connector instead.
-    ; AbuseReportsService = "LocalAbuseReportsServicesConnector"
-    ; AbuseReportsService = "RemoteAbuseReportsServicesConnector"
-
-[AbuseReportsService]
-    ;; Only needed if [Modules] AbuseReportsService above is set to
-    ;; LocalAbuseReportsServicesConnector.
-    ; LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
-    ; StorageProvider = "OpenSim.Data.MySQL.dll:MySqlAbuseReportsData"
-    ; ConnectionString = "Data Source=localhost;Database=opensim;User ID=opensim;Password=*****;Old Guids=true;CharSet=utf8mb4;"
-
-    ;; Only needed if [Modules] AbuseReportsService above is set to
-    ;; RemoteAbuseReportsServicesConnector - point this at your ROBUST
-    ;; instance's [AbuseReportsService] AbuseReportsServiceConnector.
-    ; AbuseReportsServerURI = "http://127.0.0.1:8003"
-
-[AbuseReports]
-    ;; Enables the in-viewer "Report Abuse" floater's CAPS endpoint.
-    ;Enabled = true
-
-[DisplayNames]
-    ;; Enables Display Names support (ported from Mobius): lets users set
-    ;; a separate display name from their account name, shown in the
-    ;; viewer's nametags and profile. Also requires DisplayNameSecret to
-    ;; be set under [UserAccountService] if this region talks to a
-    ;; separate ROBUST instance over the Remote connector (not needed for
-    ;; standalone/Local).
-    ;Enabled = true
 
 
 [BulletSim]
@@ -1083,6 +1282,48 @@
     ;; Default is ./bin/ScriptEngines
     ; ScriptEnginesPath = "ScriptEngines"
 
+[Experience]
+    ;; Enables viewer Experience capabilities and parcel/region Experience UI.
+    Enabled = true
+
+[ScriptExperiences]
+    ;; OpenSim Experience-Lite auto grants for trusted estate scripts.
+    ;; This is disabled by default. Enable only for trusted estate environments.
+    ; Enabled = false
+
+    ;; If true, scripts owned by estate managers are trusted for auto grants.
+    ; AllowEstateManagers = false
+
+    ;; Information returned by llGetExperienceDetails(NULL_KEY).
+    ; ExperienceName = "OpenSim Experience-Lite"
+    ; ExperienceID = "00000000-0000-0000-0000-000000000000"
+
+    ;; Comma, semicolon, pipe or space separated UUIDs of trusted script owners.
+    ; TrustedOwners =
+
+    ;; Comma, semicolon, pipe or space separated UUIDs of trusted root objects or prims.
+    ; TrustedObjects =
+
+    ;; Runtime permission bitmask trusted experiences may auto grant.
+    ;; Default 39956 grants controls, animations, camera, teleport and animation override.
+    ;; It intentionally excludes PERMISSION_DEBIT and ownership changes.
+    ;; Scripts can inspect this trust state with llIsExperienceTrusted(),
+    ;; llGetExperiencePermissions() and llExperienceCanAutoGrant(mask).
+    ;; Scripts can also use llRequestExperiencePermissions(agent, name) and
+    ;; handle experience_permissions(agent) or experience_permissions_denied(agent, reason).
+    ; AutoGrantPermissions = 39956
+
+    ;; Enables Experience-Lite key-value storage for trusted scripts.
+    ;; Provides llCreateKeyValue, llReadKeyValue, llUpdateKeyValue,
+    ;; llDeleteKeyValue, llDataSizeKeyValue, llKeyCountKeyValue and llKeysKeyValue.
+    ;; Storage is persisted on disk and scoped per region/owner.
+    ; KeyValueStoreEnabled = true
+    ; KeyValueStoreMaxKeys = 1024
+    ; KeyValueStoreMaxKeyBytes = 1011
+    ; KeyValueStoreMaxValueBytes = 4095
+    ; KeyValueStoreMaxStoreBytes = 131072
+    ; KeyValueStorePath = "ScriptExperienceKVP"
+
 
 [OSSL]
     ;# {Include-osslDefaultEnable} {} {Include file for enabling and permissions for OSSL functions} {}
@@ -1229,6 +1470,38 @@
     ;# {NoNPCGroup} {} {if true NPCs will have no group title, if false display "- NPC -"} {true false} true
     ;; if true NPCs will have no group title, if false display "- NPC -" for easy identification {true false} default: true
     ; NoNPCGroup = true
+
+[RegionWeb]
+    ;# {Enabled} {} {Enable public per-region website and blog pages} {true false} false
+    ;; Serves pages at /regionweb/<region-slug>/ with the region map,
+    ;; owner-editable profile text, media gallery, blog posts and live statistics.
+    ; Enabled = false
+
+    ;# {PublicPath} {Enabled} {Public URL path for region pages} {} /regionweb
+    ; PublicPath = "/regionweb"
+
+    ;# {ContentDirectory} {Enabled} {Folder for per-region web content} {} RegionWeb
+    ;; Relative paths are under bin/. The estate landing page uses estate.ini,
+    ;; and each region gets a folder named after its URL slug.
+    ; ContentDirectory = "RegionWeb"
+
+    ;# {EstateTitle} {Enabled} {Default title for the central estate website} {} OpenSimulator Estate
+    ; EstateTitle = "OpenSimulator Estate"
+
+    ;# {AutoCreateContent} {Enabled} {Create starter profile and post files} {true false} true
+    ; AutoCreateContent = true
+
+    ;# {ShowMap} {Enabled} {Show the current world map tile} {true false} true
+    ; ShowMap = true
+
+    ;# {ShowStats} {Enabled} {Show live region statistics} {true false} true
+    ; ShowStats = true
+
+    ;# {ShowParcels} {Enabled} {Show largest parcels} {true false} true
+    ; ShowParcels = true
+
+    ;# {PostsPerPage} {Enabled} {Number of blog posts on the region page} {} 5
+    ; PostsPerPage = 5
 
 
 [Terrain]

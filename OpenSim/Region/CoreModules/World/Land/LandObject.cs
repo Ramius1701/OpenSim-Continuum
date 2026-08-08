@@ -1016,6 +1016,8 @@ namespace OpenSim.Region.CoreModules.World.Land
             int now = Util.UnixTimeSinceEpoch();
             List<LandAccessEntry> accesslist = new();
             List<LandAccessEntry> banlist = new();
+            List<LandAccessEntry> allowed = new();
+            List<LandAccessEntry> blocked = new();
             foreach (LandAccessEntry entry in LandData.ParcelAccessList)
             {
                 if(entry.Expires > now || entry.Expires == 0)
@@ -1024,6 +1026,10 @@ namespace OpenSim.Region.CoreModules.World.Land
                         accesslist.Add(entry);
                     else if (entry.Flags == AccessList.Ban)
                         banlist.Add(entry);
+                    else if((uint)entry.Flags == 8u) // Todo: Update to AccessList.Allowed
+                        allowed.Add(entry);
+                    else if((uint)entry.Flags == 0x10u) // Todo: Update to AccessList.Blocked
+                        blocked.Add(entry);
                 }
             }
 
@@ -1042,11 +1048,21 @@ namespace OpenSim.Region.CoreModules.World.Land
             }
             else
                 remote_client.SendLandAccessListData(banlist, (uint)AccessList.Ban, LandData.LocalID);
+
+            if (allowed.Count == 0)
+                remote_client.SendLandAccessListData(new List<LandAccessEntry>() { new LandAccessEntry() }, 8u, LandData.LocalID);
+            else
+                remote_client.SendLandAccessListData(allowed, 8u, LandData.LocalID);
+
+            if (blocked.Count == 0)
+                remote_client.SendLandAccessListData(new List<LandAccessEntry>() { new LandAccessEntry() }, 0x10u, LandData.LocalID);
+            else
+                remote_client.SendLandAccessListData(blocked, 0x10u, LandData.LocalID);
         }
 
         public void UpdateAccessList(uint flags, UUID transactionID, List<LandAccessEntry> entries)
         {
-            flags &= 0x03;
+            flags &= 0x1Bu; // Todo: Update to AccessList.All
             if (flags == 0)
                 return; // we only have access and ban
 

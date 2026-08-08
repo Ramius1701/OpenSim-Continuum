@@ -75,12 +75,12 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         void path_update(int type, LSL_List data);
         void region_cross(LSL_Vector newpos, LSL_Vector oldpos);
         void linkset_data(LSL_Integer action, string name, string value);
+        void experience_permissions(LSL_Key agent_id);
+        void experience_permissions_denied(LSL_Key agent_id, LSL_Integer reason);
 
         // Combat2/Experience event handler signatures, ported from
         // GuntharDeNiro/opensim - needed for scripts to declare these as
         // real event handlers rather than getting a compile error.
-        void experience_permissions(string agent);
-        void experience_permissions_denied(string agent, int reason);
         void on_damage(int num_detected);
         void final_damage(int num_detected);
         void on_death();

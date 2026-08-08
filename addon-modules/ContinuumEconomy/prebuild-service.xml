@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<Project name="ContinuumEconomy.Service" path="addon-modules/ContinuumEconomy/ContinuumEconomy.Service" type="Exe" version="0.1.0-$Rev$" frameworkVersion="net8_0">
+  <Configuration name="Debug"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <Configuration name="Release"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="log4net" />
+  <Reference name="Nini" />
+  <Reference name="OpenMetaverse" />
+  <Reference name="XMLRPC" />
+  <Reference name="OpenSim.Continuum.Economy" />
+  <Reference name="OpenSim.Framework" />
+  <Reference name="OpenSim.Framework.Console" />
+  <Reference name="OpenSim.Framework.Servers.HttpServer" />
+  <Files><Match pattern="*.cs" recurse="false" /></Files>
+</Project>

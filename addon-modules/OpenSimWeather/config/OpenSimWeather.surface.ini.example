@@ -1,4 +1,4 @@
-;; OpenSimWeather 0.3.2 experimental puddle/snow example
+;; OpenSimWeather 0.3.4 experimental puddle/snow example
 ;;
 ;; Upload suitable alpha textures and paste their asset UUIDs below.
 ;; Surface patches are temporary terrain overlays near active avatars. They do
@@ -9,10 +9,8 @@
     CommandChannel = 89
     EstateManagerOnly = true
 
-    CoverageMode = ActiveArea
-    EmitterSpacingMeters = 24.0
-    MaxEmitters = 256
-    ActiveAreaRadiusMeters = 96.0
+    CoverageMode = Region
+    EmitterGrid = 8
 
     RainTexture =
     StormTexture =

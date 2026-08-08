@@ -1,0 +1,8 @@
+[Economy]
+    EconomyModule = ContinuumEconomyModule
+    ContinuumEconomyServer = http://127.0.0.1:8009/
+    ContinuumEconomySharedSecret = CHANGE-THIS-TO-THE-SAME-UNIQUE-32-CHARACTER-SECRET
+    SellEnabled = true
+    PriceUpload = 0
+    PriceGroupCreate = 0
+    CheckServerCert = false

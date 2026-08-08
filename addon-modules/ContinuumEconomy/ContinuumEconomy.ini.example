@@ -1,0 +1,20 @@
+[ContinuumEconomyService]
+    Port = 8009
+    DefaultBalance = 1000
+    ; Enables explicitly authenticated region-originated administrative credits.
+    ; Leave false unless simulator-side SendMoney/AddBankerMoney is required.
+    AllowRegionCredits = false
+    CurrencyPurchaseEnabled = true
+    DailyPurchaseLimit = 100
+    WeeklyPurchaseLimit = 250
+    MonthlyPurchaseLimit = 500
+    MaximumBalance = 10000
+    EstimatedCostPerUnit = 0.01
+    SystemActorID = 11111111-1111-1111-1111-111111111111
+    ; Generate a unique random value of at least 32 characters and use the same
+    ; value in the simulator [Economy] section. Do not publish the real secret.
+    RegionSharedSecret = CHANGE-THIS-TO-A-UNIQUE-32-CHARACTER-SECRET
+
+[Database]
+    StorageProvider = MySQL
+    ConnectionString = "Server=localhost;Database=opensim;User ID=opensim;Password=change-me;"

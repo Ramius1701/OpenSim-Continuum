@@ -34,16 +34,16 @@ COMMIT;
 
 BEGIN;
 
-ALTER TABLE `UserAccounts` ADD COLUMN `TOSDate` INT UNSIGNED NULL;
+ALTER TABLE `UserAccounts`
+ADD COLUMN `DisplayName` VARCHAR(31) NULL AFTER `active`,
+ADD COLUMN `NameChanged` INT NULL DEFAULT 0 AFTER `DisplayName`;
 
 COMMIT;
 
-:VERSION 8		# -------------------------
+:VERSION 8        # -------------------------
 
 BEGIN;
 
-ALTER TABLE `UserAccounts`
-	ADD COLUMN `DisplayName` VARCHAR(255) NOT NULL DEFAULT '',
-	ADD COLUMN `NameChanged` INT UNSIGNED NOT NULL DEFAULT '0';
+ALTER TABLE `UserAccounts` ADD COLUMN `TOSDate` INT UNSIGNED NULL AFTER `NameChanged`;
 
 COMMIT;

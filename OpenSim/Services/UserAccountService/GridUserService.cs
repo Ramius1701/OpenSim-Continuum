@@ -27,13 +27,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Threading.Tasks;
 using Nini.Config;
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
-using OpenSim.Services.Connectors.Hypergrid;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -47,12 +44,6 @@ namespace OpenSim.Services.UserAccountService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static bool m_Initialized;
-
-        // HG display name federation, ported from Mobius: opt-in, since it
-        // means this grid's regions will make outbound HTTP calls to
-        // foreign visitors' home grids.
-        private static bool m_FetchDisplayNames = false;
-        private static int m_DisplayNameCacheExpirationInHours = 12;
 
         public GridUserService(IConfigSource config) : base(config)
         {
@@ -79,17 +70,6 @@ namespace OpenSim.Services.UserAccountService
                     + "For this reason, users online for more than 5 days are not currently counted",
                     HandleShowGridUsersOnline);
             }
-
-            IConfig gridUserServiceConfig = config.Configs["GridUserService"];
-            if (gridUserServiceConfig is not null)
-            {
-                m_FetchDisplayNames = gridUserServiceConfig.GetBoolean("FetchDisplayNames", m_FetchDisplayNames);
-                m_DisplayNameCacheExpirationInHours = gridUserServiceConfig.GetInt("DisplayNamesCacheExpirationInHours", m_DisplayNameCacheExpirationInHours);
-            }
-
-            m_log.Info("[GRID USER SERVICE]: Fetch display names is " + (m_FetchDisplayNames ? "enabled" : "disabled"));
-            if (m_FetchDisplayNames)
-                m_log.InfoFormat("[GRID USER SERVICE]: HG display names cache expiration set to {0} hours", m_DisplayNameCacheExpirationInHours);
         }
 
         protected void HandleShowGridUser(string module, string[] cmdparams)
@@ -230,13 +210,6 @@ namespace OpenSim.Services.UserAccountService
             else
                 info.Logout = Util.UnixEpoch;
 
-            if (kvp.TryGetValue("DisplayName", out tmpstr) && tmpstr is not null)
-                info.DisplayName = tmpstr;
-
-            if (kvp.TryGetValue("NameCached", out tmpstr) && !string.IsNullOrWhiteSpace(tmpstr)
-                    && Int32.TryParse(tmpstr, out int namecached))
-                info.NameCached = Util.ToDateTime(namecached);
-
             return info;
         }
 
@@ -258,114 +231,6 @@ namespace OpenSim.Services.UserAccountService
                 ret.Add(GetGridUserInfo(id));
 
             return ret.ToArray();
-        }
-
-        public virtual GridUserInfo[] GetGridUserInfo(string[] userIDs, bool update_name)
-        {
-            List<GridUserInfo> ret = new List<GridUserInfo>();
-
-            foreach (string id in userIDs)
-            {
-                GridUserInfo userInfo = GetGridUserInfo(id);
-                if (userInfo is null && update_name)
-                    userInfo = new GridUserInfo { UserID = id };
-                ret.Add(userInfo);
-            }
-
-            if (update_name && m_FetchDisplayNames)
-                return UpdateDisplayNames(ret).ToArray();
-
-            return ret.ToArray();
-        }
-
-        /// <summary>
-        /// Refreshes stale HG (foreign) display names by grouping the given
-        /// entries by home grid and hitting each grid's get_display_names
-        /// endpoint once in parallel, ported from Mobius. Local users
-        /// (36-character plain UUID strings) are left untouched - display
-        /// names for those come from UserAccountService, not here.
-        /// </summary>
-        private List<GridUserInfo> UpdateDisplayNames(List<GridUserInfo> entries)
-        {
-            Dictionary<string, List<GridUserInfo>> grids_and_infos = new Dictionary<string, List<GridUserInfo>>();
-
-            foreach (GridUserInfo info in entries)
-            {
-                if (info is null || info.UserID.Length <= 36)
-                    continue;
-
-                if (info.NameCached >= DateTime.UtcNow.AddHours(-m_DisplayNameCacheExpirationInHours))
-                    continue;
-
-                if (Util.ParseUniversalUserIdentifier(info.UserID, out UUID uuid, out string url, out string first, out string last, out string tmp))
-                {
-                    if (!grids_and_infos.TryGetValue(url, out List<GridUserInfo> infos))
-                        infos = new List<GridUserInfo>();
-                    infos.Add(info);
-                    grids_and_infos[url] = infos;
-                }
-            }
-
-            if (grids_and_infos.Count == 0)
-                return entries;
-
-            Dictionary<string, string> results = new Dictionary<string, string>();
-            List<Task> tasks = new List<Task>();
-
-            foreach (KeyValuePair<string, List<GridUserInfo>> pair in grids_and_infos)
-            {
-                Task wrapperTask = Task.Run(() =>
-                {
-                    Dictionary<UUID, string> users = new Dictionary<UUID, string>();
-                    foreach (GridUserInfo info in pair.Value)
-                    {
-                        if (Util.ParseUniversalUserIdentifier(info.UserID, out UUID uuid, out string url, out string first, out string last, out string tmp))
-                            users[uuid] = info.UserID;
-                    }
-
-                    DisplayNameServiceConnector dnService = new DisplayNameServiceConnector(pair.Key);
-                    Dictionary<UUID, string> vals = dnService.GetDisplayNames(users.Keys.ToArray());
-                    lock (results)
-                    {
-                        foreach (KeyValuePair<UUID, string> name in vals)
-                            results[users[name.Key]] = name.Value;
-                    }
-                });
-                tasks.Add(wrapperTask);
-            }
-
-            Task.WaitAll(tasks.ToArray());
-
-            int nowUnix = Util.UnixTimeSinceEpoch();
-            foreach (GridUserInfo info in entries)
-            {
-                if (info is not null && results.TryGetValue(info.UserID, out string displayName))
-                {
-                    info.DisplayName = displayName;
-                    info.NameCached = Util.ToDateTime(nowUnix);
-                    SetDisplayName(info.UserID, displayName);
-                }
-            }
-
-            return entries;
-        }
-
-        /// <summary>
-        /// Caches a foreign visitor's display name against their GridUser
-        /// record. Ported from Mobius. Only meaningful for HG (long-form
-        /// UUI) userIDs - local users' display names live on their
-        /// UserAccount instead.
-        /// </summary>
-        public bool SetDisplayName(string userID, string displayName)
-        {
-            GridUserData d = GetGridUserData(userID);
-            if (d is null)
-                return false;
-
-            d.Data["DisplayName"] = displayName ?? string.Empty;
-            d.Data["NameCached"] = Util.UnixTimeSinceEpoch().ToString();
-
-            return m_Database.Store(d);
         }
 
         public GridUserInfo LoggedIn(string userID)

@@ -1,9 +1,0 @@
-S:\Github\opensim-enhanced\bin\OpenSimSearch.Modules.dll
-S:\Github\opensim-enhanced\bin\OpenSimSearch.Modules.pdb
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.csproj.AssemblyReference.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.GeneratedMSBuildEditorConfig.editorconfig
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.csproj.CoreCompileInputs.cache
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.sourcelink.json
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimS.62EF2F53.Up2Date
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.dll
-S:\Github\opensim-enhanced\addon-modules\OpenSimSearch\Modules\obj\Release\OpenSimSearch.Modules.pdb

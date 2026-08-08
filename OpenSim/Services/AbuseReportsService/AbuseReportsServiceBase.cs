@@ -1,57 +1,40 @@
 using System;
-using System.Reflection;
 using Nini.Config;
-using OpenSim.Framework;
 using OpenSim.Data;
-using OpenSim.Services.Interfaces;
 using OpenSim.Services.Base;
 
 namespace OpenSim.Services.AbuseReportsService
 {
     public class AbuseReportsServiceBase : ServiceBase
     {
-        protected IAbuseReportsData m_Database = null;
+        protected IAbuseReportsData m_Database;
 
         public AbuseReportsServiceBase(IConfigSource config)
             : base(config)
         {
-            string dllName = String.Empty;
-            string connString = String.Empty;
-            string realm = "AbuseReports";
+            string dllName = string.Empty;
+            string connectionString = string.Empty;
 
-            //
-            // Try reading the [DatabaseService] section, if it exists
-            //
-            IConfig dbConfig = config.Configs["DatabaseService"];
-            if (dbConfig != null)
+            IConfig databaseConfig = config.Configs["DatabaseService"];
+            if (databaseConfig != null)
             {
-                if (dllName == String.Empty)
-                    dllName = dbConfig.GetString("StorageProvider", String.Empty);
-                if (connString == String.Empty)
-                    connString = dbConfig.GetString("ConnectionString", String.Empty);
+                dllName = databaseConfig.GetString("StorageProvider", string.Empty);
+                connectionString = databaseConfig.GetString("ConnectionString", string.Empty);
             }
 
-            //
-            // [AbuseReportsService] section overrides [DatabaseService], if it exists
-            //
-            IConfig presenceConfig = config.Configs["AbuseReportsService"];
-            if (presenceConfig != null)
+            IConfig serviceConfig = config.Configs["AbuseReportsService"];
+            if (serviceConfig != null)
             {
-                dllName = presenceConfig.GetString("StorageProvider", dllName);
-                connString = presenceConfig.GetString("ConnectionString", connString);
-                realm = presenceConfig.GetString("Realm", realm);
+                dllName = serviceConfig.GetString("StorageProvider", dllName);
+                connectionString = serviceConfig.GetString("ConnectionString", connectionString);
             }
 
-            //
-            // We tried, but this doesn't exist. We can't proceed.
-            //
-            if (dllName.Equals(String.Empty))
-                throw new Exception("No StorageProvider configured");
+            if (string.IsNullOrWhiteSpace(dllName))
+                throw new Exception("No StorageProvider configured for AbuseReportsService");
 
-            m_Database = LoadPlugin<IAbuseReportsData>(dllName, new Object[] { connString });
+            m_Database = LoadPlugin<IAbuseReportsData>(dllName, new object[] { connectionString });
             if (m_Database == null)
-                throw new Exception("Could not find a storage interface in the given module " + dllName);
-
+                throw new Exception("Could not load IAbuseReportsData from " + dllName);
         }
     }
 }

@@ -112,10 +112,6 @@
 
 [ServiceList]
     AssetServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
-    ; Casperia Prime addition (not upstream OpenSim): lets an external web
-    ; front end fetch avatar/snapshot textures as plain PNG, no separate
-    ; OpenJPEG install needed - see [TexturePngService] below.
-    TexturePngServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:TexturePngServiceConnector"
     InventoryInConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     ;; Uncomment if you have set up Freeswitch (see [FreeswitchService] below)
     ;VoiceConnector = "8004/OpenSim.Server.Handlers.dll:FreeswitchServerConnector"
@@ -132,6 +128,8 @@
     FriendsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:FriendsServiceConnector"
     MapAddServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MapAddServiceConnector"
     MapGetServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:MapGetServiceConnector"
+    ;; Continuum: grid-wide Experience service endpoint.
+    ExperienceServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:ExperienceServiceConnector"
     ;; Uncomment this if you want offline IM to work
     ; OfflineIMServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.OfflineIM.dll:OfflineIMServiceRobustConnector"
     ;; Uncomment this if you want Groups V2 to work
@@ -145,6 +143,9 @@
     ;; Uncomment if you want to have centralized estate data
     ; EstateDataService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:EstateDataRobustConnector"
 
+    ;; Continuum: receive grid-wide viewer abuse reports on the private port.
+    AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
+
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
     ;; Additions for Hypergrid
@@ -156,13 +157,6 @@
     InstantMessageServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:InstantMessageServerConnector"
     HGInventoryServiceConnector = "HGInventoryService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     HGAssetServiceConnector = "HGAssetService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
-
-    ;; Uncomment if you want to support Display Names (ported from Mobius)
-    ;; for HG visitors coming from grids that also support it - exposes
-    ;; get_display_names for foreign regions to query this grid's users.
-    ;; Also needs [GridUserService] FetchDisplayNames = true on any region
-    ;; that should look up *its own* HG visitors' display names.
-    ; HGGetDisplayNamesConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:HGGetDisplayNames"
     ;; Uncomment this if you want Groups V2, HG to work
     ; HGGroupsServiceConnector = "${Const|PublicPort}/OpenSim.Addons.Groups.dll:HGGroupsServiceRobustConnector"
 
@@ -337,29 +331,6 @@
     ; Default is false.
     AllowRemoteDeleteAllTypes = false
 
-; * Casperia Prime addition (not upstream OpenSim).
-; *
-; * Lets an external web front end (a PHP site, for example) fetch avatar/
-; * snapshot textures as plain PNG over a stable, session-independent HTTP
-; * endpoint - no separate OpenJPEG install or exec() call needed. Reuses
-; * the same managed OpenMetaverse.Imaging.OpenJPEG decoder OpenSim's own
-; * GetTexture capability and map tile renderer already use internally.
-; *
-; * Usage: GET http://this-host:${Const|PublicPort}/texture_png?id=<uuid>
-; *   200 + image/png  -> decoded PNG bytes
-; *   400 / 404 / 415   -> bad id / asset not found / not a JPEG2000 texture
-; *
-[TexturePngService]
-    Enabled = true
-
-    ; Must match your [AssetService] LocalServiceModule above exactly.
-    LocalServiceModule = "OpenSim.Services.AssetService.dll:AssetService"
-
-    ; No ConnectionString needed here if [DatabaseService] below already has
-    ; your DB connection string - this falls back to that shared connection,
-    ; same as [AssetService] does. Only set this if you want a different DB.
-    ; ConnectionString = "Data Source=...;"
-
 ; * This configuration loads the inventory server modules. It duplicates
 ; * the function of the legacy inventory server
 ; *
@@ -524,12 +495,6 @@
 [GridUserService]
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:GridUserService"
-
-    ;; HG display name federation (ported from Mobius): fetches and caches
-    ;; HG visitors' display names from their home grid. Makes outbound
-    ;; HTTP calls to foreign grids, so it's opt-in.
-    ; FetchDisplayNames = true
-    ; DisplayNamesCacheExpirationInHours = 12
 
 
 [AgentPreferencesService]
@@ -927,3 +892,16 @@
 
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
+
+[ExperienceService]
+    LocalServiceModule = "OpenSim.Services.ExperienceService.dll:ExperienceService"
+    ;; ConnectionString = "Data Source=localhost;Database=robust;User ID=robust;Password=*****;Old Guids=true;CharSet=utf8mb4;"
+
+    UserAccountService = "OpenSim.Services.UserAccountService.dll:UserAccountService"
+[AbuseReportsService]
+    LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
+    ;; StorageProvider and ConnectionString inherit from [DatabaseService].
+    ;; Override them here only when using a separate abuse-report database.
+    MaxScreenshotBytes = 5242880
+    MaxSummaryBytes = 4096
+    MaxDetailsBytes = 65536

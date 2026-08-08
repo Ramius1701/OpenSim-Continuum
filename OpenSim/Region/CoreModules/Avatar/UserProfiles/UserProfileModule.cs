@@ -767,6 +767,8 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
               .Any(map => map["classifieduuid"].AsUUID().Equals(queryclassifiedID));
 
             IMoneyModule money = null;
+            IReservedMoneyModule reservedMoney = null;
+            UUID chargeReservation = UUID.Zero;
             if (!exists)
             {
                 money = s.RequestModuleInterface<IMoneyModule>();
@@ -777,6 +779,14 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                         remoteClient.SendAgentAlertMessage("You do not have enough money to create this classified.", false);
                         if(uce is not null && uce.classifiedsLists is not null)
                             remoteClient.SendAvatarClassifiedReply(remoteClient.AgentId, uce.classifiedsLists);
+                        return;
+                    }
+                    reservedMoney = money as IReservedMoneyModule;
+                    if (reservedMoney != null && queryclassifiedPrice > 0 &&
+                        !reservedMoney.ReserveCharge(remoteClient.AgentId, queryclassifiedPrice,
+                            MoneyTransactionType.ClassifiedCharge, queryName, out chargeReservation))
+                    {
+                        remoteClient.SendAgentAlertMessage("Unable to reserve the classified listing fee.", false);
                         return;
                     }
                 }
@@ -802,6 +812,8 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             object Ad = ad;
             if(!rpc.JsonRpcRequest(ref Ad, "classified_update", serverURI, UUID.Random().ToString()))
             {
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                    reservedMoney.CancelCharge(chargeReservation, remoteClient.AgentId);
                 remoteClient.SendAgentAlertMessage("Error updating classified", false);
                 if(uce is not null && uce.classifiedsLists is not null)
                     remoteClient.SendAvatarClassifiedReply(remoteClient.AgentId, uce.classifiedsLists);
@@ -809,7 +821,14 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             }
 
             // only charge if it worked
-            money?.ApplyCharge(remoteClient.AgentId, queryclassifiedPrice, MoneyTransactionType.ClassifiedCharge);
+            if (reservedMoney != null && chargeReservation != UUID.Zero)
+            {
+                if (!reservedMoney.CaptureCharge(chargeReservation, remoteClient.AgentId))
+                    m_log.ErrorFormat("[USER PROFILES MODULE]: Classified {0} was created but fee reservation {1} requires reconciliation",
+                        queryclassifiedID, chargeReservation);
+            }
+            else
+                money?.ApplyCharge(remoteClient.AgentId, queryclassifiedPrice, MoneyTransactionType.ClassifiedCharge);
 
             // just flush cache for now
             lock(m_profilesCache)
