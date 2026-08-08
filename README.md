@@ -88,6 +88,11 @@ The following components require deliberate opt-in:
 - Recovered economy, search, environment, and protection modules through their own configuration sections
 - Warp3D flat-card sprite rendering through its renderer flags
 
+RegionWeb is the per-region public site, not WhiteCore WebUI. Its public pages
+may be served independently, but Estate Admin requires HTTPS by default. The
+legacy wallet embedded in the donor module is disabled; use the separately
+packaged RegionCurrency compatibility portal only when explicitly required.
+
 `[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
 The viewer service also requires an explicit `[Modules]` selection. The grid

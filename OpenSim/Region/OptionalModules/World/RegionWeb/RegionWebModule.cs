@@ -110,9 +110,11 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private bool m_showStats;
         private bool m_showParcels;
         private bool m_inventoryCarouselEnabled = true;
-        private bool m_currencyPortalEnabled = true;
-        private bool m_currencyBuyEnabled = true;
-        private bool m_currencyTransferEnabled = true;
+        private bool m_currencyPortalEnabled;
+        private bool m_currencyBuyEnabled;
+        private bool m_currencyTransferEnabled;
+        private bool m_requireHttpsForAuthenticatedRoutes = true;
+        private int m_maxRequestBodyBytes = 1024 * 1024;
         private bool m_payPalEnabled;
         private int m_postsPerPage;
         private int m_currencyChallengeMinutes = 10;
@@ -127,7 +129,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private string m_contentDirectory = "RegionWeb";
         private string m_inventoryCarouselFolder = "RegionWeb Carousel";
         private string m_regionInventoryCarouselFolderTemplate = "RegionWeb {RegionName} Carousel";
-        private string m_currencyBuyMode = "grant";
+        private string m_currencyBuyMode = "disabled";
         private string m_currencyPurchaseStoragePath = "Currency/regionweb-purchases.tsv";
         private string m_payPalEnvironment = "sandbox";
         private string m_payPalClientID = string.Empty;
@@ -157,21 +159,23 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             m_showMap = config.GetBoolean("ShowMap", true);
             m_showStats = config.GetBoolean("ShowStats", true);
             m_showParcels = config.GetBoolean("ShowParcels", true);
-            m_postsPerPage = Math.Max(1, config.GetInt("PostsPerPage", 5));
+            m_postsPerPage = Math.Clamp(config.GetInt("PostsPerPage", 5), 1, 100);
             m_inventoryCarouselEnabled = config.GetBoolean("InventoryCarouselEnabled", true);
             m_inventoryCarouselFolder = config.GetString("InventoryCarouselFolder", "RegionWeb Carousel").Trim();
             m_regionInventoryCarouselFolderTemplate = config.GetString("RegionInventoryCarouselFolderTemplate", "RegionWeb {RegionName} Carousel").Trim();
-            m_inventoryCarouselLimit = Math.Max(1, config.GetInt("InventoryCarouselLimit", 12));
-            m_inventoryCarouselCacheSeconds = Math.Max(0, config.GetInt("InventoryCarouselCacheSeconds", 300));
-            m_currencyPortalEnabled = config.GetBoolean("CurrencyPortalEnabled", true);
-            m_currencyBuyEnabled = config.GetBoolean("CurrencyBuyEnabled", true);
-            m_currencyTransferEnabled = config.GetBoolean("CurrencyTransferEnabled", true);
-            m_currencyChallengeMinutes = Math.Max(1, config.GetInt("CurrencyChallengeMinutes", 10));
-            m_currencyChallengeCooldownSeconds = Math.Max(0, config.GetInt("CurrencyChallengeCooldownSeconds", 20));
-            m_currencySessionHours = Math.Max(1, config.GetInt("CurrencySessionHours", 12));
-            m_currencyStatementLimit = Math.Max(1, config.GetInt("CurrencyStatementLimit", 30));
-            m_currencyBuyLimit = Math.Max(1, config.GetInt("CurrencyBuyLimit", 100000));
-            m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", "grant"));
+            m_inventoryCarouselLimit = Math.Clamp(config.GetInt("InventoryCarouselLimit", 12), 1, 100);
+            m_inventoryCarouselCacheSeconds = Math.Clamp(config.GetInt("InventoryCarouselCacheSeconds", 300), 0, 86400);
+            m_currencyPortalEnabled = config.GetBoolean("CurrencyPortalEnabled", false);
+            m_currencyBuyEnabled = config.GetBoolean("CurrencyBuyEnabled", false);
+            m_currencyTransferEnabled = config.GetBoolean("CurrencyTransferEnabled", false);
+            m_requireHttpsForAuthenticatedRoutes = config.GetBoolean("RequireHttpsForAuthenticatedRoutes", true);
+            m_maxRequestBodyBytes = Math.Clamp(config.GetInt("MaxRequestBodyBytes", 1024 * 1024), 4096, 4 * 1024 * 1024);
+            m_currencyChallengeMinutes = Math.Clamp(config.GetInt("CurrencyChallengeMinutes", 10), 1, 1440);
+            m_currencyChallengeCooldownSeconds = Math.Clamp(config.GetInt("CurrencyChallengeCooldownSeconds", 20), 0, 3600);
+            m_currencySessionHours = Math.Clamp(config.GetInt("CurrencySessionHours", 12), 1, 168);
+            m_currencyStatementLimit = Math.Clamp(config.GetInt("CurrencyStatementLimit", 30), 1, 1000);
+            m_currencyBuyLimit = Math.Clamp(config.GetInt("CurrencyBuyLimit", 100000), 1, 1000000);
+            m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", "disabled"));
             m_currencyPurchaseStoragePath = config.GetString("CurrencyPurchaseStorage", "Currency/regionweb-purchases.tsv").Trim();
             m_payPalEnabled = config.GetBoolean("PayPalEnabled", false);
             m_payPalEnvironment = NormalizePayPalEnvironment(config.GetString("PayPalEnvironment", "sandbox"));
@@ -437,6 +441,26 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 string path = request.UriPath ?? string.Empty;
                 string relative = path.Length > m_basePath.Length ? path.Substring(m_basePath.Length).Trim('/') : string.Empty;
 
+                if (request.ContentLength64 > m_maxRequestBodyBytes)
+                {
+                    response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                    response.ContentType = "text/plain";
+                    response.RawBuffer = Encoding.UTF8.GetBytes("RegionWeb request body is too large.");
+                    return;
+                }
+
+                bool authenticatedRoute = relative.Equals("admin", StringComparison.OrdinalIgnoreCase)
+                    || relative.StartsWith("admin/", StringComparison.OrdinalIgnoreCase)
+                    || relative.Equals("currency", StringComparison.OrdinalIgnoreCase)
+                    || relative.StartsWith("currency/", StringComparison.OrdinalIgnoreCase);
+                if (authenticatedRoute && m_requireHttpsForAuthenticatedRoutes && !request.IsSecured)
+                {
+                    response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    response.ContentType = "text/plain";
+                    response.RawBuffer = Encoding.UTF8.GetBytes("RegionWeb authenticated routes require HTTPS.");
+                    return;
+                }
+
                 if (string.IsNullOrEmpty(relative))
                 {
                     SendIndex(response);
@@ -506,12 +530,19 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
                 SendRegionPage(scene, response);
             }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[REGION WEB]: Rejected oversized request: {0}", e.Message);
+                response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                response.ContentType = "text/plain";
+                response.RawBuffer = Encoding.UTF8.GetBytes("RegionWeb request body is too large.");
+            }
             catch (Exception e)
             {
                 m_log.WarnFormat("[REGION WEB]: Request failed: {0}", e);
                 response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 response.ContentType = "text/plain";
-                response.RawBuffer = Encoding.UTF8.GetBytes("Vanilla Sim web request failed.");
+                response.RawBuffer = Encoding.UTF8.GetBytes("RegionWeb request failed.");
             }
         }
 
@@ -3126,13 +3157,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         {
             response.AddHeader("Set-Cookie", CurrencySessionCookie + "=" + token
                 + "; Path=" + m_basePath + "; Expires=" + expiresUTC.ToString("R", CultureInfo.InvariantCulture)
-                + "; HttpOnly; SameSite=Lax");
+                + "; HttpOnly; SameSite=Lax" + (m_requireHttpsForAuthenticatedRoutes ? "; Secure" : string.Empty));
         }
 
         private void ClearCurrencySessionCookie(IOSHttpResponse response)
         {
             response.AddHeader("Set-Cookie", CurrencySessionCookie
-                + "=; Path=" + m_basePath + "; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
+                + "=; Path=" + m_basePath + "; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
+                + (m_requireHttpsForAuthenticatedRoutes ? "; Secure" : string.Empty));
         }
 
         private List<EstateAdminConfigFile> GetEstateAdminConfigFiles()
@@ -3757,7 +3789,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 Encoding encoding = request.ContentEncoding ?? Encoding.UTF8;
                 using (StreamReader reader = new StreamReader(request.InputStream, encoding))
                 {
-                    string body = reader.ReadToEnd();
+                    StringBuilder boundedBody = new StringBuilder(Math.Min(m_maxRequestBodyBytes, 16384));
+                    char[] buffer = new char[4096];
+                    int count;
+                    while ((count = reader.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+                        if (boundedBody.Length + count > m_maxRequestBodyBytes)
+                            throw new InvalidDataException("RegionWeb request body exceeds the configured limit.");
+                        boundedBody.Append(buffer, 0, count);
+                    }
+
+                    string body = boundedBody.ToString();
                     if (!string.IsNullOrEmpty(body))
                     {
                         Dictionary<string, object> parsed = ServerUtils.ParseQueryString(body);
@@ -3942,7 +3984,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 return "paypal";
             if (mode == "disabled" || mode == "disable" || mode == "off" || mode == "false")
                 return "disabled";
-            return "grant";
+            return "disabled";
         }
 
         private static string NormalizePayPalEnvironment(string value)
@@ -6514,7 +6556,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             if (!path.StartsWith("/", StringComparison.Ordinal))
                 path = "/" + path;
 
-            return path.TrimEnd('/');
+            path = path.TrimEnd('/');
+            return string.IsNullOrEmpty(path) ? "/regionweb" : path;
         }
 
         private static string Url(string value)
