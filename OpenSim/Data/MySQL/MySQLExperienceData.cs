@@ -102,10 +102,13 @@ namespace OpenSim.Data.MySQL
 
         public ExperienceInfoData[] GetExperienceInfos(UUID[] experiences)
         {
-            List<string> uuids = new List<string>();
-            foreach (var u in experiences)
-                uuids.Add("'" + u.ToString() + "'");
-            string joined = string.Join(",", uuids);
+            if (experiences == null || experiences.Length == 0)
+                return System.Array.Empty<ExperienceInfoData>();
+
+            List<string> parameters = new List<string>();
+            for (int i = 0; i < experiences.Length; ++i)
+                parameters.Add("?id" + i);
+            string joined = string.Join(",", parameters);
 
             List<ExperienceInfoData> infos = new List<ExperienceInfoData>();
 
@@ -115,6 +118,9 @@ namespace OpenSim.Data.MySQL
 
                 using (MySqlCommand cmd = new MySqlCommand("SELECT * FROM `experiences` WHERE public_id IN (" + joined + ")", dbcon))
                 {
+                    for (int i = 0; i < experiences.Length; ++i)
+                        cmd.Parameters.AddWithValue("?id" + i, experiences[i].ToString());
+
                     using (IDataReader result = cmd.ExecuteReader())
                     {
                         while (result.Read())
@@ -178,12 +184,12 @@ namespace OpenSim.Data.MySQL
                 {
                     cmd.Parameters.AddWithValue("?public_id", data.public_id.ToString());
                     cmd.Parameters.AddWithValue("?owner_id", data.owner_id.ToString());
-                    cmd.Parameters.AddWithValue("?name", data.name);
-                    cmd.Parameters.AddWithValue("?description", data.description);
+                    cmd.Parameters.AddWithValue("?name", data.name ?? string.Empty);
+                    cmd.Parameters.AddWithValue("?description", data.description ?? string.Empty);
                     cmd.Parameters.AddWithValue("?group_id", data.group_id.ToString());
                     cmd.Parameters.AddWithValue("?logo", data.logo.ToString());
-                    cmd.Parameters.AddWithValue("?marketplace", data.marketplace);
-                    cmd.Parameters.AddWithValue("?slurl", data.slurl);
+                    cmd.Parameters.AddWithValue("?marketplace", data.marketplace ?? string.Empty);
+                    cmd.Parameters.AddWithValue("?slurl", data.slurl ?? string.Empty);
                     cmd.Parameters.AddWithValue("?maturity", data.maturity);
                     cmd.Parameters.AddWithValue("?properties", data.properties);
 
@@ -202,7 +208,7 @@ namespace OpenSim.Data.MySQL
 
                 using (MySqlCommand cmd = new MySqlCommand("SELECT * FROM `experiences` WHERE name LIKE ?search", dbcon))
                 {
-                    cmd.Parameters.AddWithValue("?search", string.Format("%{0}%", search));
+                    cmd.Parameters.AddWithValue("?search", string.Format("%{0}%", search ?? string.Empty));
 
                     using (IDataReader result = cmd.ExecuteReader())
                     {
@@ -259,10 +265,13 @@ namespace OpenSim.Data.MySQL
 
         public UUID[] GetExperiencesForGroups(UUID[] groups)
         {
-            List<string> uuids = new List<string>();
-            foreach (var u in groups)
-                uuids.Add("'" + u.ToString() + "'");
-            string joined = string.Join(",", uuids);
+            if (groups == null || groups.Length == 0)
+                return System.Array.Empty<UUID>();
+
+            List<string> parameters = new List<string>();
+            for (int i = 0; i < groups.Length; ++i)
+                parameters.Add("?id" + i);
+            string joined = string.Join(",", parameters);
 
             List<UUID> experiences = new List<UUID>();
 
@@ -272,6 +281,9 @@ namespace OpenSim.Data.MySQL
 
                 using (MySqlCommand cmd = new MySqlCommand("SELECT * FROM `experiences` WHERE group_id IN (" + joined + ")", dbcon))
                 {
+                    for (int i = 0; i < groups.Length; ++i)
+                        cmd.Parameters.AddWithValue("?id" + i, groups[i].ToString());
+
                     using (IDataReader result = cmd.ExecuteReader())
                     {
                         while (result.Read())
@@ -376,12 +388,14 @@ namespace OpenSim.Data.MySQL
 
         public string[] GetKeys(UUID experience, int start, int count)
         {
+            start = System.Math.Max(0, start);
+            count = System.Math.Clamp(count, 0, 1000);
             List<string> keys = new List<string>();
             using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
             {
                 dbcon.Open();
 
-                using (MySqlCommand cmd = new MySqlCommand("SELECT `key` FROM `experience_kv` WHERE `experience` = ?experience LIMIT ?start, ?count;", dbcon))
+                using (MySqlCommand cmd = new MySqlCommand("SELECT `key` FROM `experience_kv` WHERE `experience` = ?experience ORDER BY `key` LIMIT ?start, ?count;", dbcon))
                 {
                     cmd.Parameters.AddWithValue("?experience", experience.ToString());
                     cmd.Parameters.AddWithValue("?start", start);
