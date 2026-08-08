@@ -59,7 +59,7 @@ The extended scripting surface is powerful and has estate/security implications.
 - MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
 - ContinuumEconomy: a separately named service and region module with atomic MySQL/MariaDB, PostgreSQL and SQLite providers, idempotent operations, viewer currency purchase controls, and delivery-safe object purchase holds; it is ready for the production-test runbook, not live cutover
 - HoloPhysicsGuard
-- OpenSimSearch
+- OpenSimSearch viewer-directory compatibility client (requires a separately deployed compatible search service)
 - OpenSimTide
 - OpenSimWeather
 - Viewer Abuse Reports
@@ -173,6 +173,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Current integration progress and release gates](doc/integration-progress.md)
 - [Abuse Reports](doc/AbuseReports.md)
+- [OpenSimSearch deployment boundary and runtime gate](doc/OpenSimSearch.md)
 - [MoneyServer documentation](docs/MoneyServer/README.md)
 - [ContinuumEconomy compatibility contract](doc/continuum-economy-compatibility-contract.md)
 - [ContinuumEconomy production-test runbook](doc/continuum-economy-production-test.md)
