@@ -26,6 +26,7 @@
  */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -217,6 +218,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private bool m_sendWeatherIMOnEntry;
         private int m_weatherIMDelaySeconds;
         private string m_weatherIMMessage;
+        private readonly ConcurrentDictionary<UUID, Timer> m_pendingEntryIMs = new ConcurrentDictionary<UUID, Timer>();
         private readonly Dictionary<WeatherKind, EnvironmentProfile> m_environmentProfiles = new Dictionary<WeatherKind, EnvironmentProfile>();
         private bool m_surfaceEffectsEnabled;
         private bool m_puddlesEnabled;
@@ -443,6 +445,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             m_scene = scene;
             m_scene.EventManager.OnChatFromClient += OnChatFromClient;
             m_scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+            m_scene.EventManager.OnClientClosed += OnClientClosed;
             m_log.InfoFormat(
                 "[WEATHER]: Enabled in region {0} on channel {1}",
                 scene.RegionInfo.RegionName,
@@ -454,12 +457,14 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             StopAutoCycle();
             StopActiveAreaRefresh();
             StopSurfaceTimer();
+            CancelPendingEntryIMs();
 
             Scene activeScene = m_scene;
             if (activeScene != null)
             {
                 activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
                 activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                activeScene.EventManager.OnClientClosed -= OnClientClosed;
             }
 
             lock (m_weatherChangeSync)
@@ -517,6 +522,15 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             StopAutoCycle();
             StopActiveAreaRefresh();
             StopSurfaceTimer();
+            CancelPendingEntryIMs();
+
+            Scene activeScene = m_scene;
+            if (activeScene != null)
+            {
+                activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
+                activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                activeScene.EventManager.OnClientClosed -= OnClientClosed;
+            }
 
             lock (m_weatherChangeSync)
             {
@@ -542,17 +556,42 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 return;
 
             UUID agentID = sp.UUID;
-            Util.FireAndForget(
-                o =>
+            Timer timer = null;
+            timer = new Timer(
+                _ =>
                 {
-                    if (m_weatherIMDelaySeconds > 0)
-                        Thread.Sleep(m_weatherIMDelaySeconds * 1000);
-
-                    SendWeatherIM(agentID);
+                    if (m_pendingEntryIMs.TryRemove(agentID, out Timer pending))
+                    {
+                        pending.Dispose();
+                        SendWeatherIM(agentID);
+                    }
                 },
                 null,
-                "WeatherModule.EntryIM",
-                false);
+                Timeout.Infinite,
+                Timeout.Infinite);
+
+            if (!m_pendingEntryIMs.TryAdd(agentID, timer))
+            {
+                timer.Dispose();
+                return;
+            }
+
+            timer.Change(m_weatherIMDelaySeconds * 1000, Timeout.Infinite);
+        }
+
+        private void OnClientClosed(UUID agentID, Scene scene)
+        {
+            if (m_pendingEntryIMs.TryRemove(agentID, out Timer timer))
+                timer.Dispose();
+        }
+
+        private void CancelPendingEntryIMs()
+        {
+            foreach (UUID agentID in m_pendingEntryIMs.Keys)
+            {
+                if (m_pendingEntryIMs.TryRemove(agentID, out Timer timer))
+                    timer.Dispose();
+            }
         }
 
         private void OnChatFromClient(object sender, OSChatMessage chat)
