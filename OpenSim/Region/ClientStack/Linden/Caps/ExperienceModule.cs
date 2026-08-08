@@ -25,6 +25,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ExperienceModule")]
     public class ExperienceModule : IExperienceModule, INonSharedRegionModule
     {
+        private const int MaxExperienceCapsRequestBytes = 256 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         // Dictionary of Agent IDs, with a dictionary of experience permissions and their bools
@@ -175,7 +176,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 OSDMap body;
                 try
                 {
-                    body = OSDParser.DeserializeLLSDXml(request.InputStream) as OSDMap;
+                    body = OSDParser.DeserializeLLSDXml(ReadBoundedCapsBody(request)) as OSDMap;
+                }
+                catch (InvalidDataException)
+                {
+                    response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                    return;
                 }
                 catch
                 {
@@ -336,7 +342,27 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void HandlePutExperiencePreferences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
         {
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(request.InputStream);
+            OSDMap map;
+            try
+            {
+                map = OSDParser.DeserializeLLSDXml(ReadBoundedCapsBody(request)) as OSDMap;
+            }
+            catch (InvalidDataException)
+            {
+                response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return;
+            }
+            catch
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (map == null)
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
 
             byte[] response_bytes = new byte[0];
 
@@ -367,6 +393,16 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             response.RawBuffer = response_bytes;
             response.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private static byte[] ReadBoundedCapsBody(IOSHttpRequest request)
+        {
+            if (request == null || request.InputStream == null)
+                throw new InvalidDataException("Experience request body is unavailable.");
+            if (request.ContentLength64 > MaxExperienceCapsRequestBytes)
+                throw new InvalidDataException("Experience request body is too large.");
+
+            return ReadBaseStreamHandler.ReadFully(request.InputStream, MaxExperienceCapsRequestBytes);
         }
 
         #region IExperienceModule
@@ -908,11 +944,34 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            byte[] data = ReadFully(request);
+            byte[] data;
+            try
+            {
+                data = ReadFully(request, httpRequest);
+            }
+            catch (InvalidDataException)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             //m_log.InfoFormat("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
 
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(data);
+            OSDMap map;
+            try
+            {
+                map = OSDParser.DeserializeLLSDXml(data) as OSDMap;
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            if (map == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID object_id = UUID.Zero;
             UUID item_id = UUID.Zero;
@@ -977,9 +1036,33 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            byte[] read = ReadFully(request);
+            byte[] read;
+            OSDMap experience;
+            try
+            {
+                read = ReadFully(request, httpRequest);
+                experience = OSDParser.Deserialize(read) as OSDMap;
+            }
+            catch (InvalidDataException)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
-            OSDMap experience = (OSDMap)OSDParser.Deserialize(read);
+            if (experience == null || !experience.ContainsKey("public_id") ||
+                !experience.ContainsKey("group_id") || !experience.ContainsKey("name") ||
+                !experience.ContainsKey("description") || !experience.ContainsKey("slurl") ||
+                !experience.ContainsKey("extended_metadata") || !experience.ContainsKey("maturity") ||
+                !experience.ContainsKey("properties"))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID public_id = experience["public_id"].AsUUID();
             UUID group_id = experience["group_id"].AsUUID();
@@ -990,16 +1073,42 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             int maturity = experience["maturity"].AsInteger();
             int properties = experience["properties"].AsInteger();
 
+            if (name.Length > 42 || desc.Length > 128 || slurl.Length > 256 ||
+                metadata.Length > 16 * 1024)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
             // 42 = adult, 21 = mature, 13 = general
             if (maturity != 42 && maturity != 13)
                 maturity = 21;
 
             string decoded_meta = HttpUtility.HtmlDecode(metadata);
 
-            OSDMap extended = (OSDMap)OSDParser.Deserialize(decoded_meta);
+            OSDMap extended;
+            try
+            {
+                extended = OSDParser.Deserialize(decoded_meta) as OSDMap;
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            if (extended == null || !extended.ContainsKey("logo") || !extended.ContainsKey("marketplace"))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID logo = extended["logo"].AsUUID();
             string marketplace = extended["marketplace"].AsString();
+            if (marketplace.Length > 256)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
 
@@ -1407,7 +1516,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         {
         }
 
-        protected static byte[] ReadFully(Stream stream)
+        internal static byte[] ReadFully(Stream stream, int maximumBytes)
         {
             byte[] buffer = new byte[1024];
             using (MemoryStream ms = new MemoryStream(1024 * 256))
@@ -1421,9 +1530,20 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                         return ms.ToArray();
                     }
 
+                    if (ms.Length + read > maximumBytes)
+                        throw new InvalidDataException("Experience request body is too large.");
+
                     ms.Write(buffer, 0, read);
                 }
             }
+        }
+
+        protected static byte[] ReadFully(Stream stream, IOSHttpRequest request)
+        {
+            const int maximumBytes = 256 * 1024;
+            if (request != null && request.ContentLength64 > maximumBytes)
+                throw new InvalidDataException("Experience request body is too large.");
+            return ReadFully(stream, maximumBytes);
         }
     }
 }
