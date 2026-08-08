@@ -65,6 +65,13 @@ directly into B, restart B only, and restart the complete grid. In every case
 the nameplate, nearby list, profile/search results, and display-name LSL calls
 must agree. Repeat reset-to-legacy-name and test an adjacent-region observer.
 Failure of any step blocks promotion.
+
+The receiving simulator now evicts its cached account record whenever the
+avatar becomes a root agent and broadcasts an authoritative
+`DisplayNameUpdate` to its connected viewers. This specifically covers the
+previous failure where Nearby/search showed the persisted name but the
+nameplate reverted after crossing or restart. Runtime testing must confirm both
+surfaces agree; the update is an event-queue message, not a region chat notice.
 - Tranquillity's later wholesale OAR identity rewrite was not selected because it would regress current OpenSim Dev's force-assets import path. The compatible alias lookup behavior was retained.
 - Donor branding, curated destinations, auto-update/reset scripts, forced defaults, grid-specific endpoints, and incomplete or obsolete architectural rewrites are intentionally excluded.
 - SQLite providers are required for standalone operation. MySQL/MariaDB and

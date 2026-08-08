@@ -52,6 +52,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             scene.RegisterModuleInterface<IDisplayNameModule>(this);
             scene.EventManager.OnNewClient += OnNewClient;
+            scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
         }
 
         public void RemoveRegion(Scene scene)
@@ -61,6 +62,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
             scene.UnregisterModuleInterface<IDisplayNameModule>(this);
             m_Scene = null;
             m_EventQueue = null;
@@ -117,6 +119,26 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             // a rename, or from before the grid restarted. Refresh it before the
             // viewer starts resolving nearby avatar names and registering CAPS.
             m_Scene.UserManagementModule.RemoveUser(client.AgentId);
+        }
+
+        private void OnMakeRootAgent(ScenePresence presence)
+        {
+            if (presence == null || presence.IsDeleted || presence.IsChildAgent || m_EventQueue == null)
+                return;
+
+            // A different simulator may have accepted a rename while this
+            // process retained an older account cache. Crossing/relogin is the
+            // point at which every observer must receive the authoritative grid
+            // value, otherwise nameplates can remain stale while Nearby/search
+            // already show the new name.
+            m_Scene.UserManagementModule.RemoveUser(presence.UUID);
+            UserData userData = m_Scene.UserManagementModule.GetUserData(presence.UUID);
+            if (userData == null)
+                return;
+
+            DateTime nextUpdate = userData.NameChanged.AddDays(7);
+            OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
+            m_Scene.ForEachClient(client => m_EventQueue.Enqueue(update, client.AgentId));
         }
 
         private void OnRegisterCaps(UUID agentID, Caps caps)

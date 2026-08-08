@@ -62,6 +62,11 @@ The goals are:
   implemented on the integration branch. WhiteCore also offers configurable
   update days and banned substrings; Continuum currently enforces SL's
   seven-day cooldown and basic length/control-character validation.
+- **Runtime propagation correction:** when an avatar becomes root after a
+  crossing or relog, the receiving simulator evicts its account cache, reloads
+  the persisted grid value and sends `DisplayNameUpdate` to local observers.
+  This targets the nameplate-only stale state seen while Nearby and search were
+  already correct.
 - **Affected services/files:** LLLoginService, UserAccountService, region user
   management cache, Linden CAPS/event queue, avatar picker/search, LSL identity
   functions.
