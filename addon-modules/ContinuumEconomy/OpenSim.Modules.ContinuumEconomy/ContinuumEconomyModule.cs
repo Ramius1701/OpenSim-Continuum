@@ -1527,6 +1527,15 @@ namespace OpenSim.Modules.ContinuumEconomy
                     if ((bool)resultTable["success"] == true)
                     {
                         ret = true;
+                        if (resultTable.Contains("clientBalance"))
+                            senderClient.SendMoneyBalance(UUID.Random(), true, Array.Empty<byte>(),
+                                Convert.ToInt32(resultTable["clientBalance"]), 0, UUID.Zero, false,
+                                UUID.Zero, false, 0, String.Empty);
+                        IClientAPI receiverClient = GetLocateClient(receiver);
+                        if (receiverClient != null && resultTable.Contains("receiverBalance"))
+                            receiverClient.SendMoneyBalance(UUID.Random(), true, Array.Empty<byte>(),
+                                Convert.ToInt32(resultTable["receiverBalance"]), 0, UUID.Zero, false,
+                                UUID.Zero, false, 0, String.Empty);
                     }
                 }
                 else m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: TransferMoney: Can not money transfer request from [{0}] to [{1}]", sender.ToString(), receiver.ToString());

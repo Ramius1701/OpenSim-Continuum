@@ -108,6 +108,17 @@ then call `CapturePurchase`. Exceptions call `CancelPurchase`, leaving the
 seller uncredited and releasing the buyer's hold. Direct transfers remain
 atomic and idempotent.
 
+Land preflight and preparation require the secure session established by
+`ClientLogin` and validate the requested amount against authoritative available
+funds. The existing OpenSim land-sale transaction remains responsible for the
+actual debit and ownership change; the preparation calls do not debit twice.
+
+Successful transfers return both resulting balances. The connector immediately
+updates sender and receiver viewers that are connected to that simulator. It
+does not send session data or balance callbacks to region URLs supplied by a
+login request; a resident on another simulator reads the authoritative balance
+on its next normal balance request.
+
 ## Build and deployment
 
 Run `runprebuild.bat`, then build `OpenSim.sln` in Release configuration. Copy

@@ -99,6 +99,8 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("AuthorizePurchase", AuthorizePurchase);
             server.AddXmlRPCHandler("CapturePurchase", CapturePurchase);
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
+            server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
+            server.AddXmlRPCHandler("buyLandPrep", BuyLandPrep);
         }
 
         private XmlRpcResponse Health(XmlRpcRequest request, IPEndPoint remote) => Reply(new Hashtable
@@ -257,6 +259,36 @@ namespace ContinuumEconomy.Service
             return PurchaseReply(result);
         }
 
+        private XmlRpcResponse PreflightLand(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!LandRequest(p, out Guid agent, out long currencyBuy, out string error)) return Failure(error);
+            return Reply(new Hashtable { { "success", m_backend.Ledger.GetAvailableBalance(agent) >= currencyBuy },
+                { "billableArea", ParseInt(p, "billableArea") }, { "currencyBuy", ViewerBalance(currencyBuy) } });
+        }
+
+        private XmlRpcResponse BuyLandPrep(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!LandRequest(p, out Guid agent, out long currencyBuy, out string error)) return Failure(error);
+            return m_backend.Ledger.GetAvailableBalance(agent) >= currencyBuy ?
+                Reply(new Hashtable { { "success", true } }) : Failure("Insufficient funds for land purchase");
+        }
+
+        private bool LandRequest(Hashtable p, out Guid agent, out long currencyBuy, out string error)
+        {
+            agent = Guid.Empty;
+            currencyBuy = 0;
+            if (!Guid.TryParse(Text(p, "agentId"), out agent) || agent == Guid.Empty ||
+                !Guid.TryParse(Text(p, "secureSessionId"), out Guid secure) ||
+                !m_sessions.TryGetValue(agent, out Session session) || session.SecureSessionID != secure ||
+                !Int64.TryParse(Text(p, "currencyBuy"), NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out currencyBuy) || currencyBuy < 0 || ParseInt(p, "billableArea") < 0)
+            { error = "The land purchase request could not be authenticated or has invalid values"; return false; }
+            error = String.Empty;
+            return true;
+        }
+
         private static XmlRpcResponse PurchaseReply(LedgerPurchaseResult result) => Reply(new Hashtable
         {
             { "success", result.Succeeded }, { "result", result.Code.ToString() },
@@ -287,6 +319,7 @@ namespace ContinuumEconomy.Service
                 Description=Text(p,"description")});
             return Reply(new Hashtable{{"success",result.Succeeded},{"result",result.Code.ToString()},
                 {"transactionID",result.TransactionID.ToString()},{"clientBalance",ViewerBalance(result.SenderBalance)},
+                {"receiverBalance",ViewerBalance(result.ReceiverBalance)},
                 {"message",result.Message}});
         }
 
@@ -325,6 +358,8 @@ namespace ContinuumEconomy.Service
         }
         private XmlRpcResponse SuccessBalance(Guid id)=>Reply(new Hashtable{{"success",true},{"clientBalance",ViewerBalance(m_backend.Ledger.GetBalance(id))}});
         private static int ViewerBalance(long value)=>checked((int)Math.Clamp(value,0,Int32.MaxValue));
+        private static int ParseInt(Hashtable p, string key) => Int32.TryParse(Text(p, key),
+            NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : -1;
         private static Guid InitialCreditID(Guid account){byte[] ns=account.ToByteArray(),tag=System.Text.Encoding.ASCII.GetBytes("ContinuumInitialBalance");byte[] all=new byte[ns.Length+tag.Length];Buffer.BlockCopy(ns,0,all,0,ns.Length);Buffer.BlockCopy(tag,0,all,ns.Length,tag.Length);byte[] hash=System.Security.Cryptography.SHA256.HashData(all);byte[] id=new byte[16];Buffer.BlockCopy(hash,0,id,0,16);return new Guid(id);}
         private static Hashtable Parameters(XmlRpcRequest r)=>r?.Params?.Count>0&&r.Params[0] is Hashtable p?p:new Hashtable();
         private static string Text(Hashtable p,string key)=>p.ContainsKey(key)?Convert.ToString(p[key],CultureInfo.InvariantCulture)??String.Empty:String.Empty;

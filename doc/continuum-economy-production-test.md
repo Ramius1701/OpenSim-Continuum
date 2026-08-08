@@ -34,7 +34,7 @@ Record transaction UUIDs, balances, relevant logs, and pass/fail for every row.
 | Stipends | Run the same stipend job twice and prove the stable operation ID prevents a second credit. |
 | Groups | Register a group, verify account type 100, membership fee behavior, group payments, history, and rejection of an existing resident-class UUID. |
 | Web/API | Verify balance and paged history authorization; no connection string, access key, or unrelated resident data may leak. |
-| Multi-region | Simultaneously spend one balance from two regions; total committed debit must never exceed available funds. |
+| Multi-region | Simultaneously spend one balance from two regions; total committed debit must never exceed available funds. Confirm a locally connected recipient receives an immediate balance update and a recipient on another simulator reads the committed balance on its next balance request. |
 | Failure recovery | Interrupt ContinuumEconomy.Service/database during authorize, delivery, capture, transfer, and credit; restart and retry using the same IDs. Inspect old holds with `holds`. |
 | Hypergrid | Confirm the local grid remains currency authority, foreign identities cannot gain banker privileges, and local balances are not disclosed remotely. |
 | Performance | Run representative concurrency and history loads while measuring database locks, latency, errors, and connection use. |

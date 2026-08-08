@@ -70,9 +70,10 @@ Failure of any step blocks promotion.
 - SQLite providers are required for standalone operation. MySQL/MariaDB and
   PostgreSQL providers are both required for grid/Robust operation. Experience,
   Abuse Report, and alias provider implementations now exist for all three, but
-  clean/upgrade migration and runtime certification remain open. MoneyServer and
-  ContinuumEconomy remain MySQL-only and are not production-ready for SQLite or
-  PostgreSQL deployments.
+  clean/upgrade migration and runtime certification remain open. MoneyServer
+  Compatibility remains MySQL-only. ContinuumEconomy has independent SQLite,
+  MySQL/MariaDB and PostgreSQL providers, but still requires this handoff's
+  provider-specific production-test certification before deployment.
 
 ## Release gate
 
