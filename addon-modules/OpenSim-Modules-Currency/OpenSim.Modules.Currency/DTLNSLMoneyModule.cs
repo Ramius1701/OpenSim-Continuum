@@ -157,8 +157,7 @@ namespace OpenSim.Modules.Currency
         private int PriceLand = 0;
         private int PriceCurrency = 0;
 
-        /// <summary>The m RPC handlers</summary>
-        private Dictionary<string, XmlRpcMethod> m_rpcHandlers;
+        private bool m_rpcHandlersRegistered;
 
         /// <summary>
         /// Initializes the specified scene.
@@ -341,20 +340,11 @@ namespace OpenSim.Modules.Currency
                         HttpServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
                         HttpServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
                         HttpServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                        HttpServer.AddXmlRPCHandler("GetBalance", GetBalanceHandler);
-                        HttpServer.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);
-                        HttpServer.AddXmlRPCHandler("SendMoney", SendMoneyHandler);
-                        HttpServer.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);
-
-                        m_rpcHandlers = new Dictionary<string, XmlRpcMethod>();
 
                         MainServer.Instance.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
                         MainServer.Instance.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
                         MainServer.Instance.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                        MainServer.Instance.AddXmlRPCHandler("GetBalance", GetBalanceHandler);
-                        MainServer.Instance.AddXmlRPCHandler("AddBankerMoney", AddBankerMoneyHandler);
-                        MainServer.Instance.AddXmlRPCHandler("SendMoney", SendMoneyHandler);
-                        MainServer.Instance.AddXmlRPCHandler("MoveMoney", MoveMoneyHandler);
+                        m_rpcHandlersRegistered = true;
 
                     }
                 }
@@ -406,6 +396,9 @@ namespace OpenSim.Modules.Currency
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
                 scene.UnregisterModuleInterface<IMoneyModule>(this);
+
+                if (m_sceneList.Count == 0)
+                    RemoveMoneyServerCallbacks();
 
                 m_log.InfoFormat("[MONEY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
@@ -486,6 +479,25 @@ namespace OpenSim.Modules.Currency
 
             foreach (Scene scene in scenes)
                 RemoveRegion(scene);
+
+            RemoveMoneyServerCallbacks();
+        }
+
+        private void RemoveMoneyServerCallbacks()
+        {
+            if (m_rpcHandlersRegistered)
+            {
+                MainServer.Instance.RemoveXmlRPCHandler("OnMoneyTransfered");
+                MainServer.Instance.RemoveXmlRPCHandler("UpdateBalance");
+                MainServer.Instance.RemoveXmlRPCHandler("UserAlert");
+                m_rpcHandlersRegistered = false;
+            }
+
+            if (HttpServer != null)
+            {
+                HttpServer.Stop();
+                HttpServer = null;
+            }
         }
 
         /// <summary>Objects the give money.</summary>
@@ -1215,7 +1227,7 @@ namespace OpenSim.Modules.Currency
         /// <returns>
         ///   <br />
         /// </returns>
-        public XmlRpcResponse GetBalanceHandler(XmlRpcRequest request, IPEndPoint remoteClient)
+        private XmlRpcResponse GetBalanceHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
 
             bool ret = false;
@@ -1266,7 +1278,7 @@ namespace OpenSim.Modules.Currency
         /// <returns>
         ///   <br />
         /// </returns>
-        public XmlRpcResponse AddBankerMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
+        private XmlRpcResponse AddBankerMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             m_log.InfoFormat("[MONEY MODULE]: AddBankerMoneyHandler:");
 
@@ -1333,7 +1345,7 @@ namespace OpenSim.Modules.Currency
         /// <returns>
         ///   <br />
         /// </returns>
-        public XmlRpcResponse SendMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
+        private XmlRpcResponse SendMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             bool ret = false;
 
@@ -1404,7 +1416,7 @@ namespace OpenSim.Modules.Currency
         /// <returns>
         ///   <br />
         /// </returns>
-        public XmlRpcResponse MoveMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
+        private XmlRpcResponse MoveMoneyHandler(XmlRpcRequest request, IPEndPoint remoteClient)
         {
             bool ret = false;
 
