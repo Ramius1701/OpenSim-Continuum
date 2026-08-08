@@ -50,6 +50,7 @@ namespace OpenSim.Grid.MoneyServer
 {
     class MoneyXmlRpcModule : MoneyDBService, IMoneyDBService
     {
+        private const int MaxPublicRequestBodyBytes = 64 * 1024;
         // ##################     Initial          ##################
         #region Setup Initial
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -389,11 +390,7 @@ namespace OpenSim.Grid.MoneyServer
             try
             {
                 // XML-String aus Anfrage lesen
-                string requestBody;
-                using (var reader = new StreamReader(httpRequest.InputStream, Encoding.UTF8))
-                {
-                    requestBody = reader.ReadToEnd();
-                }
+                string requestBody = ReadBoundedRequestBody(httpRequest);
 
                 // XML-Daten parsen
                 XmlDocument doc = new XmlDocument
@@ -674,9 +671,7 @@ namespace OpenSim.Grid.MoneyServer
 
             try
             {
-                string requestBody;
-                using (StreamReader reader = new StreamReader(httpRequest.InputStream, Encoding.UTF8))
-                    requestBody = reader.ReadToEnd();
+                string requestBody = ReadBoundedRequestBody(httpRequest);
 
                 XmlDocument doc = new XmlDocument
                 {
@@ -1261,6 +1256,32 @@ namespace OpenSim.Grid.MoneyServer
                 return string.Empty;
 
             return values[key].ToString();
+        }
+
+        private static string ReadBoundedRequestBody(IOSHttpRequest request)
+        {
+            if (request == null || request.InputStream == null)
+                throw new InvalidDataException("The request body is unavailable.");
+
+            if (request.ContentLength64 > MaxPublicRequestBodyBytes)
+                throw new InvalidDataException("The request body is too large.");
+
+            using (MemoryStream body = new MemoryStream())
+            {
+                byte[] buffer = new byte[4096];
+                int total = 0;
+                int read;
+                while ((read = request.InputStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > MaxPublicRequestBodyBytes)
+                        throw new InvalidDataException("The request body is too large.");
+
+                    body.Write(buffer, 0, read);
+                }
+
+                return Encoding.UTF8.GetString(body.ToArray());
+            }
         }
 
         private static int GetHashtableInt(Hashtable values, string key)
