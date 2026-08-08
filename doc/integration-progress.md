@@ -1,10 +1,10 @@
 # OpenSim Continuum integration progress
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
-Branch: `codex/complete-opensim-feature-set`
+Branch: protected `master`; active hardening branch `agent/complete-runtime-readiness`
 
-OpenSim Dev base: `247b9182c1ca0f11743de06a2808f003bc8e2a90`
+OpenSim upstream synchronized through `a87969840ce2abde50309229347fe7257456e62e`
 
 This ledger distinguishes code completion from runtime certification. A feature
 is not production-approved merely because it compiles or passes an isolated
@@ -27,7 +27,8 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 | GroupAutoInvite | Optional module is packaged; delayed requests are bounded, shutdown unsubscribes events, and failed service requests remain retryable | Complete Release build succeeds with 0 warnings and 0 errors | Verify membership, invitation authorization, crossings, logout, Groups outage/recovery and Hypergrid visitor policy |
 | OpenSimMarketplace | Optional Direct Delivery service is packaged; request/body/inventory limits, operation idempotency, durable receipt ledger, placeholder-secret rejection and handler teardown are present | Complete Release build succeeds with 0 warnings and 0 errors | Deploy behind HTTPS and run forged request, nested inventory, permissions, duplicate delivery, restart, outage and website/MySQL workflow tests |
 | HoloPhysicsGuard | Optional conservative physics sleeper is packaged and disabled/report-only by default; timer re-entry and interval overflow are bounded | Complete Release build succeeds with 0 warnings and 0 errors | PersistSleep remains MySQL/MariaDB-only; run native-physics false-positive, restart, database-loss and multi-region tests before any provider expansion |
-| Other recovered addons | Remaining documented optional components are packaged | Complete Release build succeeds | Run each addon's handoff matrix and keep it disabled unless selected |
+| RegionCurrency | Optional compatibility web portal is packaged but is not a ledger/backend; it now defaults purchases and transfers off, treats invalid buy modes as disabled, requires HTTPS, bounds authentication settings and requires a second acknowledgement for experimental PayPal code | Clean complete Release build succeeds with four known CS9193 warnings and zero errors | Test only against one explicitly selected compatible `IMoneyModule`; do not enable beside another portal/economy path. PayPal remains sandbox-only experimental work and outside ContinuumEconomy/MoneyServer certification |
+| Other recovered addons | RegionWeb and Windows first-run tooling remain documented and disabled/experimental | Complete Release build succeeds | Finish their HTTP/tooling boundary review and run each handoff matrix |
 
 ## ContinuumEconomy verified commits
 
@@ -42,7 +43,8 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 - `20f1729fb3`: order land settlement, require an exact committed debit and preserve zero-price sales.
 - `f336752f69`: refresh test-only adapters for current Dev interfaces.
 
-The latest complete Release build passed with zero warnings and zero errors.
+The latest clean complete Release build passed with the four known CS9193
+warnings and zero errors after synchronizing official OpenSimulator master.
 Generated
 `bin/*.runtimeconfig.json` files and `.audit/` material are build/test artifacts
 and intentionally remain untracked.

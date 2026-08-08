@@ -27,12 +27,16 @@
     ; own PublicPath - they no longer share a path or a login.
     PublicPath = /currency
 
+    ; Require HTTPS and mark wallet cookies Secure. Set false only on a
+    ; trusted private listener behind a correctly isolated TLS proxy.
+    RequireHttps = true
+
     ; Estate title shown in page titles/nav (same value you'd set in
     ; RegionWeb's own config, if you're running both).
     EstateTitle = My OpenSim Estate
 
-    CurrencyBuyEnabled = true
-    CurrencyTransferEnabled = true
+    CurrencyBuyEnabled = false
+    CurrencyTransferEnabled = false
 
     ; Login token settings (avatar requests a one-time code via in-world
     ; IM, then enters it here).
@@ -47,7 +51,7 @@
     ;   and you trust the local buy button, e.g. no real money involved).
     ; request: creates a pending request an estate admin must approve.
     ; paypal: routes purchases through PayPal Checkout (see below).
-    CurrencyBuyMode = grant
+    CurrencyBuyMode = disabled
     CurrencyPurchaseStorage = Currency/regioncurrency-purchases.tsv
 
     ; --- PayPal (only used when CurrencyBuyMode = paypal) ---
@@ -55,6 +59,9 @@
     ; credentials. Get sandbox credentials from developer.paypal.com before
     ; ever setting PayPalEnvironment = live.
     PayPalEnabled = false
+    ; Separate acknowledgement required before real-money code can run.
+    ; PayPal is experimental and is not ContinuumEconomy or MoneyServer.
+    AllowRealMoneyIntegration = false
     PayPalEnvironment = sandbox
     PayPalClientID =
     PayPalClientSecret =
