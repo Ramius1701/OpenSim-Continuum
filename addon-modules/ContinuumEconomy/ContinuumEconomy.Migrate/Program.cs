@@ -204,7 +204,7 @@ namespace ContinuumEconomy.Migrate
             }
 
             EconomyBackend backend = EconomyProviderFactory.Create(providerName, connectionString);
-            EconomyAcceptanceSuite.Run(backend.Ledger, backend.Purchases, Console.WriteLine);
+            EconomyAcceptanceSuite.Run(backend.Ledger, backend.Accounts, backend.Purchases, Console.WriteLine);
             Console.WriteLine("ContinuumEconomy {0} acceptance self-test passed. Test rows use unique UUIDs and were intentionally retained for auditability.", backend.Provider);
             return 0;
         }

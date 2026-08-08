@@ -10,10 +10,10 @@ module. It does not load this assembly and has no ContinuumEconomy switch.
 ContinuumEconomy requires its own service executable, configuration and region
 connector before it can be deployed.
 
-The first assembly provides atomic MySQL and SQLite ledgers with deterministic
+The first assembly provides atomic MySQL, PostgreSQL and SQLite ledgers with deterministic
 account locking, unique transaction IDs, request fingerprints, idempotent
 results, 64-bit balances, and independent tables that cannot alter a deployed
-legacy MoneyServer database. PostgreSQL remains a release blocker.
+legacy MoneyServer database.
 
 Administrative credits, group accounts, scheduled payments, legacy RPC adapters
 and the region module will be added behind explicit service authorization. A
@@ -59,10 +59,9 @@ not appear in the process command line.
 `CONTINUUM_ECONOMY_STORAGE_PROVIDER` selects `MySQL`, `PostgreSQL`, or `SQLite`
 and defaults to `MySQL` for the current migration utility. Provider aliases use
 the same names as OpenSim (`OpenSim.Data.MySQL.dll`,
-`OpenSim.Data.PGSQL.dll`, and `OpenSim.Data.SQLite.dll`). SQLite is implemented
-and passes the shared `EconomyAcceptanceSuite`. PostgreSQL fails explicitly;
-there is no silent fallback to MySQL, and it remains a release blocker until
-its implementation passes the same suite.
+`OpenSim.Data.PGSQL.dll`, and `OpenSim.Data.SQLite.dll`). All three providers
+implement the same ledger, account and purchase contracts and pass the shared
+`EconomyAcceptanceSuite`; there is no silent provider fallback.
 
 The `import` operation additionally requires all of these literal flags:
 

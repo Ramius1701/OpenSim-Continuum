@@ -51,42 +51,42 @@ namespace OpenSim.Continuum.Economy
                     new MySqlEconomyLedger(connectionString),
                     new MySqlEconomyAccountService(connectionString),
                     new MySqlEconomyPurchaseService(connectionString)),
-                EconomyStorageProvider.PostgreSql => throw MissingProvider(provider),
+                EconomyStorageProvider.PostgreSql => CreatePostgreSql(provider, connectionString),
                 EconomyStorageProvider.SQLite => CreateSQLite(provider, connectionString),
                 _ => throw new ArgumentOutOfRangeException(nameof(provider))
             };
         }
 
-        private static EconomyBackend CreateSQLite(EconomyStorageProvider provider,string connectionString)
+        private static EconomyBackend CreateSQLite(EconomyStorageProvider provider, string connectionString)
         {
-            SQLiteEconomyStore store=new(connectionString);
-            return new EconomyBackend(provider,new SQLiteEconomyLedger(store),
-                new SQLiteEconomyAccountService(store),new SQLiteEconomyPurchaseService(store));
+            SQLiteEconomyStore store = new(connectionString);
+            return new EconomyBackend(provider, new SQLiteEconomyLedger(store),
+                new SQLiteEconomyAccountService(store), new SQLiteEconomyPurchaseService(store));
+        }
+
+        private static EconomyBackend CreatePostgreSql(EconomyStorageProvider provider, string connectionString)
+        {
+            PostgreSqlEconomyStore store = new(connectionString);
+            return new EconomyBackend(provider, new PostgreSqlEconomyLedger(store),
+                new PostgreSqlEconomyAccountService(store), new PostgreSqlEconomyPurchaseService(store));
         }
 
         public static bool IsDedicatedTestDatabase(string providerName, string connectionString)
         {
-            switch(Parse(providerName))
+            switch (Parse(providerName))
             {
                 case EconomyStorageProvider.MySql:
                     return ContainsTest(new MySqlConnectionStringBuilder(connectionString).Database);
                 case EconomyStorageProvider.PostgreSql:
                     return ContainsTest(new NpgsqlConnectionStringBuilder(connectionString).Database);
                 case EconomyStorageProvider.SQLite:
-                    SQLiteConnectionStringBuilder sqlite=new(connectionString);
+                    SQLiteConnectionStringBuilder sqlite = new(connectionString);
                     return sqlite.DataSource != ":memory:" && ContainsTest(sqlite.DataSource);
                 default: return false;
             }
         }
 
         private static bool ContainsTest(string value) => !String.IsNullOrWhiteSpace(value) &&
-            value.IndexOf("test",StringComparison.OrdinalIgnoreCase)>=0;
-
-        private static NotSupportedException MissingProvider(EconomyStorageProvider provider)
-        {
-            return new NotSupportedException(
-                $"ContinuumEconomy {provider} storage is not implemented or certified. " +
-                "The service will not fall back to another database provider.");
-        }
+            value.IndexOf("test", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }

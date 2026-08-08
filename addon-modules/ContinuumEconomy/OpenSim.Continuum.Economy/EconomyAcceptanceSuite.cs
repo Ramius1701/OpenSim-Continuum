@@ -9,13 +9,16 @@ namespace OpenSim.Continuum.Economy
     /// </summary>
     public static class EconomyAcceptanceSuite
     {
-        public static void Run(IEconomyLedger ledger, IEconomyPurchaseService purchases,
+        public static void Run(IEconomyLedger ledger, IEconomyAccountService accounts,
+            IEconomyPurchaseService purchases,
             Action<string> report = null)
         {
             if (ledger == null)
                 throw new ArgumentNullException(nameof(ledger));
             if (purchases == null)
                 throw new ArgumentNullException(nameof(purchases));
+            if (accounts == null)
+                throw new ArgumentNullException(nameof(accounts));
 
             ledger.ValidateSchema();
             Guid actor = Guid.NewGuid();
@@ -89,6 +92,23 @@ namespace OpenSim.Continuum.Economy
             Require(purchases.Capture(purchaseID, buyer).State == LedgerPurchaseState.Captured &&
                 ledger.GetBalance(buyer) == 5, "purchase capture", report);
             Require(ledger.CountHistory(buyer, null, null) >= 3, "account history", report);
+
+            Guid registrationID = Guid.NewGuid();
+            LedgerAccountRegistrationRequest registration = new()
+            {
+                OperationID = registrationID,
+                AccountID = Guid.NewGuid(),
+                ActorID = actor,
+                AccountType = LedgerAccountType.Group,
+                DisplayName = "Continuum provider acceptance group"
+            };
+            Require(accounts.Register(registration, out _) == LedgerResultCode.Committed,
+                "account registration", report);
+            Require(accounts.Register(registration, out _) == LedgerResultCode.Replayed,
+                "account registration replay", report);
+            registration.DisplayName = "Conflicting acceptance group";
+            Require(accounts.Register(registration, out _) == LedgerResultCode.TransactionConflict,
+                "account registration fingerprint conflict", report);
         }
 
         private static void Require(bool condition, string test, Action<string> report)
