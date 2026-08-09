@@ -177,9 +177,11 @@ namespace osWebRtcVoice
                     throw new Exception("Unknown channel type: " + pChannelType);
             }   
             BHash hashed = hasher.Finish();
-            // The "Abs()" is because Janus room number must be a positive integer
-            // And note that this is the BHash.GetHashCode() and not Object.getHashCode().
-            int roomNumber = Math.Abs(hashed.GetHashCode());
+            // Janus room numbers must be positive. Masking avoids the
+            // Math.Abs(int.MinValue) overflow edge case.
+            int roomNumber = hashed.GetHashCode() & int.MaxValue;
+            if (roomNumber == 0)
+                roomNumber = 1;
             return roomNumber;
         }
 
@@ -223,8 +225,11 @@ namespace osWebRtcVoice
 
             if (existingRoom is not null)
             {
-                // The room we created was already created by someone else. Delete ours and use the existing one
-                await DestroyRoom(ret).ConfigureAwait(false);
+                // Deterministic room IDs refer to the same server-side room. A
+                // concurrent creator may receive "already exists" and build a
+                // second local wrapper; destroying that wrapper's room would
+                // also destroy the winner's shared Janus room.
+                ret?.Dispose();
                 return existingRoom;
             }
 

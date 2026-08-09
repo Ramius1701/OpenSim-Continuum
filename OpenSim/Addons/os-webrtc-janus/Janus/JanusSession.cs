@@ -137,11 +137,12 @@ namespace osWebRtcVoice
                 {
                     // Note that setting IsConnected to false will cause the long poll to exit
                     m_log.Debug($"{LogHeader} DestroySession. Destroyed");
+                    ret = true;
 //                    Debug("{0} DestroySession. Destroyed", LogHeader);
                 }
                 else
                 {
-                    if (resp.isError)
+                    if (resp is not null && resp.isError)
                     {
                         ErrorResp eResp = new(resp);
                         switch (eResp.errorCode)
@@ -149,6 +150,7 @@ namespace osWebRtcVoice
                             case 458:
                                 // This is the error code for a session that is already destroyed
                                 m_log.Debug($"{LogHeader} DestroySession: session already destroyed");
+                                ret = true;
 //                                DebugLog("{0} DestroySession: session already destroyed", LogHeader);
                                 break;
                             case 459:
@@ -648,7 +650,7 @@ namespace osWebRtcVoice
                                         m_log.DebugFormat("{0} EventLongPoll: error {1}", LogHeader, resp.ToString());
                                         if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest))
                                         {
-                                            outstandingRequest.TaskCompletionSource.SetResult(resp);
+                                            outstandingRequest.TaskCompletionSource.TrySetResult(resp);
                                         }
                                         else
                                         {
@@ -661,7 +663,7 @@ namespace osWebRtcVoice
                                         if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest2))
                                         {
                                             // Someone is waiting for this event
-                                            outstandingRequest2.TaskCompletionSource.SetResult(resp);
+                                            outstandingRequest2.TaskCompletionSource.TrySetResult(resp);
                                         }
                                         else
                                         {
