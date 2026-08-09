@@ -38,9 +38,14 @@ namespace OpenSim.Region.ClientStack.Linden
             m_Enabled = config != null && config.GetBoolean("Enabled", false);
             if (config != null)
             {
-                m_MaxScreenshotBytes = Math.Max(0, config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes));
-                m_MaxReportRequestBytes = Math.Max(1024,
-                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes));
+                m_MaxScreenshotBytes = Math.Clamp(
+                    config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes),
+                    0,
+                    20 * 1024 * 1024);
+                m_MaxReportRequestBytes = Math.Clamp(
+                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes),
+                    1024,
+                    1024 * 1024);
             }
 
             if (m_Enabled)
@@ -229,6 +234,10 @@ namespace OpenSim.Region.ClientStack.Linden
                 UUID screenshotID = map.ContainsKey("screenshot-id")
                     ? map["screenshot-id"].AsUUID()
                     : UUID.Zero;
+                Scene reportScene = m_Scene;
+                IAbuseReportsService reportConnector = m_Connector;
+                if (reportScene == null || reportConnector == null)
+                    throw new InvalidOperationException("Abuse reports module was removed during upload setup");
 
                 BinaryStreamHandler uploader = null;
                 uploader = new BinaryStreamHandler(
@@ -238,31 +247,46 @@ namespace OpenSim.Region.ClientStack.Linden
                     {
                         caps.HttpListener.RemoveStreamHandler("POST", uploadPath);
 
-                        report.ImageData = data ?? Array.Empty<byte>();
-
                         OSDMap uploadResponse = new OSDMap();
-                        if (report.ImageData.Length > m_MaxScreenshotBytes)
+                        try
+                        {
+                            report.ImageData = data ?? Array.Empty<byte>();
+
+                            if (!ReferenceEquals(m_Scene, reportScene) ||
+                                !ReferenceEquals(m_Connector, reportConnector))
+                            {
+                                uploadResponse["state"] = "failed";
+                            }
+                            else if (report.ImageData.Length > m_MaxScreenshotBytes)
+                            {
+                                m_log.WarnFormat(
+                                    "[ABUSE REPORTS]: Rejected {0}-byte screenshot from {1}; limit is {2} bytes",
+                                    report.ImageData.Length,
+                                    report.SenderName,
+                                    m_MaxScreenshotBytes);
+                                uploadResponse["state"] = "failed";
+                            }
+                            else if (reportConnector.ReportAbuse(report))
+                            {
+                                m_log.InfoFormat(
+                                    "[ABUSE REPORTS]: {0} reported {1} with screenshot in {2}",
+                                    report.SenderName,
+                                    report.AbuserName,
+                                    report.AbuseRegionName);
+
+                                uploadResponse["state"] = "complete";
+                                uploadResponse["new_asset"] = screenshotID;
+                            }
+                            else
+                            {
+                                uploadResponse["state"] = "failed";
+                            }
+                        }
+                        catch (Exception e)
                         {
                             m_log.WarnFormat(
-                                "[ABUSE REPORTS]: Rejected {0}-byte screenshot from {1}; limit is {2} bytes",
-                                report.ImageData.Length,
-                                report.SenderName,
-                                m_MaxScreenshotBytes);
-                            uploadResponse["state"] = "failed";
-                        }
-                        else if (m_Connector.ReportAbuse(report))
-                        {
-                            m_log.InfoFormat(
-                                "[ABUSE REPORTS]: {0} reported {1} with screenshot in {2}",
-                                report.SenderName,
-                                report.AbuserName,
-                                report.AbuseRegionName);
-
-                            uploadResponse["state"] = "complete";
-                            uploadResponse["new_asset"] = screenshotID;
-                        }
-                        else
-                        {
+                                "[ABUSE REPORTS]: Failed to store screenshot report: {0}",
+                                e);
                             uploadResponse["state"] = "failed";
                         }
 

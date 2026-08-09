@@ -488,8 +488,8 @@ registries:
     ExternalHostName = "vanilla-sim.com"
     ServerURI = "http://vanilla-sim.com:9000"
     AuthType = "BasicHttpAuthentication"
-    HttpAuthUsername = "plipbadalippHH"
-    HttpAuthPassword = "cTm78eVf5Lk2gBje8hyfdr1116gbh6"
+    HttpAuthUsername = "<issued-by-grid-operator>"
+    HttpAuthPassword = "<issued-by-grid-operator>"
     Regions = ""
     Location = ""
     TimeoutSeconds = 5

@@ -47,6 +47,8 @@ namespace OpenSim.Server.Handlers.GridUser
 {
     public class MuteListServerPostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 64 * 1024;
+        private const int MaxMuteNameLength = 255;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IMuteListService m_service;
@@ -60,16 +62,11 @@ namespace OpenSim.Server.Handlers.GridUser
         protected override byte[] ProcessRequest(string path, Stream requestData,
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
-
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
             string method = string.Empty;
 
             try
             {
+                string body = ReadBoundedBody(requestData, httpRequest).Trim();
                 Dictionary<string, object> request =
                         ServerUtils.ParseQueryString(body);
 
@@ -111,6 +108,8 @@ namespace OpenSim.Server.Handlers.GridUser
                     return FailureResult();
 
             byte[] data = m_service.MuteListRequest(agentID, mutecrc);
+            if (data == null)
+                return FailureResult();
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             result["result"] = Convert.ToBase64String(data);
@@ -137,6 +136,8 @@ namespace OpenSim.Server.Handlers.GridUser
             if(request.ContainsKey("mutename"))
             {
                 mute.MuteName = request["mutename"].ToString();
+                if (mute.MuteName.Length > MaxMuteNameLength)
+                    return FailureResult();
             }
             else
                mute.MuteName = String.Empty;
@@ -185,12 +186,35 @@ namespace OpenSim.Server.Handlers.GridUser
             if(request.ContainsKey("mutename"))
             {
                 muteName = request["mutename"].ToString();
+                if (muteName.Length > MaxMuteNameLength)
+                    return FailureResult();
 
             }
             else
                muteName = String.Empty;
 
             return m_service.RemoveMute(agentID, muteID, muteName) ? SuccessResult() : FailureResult();
+        }
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using MemoryStream body = new MemoryStream();
+            byte[] buffer = new byte[4096];
+            int total = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > MaxRequestBodyBytes)
+                    throw new InvalidDataException("Request body exceeds the service limit.");
+                body.Write(buffer, 0, read);
+            }
+            return Encoding.UTF8.GetString(body.ToArray());
         }
 
         private byte[] SuccessResult()

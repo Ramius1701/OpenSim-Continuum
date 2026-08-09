@@ -97,10 +97,10 @@ namespace OpenSim.Data.MySQL
                 "`ModeratorNotes`=?ModeratorNotes, `ModeratorID`=?ModeratorID, " +
                 "`ModeratorName`=?ModeratorName, `LastUpdated`=?LastUpdated " +
                 "WHERE `ReportID`=?ReportID";
-            cmd.Parameters.AddWithValue("Status", status);
-            cmd.Parameters.AddWithValue("ModeratorNotes", notes);
+            cmd.Parameters.AddWithValue("Status", status ?? string.Empty);
+            cmd.Parameters.AddWithValue("ModeratorNotes", notes ?? string.Empty);
             cmd.Parameters.AddWithValue("ModeratorID", moderatorID.ToString());
-            cmd.Parameters.AddWithValue("ModeratorName", moderatorName);
+            cmd.Parameters.AddWithValue("ModeratorName", moderatorName ?? string.Empty);
             cmd.Parameters.AddWithValue("LastUpdated", lastUpdated);
             cmd.Parameters.AddWithValue("ReportID", reportID);
             return ExecuteNonQuery(cmd) > 0;

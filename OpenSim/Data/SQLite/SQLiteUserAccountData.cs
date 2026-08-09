@@ -44,7 +44,7 @@ namespace OpenSim.Data.SQLite
 
         public UserAccountData[] GetUsers(UUID scopeID, string query)
         {
-            string[] words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);;
+            string[] words = (query ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
             for (int i = 0 ; i < words.Length ; i++)
             {
@@ -63,14 +63,19 @@ namespace OpenSim.Data.SQLite
             {
                 if (words.Length == 1)
                 {
-                    cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' or LastName like '{2}%' or DisplayName like '{2}%')",
-                        m_Realm, scopeID.ToString(), words[0]);
+                    cmd.CommandText = String.Format("select * from {0} where (ScopeID=:ScopeID or ScopeID=:UUIDZero) and (FirstName like :search or LastName like :search or DisplayName like :search)", m_Realm);
+                    cmd.Parameters.AddWithValue(":search", words[0] + "%");
                 }
                 else
                 {
-                    cmd.CommandText = String.Format("select * from {0} where (ScopeID='{1}' or ScopeID='00000000-0000-0000-0000-000000000000') and (FirstName like '{2}%' and LastName like '{3}%' or DisplayName like '{2}% {3}%')",
-                        m_Realm, scopeID.ToString(), words[0], words[1]);
+                    cmd.CommandText = String.Format("select * from {0} where (ScopeID=:ScopeID or ScopeID=:UUIDZero) and (FirstName like :searchFirst and LastName like :searchLast or DisplayName like :searchDisplay)", m_Realm);
+                    cmd.Parameters.AddWithValue(":searchFirst", words[0] + "%");
+                    cmd.Parameters.AddWithValue(":searchLast", words[1] + "%");
+                    cmd.Parameters.AddWithValue(":searchDisplay", words[0] + "% " + words[1] + "%");
                 }
+
+                cmd.Parameters.AddWithValue(":ScopeID", scopeID.ToString());
+                cmd.Parameters.AddWithValue(":UUIDZero", UUID.Zero.ToString());
 
                 return DoQuery(cmd);
             }

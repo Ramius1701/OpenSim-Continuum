@@ -12,7 +12,8 @@ modernized into, or used as a host for, ContinuumEconomy.
 | `OpenSim.Modules.Currency` | Compatibility region `IMoneyModule`, viewer events, land/object/script payment integration and callbacks. | Preserve for MoneyServer Compatibility; implement a separately named Continuum region connector. |
 | `MoneyServer` | Independent compatibility service, XML-RPC/helper endpoints, policy and stipends. | Preserve as MoneyServer Compatibility; do not load ContinuumEconomy. |
 | `OpenSim.Data.MySQL.MySQLMoneyDataWrapper` | Legacy balances, users, transactions and sales tables. | Read-only import/reconciliation source after cutover; never silently mix ledgers. |
-| RegionCurrency | Optional wallet, purchase and administration presentation. | Client of authenticated economy APIs, never direct ledger owner. |
+| RegionWeb | Canonical optional website, wallet, purchase and administration presentation. | Client of authenticated economy APIs, never direct ledger owner. |
+| RegionCurrency | Deprecated compatibility copy from the earlier split. | Disabled whenever RegionWeb is enabled; never a direct ledger owner. |
 
 ## Legacy endpoint surface
 

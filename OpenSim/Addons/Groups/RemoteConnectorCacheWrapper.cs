@@ -75,6 +75,12 @@ namespace OpenSim.Groups
             m_ForeignImporter = new ForeignImporter(uman);
         }
 
+        private void CompleteRequest(string cacheKey)
+        {
+            lock (m_Cache)
+                m_ActiveRequests.Remove(cacheKey);
+        }
+
         public UUID CreateGroup(UUID RequestingAgentID, GroupRecordDelegate d)
         {
             //m_log.DebugFormat("[Groups.RemoteConnector]: Creating group {0}", name);
@@ -100,6 +106,9 @@ namespace OpenSim.Groups
             //reason = string.Empty;
             //ExtendedGroupRecord group = m_GroupsService.UpdateGroup(RequestingAgentID, groupID, charter, showInList, insigniaID, membershipFee, openEnrollment, allowPublish, maturePublish);
             ExtendedGroupRecord group = d();
+
+            if (group == null)
+                return false;
 
             if (!group.GroupID.IsZero())
                 m_Cache.AddOrUpdate("group-" + group.GroupID.ToString(), group, GROUPS_CACHE_TIMEOUT);
@@ -155,7 +164,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -245,7 +254,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -290,7 +299,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -334,7 +343,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -380,12 +389,13 @@ namespace OpenSim.Groups
                         else
                             members = new List<GroupMembersData>();
 
-                        m_Cache.AddOrUpdate(cacheKey, _members, GROUPS_CACHE_TIMEOUT);
+                        m_Cache.AddOrUpdate(cacheKey,
+                            _members ?? new List<ExtendedGroupMembersData>(), GROUPS_CACHE_TIMEOUT);
                         return (List<GroupMembersData>)members;
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -488,10 +498,12 @@ namespace OpenSim.Groups
                             m_Cache.AddOrUpdate(cacheKey, roles, GROUPS_CACHE_TIMEOUT);
                             return (List<GroupRolesData>)roles;
                         }
+
+                        return new List<GroupRolesData>();
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -541,12 +553,13 @@ namespace OpenSim.Groups
                         //m_Cache.AddOrUpdate(cacheKey, rmembers, GROUPS_CACHE_TIMEOUT);
                         // Caching the list of ExtendedGroupRoleMembersData doesn't show that issue
                         // I don't get it.
-                        m_Cache.AddOrUpdate(cacheKey, _rmembers, GROUPS_CACHE_TIMEOUT);
+                        m_Cache.AddOrUpdate(cacheKey,
+                            _rmembers ?? new List<ExtendedGroupRoleMembersData>(), GROUPS_CACHE_TIMEOUT);
                         return (List<GroupRoleMembersData>)rmembers;
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -661,7 +674,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -758,7 +771,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else
@@ -803,7 +816,7 @@ namespace OpenSim.Groups
                     }
                     finally
                     {
-                        m_ActiveRequests.Remove(cacheKey);
+                        CompleteRequest(cacheKey);
                     }
                 }
                 else

@@ -17,5 +17,8 @@ namespace OpenSim.Data.SQLite
 
         protected override DbConnection CreateConnection() =>
             new SQLiteConnection(m_connectionString);
+
+        protected override string KeyValueSizeExpression =>
+            "LENGTH(CAST(key AS BLOB)) + LENGTH(CAST(value AS BLOB))";
     }
 }

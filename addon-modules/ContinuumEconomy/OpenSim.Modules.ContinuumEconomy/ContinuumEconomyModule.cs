@@ -376,6 +376,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 scene.EventManager.OnLandBuy -= processLandBuy;
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
+                scene.UnregisterModuleInterface<IMoneyModule>(this);
 
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
@@ -450,7 +451,12 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </summary>
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = new List<Scene>(m_sceneList.Values).ToArray();
 
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         /// <summary>Objects the give money.</summary>
@@ -552,9 +558,12 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="amount">The amount.</param>
         public bool UploadCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
-            if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+            if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
             {
                 int balance = QueryBalanceFromMoneyServer(client);
                 if (balance >= amount) return true;
@@ -571,9 +580,12 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="amount">The amount.</param>
         public bool AmountCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
-            if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+            if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
             {
                 int balance = QueryBalanceFromMoneyServer(client);
                 if (balance >= amount) return true;
@@ -1069,7 +1081,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         {
             if (user != null)
             {
-                if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+                if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
                 {
                     //Scene s = GetLocateScene(user.AgentId);
                     Scene s = (Scene)user.Scene;
@@ -1647,6 +1659,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID,
             ulong regionHandle, UUID regionUUID, string description, UUID transactionID = default)
         {
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+                return false;
+
             bool ret = false;
 
             if (m_enable_server)
@@ -1700,6 +1715,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool SendMoneyTo(UUID avatarID, int amount, int type, string secretCode)
         {
+            if (avatarID == UUID.Zero || amount < 0)
+                return false;
+
             bool ret = false;
 
             if (m_enable_server)
@@ -1758,6 +1776,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool MoveMoneyFromTo(UUID senderID, UUID receiverID, int amount, string secretCode)
         {
+            if (senderID == UUID.Zero || receiverID == UUID.Zero || senderID == receiverID || amount < 0)
+                return false;
+
             bool ret = false;
 
             if (m_enable_server)
@@ -1803,6 +1824,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool AddBankerMoney(UUID bankerID, int amount, ulong regionHandle, UUID regionUUID)
         {
+            if (bankerID == UUID.Zero || amount < 0)
+                return false;
+
             bool ret = false;
             m_settle_user = false;
 
@@ -1855,6 +1879,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool PayMoneyCharge(UUID sender, int amount, int type, ulong regionHandle, UUID regionUUID, string description)
         {
+            if (sender == UUID.Zero || amount < 0)
+                return false;
+
             bool ret = false;
             IClientAPI senderClient = GetLocateClient(sender);
 

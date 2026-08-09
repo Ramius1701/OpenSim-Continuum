@@ -141,6 +141,13 @@ namespace osWebRtcVoice
             {
                 m_log.Error($"{LogHeader} Detach: exception", e);
             }
+            finally
+            {
+                if (_JanusSession.PluginId == PluginId)
+                    _JanusSession.PluginId = null;
+                PluginId = null;
+                PluginUri = null;
+            }
 
             return ret;
         }   

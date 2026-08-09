@@ -26,6 +26,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
         private bool m_Enabled = false;
 
         private IExperienceService m_remoteConnector;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         public Type ReplaceableInterface
         {
@@ -67,21 +69,48 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
 
         public void Close()
         {
+            if (!m_Enabled)
+                return;
+
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                scene.UnregisterModuleInterface<IExperienceService>(this);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            scene.RegisterModuleInterface<IExperienceService>(this);
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
+
+                scene.RegisterModuleInterface<IExperienceService>(this);
+            }
+
             m_log.InfoFormat("[EXPERIENCE CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+            }
 
             scene.UnregisterModuleInterface<IExperienceService>(this);
         }

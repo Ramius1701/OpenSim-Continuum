@@ -45,6 +45,7 @@ namespace OpenSim.Services.UserAccountService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static UserAccountService m_RootInstance;
+        private readonly object m_DisplayNameUpdateLock = new object();
 
         /// <summary>
         /// Should we create default entries (minimum body parts/clothing, avatar wearable entries) for a new avatar?
@@ -401,15 +402,31 @@ namespace OpenSim.Services.UserAccountService
 
         public bool SetDisplayName(UUID agentID, string displayName)
         {
-            var account = GetUserAccount(UUID.Zero, agentID);
-
-            if (account is null)
+            displayName = (displayName ?? string.Empty).Trim();
+            if (displayName.Length > 31 || displayName.IndexOfAny(['\r', '\n', '\t']) >= 0)
                 return false;
 
-            account.DisplayName = displayName;
-            account.NameChanged = Utils.GetUnixTime();
+            // Rename throttling is an authoritative grid invariant. Simulator
+            // caches can be stale and two simulators can receive requests at
+            // the same time, so enforce and store under one service lock.
+            lock (m_DisplayNameUpdateLock)
+            {
+                var account = GetUserAccount(UUID.Zero, agentID);
+                if (account is null)
+                    return false;
 
-            return StoreUserAccount(account);
+                uint now = Utils.GetUnixTime();
+                const uint renameIntervalSeconds = 7 * 24 * 60 * 60;
+                if (account.NameChanged > 0 &&
+                    (ulong)now < (ulong)account.NameChanged + renameIntervalSeconds)
+                {
+                    return false;
+                }
+
+                account.DisplayName = displayName;
+                account.NameChanged = now;
+                return StoreUserAccount(account);
+            }
         }
 
         #endregion

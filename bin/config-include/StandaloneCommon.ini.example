@@ -396,7 +396,11 @@
     ;LevelHGFriends = 0;
 
 [Messaging]
-
+    ;; Empty OfflineMessageURL selects the local datastore-backed service.
+    OfflineMessageModule = "Offline Message Module V2"
+    OfflineMessageURL =
+    ForwardOfflineGroupMessages = true
+    MuteListModule = MuteListModule
 
 [EntityTransfer]
     ;; User level from which local users are allowed to HG teleport. Default 0 (all users)

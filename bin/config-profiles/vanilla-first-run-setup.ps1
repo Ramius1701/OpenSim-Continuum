@@ -1,8 +1,13 @@
 param(
-    [int]$Port = 9090
+    [int]$Port = 9090,
+    [switch]$UnsafeExperimental
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $UnsafeExperimental) {
+    throw "The recovered first-run wizard is quarantined experimental tooling. It can overwrite simulator configuration and persist setup credentials. Configure Continuum manually for production. Developers auditing the recovered wizard must explicitly pass -UnsafeExperimental."
+}
 
 $ProfileRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $BinRoot = Split-Path -Parent $ProfileRoot
@@ -263,14 +268,14 @@ function Read-Settings($Form) {
         AvatarPassword = $avatarPassword
         AvatarEmail = (Get-FormValue $Form "avatar_email" "").Trim()
         FeatureMaps = Get-FormBool $Form "feature_maps" $true
-        FeatureRegionWeb = Get-FormBool $Form "feature_regionweb" $true
-        FeatureWeather = Get-FormBool $Form "feature_weather" $true
-        FeatureCurrency = Get-FormBool $Form "feature_currency" $true
+        FeatureRegionWeb = Get-FormBool $Form "feature_regionweb" $false
+        FeatureWeather = Get-FormBool $Form "feature_weather" $false
+        FeatureCurrency = Get-FormBool $Form "feature_currency" $false
         FeatureGroups = Get-FormBool $Form "feature_groups" $true
         FeatureTextBuild = Get-FormBool $Form "feature_textbuild" $true
-        FeatureMultiGrid = Get-FormBool $Form "feature_multigrid" $true
+        FeatureMultiGrid = Get-FormBool $Form "feature_multigrid" $false
         FeatureScripts = Get-FormBool $Form "feature_scripts" $true
-        FeaturePhysics = Get-FormBool $Form "feature_physics" $true
+        FeaturePhysics = Get-FormBool $Form "feature_physics" $false
         FeatureOfflineIM = Get-FormBool $Form "feature_offlineim" $true
     }
 }

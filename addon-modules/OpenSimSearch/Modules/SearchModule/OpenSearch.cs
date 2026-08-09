@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Threading;
 using System.Xml;
 using OpenMetaverse;
 using log4net;
@@ -37,10 +38,12 @@ namespace OpenSimSearch.Modules.OpenSearch
         //
         // Module vars
         //
-        private List<Scene> m_Scenes = new();
+        private readonly List<Scene> m_Scenes = new();
         private string m_SearchServer = "";
         private bool m_Enabled = true;
         private int m_RequestTimeoutMs = 5000;
+        private int m_MaxConcurrentRequests = 8;
+        private int m_ActiveRequests;
 
         #region IRegionModuleBase implementation
         public void Initialise(IConfigSource config)
@@ -58,22 +61,32 @@ namespace OpenSimSearch.Modules.OpenSearch
                 return;
             }
 
-            m_SearchServer = searchConfig.GetString("SearchURL", "");
-            if (m_SearchServer == "")
+            m_SearchServer = searchConfig.GetString("SearchURL", "").Trim();
+            if (!Uri.TryCreate(m_SearchServer, UriKind.Absolute, out Uri searchUri) ||
+                (searchUri.Scheme != Uri.UriSchemeHttp && searchUri.Scheme != Uri.UriSchemeHttps))
             {
+                m_log.Error("[SEARCH] SearchURL must be an absolute HTTP or HTTPS URL; module disabled");
                 m_Enabled = false;
                 return;
             }
+
+            if (searchUri.Scheme != Uri.UriSchemeHttps)
+                m_log.Warn("[SEARCH] SearchURL is not HTTPS; queries and results can be observed or modified in transit");
 
             m_RequestTimeoutMs = Math.Clamp(
                 searchConfig.GetInt("RequestTimeoutMs", m_RequestTimeoutMs),
                 1000,
                 30000);
+            m_MaxConcurrentRequests = Math.Clamp(
+                searchConfig.GetInt("MaxConcurrentRequests", m_MaxConcurrentRequests),
+                1,
+                64);
 
             m_log.InfoFormat(
-                "[SEARCH] OpenSimSearch module is active; endpoint {0}, timeout {1}ms",
+                "[SEARCH] OpenSimSearch module is active; endpoint {0}, timeout {1}ms, concurrency {2}",
                 m_SearchServer,
-                m_RequestTimeoutMs);
+                m_RequestTimeoutMs,
+                m_MaxConcurrentRequests);
             m_Enabled = true;
         }
 
@@ -82,17 +95,18 @@ namespace OpenSimSearch.Modules.OpenSearch
             if (!m_Enabled)
                 return;
 
-            // Hook up events
-            scene.EventManager.OnNewClient += OnNewClient;
-
-            // Take ownership of the ISearchModule service
-            scene.RegisterModuleInterface<ISearchModule>(this);
-
-            // Add our scene to our list...
+            bool added;
             lock(m_Scenes)
             {
-                m_Scenes.Add(scene);
+                added = !m_Scenes.Contains(scene);
+                if (added)
+                    m_Scenes.Add(scene);
             }
+            if (!added)
+                return;
+
+            scene.EventManager.OnNewClient += OnNewClient;
+            scene.RegisterModuleInterface<ISearchModule>(this);
         }
 
         public void RemoveRegion(Scene scene)
@@ -103,6 +117,7 @@ namespace OpenSimSearch.Modules.OpenSearch
             scene.UnregisterModuleInterface<ISearchModule>(this);
 
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(UnsubscribeClient);
 
             lock(m_Scenes)
             {
@@ -125,6 +140,11 @@ namespace OpenSimSearch.Modules.OpenSearch
 
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_Scenes)
+                scenes = m_Scenes.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         public string Name
@@ -141,16 +161,78 @@ namespace OpenSimSearch.Modules.OpenSearch
         /// New Client Event Handler
         private void OnNewClient(IClientAPI client)
         {
-            // Subscribe to messages
-            client.OnDirPlacesQuery += DirPlacesQuery;
-            client.OnDirFindQuery += DirFindQuery;
-            client.OnDirPopularQuery += DirPopularQuery;
-            client.OnDirLandQuery += DirLandQuery;
-            client.OnDirClassifiedQuery += DirClassifiedQuery;
-            // Response after Directory Queries
-            client.OnEventInfoRequest += EventInfoRequest;
-            client.OnClassifiedInfoRequest += ClassifiedInfoRequest;
-            client.OnMapItemRequest += HandleMapItemRequest;
+            client.OnDirPlacesQuery += OnDirPlacesQuery;
+            client.OnDirFindQuery += OnDirFindQuery;
+            client.OnDirPopularQuery += OnDirPopularQuery;
+            client.OnDirLandQuery += OnDirLandQuery;
+            client.OnDirClassifiedQuery += OnDirClassifiedQuery;
+            client.OnEventInfoRequest += OnEventInfoRequest;
+            client.OnClassifiedInfoRequest += OnClassifiedInfoRequest;
+            client.OnMapItemRequest += OnMapItemRequest;
+        }
+
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            client.OnDirPlacesQuery -= OnDirPlacesQuery;
+            client.OnDirFindQuery -= OnDirFindQuery;
+            client.OnDirPopularQuery -= OnDirPopularQuery;
+            client.OnDirLandQuery -= OnDirLandQuery;
+            client.OnDirClassifiedQuery -= OnDirClassifiedQuery;
+            client.OnEventInfoRequest -= OnEventInfoRequest;
+            client.OnClassifiedInfoRequest -= OnClassifiedInfoRequest;
+            client.OnMapItemRequest -= OnMapItemRequest;
+        }
+
+        private void OnDirPlacesQuery(IClientAPI remote, UUID query, string text, int flags, int category, string sim, int start) =>
+            ExecuteSearchRequest(remote, "places", () => DirPlacesQuery(remote, query, text, flags, category, sim, start));
+        private void OnDirFindQuery(IClientAPI remote, UUID query, string text, uint flags, int start) =>
+            ExecuteSearchRequest(remote, "directory", () => DirFindQuery(remote, query, text, flags, start));
+        private void OnDirPopularQuery(IClientAPI remote, UUID query, uint flags) =>
+            ExecuteSearchRequest(remote, "popular", () => DirPopularQuery(remote, query, flags));
+        private void OnDirLandQuery(IClientAPI remote, UUID query, uint flags, uint type, int price, int area, int start) =>
+            ExecuteSearchRequest(remote, "land", () => DirLandQuery(remote, query, flags, type, price, area, start));
+        private void OnDirClassifiedQuery(IClientAPI remote, UUID query, string text, uint flags, uint category, int start) =>
+            ExecuteSearchRequest(remote, "classifieds", () => DirClassifiedQuery(remote, query, text, flags, category, start));
+        private void OnEventInfoRequest(IClientAPI remote, uint eventID) =>
+            ExecuteSearchRequest(remote, "event details", () => EventInfoRequest(remote, eventID));
+        private void OnClassifiedInfoRequest(UUID classifiedID, IClientAPI remote) =>
+            ExecuteSearchRequest(remote, "classified details", () => ClassifiedInfoRequest(classifiedID, remote));
+        private void OnMapItemRequest(IClientAPI remote, uint flags, uint estate, bool godlike, uint type, ulong handle) =>
+            ExecuteSearchRequest(remote, "map items", () => HandleMapItemRequest(remote, flags, estate, godlike, type, handle));
+
+        private void ExecuteSearchRequest(IClientAPI client, string operation, Action request)
+        {
+            int activeRequests = Interlocked.Increment(ref m_ActiveRequests);
+            if (activeRequests > m_MaxConcurrentRequests)
+            {
+                Interlocked.Decrement(ref m_ActiveRequests);
+                m_log.WarnFormat(
+                    "[SEARCH]: Rejected {0} request because {1} backend requests are already active",
+                    operation,
+                    m_MaxConcurrentRequests);
+                client.SendAgentAlertMessage("Search is busy. Please try again.", false);
+                return;
+            }
+
+            // An external search service may consume the complete timeout. Keep
+            // that wait off the simulator client-event thread, while bounding
+            // work so a failed backend cannot exhaust the shared worker pool.
+            Util.FireAndForget(_ =>
+            {
+                try
+                {
+                    request();
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[SEARCH]: Rejected malformed {0} response: {1}", operation, e.Message);
+                    client.SendAgentAlertMessage("Unable to search at this time.", false);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref m_ActiveRequests);
+                }
+            }, null, $"OpenSimSearch.{operation}");
         }
 
         //
@@ -202,7 +284,7 @@ namespace OpenSimSearch.Modules.OpenSearch
                     ex);
                 return ErrorResponse();
             }
-            if (Resp.IsFault)
+            if (Resp == null || Resp.IsFault)
                 return ErrorResponse();
             if (Resp.Value is not Hashtable respData)
             {
@@ -213,7 +295,50 @@ namespace OpenSimSearch.Modules.OpenSearch
                 return ErrorResponse();
             }
 
+            if (!TryGetBoolean(respData, "success", out bool success) || !success)
+                return ErrorResponse();
+            if (respData["data"] is not ArrayList responseData)
+            {
+                m_log.ErrorFormat(
+                    "[SEARCH]: Search Server {0} returned invalid data for {1}",
+                    m_SearchServer,
+                    method);
+                return ErrorResponse();
+            }
+
+            // Viewer directory replies use at most 100 entries plus a paging
+            // sentinel. Never allow an external backend to drive unbounded
+            // per-request iteration or allocation in the simulator.
+            if (responseData.Count > 101)
+            {
+                ArrayList bounded = new(101);
+                for (int i = 0; i < 101; ++i)
+                    bounded.Add(responseData[i]);
+                respData["data"] = bounded;
+            }
+
+            respData["success"] = true;
             return respData;
+        }
+
+        private static bool TryGetBoolean(Hashtable data, string key, out bool value)
+        {
+            value = false;
+            if (data == null || !data.ContainsKey(key) || data[key] == null)
+                return false;
+            try
+            {
+                value = Convert.ToBoolean(data[key], CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
+            catch (InvalidCastException)
+            {
+                return false;
+            }
         }
 
         private static Hashtable ErrorResponse()
@@ -630,7 +755,11 @@ namespace OpenSimSearch.Modules.OpenSearch
 
                     ParcelRegionUUID = d["region_UUID"].ToString();
 
-                    foreach (Scene scene in m_Scenes)
+                    Scene[] scenes;
+                    lock (m_Scenes)
+                        scenes = m_Scenes.ToArray();
+
+                    foreach (Scene scene in scenes)
                     {
                         if (scene.RegionInfo.RegionID.ToString() == ParcelRegionUUID)
                         {

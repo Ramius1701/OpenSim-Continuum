@@ -17,6 +17,7 @@ namespace OpenSim.Services.Connectors
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private string m_ServerURI = string.Empty;
+        private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
 
         public AbuseReportsServicesConnector()
         {
@@ -42,13 +43,23 @@ namespace OpenSim.Services.Connectors
             if (string.IsNullOrWhiteSpace(serviceURI))
                 throw new Exception("[ABUSE REPORTS CONNECTOR]: AbuseReportsServerURI is not configured");
 
+            IConfig abuseConfig = source.Configs["AbuseReports"];
+            if (abuseConfig != null)
+            {
+                m_MaxScreenshotBytes = Math.Clamp(
+                    abuseConfig.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes),
+                    0,
+                    20 * 1024 * 1024);
+            }
+
             SetServerURI(serviceURI);
             base.Initialise(source, "AbuseReportsService");
         }
 
         public bool ReportAbuse(AbuseReportData report)
         {
-            if (report == null || string.IsNullOrEmpty(m_ServerURI))
+            if (report == null || string.IsNullOrEmpty(m_ServerURI)
+                || (report.ImageData?.Length ?? 0) > m_MaxScreenshotBytes)
                 return false;
 
             Dictionary<string, object> sendData = new Dictionary<string, object>
@@ -76,6 +87,9 @@ namespace OpenSim.Services.Connectors
 
         public AbuseReportData GetReport(int reportID, bool includeImage)
         {
+            if (reportID < 1)
+                return null;
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "get",
@@ -88,6 +102,11 @@ namespace OpenSim.Services.Connectors
 
         public AbuseReportData[] GetReports(int start, int count, string status)
         {
+            if (start < 0 || count < 1)
+                return Array.Empty<AbuseReportData>();
+
+            count = Math.Min(count, 200);
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "list",
@@ -109,6 +128,9 @@ namespace OpenSim.Services.Connectors
         public bool UpdateReport(int reportID, string status, string notes,
             UUID moderatorID, string moderatorName)
         {
+            if (reportID < 1)
+                return false;
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "update",
@@ -126,7 +148,17 @@ namespace OpenSim.Services.Connectors
             if (string.IsNullOrWhiteSpace(serverURI))
                 throw new ArgumentException("Abuse reports server URI cannot be empty", nameof(serverURI));
 
-            m_ServerURI = serverURI.TrimEnd('/') + "/abuse";
+            string candidate = serverURI.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(uri.Host))
+            {
+                throw new ArgumentException(
+                    "Abuse reports server URI must be an absolute HTTP or HTTPS URL",
+                    nameof(serverURI));
+            }
+
+            m_ServerURI = candidate + "/abuse";
         }
 
         private bool DoSimplePost(string requestString, string method)
@@ -154,7 +186,7 @@ namespace OpenSim.Services.Connectors
                 }
 
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                if (!replyData.ContainsKey("result"))
+                if (replyData == null || !replyData.ContainsKey("result"))
                 {
                     m_log.WarnFormat(
                         "[ABUSE REPORTS CONNECTOR]: {0} reply did not contain a result field",
@@ -179,7 +211,7 @@ namespace OpenSim.Services.Connectors
                 string.Equals(result?.ToString(), "success", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static AbuseReportData ParseReport(Dictionary<string, object> data, string prefix)
+        private AbuseReportData ParseReport(Dictionary<string, object> data, string prefix)
         {
             AbuseReportData report = new AbuseReportData();
             TryGetInt(data, prefix + "id", out report.ReportID);
@@ -204,8 +236,30 @@ namespace OpenSim.Services.Connectors
             report.ModeratorNotes = GetString(data, prefix + "notes");
             report.ModeratorName = GetString(data, prefix + "moderator-name");
             string image = GetString(data, prefix + "image-data");
-            report.ImageData = string.IsNullOrEmpty(image) ? Array.Empty<byte>() : Convert.FromBase64String(image);
+            report.ImageData = TryDecodeImage(image);
             return report;
+        }
+
+        private byte[] TryDecodeImage(string image)
+        {
+            if (string.IsNullOrEmpty(image))
+                return Array.Empty<byte>();
+
+            // Base64 expands three bytes into four characters. Reject before
+            // allocating the decoded array, allowing a small padding margin.
+            long maximumEncodedLength = ((long)m_MaxScreenshotBytes + 2L) / 3L * 4L;
+            if (image.Length > maximumEncodedLength)
+                return Array.Empty<byte>();
+
+            try
+            {
+                byte[] decoded = Convert.FromBase64String(image);
+                return decoded.Length <= m_MaxScreenshotBytes ? decoded : Array.Empty<byte>();
+            }
+            catch (FormatException)
+            {
+                return Array.Empty<byte>();
+            }
         }
 
         private static bool TryGetInt(Dictionary<string, object> data, string key, out int value)

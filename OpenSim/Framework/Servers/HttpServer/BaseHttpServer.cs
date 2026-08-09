@@ -360,10 +360,14 @@ namespace OpenSim.Framework.Servers.HttpServer
 
         public void AddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false)
         {
+            TryAddSimpleStreamHandler(handler, varPath);
+        }
+
+        public bool TryAddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false)
+        {
             if (varPath)
-                m_simpleStreamVarPath.TryAdd(handler.Path, handler);
-            else
-                m_simpleStreamHandlers.TryAdd(handler.Path, handler);
+                return m_simpleStreamVarPath.TryAdd(handler.Path, handler);
+            return m_simpleStreamHandlers.TryAdd(handler.Path, handler);
         }
 
         public void AddWebSocketHandler(string servicepath, WebSocketRequestDelegate handler)

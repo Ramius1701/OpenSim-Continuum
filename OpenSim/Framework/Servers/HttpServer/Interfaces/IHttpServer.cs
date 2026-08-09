@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Collections.Generic;
 using Nwc.XmlRpc;
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -76,6 +77,8 @@ namespace OpenSim.Framework.Servers.HttpServer
         /// <param name="handler"></param>
         void AddStreamHandler(IRequestHandler handler);
         void AddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
+        bool TryAddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
+        List<string> GetSimpleStreamHandlerKeys();
 
         bool AddXmlRPCHandler(string method, XmlRpcMethod handler);
         bool AddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive);

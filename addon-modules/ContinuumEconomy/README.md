@@ -26,8 +26,9 @@ Donor lineage:
 - DTL/NSL MoneyServer: deployed protocol and region compatibility base.
 - WhiteCore `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`: behavioural reference for
   user/group accounting, history, fees, purchase controls and scheduling.
-- Gunthar-derived RegionCurrency: optional wallet/admin interface; its local
-  file ledger is not used as the grid authority.
+- Gunthar-derived RegionWeb: canonical optional website/wallet/admin interface;
+  its local request files are not used as the grid authority. RegionCurrency is
+  retained only as a deprecated compatibility copy from the earlier split.
 - Continuum: independent transactional implementation and hardening.
 
 Gloebit is excluded. Use a separate production-test deployment and complete

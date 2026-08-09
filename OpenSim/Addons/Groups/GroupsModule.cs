@@ -185,9 +185,6 @@ namespace OpenSim.Groups
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_groupsEnabled)
-                return;
-
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             scene.EventManager.OnNewClient -= OnNewClient;
@@ -195,6 +192,14 @@ namespace OpenSim.Groups
             scene.EventManager.OnMakeChildAgent -= OnMakeChild;
             scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             scene.EventManager.OnClientClosed -= OnClientClosed;
+            scene.UnregisterModuleInterface<IGroupsModule>(this);
+
+            scene.ForEachClient(client =>
+            {
+                client.OnAgentDataUpdateRequest -= OnAgentDataUpdateRequest;
+                client.OnUUIDGroupNameRequest -= HandleUUIDGroupNameRequest;
+                client.OnInstantMessage -= OnInstantMessage;
+            });
 
             lock (m_sceneList)
             {
@@ -204,10 +209,14 @@ namespace OpenSim.Groups
 
         public void Close()
         {
-            if (!m_groupsEnabled)
-                return;
-
             if (m_debugEnabled) m_log.Debug("[Groups]: Shutting down Groups module.");
+
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = m_sceneList.ToArray();
+
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         public Type ReplaceableInterface
@@ -277,6 +286,8 @@ namespace OpenSim.Groups
                 return;
 
             ScenePresence sp = scene.GetScenePresence(AgentId);
+            if (sp == null)
+                return;
             IClientAPI client = sp.ControllingClient;
             if (client != null)
             {
@@ -1259,8 +1270,15 @@ namespace OpenSim.Groups
                 }
                 else
                 {
-                    regionInfo = m_sceneList[0].RegionInfo;
-                    UserAccount acc = m_sceneList[0].UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
+                    Scene scene = GetAnyScene();
+                    if (scene == null)
+                    {
+                        m_log.WarnFormat("[Groups]: Cannot notify eject operation for {0}; no region is available", agentID);
+                        return;
+                    }
+
+                    regionInfo = scene.RegionInfo;
+                    UserAccount acc = scene.UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
 
                     if (acc != null)
                     {
@@ -1277,7 +1295,7 @@ namespace OpenSim.Groups
             if ((groupInfo == null))
                 return;
 
-            UserData udata = m_sceneList[0].UserManagementModule.GetUserData(ejecteeID);
+            UserData udata = m_UserManagement?.GetUserData(ejecteeID);
             IClientAPI ejecteeClient = GetActiveRootClient(ejecteeID);
 
             string ejecteeName;
@@ -1361,22 +1379,35 @@ namespace OpenSim.Groups
         // and send the actual invite IM.
         public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
         {
+            TryInviteGroup(remoteClient, agentID, groupID, invitedAgentID, roleID, message);
+        }
+
+        public bool TryInviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
+        {
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             string agentName = m_UserManagement.GetUserName(agentID);
-            RegionInfo regionInfo = m_sceneList[0].RegionInfo;
+            Scene scene = remoteClient?.Scene as Scene ?? GetAnyScene();
+            if (scene == null)
+            {
+                m_log.WarnFormat("[Groups]: Cannot send invitation for group {0}; no region is available", groupID);
+                return false;
+            }
+            RegionInfo regionInfo = scene.RegionInfo;
 
             GroupRecord group = m_groupData.GetGroupRecord(agentID.ToString(), groupID, null);
             if (group == null)
             {
                 m_log.DebugFormat("[Groups]: No such group {0}", groupID);
-                return;
+                return false;
             }
 
             // Todo: Security check, probably also want to send some kind of notification
             UUID InviteID = UUID.Random();
 
-            if (m_groupData.AddAgentToGroupInvite(agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString()))
+            bool accepted = m_groupData.AddAgentToGroupInvite(
+                agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString());
+            if (accepted)
             {
                 if (m_msgTransferModule != null)
                 {
@@ -1408,6 +1439,7 @@ namespace OpenSim.Groups
                     OutgoingInstantMessage(msg, invitedAgentID);
                 }
             }
+            return accepted;
         }
 
         private static string FormatInviteMessage(string message, string inviterName, string groupName, string defaultMessage)
@@ -1428,9 +1460,21 @@ namespace OpenSim.Groups
         #endregion
 
         #region Client/Update Tools
+        private Scene[] GetScenesSnapshot()
+        {
+            lock (m_sceneList)
+                return m_sceneList.ToArray();
+        }
+
+        private Scene GetAnyScene()
+        {
+            lock (m_sceneList)
+                return m_sceneList.Count == 0 ? null : m_sceneList[0];
+        }
+
         private IClientAPI GetActiveRootClient(UUID agentID)
         {
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null && !sp.IsChildAgent && !sp.IsDeleted)
@@ -1449,7 +1493,7 @@ namespace OpenSim.Groups
             IClientAPI child = null;
 
             // Try root avatar first
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null&& !sp.IsDeleted)
@@ -1475,7 +1519,7 @@ namespace OpenSim.Groups
 
             ScenePresence presence = null;
 
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 presence = scene.GetScenePresence(AgentID);
                 if (presence != null)
@@ -1589,7 +1633,8 @@ namespace OpenSim.Groups
                 activeGroupName = membership.GroupName;
             }
 
-            UserAccount account = m_sceneList[0].UserAccountService.GetUserAccount(remoteClient.Scene.RegionInfo.ScopeID, agentID);
+            Scene requestScene = remoteClient.Scene as Scene ?? GetAnyScene();
+            UserAccount account = requestScene?.UserAccountService.GetUserAccount(remoteClient.Scene.RegionInfo.ScopeID, agentID);
             string firstname, lastname;
             if (account != null)
             {

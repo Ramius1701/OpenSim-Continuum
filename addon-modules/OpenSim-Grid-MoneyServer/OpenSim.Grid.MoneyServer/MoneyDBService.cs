@@ -85,6 +85,7 @@ namespace OpenSim.Grid.MoneyServer
         //}
 
         private const int MAX_ALLOWED_CONNECTIONS = 100;
+        private const int CONNECTION_WAIT_TIMEOUT_MILLISECONDS = 30000;
 
         // Ersetze die Methode Initialise, damit die Verbindungen im Pool korrekt angelegt werden.
         // Füge außerdem eine Schutzmaßnahme in GetLockedConnection hinzu, damit der Index nie außerhalb des Bereichs liegt.
@@ -131,6 +132,8 @@ namespace OpenSim.Grid.MoneyServer
                 }
 
                 int lockedCons = 0;
+                bool waitLogged = false;
+                Stopwatch waitTime = Stopwatch.StartNew();
                 while (true)
                 {
                     m_lastConnect++;
@@ -161,11 +164,24 @@ namespace OpenSim.Grid.MoneyServer
                     }
 
                     lockedCons++;
-                    if (lockedCons > m_maxConnections)
+                    if (lockedCons >= m_maxConnections)
                     {
                         lockedCons = 0;
-                        System.Threading.Thread.Sleep(2000);
-                        m_log.Warn("GetLockedConnection: All connections are in use. Probable cause: Something didn't release a mutex properly, or high volume of requests inbound.");
+                        if (waitTime.ElapsedMilliseconds >= CONNECTION_WAIT_TIMEOUT_MILLISECONDS)
+                        {
+                            throw new TimeoutException(
+                                $"No MoneyServer database connection became available within {CONNECTION_WAIT_TIMEOUT_MILLISECONDS / 1000} seconds.");
+                        }
+
+                        if (!waitLogged)
+                        {
+                            m_log.Warn("GetLockedConnection: All connections are in use; waiting up to 30 seconds for capacity.");
+                            waitLogged = true;
+                        }
+
+                        // Release the allocator lock while waiting so other
+                        // request threads can observe newly available managers.
+                        System.Threading.Monitor.Wait(connectionLock, 50);
                     }
                 }
             }
@@ -302,6 +318,12 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="amount">The amount.</param>
         public bool withdrawMoney(UUID transactionID, string senderID, int amount)
         {
+            if (transactionID == UUID.Zero || string.IsNullOrWhiteSpace(senderID) || amount < 0)
+            {
+                m_log.WarnFormat("[MONEY DB]: Rejected invalid debit request for transaction {0}.", transactionID);
+                return false;
+            }
+
             MySQLSuperManager dbm = GetLockedConnection();
 
             try
@@ -328,6 +350,12 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool giveMoney(UUID transactionID, string receiverID, int amount)
         {
+            if (transactionID == UUID.Zero || string.IsNullOrWhiteSpace(receiverID) || amount < 0)
+            {
+                m_log.WarnFormat("[MONEY DB]: Rejected invalid credit request for transaction {0}.", transactionID);
+                return false;
+            }
+
             MySQLSuperManager dbm = GetLockedConnection();
             try
             {
@@ -738,8 +766,6 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool BuyCurrency(string userID, int amount)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction.TransUUID = UUID.Random();
             transaction.Sender = UUID.Zero.ToString();  // System sender
@@ -757,10 +783,7 @@ namespace OpenSim.Grid.MoneyServer
 
             bool ret = addTransaction(transaction);
             if (!ret)
-            {
-                dbm.Release();
                 return false;
-            }
 
             try
             {
@@ -770,7 +793,6 @@ namespace OpenSim.Grid.MoneyServer
             catch (MySql.Data.MySqlClient.MySqlException e)
             {
                 m_log.Error("[BuyCurrency]: SQL Exception - " + e.ToString());
-                dbm.Manager.Reconnect();
                 ret = giveMoney(transaction.TransUUID, userID, amount);
             }
             catch (Exception e)
@@ -778,11 +800,6 @@ namespace OpenSim.Grid.MoneyServer
                 m_log.Error("[BuyCurrency]: Exception - " + e.ToString());
                 return false;
             }
-            finally
-            {
-                dbm.Release();
-            }
-
             if (ret)
             {
                 m_log.InfoFormat("[BuyCurrency]: Successfully bought currency for user {0} in amount {1}", userID, amount);
@@ -794,11 +811,10 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="transaction">The transaction.</param>
         public bool setTotalSale(TransactionData transaction)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             if (transaction.Receiver == transaction.Sender) return false;
             if (transaction.Sender == UUID.Zero.ToString()) return false;
 
+            MySQLSuperManager dbm = GetLockedConnection();
             int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
             try
             {
@@ -855,8 +871,6 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="type">The type.</param>
         public bool addUser(string userID, int balance, int status, int type)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction.TransUUID = UUID.Random();
             transaction.Sender = UUID.Zero.ToString();
@@ -874,11 +888,9 @@ namespace OpenSim.Grid.MoneyServer
 
             bool ret = addTransaction(transaction);
             if (!ret)
-            {
-                dbm.Release();
                 return false;
-            }
 
+            MySQLSuperManager dbm = GetLockedConnection();
             try
             {
                 ret = dbm.Manager.addUser(userID, 0, status, type);		// make Balance Table
@@ -931,6 +943,47 @@ namespace OpenSim.Grid.MoneyServer
             {
                 dbm.Release();
             }
+        }
+
+        public bool cancelPendingTransaction(UUID transactionID, string description)
+        {
+            if (transactionID == UUID.Zero)
+                return false;
+
+            MySQLSuperManager dbm = GetLockedConnection();
+            try
+            {
+                return ExecutePendingCancellation(dbm, transactionID, description);
+            }
+            catch (MySqlException e)
+            {
+                m_log.Error(e);
+                dbm.Manager.Reconnect();
+                return ExecutePendingCancellation(dbm, transactionID, description);
+            }
+            catch (Exception e)
+            {
+                m_log.Error(e);
+                return false;
+            }
+            finally
+            {
+                dbm.Release();
+            }
+        }
+
+        private static bool ExecutePendingCancellation(
+            MySQLSuperManager dbm, UUID transactionID, string description)
+        {
+            const string sql =
+                "UPDATE transactions SET status = ?failedStatus, description = ?description " +
+                "WHERE UUID = ?transactionID AND status = ?pendingStatus";
+            using MySqlCommand command = new MySqlCommand(sql, dbm.Manager.dbcon);
+            command.Parameters.AddWithValue("?failedStatus", (int)Status.FAILED_STATUS);
+            command.Parameters.AddWithValue("?description", description ?? string.Empty);
+            command.Parameters.AddWithValue("?transactionID", transactionID.ToString());
+            command.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
+            return command.ExecuteNonQuery() == 1;
         }
 
         /// <summary>Sets the trans expired.</summary>
@@ -1067,8 +1120,140 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool DoTransfer(UUID transactionUUID)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
+            TransactionData transaction = FetchTransaction(transactionUUID);
+            if (transaction == null || transaction.Status != (int)Status.PENDING_STATUS)
+            {
+                m_log.ErrorFormat("[MONEY DB]: Transaction {0} is missing or is no longer pending.", transactionUUID);
+                return false;
+            }
 
+            if (transaction.Sender == transaction.Receiver || transaction.Amount < 0)
+            {
+                m_log.ErrorFormat("[MONEY DB]: Invalid transfer {0}: sender, receiver or amount is not valid.", transactionUUID);
+                return false;
+            }
+
+            MySQLSuperManager dbm = GetLockedConnection();
+            MySqlTransaction dbTransaction = null;
+            try
+            {
+                MySqlConnection connection = dbm.Manager.dbcon;
+                dbTransaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted);
+
+                const string lockTransactionSql =
+                    "SELECT status FROM transactions WHERE UUID = ?transactionID FOR UPDATE";
+                using (MySqlCommand command = new MySqlCommand(lockTransactionSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?transactionID", transactionUUID.ToString());
+                    object status = command.ExecuteScalar();
+                    if (status == null || status == DBNull.Value ||
+                        Convert.ToInt32(status) != (int)Status.PENDING_STATUS)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                int senderBalance = -1;
+                int receiverBalance = -1;
+                const string lockBalancesSql =
+                    "SELECT user, balance FROM balances " +
+                    "WHERE user IN (?senderID, ?receiverID) FOR UPDATE";
+                using (MySqlCommand command = new MySqlCommand(lockBalancesSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?senderID", transaction.Sender);
+                    command.Parameters.AddWithValue("?receiverID", transaction.Receiver);
+                    using (MySqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string userID = Convert.ToString(reader["user"]);
+                            int balance = Convert.ToInt32(reader["balance"]);
+                            if (string.Equals(userID, transaction.Sender, StringComparison.OrdinalIgnoreCase))
+                                senderBalance = balance;
+                            else if (string.Equals(userID, transaction.Receiver, StringComparison.OrdinalIgnoreCase))
+                                receiverBalance = balance;
+                        }
+                    }
+                }
+
+                if (senderBalance < transaction.Amount || receiverBalance < 0 ||
+                    (long)receiverBalance + transaction.Amount > int.MaxValue)
+                {
+                    dbTransaction.Rollback();
+                    m_log.ErrorFormat("[MONEY DB]: Transfer {0} failed balance or account validation.", transactionUUID);
+                    return false;
+                }
+
+                int newSenderBalance = senderBalance - transaction.Amount;
+                int newReceiverBalance = receiverBalance + transaction.Amount;
+                const string updateBalanceSql =
+                    "UPDATE balances SET balance = ?balance WHERE user = ?userID";
+                using (MySqlCommand command = new MySqlCommand(updateBalanceSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?balance", newSenderBalance);
+                    command.Parameters.AddWithValue("?userID", transaction.Sender);
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+
+                    command.Parameters["?balance"].Value = newReceiverBalance;
+                    command.Parameters["?userID"].Value = transaction.Receiver;
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                const string completeSql =
+                    "UPDATE transactions SET senderBalance = ?senderBalance, " +
+                    "receiverBalance = ?receiverBalance, status = ?successStatus " +
+                    "WHERE UUID = ?transactionID AND status = ?pendingStatus";
+                using (MySqlCommand command = new MySqlCommand(completeSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?senderBalance", newSenderBalance);
+                    command.Parameters.AddWithValue("?receiverBalance", newReceiverBalance);
+                    command.Parameters.AddWithValue("?successStatus", (int)Status.SUCCESS_STATUS);
+                    command.Parameters.AddWithValue("?transactionID", transactionUUID.ToString());
+                    command.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                dbTransaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    dbTransaction?.Rollback();
+                }
+                catch
+                {
+                    // Preserve the original transfer failure.
+                }
+
+                m_log.ErrorFormat("[MONEY DB]: Atomic transfer {0} failed: {1}", transactionUUID, ex);
+                return false;
+            }
+            finally
+            {
+                dbTransaction?.Dispose();
+                dbm.Release();
+            }
+
+            setTotalSale(transaction);
+            return true;
+        }
+
+        private bool LegacyDoTransfer(UUID transactionUUID)
+        {
             bool do_trans = false;
 
             TransactionData transaction = new TransactionData();
@@ -1080,7 +1265,6 @@ namespace OpenSim.Grid.MoneyServer
                 if (transaction.Sender == transaction.Receiver)
                 {
                     m_log.ErrorFormat("[MONEY DB]: DoTransfer: Transfer von {0} zu sich selbst ist nicht erlaubt.", transaction.Sender);
-                    dbm.Release();
                     return false;
                 }
 
@@ -1089,16 +1273,17 @@ namespace OpenSim.Grid.MoneyServer
                 //check the amount
                 if (transaction.Amount >= 0 && balance >= transaction.Amount)
                 {
+                    // Validate the receiver before debiting the sender. The old
+                    // order returned here after a successful withdrawal and
+                    // permanently lost the sender's funds.
+                    if (getBalance(transaction.Receiver) == -1)
+                    {
+                        m_log.ErrorFormat("[MONEY DB]: DoTransfer: Receiver not found in balances table. {0}", transaction.Receiver);
+                        return false;
+                    }
+
                     if (withdrawMoney(transactionUUID, transaction.Sender, transaction.Amount))
                     {
-                        //If receiver not found, add it to DB.
-                        if (getBalance(transaction.Receiver) == -1)
-                        {
-                            m_log.ErrorFormat("[MONEY DB]: DoTransfer: Receiver not found in balances table. {0}", transaction.Receiver);
-                            dbm.Release();
-                            return false;
-                        }
-
                         if (giveMoney(transactionUUID, transaction.Receiver, transaction.Amount))
                         {
                             do_trans = true;
@@ -1141,8 +1326,6 @@ namespace OpenSim.Grid.MoneyServer
                 setTotalSale(transaction);
             }
 
-            dbm.Release();
-
             return do_trans;
         }
 
@@ -1151,25 +1334,21 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="transactionUUID">The transaction UUID.</param>
         public bool DoAddMoney(UUID transactionUUID)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction = FetchTransaction(transactionUUID);
 
-            if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS)
+            if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS && transaction.Amount >= 0)
             {
                 //If receiver not found, add it to DB.
                 if (getBalance(transaction.Receiver) == -1)
                 {
                     m_log.ErrorFormat("[MONEY DB]: DoAddMoney: Receiver not found in balances table. {0}", transaction.Receiver);
-                    dbm.Release();
                     return false;
                 }
                 //
                 if (giveMoney(transactionUUID, transaction.Receiver, transaction.Amount))
                 {
                     setTotalSale(transaction);
-                    dbm.Release();
                     return true;
                 }
                 else
@@ -1182,8 +1361,6 @@ namespace OpenSim.Grid.MoneyServer
             {	// Can not fetch the transaction or it has expired
                 m_log.ErrorFormat("[MONEY DB]: The transaction:{0} has expired", transactionUUID.ToString());
             }
-
-            dbm.Release();
 
             return false;
         }
@@ -1401,7 +1578,7 @@ namespace OpenSim.Grid.MoneyServer
         }
 
 
-        public bool PerformMoneyTransfer(string senderID, string receiverID, int amount)
+        private bool PerformMoneyTransfer(string senderID, string receiverID, int amount)
         {
             m_log.InfoFormat("[MONEY TRANSFER]: Transferring {0} from {1} to {2}.", amount, senderID, receiverID);
 
@@ -1439,7 +1616,7 @@ namespace OpenSim.Grid.MoneyServer
             }
         }
 
-        public void InitializeUserCurrency(string agentId)
+        private void InitializeUserCurrency(string agentId)
         {
             m_log.InfoFormat("[INITIALIZE USER CURRENCY]: Initializing currency for new user: {0}", agentId);
             int realMoney = 1000; // Beispielwert oder aus der MoneyServer.ini geladen
@@ -1467,7 +1644,7 @@ namespace OpenSim.Grid.MoneyServer
 
         }
 
-        public Hashtable ApplyFallbackCredit(string agentId)
+        private Hashtable ApplyFallbackCredit(string agentId)
         {
             m_log.WarnFormat("[FALLBACK CREDIT]: Applying fallback credit for user {0}", agentId);
 

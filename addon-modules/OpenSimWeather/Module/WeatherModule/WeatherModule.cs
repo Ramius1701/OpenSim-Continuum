@@ -26,6 +26,7 @@
  */
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
@@ -209,6 +210,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private Timer m_autoCycleTimer;
         private Timer m_autoCycleWarningTimer;
         private int m_autoCycleBusy;
+        private int m_autoCycleGeneration;
         private long m_nextAutoCycleTicks;
         private WeatherKind m_pendingAutoCycleWeather;
         private bool m_hasPendingAutoCycleWeather;
@@ -217,6 +219,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private bool m_sendWeatherIMOnEntry;
         private int m_weatherIMDelaySeconds;
         private string m_weatherIMMessage;
+        private readonly ConcurrentDictionary<UUID, Timer> m_pendingEntryIMs = new ConcurrentDictionary<UUID, Timer>();
         private readonly Dictionary<WeatherKind, EnvironmentProfile> m_environmentProfiles = new Dictionary<WeatherKind, EnvironmentProfile>();
         private bool m_surfaceEffectsEnabled;
         private bool m_puddlesEnabled;
@@ -443,6 +446,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             m_scene = scene;
             m_scene.EventManager.OnChatFromClient += OnChatFromClient;
             m_scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+            m_scene.EventManager.OnClientClosed += OnClientClosed;
             m_log.InfoFormat(
                 "[WEATHER]: Enabled in region {0} on channel {1}",
                 scene.RegionInfo.RegionName,
@@ -454,12 +458,14 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             StopAutoCycle();
             StopActiveAreaRefresh();
             StopSurfaceTimer();
+            CancelPendingEntryIMs();
 
             Scene activeScene = m_scene;
             if (activeScene != null)
             {
                 activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
                 activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                activeScene.EventManager.OnClientClosed -= OnClientClosed;
             }
 
             lock (m_weatherChangeSync)
@@ -517,6 +523,15 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             StopAutoCycle();
             StopActiveAreaRefresh();
             StopSurfaceTimer();
+            CancelPendingEntryIMs();
+
+            Scene activeScene = m_scene;
+            if (activeScene != null)
+            {
+                activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
+                activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                activeScene.EventManager.OnClientClosed -= OnClientClosed;
+            }
 
             lock (m_weatherChangeSync)
             {
@@ -542,17 +557,52 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 return;
 
             UUID agentID = sp.UUID;
-            Util.FireAndForget(
-                o =>
+            Timer timer = null;
+            timer = new Timer(
+                _ =>
                 {
-                    if (m_weatherIMDelaySeconds > 0)
-                        Thread.Sleep(m_weatherIMDelaySeconds * 1000);
-
-                    SendWeatherIM(agentID);
+                    if (m_pendingEntryIMs.TryRemove(agentID, out Timer pending))
+                    {
+                        pending.Dispose();
+                        try
+                        {
+                            SendWeatherIM(agentID);
+                        }
+                        catch (Exception e)
+                        {
+                            m_log.WarnFormat(
+                                "[WEATHER]: Failed to send entry forecast to {0}: {1}",
+                                agentID,
+                                e.Message);
+                        }
+                    }
                 },
                 null,
-                "WeatherModule.EntryIM",
-                false);
+                Timeout.Infinite,
+                Timeout.Infinite);
+
+            if (!m_pendingEntryIMs.TryAdd(agentID, timer))
+            {
+                timer.Dispose();
+                return;
+            }
+
+            timer.Change(m_weatherIMDelaySeconds * 1000, Timeout.Infinite);
+        }
+
+        private void OnClientClosed(UUID agentID, Scene scene)
+        {
+            if (m_pendingEntryIMs.TryRemove(agentID, out Timer timer))
+                timer.Dispose();
+        }
+
+        private void CancelPendingEntryIMs()
+        {
+            foreach (UUID agentID in m_pendingEntryIMs.Keys)
+            {
+                if (m_pendingEntryIMs.TryRemove(agentID, out Timer timer))
+                    timer.Dispose();
+            }
         }
 
         private void OnChatFromClient(object sender, OSChatMessage chat)
@@ -962,8 +1012,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 ? m_autoCycleStartupDelaySeconds * 1000
                 : AutoCycleIntervalMS();
 
-            m_autoCycleTimer = new Timer(AutoCycleTimerElapsed, null, Timeout.Infinite, Timeout.Infinite);
-            m_autoCycleWarningTimer = new Timer(AutoCycleForecastWarningElapsed, null, Timeout.Infinite, Timeout.Infinite);
+            int generation = Volatile.Read(ref m_autoCycleGeneration);
+            m_autoCycleTimer = new Timer(AutoCycleTimerElapsed, generation, Timeout.Infinite, Timeout.Infinite);
+            m_autoCycleWarningTimer = new Timer(AutoCycleForecastWarningElapsed, generation, Timeout.Infinite, Timeout.Infinite);
             ScheduleAutoCycle(dueTime);
 
             m_log.InfoFormat(
@@ -975,6 +1026,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void StopAutoCycle()
         {
+            Interlocked.Increment(ref m_autoCycleGeneration);
             Timer timer = m_autoCycleTimer;
             m_autoCycleTimer = null;
             Timer warningTimer = m_autoCycleWarningTimer;
@@ -987,11 +1039,16 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             Interlocked.Exchange(ref m_autoCycleBusy, 0);
             m_nextAutoCycleTicks = 0;
-            m_hasPendingAutoCycleWeather = false;
+            lock (m_sync)
+                m_hasPendingAutoCycleWeather = false;
         }
 
         private void AutoCycleTimerElapsed(object state)
         {
+            int generation = state is int value ? value : -1;
+            if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                return;
+
             if (Interlocked.Exchange(ref m_autoCycleBusy, 1) != 0)
                 return;
 
@@ -1004,6 +1061,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 WeatherKind weather;
                 lock (m_sync)
                 {
+                    if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                        return;
                     weather = m_hasPendingAutoCycleWeather ? m_pendingAutoCycleWeather : PickAutoCycleWeather();
                     m_hasPendingAutoCycleWeather = false;
                 }
@@ -1036,7 +1095,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             finally
             {
                 Interlocked.Exchange(ref m_autoCycleBusy, 0);
-                ScheduleNextAutoCycle();
+                if (generation == Volatile.Read(ref m_autoCycleGeneration))
+                    ScheduleNextAutoCycle();
             }
         }
 
@@ -1096,28 +1156,47 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void AutoCycleForecastWarningElapsed(object state)
         {
+            int generation = state is int value ? value : -1;
+            if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                return;
+
             Scene scene = m_scene;
             if (scene == null || string.IsNullOrEmpty(m_autoCycleForecastWarningMessage))
                 return;
 
-            WeatherKind nextWeather;
-            lock (m_sync)
+            try
             {
-                if (!m_hasPendingAutoCycleWeather)
+                WeatherKind nextWeather;
+                lock (m_sync)
                 {
-                    m_pendingAutoCycleWeather = PickAutoCycleWeather();
-                    m_hasPendingAutoCycleWeather = true;
+                    if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                        return;
+                    if (!m_hasPendingAutoCycleWeather)
+                    {
+                        m_pendingAutoCycleWeather = PickAutoCycleWeather();
+                        m_hasPendingAutoCycleWeather = true;
+                    }
+
+                    nextWeather = m_pendingAutoCycleWeather;
                 }
 
-                nextWeather = m_pendingAutoCycleWeather;
-            }
+                if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                    return;
 
-            string message = FormatForecastWarningMessage(scene, nextWeather);
-            scene.ForEachRootScenePresence(sp =>
+                string message = FormatForecastWarningMessage(scene, nextWeather);
+                scene.ForEachRootScenePresence(sp =>
+                {
+                    if (sp != null && !sp.IsDeleted && sp.ControllingClient != null)
+                        SendRegionWeatherMessage(sp, message);
+                });
+            }
+            catch (Exception e)
             {
-                if (sp != null && !sp.IsDeleted && sp.ControllingClient != null)
-                    SendRegionWeatherMessage(sp, message);
-            });
+                m_log.WarnFormat(
+                    "[WEATHER]: Forecast warning failed in {0}: {1}",
+                    scene.RegionInfo.RegionName,
+                    e.Message);
+            }
         }
 
         private int AutoCycleIntervalMS()

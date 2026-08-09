@@ -2165,7 +2165,7 @@ namespace OpenSim.Region.Framework.Scenes
                 AssetBase asset = CreateAsset(
                     itemBase.Name, itemBase.Description,
                     (sbyte)AssetType.LSLText,
-                    Encoding.ASCII.GetBytes(scriptText),
+                    Encoding.UTF8.GetBytes(scriptText),
                     agentID);
 
                 AssetService.Store(asset);
@@ -2872,7 +2872,8 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         fixrot = true;
                         sog = objlist[0];
-                        netRot = Quaternion.Conjugate(sog.RootPart.GetWorldRotation());
+                        Quaternion worldRotation = sog.RootPart.GetWorldRotation();
+                        netRot = Quaternion.Conjugate(in worldRotation);
                         netRot *= rot.Value;
                         Vector3 off;
                         if (atRoot)

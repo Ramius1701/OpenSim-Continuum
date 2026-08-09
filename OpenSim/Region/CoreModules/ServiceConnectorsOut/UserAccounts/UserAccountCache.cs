@@ -65,8 +65,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         private bool disposed;
         private void Dispose(bool disposing)
         {
-            if (!disposed)
+            lock(accessLock)
             {
+                if (disposed)
+                    return;
+
                 disposed = true;
                 m_UUIDCache.Dispose();
                 m_NameCache.Dispose();
@@ -80,6 +83,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
             // Cache even null accounts
             lock(accessLock)
             {
+                if (disposed)
+                    return;
+
                 if (account == null)
                     m_UUIDCache.AddOrUpdate(userID, null, CACHE_NULL_EXPIRATION_SECONDS);
                 else if(account.LocalToGrid)
@@ -100,6 +106,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             lock(accessLock)
             {
+                if (disposed)
+                {
+                    inCache = false;
+                    return null;
+                }
+
                 if (m_UUIDCache.TryGetValue(userID, out UserAccount account))
                 {
                     //m_log.DebugFormat("[USER CACHE]: Account {0} {1} found in cache", account.FirstName, account.LastName);
@@ -115,6 +127,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             lock(accessLock)
             {
+                if (disposed)
+                {
+                    inCache = false;
+                    return null;
+                }
+
                 if (m_NameCache.TryGetValue(name.ToLowerInvariant(), out UserAccount account))
                 {
                     inCache = true;
@@ -134,6 +152,9 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             lock(accessLock)
             {
+                if (disposed)
+                    return;
+
                 if (m_UUIDCache.TryGetValue(id, out UserAccount account))
                 {
                     m_UUIDCache.Remove(id);
@@ -145,11 +166,18 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         public void Remove(string name)
         {
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+
             lock(accessLock)
             {
-                if (m_NameCache.TryGetValue(name.ToLowerInvariant(), out UserAccount account))
+                if (disposed)
+                    return;
+
+                string normalizedName = name.ToLowerInvariant();
+                if (m_NameCache.TryGetValue(normalizedName, out UserAccount account))
                 {
-                    m_NameCache.Remove(name);
+                    m_NameCache.Remove(normalizedName);
                     if (account != null)
                         m_UUIDCache.Remove(account.PrincipalID);
                 }

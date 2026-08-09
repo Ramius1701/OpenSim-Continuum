@@ -23,12 +23,18 @@ namespace OpenSim.Services.AbuseReportsService
             : base(config)
         {
             IConfig serviceConfig = config.Configs["AbuseReportsService"];
-            m_MaxScreenshotBytes = Math.Max(0,
-                serviceConfig?.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024) ?? 5 * 1024 * 1024);
-            m_MaxSummaryBytes = Math.Max(256,
-                serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096);
-            m_MaxDetailsBytes = Math.Max(1024,
-                serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536);
+            m_MaxScreenshotBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024) ?? 5 * 1024 * 1024,
+                0,
+                20 * 1024 * 1024);
+            m_MaxSummaryBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096,
+                256,
+                64 * 1024);
+            m_MaxDetailsBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536,
+                1024,
+                1024 * 1024);
 
             m_log.Debug("[ABUSE REPORTS SERVICE]: Starting abuse reports service");
 
@@ -54,7 +60,15 @@ namespace OpenSim.Services.AbuseReportsService
             if (report == null)
                 return false;
 
+            Normalize(report);
+
             if (report.SenderID.IsZero() || report.AbuseRegionID.IsZero() ||
+                report.SenderName.Length > 64 ||
+                report.AbuseRegionName.Length > 45 ||
+                report.AbuserName.Length > 128 ||
+                report.Category.Length > 128 ||
+                report.Position.Length > 45 ||
+                report.Version.Length > 256 ||
                 Encoding.UTF8.GetByteCount(report.Summary ?? string.Empty) > m_MaxSummaryBytes ||
                 Encoding.UTF8.GetByteCount(report.Details ?? string.Empty) > m_MaxDetailsBytes ||
                 (report.ImageData?.Length ?? 0) > m_MaxScreenshotBytes)
@@ -68,8 +82,6 @@ namespace OpenSim.Services.AbuseReportsService
                     m_MaxScreenshotBytes);
                 return false;
             }
-
-            Normalize(report);
 
             try
             {

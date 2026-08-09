@@ -1453,6 +1453,11 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         // opensim, matching the same addition in Addons/Groups/GroupsModule.cs.
         public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
         {
+            TryInviteGroup(remoteClient, agentID, groupID, invitedAgentID, roleID, message);
+        }
+
+        public bool TryInviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
+        {
             if (m_debugEnabled) m_log.DebugFormat("[GROUPS]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             string agentName;
@@ -1476,8 +1481,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
                 }
                 else
                 {
-                    regionInfo = m_sceneList[0].RegionInfo;
-                    UserAccount account = m_sceneList[0].UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
+                    Scene scene = GetAnyScene();
+                    if (scene == null)
+                        return false;
+
+                    regionInfo = scene.RegionInfo;
+                    UserAccount account = scene.UserAccountService.GetUserAccount(regionInfo.ScopeID, agentID);
 
                     if (account != null)
                     {
@@ -1535,6 +1544,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
                     OutgoingInstantMessage(msg, invitedAgentID);
                 }
             }
+            return inviteInfo != null;
         }
 
         private static string FormatInviteMessage(string message, string inviterName, string groupName, string defaultMessage)
@@ -1557,9 +1567,21 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 
         #region Client/Update Tools
 
+        private Scene[] GetScenesSnapshot()
+        {
+            lock (m_sceneList)
+                return m_sceneList.ToArray();
+        }
+
+        private Scene GetAnyScene()
+        {
+            lock (m_sceneList)
+                return m_sceneList.Count == 0 ? null : m_sceneList[0];
+        }
+
         private IClientAPI GetActiveRootClient(UUID agentID)
         {
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null && !sp.IsChildAgent && !sp.IsDeleted)
@@ -1578,7 +1600,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
             IClientAPI child = null;
 
             // Try root avatar first
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null && !sp.IsDeleted)
@@ -1604,7 +1626,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 
             ScenePresence presence = null;
 
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 presence = scene.GetScenePresence(AgentID);
                 if (presence != null)

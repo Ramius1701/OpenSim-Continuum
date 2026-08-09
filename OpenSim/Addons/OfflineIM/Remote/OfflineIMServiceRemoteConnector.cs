@@ -48,11 +48,12 @@ namespace OpenSim.OfflineIM
 
         private string m_ServerURI = string.Empty;
         private IServiceAuth m_Auth;
-        private object m_Lock = new object();
+        private readonly object m_Lock = new object();
+        private int m_MaxReturnedMessages = 1000;
 
         public OfflineIMServiceRemoteConnector(string url)
         {
-            m_ServerURI = url;
+            m_ServerURI = ValidateServerUri(url);
             m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
         }
 
@@ -65,7 +66,11 @@ namespace OpenSim.OfflineIM
                 return;
             }
 
-            m_ServerURI = cnf.GetString("OfflineMessageURL", string.Empty);
+            m_ServerURI = ValidateServerUri(cnf.GetString("OfflineMessageURL", string.Empty));
+            m_MaxReturnedMessages = Math.Clamp(
+                cnf.GetInt("MaxOfflineIMs", 25),
+                0,
+                1000);
 
             /// This is from BaseServiceConnector
             string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", "Messaging" }, "None");
@@ -111,10 +116,27 @@ namespace OpenSim.OfflineIM
             {
                 foreach (object v in resultdic.Values)
                 {
+                    if (ims.Count >= m_MaxReturnedMessages)
+                        break;
+
                     if (v is Dictionary<string, object> vdic)
                     {
-                        GridInstantMessage m = OfflineIMDataUtils.GridInstantMessage(vdic);
-                        ims.Add(m);
+                        try
+                        {
+                            GridInstantMessage m = OfflineIMDataUtils.GridInstantMessage(vdic);
+                            if (m.toAgentID == principalID.Guid)
+                                ims.Add(m);
+                            else
+                                m_log.WarnFormat(
+                                    "[OfflineIM.V2.RemoteConnector]: Ignoring message returned for the wrong recipient");
+                        }
+                        catch (Exception ex)
+                        {
+                            m_log.WarnFormat(
+                                "[OfflineIM.V2.RemoteConnector]: Ignoring malformed message for {0}: {1}",
+                                principalID,
+                                ex.Message);
+                        }
                     }
                 }
             }
@@ -132,17 +154,15 @@ namespace OpenSim.OfflineIM
                 return false;
             }
 
-            if(ret.TryGetValue("RESULT", out object o))
+            if (!ret.TryGetValue("RESULT", out object o)
+                || !bool.TryParse(o?.ToString(), out bool stored)
+                || !stored)
             {
-                string result = o.ToString();
-                if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    if(ret.TryGetValue("REASON", out object ro))
-                        reason = ro.ToString();
-                    else
-                        reason = "Unknown error";
-                    return false;
-                }
+                if(ret.TryGetValue("REASON", out object ro))
+                    reason = ro.ToString();
+                else
+                    reason = "Offline message server did not confirm storage";
+                return false;
             }
 
             reason = string.Empty;
@@ -166,16 +186,35 @@ namespace OpenSim.OfflineIM
         {
             sendData["METHOD"] = method;
 
-            string reply = string.Empty;
-            lock (m_Lock)
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                         m_ServerURI + "/offlineim",
-                         ServerUtils.BuildQueryString(sendData),
-                         m_Auth);
+            try
+            {
+                string reply;
+                lock (m_Lock)
+                    reply = SynchronousRestFormsRequester.MakeRequest("POST",
+                             m_ServerURI + "/offlineim",
+                             ServerUtils.BuildQueryString(sendData),
+                             m_Auth);
 
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: {0} request failed: {1}", method, ex.Message);
+                return null;
+            }
+        }
 
-            return replyData;
+        private static string ValidateServerUri(string value)
+        {
+            string candidate = (value ?? string.Empty).Trim().TrimEnd('/');
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(uri.Host))
+            {
+                throw new ArgumentException("OfflineMessageURL must be an absolute HTTP or HTTPS URL");
+            }
+
+            return candidate;
         }
         #endregion
 

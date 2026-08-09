@@ -30,12 +30,20 @@ trust boundary.
     Module = "OpenSimSearch"
     SearchURL = "https://search.example.invalid/query"
     RequestTimeoutMs = 5000
+    MaxConcurrentRequests = 8
 ```
 
 `RequestTimeoutMs` is clamped to 1,000–30,000 milliseconds and defaults to five
-seconds. A failed, malformed, or unavailable endpoint returns an empty/failure
-result to the viewer instead of throwing from the client request path. Use HTTPS
-and do not put database credentials in simulator configuration.
+seconds. `SearchURL` must be an absolute HTTP(S) URL; HTTP produces an explicit
+transport warning. A failed, malformed, or unavailable endpoint returns a fixed
+failure message to the viewer instead of throwing from the client request path.
+Backend calls run away from the simulator client-event thread.
+`MaxConcurrentRequests` limits active and queued work to 1-64 requests (default
+8); excess viewer queries receive a short busy response instead of consuming an
+unbounded number of workers while the backend is slow or unavailable.
+Result processing is capped at the viewer's 100 entries plus paging sentinel,
+and region-list reads are synchronized with region removal. Use HTTPS and do not
+put database credentials in simulator configuration.
 
 Do not enable both `BasicSearchModule` and `OpenSimSearch` for the same region.
 Leave the default Basic module selected when no compatible external endpoint is
@@ -54,6 +62,7 @@ Test all of the following against the exact deployed backend:
 - hidden/private parcel and resident privacy rules;
 - two simulators publishing changes and observing the same results;
 - backend outage, timeout, malformed XML-RPC and oversized result behavior;
+- concurrency saturation without simulator client-event stalls;
 - Hypergrid inclusion/exclusion policy and foreign destination validation.
 
 Compilation alone does not certify an external search backend.

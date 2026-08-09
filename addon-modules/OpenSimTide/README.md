@@ -66,7 +66,10 @@ Remember you need an .ini file in bin/addon-modules/OpenSimTide/config/
 
 Continuum validates `TideUpdateRate` and `TideCycleTime`, swaps reversed low/high
 marks with a warning, and restores the original region water height on module
-shutdown by default. Keep the module disabled until it has been tested on the
+shutdown by default. Its script-facing tide-level channel always uses an
+invariant decimal point, and `TideAnnounceCount` now means the exact number of
+warning broadcasts (including zero). Tide-cycle calculations use UTC so a
+Windows daylight-saving transition cannot shift the cycle. Keep the module disabled until it has been tested on the
 exact region topology; adjacent regions with different water levels retain the
 viewer-visible vertical seam limitation described above.
 

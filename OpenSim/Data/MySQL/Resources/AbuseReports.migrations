@@ -57,3 +57,16 @@ ALTER TABLE `AbuseReports`
 UPDATE `AbuseReports` SET `LastUpdated` = `Time` WHERE `LastUpdated` = 0;
 
 COMMIT;
+
+# -----------------
+:VERSION 4
+
+BEGIN;
+
+# Match the service's bounded 64 KiB details contract and the unbounded text
+# providers used by SQLite/PostgreSQL. Existing reports are preserved.
+ALTER TABLE `AbuseReports`
+  MODIFY `Details` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  MODIFY `Summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+COMMIT;

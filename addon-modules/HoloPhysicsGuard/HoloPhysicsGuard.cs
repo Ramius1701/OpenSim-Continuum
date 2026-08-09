@@ -72,6 +72,7 @@ namespace HoloNeon.RegionModules
         private string m_mode = "ReportOnly";
         private string m_connectionString = String.Empty;
         private string m_connectionSource = "none";
+        private string m_storageProvider = String.Empty;
 
         private string[] m_alwaysSleepNameContains = Array.Empty<string>();
         private string[] m_neverSleepNameContains = Array.Empty<string>();
@@ -168,21 +169,31 @@ namespace HoloNeon.RegionModules
                     return;
                 }
 
-                if (m_autoCreateTable)
+                if (!IsMySqlProvider(m_storageProvider))
                 {
-                    try
-                    {
+                    m_log.ErrorFormat(
+                        "[HOLO PHYSICS GUARD]: PersistSleep supports only MySQL/MariaDB, but StorageProvider is '{0}'; module disabled",
+                        String.IsNullOrWhiteSpace(m_storageProvider) ? "unspecified" : m_storageProvider
+                    );
+                    m_enabled = false;
+                    return;
+                }
+
+                try
+                {
+                    if (m_autoCreateTable)
                         EnsureTable();
-                    }
-                    catch (Exception ex)
-                    {
-                        m_log.ErrorFormat(
-                            "[HOLO PHYSICS GUARD]: Failed creating/checking module table: {0}",
-                            ex
-                        );
-                        m_enabled = false;
-                        return;
-                    }
+                    else
+                        VerifyTable();
+                }
+                catch (Exception ex)
+                {
+                    m_log.ErrorFormat(
+                        "[HOLO PHYSICS GUARD]: Failed validating module persistence: {0}",
+                        ex
+                    );
+                    m_enabled = false;
+                    return;
                 }
             }
 
@@ -254,6 +265,13 @@ namespace HoloNeon.RegionModules
             lock (m_scenes)
                 m_scenes.Remove(scene);
 
+            // Wait for any sleep/wake operation that already selected this
+            // scene. Later operations re-check membership while holding the
+            // same lock and will not mutate a removed region.
+            lock (m_operationLock)
+            {
+            }
+
             lock (m_regionBecameEmptyAt)
                 m_regionBecameEmptyAt.Remove(scene.RegionInfo.RegionID);
 
@@ -273,6 +291,12 @@ namespace HoloNeon.RegionModules
                 m_timer = null;
             }
 
+            // Timer disposal prevents new callbacks but does not wait for one
+            // already running. Make Close a real mutation barrier.
+            lock (m_operationLock)
+            {
+            }
+
             lock (m_scenes)
                 m_scenes.Clear();
 
@@ -286,9 +310,12 @@ namespace HoloNeon.RegionModules
         private void ResolveConnectionString(IConfigSource source, IConfig config)
         {
             m_connectionString = config.GetString("ConnectionString", String.Empty).Trim();
+            m_storageProvider = config.GetString("StorageProvider", String.Empty).Trim();
             if (!String.IsNullOrWhiteSpace(m_connectionString))
             {
                 m_connectionSource = "HoloPhysicsGuard";
+                if (String.IsNullOrWhiteSpace(m_storageProvider))
+                    m_storageProvider = "OpenSim.Data.MySQL.dll";
                 return;
             }
 
@@ -297,8 +324,17 @@ namespace HoloNeon.RegionModules
                 return;
 
             m_connectionString = databaseConfig.GetString("ConnectionString", String.Empty).Trim();
+            if (String.IsNullOrWhiteSpace(m_storageProvider))
+                m_storageProvider = databaseConfig.GetString("StorageProvider", String.Empty).Trim();
             if (!String.IsNullOrWhiteSpace(m_connectionString))
                 m_connectionSource = "DatabaseService";
+        }
+
+        private static bool IsMySqlProvider(string provider)
+        {
+            return provider.Equals("OpenSim.Data.MySQL.dll", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("MariaDB", StringComparison.OrdinalIgnoreCase);
         }
 
         private void OnTimer(object sender, ElapsedEventArgs e)
@@ -348,6 +384,9 @@ namespace HoloNeon.RegionModules
 
         private void CheckScene(Scene scene)
         {
+            if (!IsSceneActive(scene))
+                return;
+
             UUID regionID = scene.RegionInfo.RegionID;
             bool occupied = scene.GetRootAgentCount() > 0;
             bool wasOccupied;
@@ -373,7 +412,7 @@ namespace HoloNeon.RegionModules
                     {
                         lock (m_operationLock)
                         {
-                            if (m_enabled)
+                            if (m_enabled && IsSceneActive(scene))
                                 wakeComplete = WakeRegion(scene, "avatar_enter");
                         }
                     }
@@ -419,7 +458,7 @@ namespace HoloNeon.RegionModules
 
             lock (m_operationLock)
             {
-                if (m_enabled && scene.GetRootAgentCount() == 0)
+                if (m_enabled && IsSceneActive(scene) && scene.GetRootAgentCount() == 0)
                     SleepPhysicalObjects(scene);
             }
 
@@ -542,6 +581,9 @@ namespace HoloNeon.RegionModules
 
         private bool WakeRegion(Scene scene, string reason)
         {
+            if (!m_enabled || !IsSceneActive(scene))
+                return false;
+
             List<SleepRow> rows = GetSleepRows(scene.RegionInfo.RegionID);
             if (rows.Count == 0)
                 return true;
@@ -552,6 +594,9 @@ namespace HoloNeon.RegionModules
 
             foreach (SleepRow row in rows)
             {
+                if (!m_enabled || !IsSceneActive(scene))
+                    return false;
+
                 SceneObjectGroup sog = FindSceneObjectGroup(scene, row.ObjectUUID);
 
                 if (sog == null || sog.RootPart == null)
@@ -634,6 +679,12 @@ namespace HoloNeon.RegionModules
             }
 
             return failed == 0;
+        }
+
+        private bool IsSceneActive(Scene scene)
+        {
+            lock (m_scenes)
+                return m_scenes.Contains(scene);
         }
 
         private SceneObjectGroup FindSceneObjectGroup(Scene scene, UUID rootPartUUID)
@@ -756,6 +807,17 @@ CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
                 command.ExecuteNonQuery();
 
             m_log.Info("[HOLO PHYSICS GUARD]: Table holo_physics_guard_sleep ready");
+        }
+
+        private void VerifyTable()
+        {
+            const string sql = "SELECT 1 FROM holo_physics_guard_sleep LIMIT 1;";
+
+            using (MySqlConnection connection = OpenDb())
+            using (MySqlCommand command = new MySqlCommand(sql, connection))
+                command.ExecuteScalar();
+
+            m_log.Info("[HOLO PHYSICS GUARD]: Existing table holo_physics_guard_sleep verified");
         }
 
         private void RecordSleepInDb(Scene scene, SceneObjectGroup sog, SceneObjectPart root)

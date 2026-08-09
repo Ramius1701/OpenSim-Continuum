@@ -55,9 +55,8 @@ namespace OpenSim.Groups
         private IGroupsServicesConnector m_LocalGroupsConnector;
         private string m_LocalGroupsServiceLocation;
         private IUserManagement m_UserManagement;
-        private IOfflineIMService m_OfflineIM;
-        private IMessageTransferModule m_Messaging;
         private List<Scene> m_Scenes;
+        private readonly object m_ScenesLock = new object();
         private ForeignImporter m_ForeignImporter;
         private string m_ServiceLocation;
         private IConfigSource m_Config;
@@ -105,9 +104,13 @@ namespace OpenSim.Groups
                 return;
 
             m_log.DebugFormat("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+            lock (m_ScenesLock)
+            {
+                if (m_Scenes.Contains(scene))
+                    return;
+                m_Scenes.Add(scene);
+            }
             scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
-            m_Scenes.Add(scene);
-
             scene.EventManager.OnNewClient += OnNewClient;
         }
 
@@ -116,8 +119,14 @@ namespace OpenSim.Groups
             if (!m_Enabled)
                 return;
 
+            lock (m_ScenesLock)
+            {
+                if (!m_Scenes.Remove(scene))
+                    return;
+            }
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(UnsubscribeClient);
             scene.UnregisterModuleInterface<IGroupsServicesConnector>(this);
-            m_Scenes.Remove(scene);
         }
 
         public void RegionLoaded(Scene scene)
@@ -127,9 +136,13 @@ namespace OpenSim.Groups
 
             if (m_UserManagement == null)
             {
-                m_UserManagement = scene.RequestModuleInterface<IUserManagement>();
-                m_OfflineIM = scene.RequestModuleInterface<IOfflineIMService>();
-                m_Messaging = scene.RequestModuleInterface<IMessageTransferModule>();
+                IUserManagement userManagement = scene.RequestModuleInterface<IUserManagement>();
+                if (userManagement == null)
+                {
+                    m_log.ErrorFormat("[Groups]: IUserManagement is unavailable in region {0}", scene.Name);
+                    return;
+                }
+                m_UserManagement = userManagement;
                 m_ForeignImporter = new ForeignImporter(m_UserManagement);
 
                 if (m_ServiceLocation.Equals("local"))
@@ -154,6 +167,13 @@ namespace OpenSim.Groups
 
         public void Close()
         {
+            if (!m_Enabled || m_Scenes == null)
+                return;
+            Scene[] scenes;
+            lock (m_ScenesLock)
+                scenes = m_Scenes.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         #endregion
@@ -163,6 +183,11 @@ namespace OpenSim.Groups
             client.OnCompleteMovementToRegion += OnCompleteMovementToRegion;
         }
 
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            client.OnCompleteMovementToRegion -= OnCompleteMovementToRegion;
+        }
+
         void OnCompleteMovementToRegion(IClientAPI client, bool arg2)
         {
             if (client.SceneAgent is ScenePresence sp)
@@ -170,13 +195,28 @@ namespace OpenSim.Groups
                 if (sp.PresenceType != PresenceType.Npc)
                 {
                     AgentCircuitData aCircuit = sp.Scene.AuthenticateHandler.GetAgentCircuitData(client.AgentId);
-                    if (aCircuit != null && (aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0 &&
-                        m_OfflineIM != null && m_Messaging != null)
+                    if (aCircuit != null &&
+                        (aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0)
                     {
-                        List<GridInstantMessage> ims = m_OfflineIM.GetMessages(aCircuit.AgentID);
-                        if (ims != null && ims.Count > 0)
-                            foreach (GridInstantMessage im in ims)
-                                m_Messaging.SendInstantMessage(im, delegate(bool success) { });
+                        IOfflineIMService offlineIM = sp.Scene.RequestModuleInterface<IOfflineIMService>();
+                        IMessageTransferModule messaging = sp.Scene.RequestModuleInterface<IMessageTransferModule>();
+                        if (offlineIM == null || messaging == null)
+                            return;
+
+                        try
+                        {
+                            List<GridInstantMessage> ims = offlineIM.GetMessages(aCircuit.AgentID);
+                            if (ims != null && ims.Count > 0)
+                                foreach (GridInstantMessage im in ims)
+                                    messaging.SendInstantMessage(im, delegate(bool success) { });
+                        }
+                        catch (Exception ex)
+                        {
+                            m_log.WarnFormat(
+                                "[Groups]: Unable to deliver Hypergrid offline group messages for {0}: {1}",
+                                aCircuit.AgentID,
+                                ex.Message);
+                        }
                     }
                 }
             }

@@ -31,6 +31,10 @@
 
     ;; Administrative/forced transfers.
     EnableForceTransfer = false
+    ;; Exact trusted simulator/service source IPs permitted to call
+    ;; ForceTransferMoney. Add every remote simulator host that uses the
+    ;; compatibility connector; never expose this endpoint broadly.
+    ForceTransferAllowedIPs = "127.0.0.1,::1"
     BankerAvatar = "00000000-0000-0000-0000-000000000000"
 
     ;; Exact trusted source IP addresses permitted to call AddBankerMoney.
@@ -40,10 +44,10 @@
 
     EnableAmountZero = false
 
-    ;; Viewer currency purchase support. The Continuum alpha test profile enables
-    ;; this so the complete viewer quote/purchase path is exercised.
+    ;; Viewer currency purchase support. Keep disabled until the compatibility
+    ;; service has passed the cloned-database purchase and limit matrix.
     ;; Secure viewer sessions are checked before a quote or purchase is accepted.
-    CurrencyOnOff = "on"
+    CurrencyOnOff = "off"
 
     ;; Successful viewer BuyMoney totals use UTC calendar boundaries.
     ;; Week begins Monday UTC. Zero disables an individual period limit.

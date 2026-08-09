@@ -25,10 +25,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ExperienceModule")]
     public class ExperienceModule : IExperienceModule, INonSharedRegionModule
     {
+        private const int MaxExperienceCapsRequestBytes = 256 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         // Dictionary of Agent IDs, with a dictionary of experience permissions and their bools
         private Dictionary<UUID, Dictionary<UUID, bool>> m_ExperiencePermissions = new Dictionary<UUID, Dictionary<UUID, bool>>();
+        private readonly object m_ExperiencePermissionsLock = new object();
 
         private ExpiringCache<UUID, ExperienceInfo> m_ExperienceInfoCache = new ExpiringCache<UUID, ExperienceInfo>();
 
@@ -79,7 +81,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             scene.EventManager.OnClientClosed -= OnClientClosed;
             scene.EventManager.OnAvatarEnteringNewParcel -= EventManager_OnAvatarEnteringNewParcel;
             scene.UnregisterModuleInterface<IExperienceModule>(this);
-            m_ExperiencePermissions.Clear();
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions.Clear();
+            m_ExperienceService = null;
+            m_ScriptModules = null;
             m_scene = null;
         }
 
@@ -111,17 +116,38 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void OnNewClient(IClientAPI client)
         {
-            m_ExperiencePermissions[client.AgentId] = m_ExperienceService.FetchExperiencePermissions(client.AgentId);
+            Dictionary<UUID, bool> permissions;
+            try
+            {
+                permissions = m_ExperienceService?.FetchExperiencePermissions(client.AgentId)
+                    ?? new Dictionary<UUID, bool>();
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE]: Unable to load permissions for {0}; login will continue with an empty cache: {1}",
+                    client.AgentId,
+                    ex.Message);
+                permissions = new Dictionary<UUID, bool>();
+            }
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions[client.AgentId] = permissions;
         }
 
         private void OnClientClosed(UUID agentID, Scene scene)
         {
-            m_ExperiencePermissions.Remove(agentID);
+            lock (m_ExperiencePermissionsLock)
+                m_ExperiencePermissions.Remove(agentID);
         }
 
         public void PostInitialise() {}
 
-        public void Close() {}
+        public void Close()
+        {
+            Scene scene = m_scene;
+            if (scene != null)
+                RemoveRegion(scene);
+        }
 
         public string Name { get { return "ExperienceModule"; } }
 
@@ -175,7 +201,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 OSDMap body;
                 try
                 {
-                    body = OSDParser.DeserializeLLSDXml(request.InputStream) as OSDMap;
+                    body = OSDParser.DeserializeLLSDXml(ReadBoundedCapsBody(request)) as OSDMap;
+                }
+                catch (InvalidDataException)
+                {
+                    response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                    return;
                 }
                 catch
                 {
@@ -204,11 +235,31 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 HashSet<UUID> blockedSet = new(blocked.Where(id => !trustedSet.Contains(id)));
                 allowed = allowed.Where(id => !trustedSet.Contains(id) && !blockedSet.Contains(id)).ToArray();
 
+                HashSet<UUID> enabledPolicyIDs = new(allowed);
+                enabledPolicyIDs.UnionWith(trustedSet);
+                if (enabledPolicyIDs.Count > 0)
+                {
+                    ExperienceInfo[] policyInfos = GetExperienceInfos(enabledPolicyIDs.ToArray(), true);
+                    HashSet<UUID> validPolicyIDs = new(
+                        policyInfos
+                            .Where(info => info != null &&
+                                (info.properties & (int)(ExperienceFlags.Invalid |
+                                    ExperienceFlags.Disabled | ExperienceFlags.Suspended)) == 0)
+                            .Select(info => info.public_id));
+                    if (!enabledPolicyIDs.SetEquals(validPolicyIDs))
+                    {
+                        response.StatusCode = (int)HttpStatusCode.BadRequest;
+                        return;
+                    }
+                }
+
                 EstateSettings settings = m_scene.RegionInfo.EstateSettings;
                 settings.AllowedExperiences = allowed;
                 settings.BlockedExperiences = blockedSet.ToArray();
                 settings.KeyExperiences = trusted;
                 m_scene.EstateDataService.StoreEstateSettings(settings);
+                m_scene.ForEachRootScenePresence(
+                    presence => UpdateScriptExperiencePerms(presence, false));
             }
             else if (request.HttpMethod != "GET")
             {
@@ -218,11 +269,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             OSDMap result = new()
             {
-                ["allowed"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.AllowedExperiences),
-                ["blocked"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.BlockedExperiences),
+                ["allowed"] = ToOSDArray(GetEstateAllowedExperiences()),
+                ["blocked"] = ToOSDArray(GetEstateBlockedExperiences()),
                 ["default"] = UUID.Zero,
                 ["disabled"] = new OSDArray(),
-                ["trusted"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.KeyExperiences)
+                ["trusted"] = ToOSDArray(GetEstateKeyExperiences())
             };
 
             response.ContentType = "application/llsd+xml";
@@ -336,49 +387,90 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void HandlePutExperiencePreferences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
         {
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(request.InputStream);
+            OSDMap map;
+            try
+            {
+                map = OSDParser.DeserializeLLSDXml(ReadBoundedCapsBody(request)) as OSDMap;
+            }
+            catch (InvalidDataException)
+            {
+                response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return;
+            }
+            catch
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (map == null)
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
 
             byte[] response_bytes = new byte[0];
 
-            if (map.Keys.Count == 1)
+            if (map.Keys.Count != 1)
             {
-                string first_key = map.Keys.First();
-                if (!UUID.TryParse(first_key, out UUID experience_id) || map[first_key] is not OSDMap m)
-                {
-                    response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    return;
-                }
-
-                if (m.ContainsKey("permission"))
-                {
-                    bool allowed = m["permission"].AsString() == "Allow";
-
-                    SetExperiencePermissions(agentID, experience_id, allowed);
-
-                    string response_str = "<llsd><map><key>blocked</key><array>" +
-                    (allowed == false ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                        "</array><key>experiences</key><array>" +
-                    (allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                        "</array></map></llsd>";
-
-                    response_bytes = Encoding.UTF8.GetBytes(response_str);
-                }
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
             }
+
+            string first_key = map.Keys.First();
+            if (!UUID.TryParse(first_key, out UUID experience_id) || experience_id == UUID.Zero ||
+                map[first_key] is not OSDMap permissionMap ||
+                !permissionMap.TryGetValue("permission", out OSD permissionValue))
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            string permission = permissionValue.AsString();
+            if (permission != "Allow" && permission != "Block")
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            bool allowed = permission == "Allow";
+            if (!SetExperiencePermissions(agentID, experience_id, allowed))
+            {
+                response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
+
+            string response_str = "<llsd><map><key>blocked</key><array>" +
+                (!allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
+                "</array><key>experiences</key><array>" +
+                (allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
+                "</array></map></llsd>";
+
+            response_bytes = Encoding.UTF8.GetBytes(response_str);
 
             response.RawBuffer = response_bytes;
             response.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private static byte[] ReadBoundedCapsBody(IOSHttpRequest request)
+        {
+            if (request == null || request.InputStream == null)
+                throw new InvalidDataException("Experience request body is unavailable.");
+            if (request.ContentLength64 > MaxExperienceCapsRequestBytes)
+                throw new InvalidDataException("Experience request body is too large.");
+
+            return ReadBaseStreamHandler.ReadFully(request.InputStream, MaxExperienceCapsRequestBytes);
         }
 
         #region IExperienceModule
 
         public ExperiencePermission GetExperiencePermission(UUID avatar_id, UUID experience_id)
         {
-            if(m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                if(m_ExperiencePermissions[avatar_id].ContainsKey(experience_id))
-                {
-                    return m_ExperiencePermissions[avatar_id][experience_id] ? ExperiencePermission.Allowed : ExperiencePermission.Blocked;
-                }
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions) &&
+                    permissions.TryGetValue(experience_id, out bool allowed))
+                    return allowed ? ExperiencePermission.Allowed : ExperiencePermission.Blocked;
             }
             return ExperiencePermission.None;
         }
@@ -388,10 +480,15 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             bool updated = m_ExperienceService.UpdateExperiencePermissions(avatar_id, experience_id, allow ? ExperiencePermission.Allowed : ExperiencePermission.Blocked);
             if(updated)
             {
-                if (m_ExperiencePermissions.ContainsKey(avatar_id) == false)
-                    m_ExperiencePermissions.Add(avatar_id, new Dictionary<UUID, bool>());
-
-                m_ExperiencePermissions[avatar_id][experience_id] = allow;
+                lock (m_ExperiencePermissionsLock)
+                {
+                    if (!m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    {
+                        permissions = new Dictionary<UUID, bool>();
+                        m_ExperiencePermissions[avatar_id] = permissions;
+                    }
+                    permissions[experience_id] = allow;
+                }
 
                 if (!allow)
                 {
@@ -407,53 +504,37 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public bool ForgetExperiencePermissions(UUID avatar_id, UUID experience_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            bool updated = m_ExperienceService.UpdateExperiencePermissions(
+                avatar_id, experience_id, ExperiencePermission.None);
+            if (updated)
             {
-                if (m_ExperiencePermissions[avatar_id].ContainsKey(experience_id))
+                lock (m_ExperiencePermissionsLock)
                 {
-                    bool updated = m_ExperienceService.UpdateExperiencePermissions(avatar_id, experience_id, ExperiencePermission.None);
-                    if(updated)
-                    {
-                        m_ExperiencePermissions[avatar_id].Remove(experience_id);
-                    }
-                    return updated;
+                    if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                        permissions.Remove(experience_id);
                 }
             }
-            return false;
+            return updated;
         }
 
         public UUID[] GetAllowedExperiences(UUID avatar_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                List<UUID> allowed_experiences = new List<UUID>();
-                foreach(var x in m_ExperiencePermissions[avatar_id])
-                {
-                    if(x.Value)
-                    {
-                        allowed_experiences.Add(x.Key);
-                    }
-                }
-                return allowed_experiences.ToArray();
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    return permissions.Where(x => x.Value).Select(x => x.Key).ToArray();
             }
-            return new UUID[0];
+            return Array.Empty<UUID>();
         }
 
         public UUID[] GetBlockedExperiences(UUID avatar_id)
         {
-            if (m_ExperiencePermissions.ContainsKey(avatar_id))
+            lock (m_ExperiencePermissionsLock)
             {
-                List<UUID> allowed_experiences = new List<UUID>();
-                foreach (var x in m_ExperiencePermissions[avatar_id])
-                {
-                    if (x.Value == false)
-                    {
-                        allowed_experiences.Add(x.Key);
-                    }
-                }
-                return allowed_experiences.ToArray();
+                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
+                    return permissions.Where(x => !x.Value).Select(x => x.Key).ToArray();
             }
-            return new UUID[0];
+            return Array.Empty<UUID>();
         }
 
         public UUID[] GetAgentExperiences(UUID agent_id)
@@ -514,10 +595,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public bool SetExperiencePermission(UUID avatar_id, UUID experience_id, ExperiencePermission perm)
         {
             if (perm == ExperiencePermission.None)
-                ForgetExperiencePermissions(avatar_id, experience_id);
-            else
-                SetExperiencePermissions(avatar_id, experience_id, perm == ExperiencePermission.Allowed);
-            return true;
+                return ForgetExperiencePermissions(avatar_id, experience_id);
+
+            return SetExperiencePermissions(
+                avatar_id,
+                experience_id,
+                perm == ExperiencePermission.Allowed);
         }
 
         public ExperienceInfo[] FindExperiencesByName(string query)
@@ -646,17 +729,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public UUID[] GetEstateAllowedExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.AllowedExperiences;
+            return m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
         }
 
         public UUID[] GetEstateKeyExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.KeyExperiences;
+            return m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
         }
 
         public UUID[] GetEstateBlockedExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.BlockedExperiences;
+            return m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
         }
 
 
@@ -667,19 +750,38 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
         {
             var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
+            if (land == null)
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE]: Unable to evaluate parcel Experience policy for avatar {0} at {1}",
+                    avatar.UUID,
+                    avatar.AbsolutePosition);
+                return;
+            }
 
-            var estate_experiences = m_scene.RegionInfo.EstateSettings.AllowedExperiences.Union(m_scene.RegionInfo.EstateSettings.KeyExperiences);
+            UUID[] estateAllowed = m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
+            UUID[] estateKey = m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
+            UUID[] estateBlocked = m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
+            HashSet<UUID> estateExperiences = new(estateAllowed);
+            estateExperiences.UnionWith(estateKey);
 
-            var parcel_experiences = land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED).Select(x => x.AgentID);
+            HashSet<UUID> parcelExperiences = new(
+                land.LandData.ParcelAccessList
+                    .Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED)
+                    .Select(x => x.AgentID));
 
-            var blocked_experiences = m_scene.RegionInfo.EstateSettings.BlockedExperiences.Union(
-                land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED).Select(x => x.AgentID));
+            HashSet<UUID> blockedExperiences = new(estateBlocked);
+            blockedExperiences.UnionWith(
+                land.LandData.ParcelAccessList
+                    .Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED)
+                    .Select(x => x.AgentID));
 
-            var agent_allowed = m_ExperiencePermissions.ContainsKey(avatar.UUID) ? m_ExperiencePermissions[avatar.UUID].Where(x => x.Value == true).Select(x => x.Key) : Enumerable.Empty<UUID>();
+            HashSet<UUID> agentAllowed = new(GetAllowedExperiences(avatar.UUID));
 
-            var allowed = estate_experiences.Union(parcel_experiences)
-                .Except(blocked_experiences)
-                .Where(x => agent_allowed.Contains(x));
+            HashSet<UUID> allowed = new(estateExperiences);
+            allowed.UnionWith(parcelExperiences);
+            allowed.IntersectWith(agentAllowed);
+            allowed.ExceptWith(blockedExperiences);
 
             m_scene.ForEachSOG(sog =>
             {
@@ -709,7 +811,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 });
 
 
-                if (sog.IsAttachment && sog.AttachedExperienceID != UUID.Zero)
+                if (sog.IsAttachment && sog.AttachedAvatar == avatar.UUID &&
+                    sog.AttachedExperienceID != UUID.Zero)
                 {
                     if (!allowed.Contains(sog.AttachedExperienceID))
                     {
@@ -837,11 +940,22 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             string page_size = query.Get("page_size");
             string query_str = query.Get("query");
 
-            // todo: handle pages
+            int pageNumber = 1;
+            int pageSize = 30;
+            if ((!string.IsNullOrEmpty(page) && !int.TryParse(page, out pageNumber)) ||
+                (!string.IsNullOrEmpty(page_size) && !int.TryParse(page_size, out pageSize)) ||
+                pageNumber < 1 || pageSize < 1 || pageSize > 100)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            }
 
             ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str);
+            long offset = ((long)pageNumber - 1) * pageSize;
+            if (offset >= results.Length)
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
 
-            return ExperienceCapsResponse.SerializeExperiences(results);
+            return ExperienceCapsResponse.SerializeExperiences(results.Skip((int)offset).Take(pageSize));
         }
     }
 
@@ -908,11 +1022,34 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            byte[] data = ReadFully(request);
+            byte[] data;
+            try
+            {
+                data = ReadFully(request, httpRequest);
+            }
+            catch (InvalidDataException)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             //m_log.InfoFormat("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
 
-            OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(data);
+            OSDMap map;
+            try
+            {
+                map = OSDParser.DeserializeLLSDXml(data) as OSDMap;
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            if (map == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID object_id = UUID.Zero;
             UUID item_id = UUID.Zero;
@@ -929,11 +1066,22 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 item_id = item_id_osd.AsUUID();
             }
 
+            if (object_id == UUID.Zero || item_id == UUID.Zero)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             SceneObjectPart scene_object = m_Scene.GetSceneObjectPart(object_id);
 
             if(scene_object != null)
             {
+                if (!m_Scene.Permissions.CanEditObject(scene_object.ParentGroup.UUID, m_AgentID))
+                {
+                    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                    return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+                }
+
                 TaskInventoryItem inv_item = scene_object.Inventory.GetInventoryItem(item_id);
 
                 if(inv_item != null)
@@ -977,9 +1125,33 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            byte[] read = ReadFully(request);
+            byte[] read;
+            OSDMap experience;
+            try
+            {
+                read = ReadFully(request, httpRequest);
+                experience = OSDParser.Deserialize(read) as OSDMap;
+            }
+            catch (InvalidDataException)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
-            OSDMap experience = (OSDMap)OSDParser.Deserialize(read);
+            if (experience == null || !experience.ContainsKey("public_id") ||
+                !experience.ContainsKey("group_id") || !experience.ContainsKey("name") ||
+                !experience.ContainsKey("description") || !experience.ContainsKey("slurl") ||
+                !experience.ContainsKey("extended_metadata") || !experience.ContainsKey("maturity") ||
+                !experience.ContainsKey("properties"))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID public_id = experience["public_id"].AsUUID();
             UUID group_id = experience["group_id"].AsUUID();
@@ -990,54 +1162,87 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             int maturity = experience["maturity"].AsInteger();
             int properties = experience["properties"].AsInteger();
 
+            if (name.Length > 42 || desc.Length > 128 || slurl.Length > 256 ||
+                metadata.Length > 16 * 1024)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
             // 42 = adult, 21 = mature, 13 = general
             if (maturity != 42 && maturity != 13)
                 maturity = 21;
 
             string decoded_meta = HttpUtility.HtmlDecode(metadata);
 
-            OSDMap extended = (OSDMap)OSDParser.Deserialize(decoded_meta);
+            OSDMap extended;
+            try
+            {
+                extended = OSDParser.Deserialize(decoded_meta) as OSDMap;
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+            if (extended == null || !extended.ContainsKey("logo") || !extended.ContainsKey("marketplace"))
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             UUID logo = extended["logo"].AsUUID();
             string marketplace = extended["marketplace"].AsString();
+            if (marketplace.Length > 256)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
 
             if (currentInfo == null)
-                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
-
-            bool is_admin = m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id);
-
-            if(is_admin)
             {
-                currentInfo.name = name;
-                currentInfo.description = desc;
-                currentInfo.group_id = group_id;
-
-                if (slurl != "last")
-                    currentInfo.slurl = slurl;
-
-                currentInfo.marketplace = marketplace;
-                currentInfo.logo = logo;
-                currentInfo.maturity = maturity;
-
-                if((properties & (int)ExperienceFlags.Disabled) != 0)
-                {
-                    currentInfo.properties |= (int)ExperienceFlags.Disabled;
-                }
-                else
-                {
-                    currentInfo.properties &= ~(int)ExperienceFlags.Disabled;
-                }
-
-                var updated_info = m_ExperienceModule.UpdateExperienceInfo(currentInfo);
-                if(updated_info != null)
-                {
-                    currentInfo = updated_info;
-                }
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
             }
 
-            return ExperienceCapsResponse.SerializeExperiences(new[] { currentInfo });
+            if (!m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id) ||
+                group_id != currentInfo.group_id)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
+            int updatedProperties = currentInfo.properties;
+            if ((properties & (int)ExperienceFlags.Disabled) != 0)
+                updatedProperties |= (int)ExperienceFlags.Disabled;
+            else
+                updatedProperties &= ~(int)ExperienceFlags.Disabled;
+
+            ExperienceInfo requestedInfo = new()
+            {
+                public_id = currentInfo.public_id,
+                owner_id = currentInfo.owner_id,
+                group_id = currentInfo.group_id,
+                name = name,
+                description = desc,
+                slurl = slurl == "last" ? currentInfo.slurl : slurl,
+                marketplace = marketplace,
+                logo = logo,
+                maturity = maturity,
+                properties = updatedProperties,
+                quota = currentInfo.quota
+            };
+
+            ExperienceInfo updatedInfo = m_ExperienceModule.UpdateExperienceInfo(requestedInfo);
+            if (updatedInfo == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
+            return ExperienceCapsResponse.SerializeExperiences(new[] { updatedInfo });
         }
     }
 
@@ -1211,20 +1416,21 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             if (ids == null)
                 return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            if (ids.Length > 1000)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            }
 
-            List<ExperienceInfo> infos = new();
+            HashSet<UUID> experienceIDs = new();
 
             foreach (string id in ids)
             {
-                if (!UUID.TryParse(id, out UUID experience_id))
-                    continue;
-
-                ExperienceInfo info = m_ExperienceModule.GetExperienceInfo(experience_id);
-
-                if (info != null)
-                    infos.Add(info);
+                if (UUID.TryParse(id, out UUID experienceID) && experienceID != UUID.Zero)
+                    experienceIDs.Add(experienceID);
             }
 
+            ExperienceInfo[] infos = m_ExperienceModule.GetExperienceInfos(experienceIDs.ToArray());
             return ExperienceCapsResponse.SerializeExperiences(infos);
         }
     }
@@ -1407,7 +1613,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         {
         }
 
-        protected static byte[] ReadFully(Stream stream)
+        internal static byte[] ReadFully(Stream stream, int maximumBytes)
         {
             byte[] buffer = new byte[1024];
             using (MemoryStream ms = new MemoryStream(1024 * 256))
@@ -1421,9 +1627,20 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                         return ms.ToArray();
                     }
 
+                    if (ms.Length + read > maximumBytes)
+                        throw new InvalidDataException("Experience request body is too large.");
+
                     ms.Write(buffer, 0, read);
                 }
             }
+        }
+
+        protected static byte[] ReadFully(Stream stream, IOSHttpRequest request)
+        {
+            const int maximumBytes = 256 * 1024;
+            if (request != null && request.ContentLength64 > maximumBytes)
+                throw new InvalidDataException("Experience request body is too large.");
+            return ReadFully(stream, maximumBytes);
         }
     }
 }

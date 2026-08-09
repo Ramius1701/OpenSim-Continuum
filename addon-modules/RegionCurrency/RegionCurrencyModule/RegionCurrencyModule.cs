@@ -67,15 +67,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
         private readonly Dictionary<string, CurrencyPurchaseRequest> m_currencyPurchaseRequests = new Dictionary<string, CurrencyPurchaseRequest>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, CurrencyPayPalOrder> m_currencyPayPalOrders = new Dictionary<string, CurrencyPayPalOrder>(StringComparer.OrdinalIgnoreCase);
         private bool m_currencyPortalEnabled = true;
-        private bool m_currencyBuyEnabled = true;
-        private bool m_currencyTransferEnabled = true;
+        private bool m_currencyBuyEnabled;
+        private bool m_currencyTransferEnabled;
+        private bool m_requireHttps = true;
+        private bool m_allowRealMoneyIntegration;
         private bool m_payPalEnabled;
         private int m_currencyChallengeMinutes = 10;
         private int m_currencyChallengeCooldownSeconds = 20;
         private int m_currencySessionHours = 12;
         private int m_currencyStatementLimit = 30;
         private int m_currencyBuyLimit = 100000;
-        private string m_currencyBuyMode = "grant";
+        private string m_currencyBuyMode = "disabled";
         private string m_currencyPurchaseStoragePath = "Currency/regionweb-purchases.tsv";
         private string m_payPalEnvironment = "sandbox";
         private string m_payPalClientID = string.Empty;
@@ -2119,13 +2121,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
         {
             response.AddHeader("Set-Cookie", CurrencySessionCookie + "=" + token
                 + "; Path=" + m_basePath + "; Expires=" + expiresUTC.ToString("R", CultureInfo.InvariantCulture)
-                + "; HttpOnly; SameSite=Lax");
+                + "; HttpOnly; SameSite=Lax" + (m_requireHttps ? "; Secure" : string.Empty));
         }
 
         private void ClearCurrencySessionCookie(IOSHttpResponse response)
         {
             response.AddHeader("Set-Cookie", CurrencySessionCookie
-                + "=; Path=" + m_basePath + "; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax");
+                + "=; Path=" + m_basePath + "; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax"
+                + (m_requireHttps ? "; Secure" : string.Empty));
         }
 
         private static string GenerateCurrencyChallengeToken()
@@ -2159,7 +2162,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 return "paypal";
             if (mode == "disabled" || mode == "disable" || mode == "off" || mode == "false")
                 return "disabled";
-            return "grant";
+            return "disabled";
         }
 
         private static string NormalizePayPalEnvironment(string value)
@@ -2908,7 +2911,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
         private readonly object m_sync = new object();
         private readonly Dictionary<UUID, Scene> m_scenesByID = new Dictionary<UUID, Scene>();
         private bool m_enabled;
-        private bool m_handlerRegistered;
+        private bool m_fixedHandlerRegistered;
+        private bool m_variableHandlerRegistered;
         private string m_basePath = "/currency";
         private string m_defaultEstateTitle = "My OpenSim Estate";
 
@@ -2925,7 +2929,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
             if (!path.StartsWith("/", StringComparison.Ordinal))
                 path = "/" + path;
 
-            return path.TrimEnd('/');
+            path = path.TrimEnd('/');
+            return string.IsNullOrEmpty(path) ? "/currency" : path;
         }
 
         public void Initialise(IConfigSource source)
@@ -2935,18 +2940,27 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 return;
 
             m_enabled = config.GetBoolean("Enabled", false);
+            IConfig regionWebConfig = source.Configs["RegionWeb"];
+            if (m_enabled && regionWebConfig != null && regionWebConfig.GetBoolean("Enabled", false))
+            {
+                m_log.Warn("[REGION CURRENCY]: Disabled because RegionWeb is enabled. RegionWeb is the canonical combined website and currency portal; RegionCurrency is compatibility-only.");
+                m_enabled = false;
+                return;
+            }
             m_basePath = CleanPath(config.GetString("PublicPath", "/currency"));
             m_defaultEstateTitle = config.GetString("EstateTitle", "My OpenSim Estate").Trim();
             if (string.IsNullOrEmpty(m_defaultEstateTitle))
                 m_defaultEstateTitle = "My OpenSim Estate";
-            m_currencyBuyEnabled = config.GetBoolean("CurrencyBuyEnabled", true);
-            m_currencyTransferEnabled = config.GetBoolean("CurrencyTransferEnabled", true);
-            m_currencyChallengeMinutes = Math.Max(1, config.GetInt("CurrencyChallengeMinutes", 10));
-            m_currencyChallengeCooldownSeconds = Math.Max(0, config.GetInt("CurrencyChallengeCooldownSeconds", 20));
-            m_currencySessionHours = Math.Max(1, config.GetInt("CurrencySessionHours", 12));
-            m_currencyStatementLimit = Math.Max(1, config.GetInt("CurrencyStatementLimit", 30));
-            m_currencyBuyLimit = Math.Max(1, config.GetInt("CurrencyBuyLimit", 100000));
-            m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", "grant"));
+            m_currencyBuyEnabled = config.GetBoolean("CurrencyBuyEnabled", false);
+            m_currencyTransferEnabled = config.GetBoolean("CurrencyTransferEnabled", false);
+            m_requireHttps = config.GetBoolean("RequireHttps", true);
+            m_allowRealMoneyIntegration = config.GetBoolean("AllowRealMoneyIntegration", false);
+            m_currencyChallengeMinutes = Math.Clamp(config.GetInt("CurrencyChallengeMinutes", 10), 1, 1440);
+            m_currencyChallengeCooldownSeconds = Math.Clamp(config.GetInt("CurrencyChallengeCooldownSeconds", 20), 0, 3600);
+            m_currencySessionHours = Math.Clamp(config.GetInt("CurrencySessionHours", 12), 1, 168);
+            m_currencyStatementLimit = Math.Clamp(config.GetInt("CurrencyStatementLimit", 30), 1, 1000);
+            m_currencyBuyLimit = Math.Clamp(config.GetInt("CurrencyBuyLimit", 100000), 1, 1000000);
+            m_currencyBuyMode = NormalizeCurrencyBuyMode(config.GetString("CurrencyBuyMode", "disabled"));
             m_currencyPurchaseStoragePath = config.GetString("CurrencyPurchaseStorage", "Currency/regioncurrency-purchases.tsv").Trim();
             m_payPalEnabled = config.GetBoolean("PayPalEnabled", false);
             m_payPalEnvironment = NormalizePayPalEnvironment(config.GetString("PayPalEnvironment", "sandbox"));
@@ -2956,6 +2970,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
             m_payPalPricePerToken = ParsePositiveDecimal(config.GetString("PayPalPricePerToken", "0.01"), 0.01m);
             m_payPalReturnBaseUrl = config.GetString("PayPalReturnBaseUrl", string.Empty).Trim();
             m_payPalOrderStoragePath = config.GetString("PayPalOrderStorage", "Currency/regioncurrency-paypal-orders.tsv").Trim();
+
+            if (m_currencyBuyMode.Equals("paypal", StringComparison.OrdinalIgnoreCase)
+                && (!m_payPalEnabled || !m_allowRealMoneyIntegration))
+            {
+                m_log.Warn("[REGION CURRENCY]: PayPal buy mode requires both PayPalEnabled=true and AllowRealMoneyIntegration=true; purchases disabled.");
+                m_currencyBuyEnabled = false;
+                m_currencyBuyMode = "disabled";
+            }
 
             if (string.IsNullOrEmpty(m_currencyPurchaseStoragePath))
                 m_currencyPurchaseStoragePath = "Currency/regioncurrency-purchases.tsv";
@@ -2981,9 +3003,12 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"));
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"), true);
-                m_handlerRegistered = true;
+                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"));
+                m_variableHandlerRegistered = m_fixedHandlerRegistered && server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"), true);
+                if (!m_variableHandlerRegistered)
+                    throw new InvalidOperationException("HTTP path " + m_basePath + " is already owned by another module");
 
                 MainConsole.Instance.Commands.AddCommand(
                     "RegionCurrency", false, "regioncurrency pending",
@@ -3007,6 +3032,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
             }
             catch (Exception e)
             {
+                RemoveHttpHandlers();
                 m_enabled = false;
                 m_log.WarnFormat("[REGION CURRENCY]: Could not enable module: {0}", e.Message);
             }
@@ -3039,12 +3065,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
         public void Close()
         {
-            if (m_handlerRegistered)
-            {
-                MainServer.GetHttpServer(0).RemoveSimpleStreamHandler(m_basePath);
-                MainServer.GetHttpServer(0).RemoveSimpleStreamHandler(m_basePath);
-                m_handlerRegistered = false;
-            }
+            RemoveHttpHandlers();
 
             lock (m_sync)
                 m_scenesByID.Clear();
@@ -3061,6 +3082,20 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
             lock (m_currencyPayPalLock)
                 m_currencyPayPalOrders.Clear();
+        }
+
+        private void RemoveHttpHandlers()
+        {
+            if (!m_fixedHandlerRegistered && !m_variableHandlerRegistered)
+                return;
+
+            IHttpServer server = MainServer.GetHttpServer(0);
+            if (m_fixedHandlerRegistered)
+                server.RemoveSimpleStreamHandler(m_basePath);
+            if (m_variableHandlerRegistered)
+                server.RemoveSimpleStreamHandler(m_basePath);
+            m_fixedHandlerRegistered = false;
+            m_variableHandlerRegistered = false;
         }
 
         private void AddOrUpdateScene(Scene scene)
@@ -3086,6 +3121,14 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
         {
             try
             {
+                if (m_requireHttps && !request.IsSecured)
+                {
+                    response.StatusCode = (int)HttpStatusCode.Forbidden;
+                    response.ContentType = "text/plain";
+                    response.RawBuffer = Encoding.UTF8.GetBytes("RegionCurrency requires HTTPS.");
+                    return;
+                }
+
                 string path = request.UriPath ?? string.Empty;
                 string relative = path.Length > m_basePath.Length ? path.Substring(m_basePath.Length).Trim('/') : string.Empty;
                 string[] rawParts = string.IsNullOrEmpty(relative)

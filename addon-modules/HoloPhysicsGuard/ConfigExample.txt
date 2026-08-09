@@ -20,6 +20,11 @@ DryRun = true
 ; a different database. Never commit live credentials.
 ConnectionString =
 
+; PersistSleep is MySQL/MariaDB-only. When ConnectionString is inherited this
+; is inherited from [DatabaseService] too. Set it explicitly with a module-
+; specific connection string; unsupported providers disable PersistSleep.
+StorageProvider = OpenSim.Data.MySQL.dll
+
 AutoCreateTable = true
 
 SleepWhenEmpty = true

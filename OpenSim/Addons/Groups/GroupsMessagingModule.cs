@@ -133,7 +133,11 @@ namespace OpenSim.Groups
                 return;
 
             scene.RegisterModuleInterface<IGroupsMessagingModule>(this);
-            m_sceneList.Add(scene);
+            lock (m_sceneList)
+            {
+                if (!m_sceneList.Contains(scene))
+                    m_sceneList.Add(scene);
+            }
 
             scene.EventManager.OnNewClient += OnNewClient;
             scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
@@ -193,26 +197,30 @@ namespace OpenSim.Groups
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_groupMessagingEnabled)
-                return;
-
             if (m_debugEnabled) m_log.DebugFormat("[Groups.Messaging]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
-            m_sceneList.Remove(scene);
+            lock (m_sceneList)
+                m_sceneList.Remove(scene);
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+            scene.EventManager.OnMakeChildAgent -= OnMakeChildAgent;
             scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             scene.EventManager.OnClientLogin -= OnClientLogin;
             scene.UnregisterModuleInterface<IGroupsMessagingModule>(this);
+
+            scene.ForEachClient(client => client.OnInstantMessage -= OnInstantMessage);
         }
 
         public void Close()
         {
-            if (!m_groupMessagingEnabled)
-                return;
-
             if (m_debugEnabled) m_log.Debug("[Groups.Messaging]: Shutting down GroupsMessagingModule module.");
 
-            m_sceneList.Clear();
+            Scene[] scenes;
+            lock (m_sceneList)
+                scenes = m_sceneList.ToArray();
+
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
 
             m_groupData = null;
             m_msgTransferModule = null;
@@ -417,6 +425,12 @@ namespace OpenSim.Groups
 
         #region SimGridEventHandlers
 
+        private Scene[] GetScenesSnapshot()
+        {
+            lock (m_sceneList)
+                return m_sceneList.ToArray();
+        }
+
         void OnClientLogin(IClientAPI client)
         {
             if (m_debugEnabled) m_log.DebugFormat("[Groups.Messaging]: OnInstantMessage registered for {0}", client.Name);
@@ -465,7 +479,11 @@ namespace OpenSim.Groups
 
                 UUID GroupID = new UUID(msg.imSessionID);
 
-                Scene aScene = m_sceneList[0];
+                Scene[] scenes = GetScenesSnapshot();
+                if (scenes.Length == 0)
+                    return;
+
+                Scene aScene = scenes[0];
                 GridRegion regionOfOrigin = aScene.GridService.GetRegionByUUID(aScene.RegionInfo.ScopeID, regionID);
 
                 List<GroupMembersData> groupMembers = m_groupData.GetGroupMembers(UUID.Zero.ToString(), GroupID);
@@ -474,7 +492,7 @@ namespace OpenSim.Groups
                 //    foreach (GroupMembersData m in groupMembers)
                 //        m_log.DebugFormat("[Groups.Messaging]: member {0}", m.AgentID);
 
-                foreach (Scene s in m_sceneList)
+                foreach (Scene s in scenes)
                 {
                     s.ForEachScenePresence(sp =>
                         {
@@ -738,7 +756,7 @@ namespace OpenSim.Groups
             IClientAPI child = null;
 
             // Try root avatar first
-            foreach (Scene scene in m_sceneList)
+            foreach (Scene scene in GetScenesSnapshot())
             {
                 ScenePresence sp = scene.GetScenePresence(agentID);
                 if (sp != null)

@@ -66,7 +66,7 @@ namespace osWebRtcVoice
 
         public string PluginId { get; set; }
 
-//        private CancellationTokenSource _CancelTokenSource = new();
+        private readonly CancellationTokenSource _LongPollCancellation = new();
 
         public bool IsConnected { get; set; }
 
@@ -90,6 +90,8 @@ namespace osWebRtcVoice
             {
                 _ = DestroySession();
             }
+            else
+                _LongPollCancellation.Cancel();
         }
 
         /// <summary>
@@ -137,11 +139,12 @@ namespace osWebRtcVoice
                 {
                     // Note that setting IsConnected to false will cause the long poll to exit
                     m_log.Debug($"{LogHeader} DestroySession. Destroyed");
+                    ret = true;
 //                    Debug("{0} DestroySession. Destroyed", LogHeader);
                 }
                 else
                 {
-                    if (resp.isError)
+                    if (resp is not null && resp.isError)
                     {
                         ErrorResp eResp = new(resp);
                         switch (eResp.errorCode)
@@ -149,6 +152,7 @@ namespace osWebRtcVoice
                             case 458:
                                 // This is the error code for a session that is already destroyed
                                 m_log.Debug($"{LogHeader} DestroySession: session already destroyed");
+                                ret = true;
 //                                DebugLog("{0} DestroySession: session already destroyed", LogHeader);
                                 break;
                             case 459:
@@ -173,7 +177,7 @@ namespace osWebRtcVoice
                 m_log.Error($"{LogHeader} DestroySession: exception ", e);
             }
             IsConnected = false;
-//            _CancelTokenSource.Cancel();
+            _LongPollCancellation.Cancel();
 
             return ret;
         }
@@ -273,19 +277,20 @@ namespace osWebRtcVoice
                 OutstandingRequest outReq = new OutstandingRequest
                 {
                     TransactionId = pReq.TransactionId,
-                    RequestTime = DateTime.Now,
-                    TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>()
+                    RequestTime = DateTime.UtcNow,
+                    TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>(
+                        TaskCreationOptions.RunContinuationsAsynchronously)
                 };
                 _OutstandingRequests[pReq.TransactionId] = outReq;
 
                 string reqStr = pReq.ToJson();
 
-                HttpClient httpClient = WebUtil.GetNewGlobalHttpClient(30000);
-                HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
+                HttpClient httpClient = WebUtil.GetGlobalNoRedirHttpClient(30000, 1024 * 1024);
+                using HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
                 reqMsg.Content = new StringContent(reqStr, System.Text.Encoding.UTF8, MediaTypeNames.Application.Json);
                 reqMsg.Headers.TryAddWithoutValidation("Accept", "application/json");
 
-                HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                using HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -307,7 +312,8 @@ namespace osWebRtcVoice
 
                         // Wait on the local TaskCompletionSource instead of re-reading the dictionary.
                         // This avoids a race where the long-poll thread already removed the request.
-                        ret = await outReq.TaskCompletionSource.Task;
+                        ret = await outReq.TaskCompletionSource.Task
+                            .WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
                     }
                     else 
                     {
@@ -350,12 +356,12 @@ namespace osWebRtcVoice
 
             try
             {
-                HttpClient httpClient = WebUtil.GetNewGlobalHttpClient(30000);
-                HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
+                HttpClient httpClient = WebUtil.GetGlobalNoRedirHttpClient(30000, 1024 * 1024);
+                using HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
                 string reqStr = pReq.ToJson();
                 reqMsg.Content = new StringContent(reqStr, System.Text.Encoding.UTF8, MediaTypeNames.Application.Json);
                 reqMsg.Headers.TryAddWithoutValidation("Accept", "application/json");
-                HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                using HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
                 string respStr = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 ret = JanusMessageResp.FromJson(respStr);
             }
@@ -439,7 +445,10 @@ namespace osWebRtcVoice
         /// </summary>
         /// <param name="pURI"></param>
         /// <returns></returns>
-        public async Task<JanusMessageResp> GetFromJanus(string pURI, int timeout = 30000)
+        public async Task<JanusMessageResp> GetFromJanus(
+            string pURI,
+            int timeout = 30000,
+            CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrEmpty(_JanusAPIToken))
             {
@@ -457,7 +466,7 @@ namespace osWebRtcVoice
                 HttpResponseMessage response = null;
                 try
                 {
-                    response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                    response = await httpClient.SendAsync(reqMsg, cancellationToken).ConfigureAwait(false);
 
                     if (response is not null && response.IsSuccessStatusCode)
                     {
@@ -560,7 +569,10 @@ namespace osWebRtcVoice
                 {
                     try
                     {
-                        JanusMessageResp resp = await GetFromJanus(SessionUri, 60000).ConfigureAwait(false);
+                        JanusMessageResp resp = await GetFromJanus(
+                            SessionUri,
+                            60000,
+                            _LongPollCancellation.Token).ConfigureAwait(false);
                         if (resp is not null)
                         {
                             //_ = Task.Run(() =>
@@ -646,7 +658,7 @@ namespace osWebRtcVoice
                                         m_log.DebugFormat("{0} EventLongPoll: error {1}", LogHeader, resp.ToString());
                                         if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest))
                                         {
-                                            outstandingRequest.TaskCompletionSource.SetResult(resp);
+                                            outstandingRequest.TaskCompletionSource.TrySetResult(resp);
                                         }
                                         else
                                         {
@@ -659,7 +671,7 @@ namespace osWebRtcVoice
                                         if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest2))
                                         {
                                             // Someone is waiting for this event
-                                            outstandingRequest2.TaskCompletionSource.SetResult(resp);
+                                            outstandingRequest2.TaskCompletionSource.TrySetResult(resp);
                                         }
                                         else
                                         {

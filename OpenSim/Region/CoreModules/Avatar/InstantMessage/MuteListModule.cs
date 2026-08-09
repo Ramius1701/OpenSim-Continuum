@@ -50,9 +50,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                 MethodBase.GetCurrentMethod().DeclaringType);
 
         protected bool m_Enabled = false;
-        protected List<Scene> m_SceneList = new List<Scene>();
-        protected IMuteListService m_service = null;
-        private IUserManagement m_userManagementModule;
+        protected readonly List<Scene> m_SceneList = new List<Scene>();
 
         public void Initialise(IConfigSource config)
         {
@@ -79,7 +77,6 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             if (xfer == null)
             {
                 m_log.ErrorFormat("[MuteListModule]: Xfer not available in region {0}. Module Disabled", scene.Name);
-                m_Enabled = false;
                 return;
             }
 
@@ -87,31 +84,32 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             if(srv == null)
             {
                 m_log.ErrorFormat("[MuteListModule]: MuteListService not available in region {0}. Module Disabled", scene.Name);
-                m_Enabled = false;
                 return;
             }
 
+            bool added;
             lock (m_SceneList)
             {
-                if(m_service == null)
-                    m_service = srv;
-                if(m_userManagementModule == null)
-                     m_userManagementModule = scene.RequestModuleInterface<IUserManagement>();
-                m_SceneList.Add(scene);
-                scene.EventManager.OnNewClient += OnNewClient;
+                added = !m_SceneList.Contains(scene);
+                if (added)
+                    m_SceneList.Add(scene);
             }
+            if (added)
+                scene.EventManager.OnNewClient += OnNewClient;
         }
 
         public void RemoveRegion(Scene scene)
         {
+            bool removed;
             lock (m_SceneList)
             {
-                if(m_SceneList.Contains(scene))
-                {
-                    m_SceneList.Remove(scene);
-                    scene.EventManager.OnNewClient -= OnNewClient;
-                }
+                removed = m_SceneList.Remove(scene);
             }
+            if (!removed)
+                return;
+
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(UnsubscribeClient);
         }
 
         public void PostInitialise()
@@ -134,14 +132,20 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_SceneList)
+                scenes = m_SceneList.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         private bool IsForeign(IClientAPI client)
         {
-            if(m_userManagementModule == null)
+            IUserManagement userManagement = client.Scene.RequestModuleInterface<IUserManagement>();
+            if(userManagement == null)
                 return false; // we can't check
 
-            return !m_userManagementModule.IsLocalGridUser(client.AgentId);
+            return !userManagement.IsLocalGridUser(client.AgentId);
         }
 
         private void OnNewClient(IClientAPI client)
@@ -149,6 +153,13 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             client.OnMuteListRequest += OnMuteListRequest;
             client.OnUpdateMuteListEntry += OnUpdateMuteListEntry;
             client.OnRemoveMuteListEntry += OnRemoveMuteListEntry;
+        }
+
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            client.OnMuteListRequest -= OnMuteListRequest;
+            client.OnUpdateMuteListEntry -= OnUpdateMuteListEntry;
+            client.OnRemoveMuteListEntry -= OnRemoveMuteListEntry;
         }
 
         private void OnMuteListRequest(IClientAPI client, uint crc)
@@ -172,13 +183,27 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
                 return;
             }
 
-            Byte[] data = m_service.MuteListRequest(client.AgentId, crc);
+            IMuteListService service = client.Scene.RequestModuleInterface<IMuteListService>();
+            if (service == null)
+            {
+                SendCachedOrEmpty(client, crc);
+                return;
+            }
+
+            Byte[] data;
+            try
+            {
+                data = service.MuteListRequest(client.AgentId, crc);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[MuteListModule]: Failed to retrieve mutes for {0}: {1}", client.AgentId, ex.Message);
+                SendCachedOrEmpty(client, crc);
+                return;
+            }
             if (data == null)
             {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
+                SendCachedOrEmpty(client, crc);
                 return;
             }
 
@@ -190,10 +215,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
 
             if (data.Length == 1)
             {
-                if(crc == 0)
-                    client.SendEmpytMuteList();
-                else
-                    client.SendUseCachedMuteList();
+                SendCachedOrEmpty(client, crc);
                 return;
             }
 
@@ -212,7 +234,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             {
                 if(agentID == muteID)
                     return;
-                if(m_SceneList[0].Permissions.IsAdministrator(muteID))
+                if(client.Scene is Scene scene && scene.Permissions.IsAdministrator(muteID))
                 {
                     OnMuteListRequest(client, 0);
                     return;
@@ -227,15 +249,44 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage
             mute.MuteFlags = (int)muteFlags;
             mute.Stamp = Util.UnixTimeSinceEpoch();
 
-            m_service.UpdateMute(mute);
+            IMuteListService service = client.Scene.RequestModuleInterface<IMuteListService>();
+            if (service == null)
+                return;
+            try
+            {
+                if (!service.UpdateMute(mute))
+                    m_log.WarnFormat("[MuteListModule]: Failed to persist mute update for {0}", agentID);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[MuteListModule]: Failed to update mutes for {0}: {1}", agentID, ex.Message);
+            }
         }
 
         private void OnRemoveMuteListEntry(IClientAPI client, UUID muteID, string muteName)
         {
             if (!m_Enabled || IsForeign(client))
                 return;
-            m_service.RemoveMute(client.AgentId, muteID, muteName);
+            IMuteListService service = client.Scene.RequestModuleInterface<IMuteListService>();
+            if (service == null)
+                return;
+            try
+            {
+                if (!service.RemoveMute(client.AgentId, muteID, muteName))
+                    m_log.WarnFormat("[MuteListModule]: Failed to persist mute removal for {0}", client.AgentId);
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat("[MuteListModule]: Failed to remove mute for {0}: {1}", client.AgentId, ex.Message);
+            }
+        }
+
+        private static void SendCachedOrEmpty(IClientAPI client, uint crc)
+        {
+            if (crc == 0)
+                client.SendEmpytMuteList();
+            else
+                client.SendUseCachedMuteList();
         }
     }
 }
-

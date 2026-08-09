@@ -2,17 +2,18 @@
 
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. This branch is an **alpha integration build**, not a production-test candidate. The complete solution builds, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, and other distributed paths still require donor-regression and multi-service runtime verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
+The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The repository has subsequently synchronized OpenSim upstream through `a87969840ce2abde50309229347fe7257456e62e` while retaining the audited Continuum feature set. The active hardening branch remains an **alpha integration build**, not a production-approved release. The complete solution builds cleanly, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, voice, and other distributed paths still require the recorded live-grid verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md), [the integration progress ledger](doc/integration-progress.md), and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
 
 ## Project status — alpha
 
 - Target runtime: .NET 8
 - Required deployment targets: Windows standalone with SQLite; Windows grid mode
   with Robust using MySQL/MariaDB or PostgreSQL
-- Baseline build: successful with four known CS9193 compiler warnings
-- Continuum completion build: successful
+- Original baseline build: successful with four known CS9193 compiler warnings
+- The four CS9193 warnings have been corrected without changing their quaternion calculations
 - Latest complete Release build: successful with zero warnings and zero errors
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
+- Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
 
@@ -51,9 +52,10 @@ The extended scripting surface is powerful and has estate/security implications.
 
 ### Optional region modules and services
 
-- Gunthar RegionWeb per-region website and protected estate tools
+- Gunthar RegionWeb combined per-region website, protected estate tools and optional wallet portal
 - GroupAutoInvite
-- RegionCurrency
+- Deprecated RegionCurrency compatibility portal for deployments made against
+  the earlier split; it disables itself when RegionWeb is enabled
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
 - MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
@@ -74,7 +76,7 @@ dedicated providers are implemented and certified.
 
 - Warp3D alpha texture-card sprite rendering, disabled by default
 - Dedicated experimental ubODE tuning branch for social collision, contact, bounce, buoyancy, and water behavior
-- Windows first-run setup tooling, retained as experimental until its remaining donor assumptions and operational edge cases are certified
+- Recovered Windows first-run setup tooling, quarantined because it can overwrite configuration and persist credentials; it is not a supported production setup path
 
 ## Safe defaults
 
@@ -85,6 +87,13 @@ The following components require deliberate opt-in:
 - `[OpenSimMarketplace] Enabled = false`
 - Recovered economy, search, environment, and protection modules through their own configuration sections
 - Warp3D flat-card sprite rendering through its renderer flags
+
+RegionWeb is the canonical combined Gunthar-derived per-region site, estate
+control room and optional wallet presentation; it is not WhiteCore WebUI and it
+is not an economy backend. Public pages may be served independently, while
+Estate Admin and wallet routes require HTTPS by default. RegionCurrency is only
+a deprecated compatibility path for deployments made against the earlier split
+and automatically disables itself whenever RegionWeb is enabled.
 
 `[ScriptExperiences]` controls the separate Experience-Lite automatic permission/KVP layer; it is not the grid-wide Experience service itself. The grid-wide service and its Robust endpoint are enabled in the Continuum grid examples. Keep automatic grants restricted to trusted estate managers, owners, or objects during testing.
 
@@ -115,8 +124,8 @@ database and an upgrade from the exact schema used by the target deployment.
 
 See [BUILDING.md](BUILDING.md) for the upstream build prerequisites and platform details.
 
-On Windows, build from the repository root (for this integration worktree,
-`S:\Github\OpenSim-Continuum-complete`):
+On Windows, build from the root of the checkout or isolated worktree you intend
+to test. Do not mix binaries from another OpenSim checkout:
 
 ```powershell
 .\runprebuild.bat
@@ -136,10 +145,14 @@ Generated `bin/*.runtimeconfig.json` files are build artifacts and must not be c
 6. Inspect logs for repeated exceptions, authentication failures, sensitive data, and migration errors.
 7. Test Robust outage/recovery and Hypergrid boundaries before enabling identity or Experience features on a public grid.
 
-The Windows setup wizard is not a substitute for reviewing production configuration.
+The recovered Windows setup wizard is quarantined and its launcher exits without
+making changes. It is not a supported production setup path. Configure the
+simulator and Robust services manually from the supplied examples and review all
+credentials, service URIs, database providers, and optional-module settings.
 
 ## Branches used for testing
 
+- `agent/complete-runtime-readiness`: active production-hardening and runtime-test candidate
 - `codex/complete-opensim-feature-set`: complete OpenSim-side feature candidate
 - `codex/production-feature-integration`: earlier conservative integration checkpoint
 - `codex/testing-ubode-tuning`: experimental ubODE series on the integration candidate

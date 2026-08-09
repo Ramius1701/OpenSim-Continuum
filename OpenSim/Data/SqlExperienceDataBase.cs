@@ -10,6 +10,7 @@ namespace OpenSim.Data
     public abstract class SqlExperienceDataBase : IExperienceData
     {
         protected abstract DbConnection CreateConnection();
+        protected abstract string KeyValueSizeExpression { get; }
 
         protected SqlExperienceDataBase()
         {
@@ -119,7 +120,7 @@ namespace OpenSim.Data
         }
 
         public int GetKeyValueSize(UUID experience) => Convert.ToInt32(Scalar(
-            "SELECT COALESCE(SUM(LENGTH(key) + LENGTH(value)),0) FROM experience_kv WHERE experience=@experience",
+            "SELECT COALESCE(SUM(" + KeyValueSizeExpression + "),0) FROM experience_kv WHERE experience=@experience",
             ("@experience", experience.ToString())));
 
         private ExperienceInfoData[] QueryExperienceInfos(string where,

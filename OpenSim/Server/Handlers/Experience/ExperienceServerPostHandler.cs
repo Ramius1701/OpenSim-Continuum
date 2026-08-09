@@ -21,6 +21,7 @@ namespace OpenSim.Server.Handlers.Experience
 {
     public class ExperienceServerPostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 1024 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IExperienceService m_service;
@@ -35,9 +36,16 @@ namespace OpenSim.Server.Handlers.Experience
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
             string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
+            try
+            {
+                body = ReadBoundedBody(requestData, httpRequest, MaxRequestBodyBytes).Trim();
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[EXPERIENCE HANDLER]: Rejected request: {0}", e.Message);
+                httpResponse.StatusCode = 413;
+                return FailureResult();
+            }
 
             //m_log.InfoFormat("[EXPERIENCE POST HANDLER]: {0}", body);
 
@@ -305,6 +313,9 @@ namespace OpenSim.Server.Handlers.Experience
         {
             UUID experience_id;
 
+            if (!request.ContainsKey("EXPERIENCE"))
+                return FailureResult();
+
             if (!UUID.TryParse(request["EXPERIENCE"].ToString(), out experience_id))
                 return FailureResult();
 
@@ -393,8 +404,11 @@ namespace OpenSim.Server.Handlers.Experience
                 if (request.ContainsKey("START") == false || request.ContainsKey("COUNT") == false)
                     return FailureResult();
 
-                int start = int.Parse(request["START"].ToString());
-                int count = int.Parse(request["COUNT"].ToString());
+                if (!int.TryParse(request["START"].ToString(), out int start) || start < 0 ||
+                    !int.TryParse(request["COUNT"].ToString(), out int count) || count < 1 || count > 1000)
+                {
+                    return FailureResult();
+                }
 
                 string[] keys = m_service.GetKeys(experience_id, start, count);
 
@@ -431,6 +445,29 @@ namespace OpenSim.Server.Handlers.Experience
             rootElement.AppendChild(result);
 
             return Util.DocToBytes(doc);
+        }
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request, int maximumBytes)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > maximumBytes)
+                throw new InvalidDataException("Request body exceeds the configured service limit.");
+
+            using (MemoryStream body = new MemoryStream())
+            {
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                int read;
+                while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > maximumBytes)
+                        throw new InvalidDataException("Request body exceeds the configured service limit.");
+                    body.Write(buffer, 0, read);
+                }
+                return Encoding.UTF8.GetString(body.ToArray());
+            }
         }
 
         private byte[] FailureResult()

@@ -42,6 +42,8 @@ namespace OpenSim.Services.Connectors
 {
     public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasService
     {
+        private const int MaxAliasResults = 1000;
+        private const int MaxDescriptionLength = 80;
         private static readonly ILog m_log =
                 LogManager.GetLogger(
                 MethodBase.GetCurrentMethod().DeclaringType);
@@ -93,6 +95,9 @@ namespace OpenSim.Services.Connectors
 
         public UserAlias GetUserForAlias(UUID aliasID)
         {
+            if (aliasID == UUID.Zero)
+                return null;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -100,33 +105,14 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "getuserforalias";
             sendData["AliasID"] = aliasID.ToString();
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/useralias";
-
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
-
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserForAlias received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "GetUserForAlias");
 
             if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
             {
                 if (replyData["result"] is Dictionary<string, object>)
                 {
-                    var alias = new UserAlias((Dictionary<string, object>)replyData["result"]);
-                    return alias;
+                    return ParseAlias((Dictionary<string, object>)replyData["result"]);
                 }
             }
 
@@ -135,6 +121,9 @@ namespace OpenSim.Services.Connectors
 
         public List<UserAlias> GetUserAliases(UUID userID)
         {
+            if (userID == UUID.Zero)
+                return new List<UserAlias>();
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -142,31 +131,13 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "getuseraliases";
             sendData["UserID"] = userID.ToString();
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/useralias";
-
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
-
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: GetUserLiases received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "GetUserAliases");
 
             if ((replyData == null) || 
                 (replyData.ContainsKey("result") && replyData["result"].ToString() == "null"))
             {
-                return null;
+                return new List<UserAlias>();
             }
 
             Dictionary<string, object>.ValueCollection aliasList = replyData.Values;
@@ -174,16 +145,19 @@ namespace OpenSim.Services.Connectors
 
             foreach (object elements in aliasList)
             {
+                if (userAliases.Count >= MaxAliasResults)
+                    break;
                 if (elements is Dictionary<string, object>)
                 {
-                    var alias = new UserAlias((Dictionary<string, object>)elements);
-                    userAliases.Add(alias);
+                    UserAlias alias = ParseAlias((Dictionary<string, object>)elements);
+                    if (alias != null)
+                        userAliases.Add(alias);
                 }
                 else
                 {
                     m_log.DebugFormat(
                         "[USER ALIAS CONNECTOR]: GetUserAliases received invalid response type {0}",
-                        elements.GetType());
+                        elements?.GetType());
                 }
             }
 
@@ -192,6 +166,10 @@ namespace OpenSim.Services.Connectors
 
         public UserAlias CreateAlias(UUID AliasID, UUID UserID, string Description)
         {
+            if (AliasID == UUID.Zero || UserID == UUID.Zero ||
+                (Description?.Length ?? 0) > MaxDescriptionLength)
+                return null;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -199,36 +177,16 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "createalias";
             sendData["AliasID"] = AliasID.ToString();
             sendData["UserID"] = UserID.ToString();
-            sendData["Description"] = Description.ToString();
+            sendData["Description"] = Description ?? string.Empty;
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/useralias";
-
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
-
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: CreateAlias received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
-                return null;
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "CreateAlias");
 
             if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
             {
                 if (replyData["result"] is Dictionary<string, object>)
                 {
-                    var alias = new UserAlias((Dictionary<string, object>)replyData["result"]);
-                    return alias;
+                    return ParseAlias((Dictionary<string, object>)replyData["result"]);
                 }
             }
 
@@ -237,6 +195,9 @@ namespace OpenSim.Services.Connectors
 
         public bool DeleteAlias(UUID aliasID)
         {
+            if (aliasID == UUID.Zero)
+                return false;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
 
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -244,34 +205,50 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "deletealias";
             sendData["AliasID"] = aliasID.ToString();
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/useralias";
-
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST", uri, reqString, m_Auth);
-
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: DeleteAlias received null or empty reply");
-                    return false;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT ALIAS CONNECTOR]: Exception when contacting user alias server at {0}: {1}", uri, e.Message);
-                return false;
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "DeleteAlias");
             if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
             {
-                var result = (bool)replyData["result"];
-                return result;
+                return bool.TryParse(replyData["result"].ToString(), out bool result) && result;
             }
 
             return false;
+        }
+
+        private Dictionary<string, object> DoPost(string requestString, string method)
+        {
+            string uri = m_ServerURI + "/useralias";
+            try
+            {
+                string reply = SynchronousRestFormsRequester.MakeRequest(
+                    "POST", uri, requestString, m_Auth);
+                if (string.IsNullOrEmpty(reply))
+                {
+                    m_log.DebugFormat("[USER ALIAS CONNECTOR]: {0} received an empty reply", method);
+                    return null;
+                }
+
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[USER ALIAS CONNECTOR]: {0} failed contacting {1}: {2}",
+                    method, uri, e.Message);
+                return null;
+            }
+        }
+
+        private static UserAlias ParseAlias(Dictionary<string, object> data)
+        {
+            try
+            {
+                return new UserAlias(data);
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

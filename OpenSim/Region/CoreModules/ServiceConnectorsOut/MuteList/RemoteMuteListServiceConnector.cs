@@ -51,6 +51,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
         private bool m_Enabled = false;
 
         private IMuteListService m_remoteConnector;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         public Type ReplaceableInterface
         {
@@ -78,8 +80,17 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
                 string name = moduleConfig.GetString("MuteListService", "");
                 if (name == Name)
                 {
-                    m_remoteConnector = new MuteListServicesConnector(source);
-                    m_Enabled = true;
+                    try
+                    {
+                        m_remoteConnector = new MuteListServicesConnector(source);
+                        m_Enabled = true;
+                    }
+                    catch (Exception e)
+                    {
+                        m_log.ErrorFormat(
+                            "[MUTELIST CONNECTOR]: Remote service configuration is invalid; module disabled. {0}",
+                            e.Message);
+                    }
                 }
             }
         }
@@ -90,21 +101,50 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
 
         public void Close()
         {
+            if (!m_Enabled)
+                return;
+
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                scene.UnregisterModuleInterface<IMuteListService>(this);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            scene.RegisterModuleInterface<IMuteListService>(this);
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
+
+                scene.RegisterModuleInterface<IMuteListService>(this);
+            }
+
             m_log.InfoFormat("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+            }
+
+            scene.UnregisterModuleInterface<IMuteListService>(this);
         }
 
         public void RegionLoaded(Scene scene)
@@ -118,23 +158,26 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList
         #region IMuteListService
         public Byte[] MuteListRequest(UUID agentID, uint crc)
         {
-            if (!m_Enabled)
+            IMuteListService connector = m_remoteConnector;
+            if (!m_Enabled || connector == null)
                 return null;
-            return m_remoteConnector.MuteListRequest(agentID, crc);
+            return connector.MuteListRequest(agentID, crc);
         }
 
         public bool UpdateMute(MuteData mute)
         {
-            if (!m_Enabled)
+            IMuteListService connector = m_remoteConnector;
+            if (!m_Enabled || connector == null)
                 return false;
-            return m_remoteConnector.UpdateMute(mute);
+            return connector.UpdateMute(mute);
         }
 
         public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
         {
-            if (!m_Enabled)
+            IMuteListService connector = m_remoteConnector;
+            if (!m_Enabled || connector == null)
                 return false;
-            return m_remoteConnector.RemoveMute(agentID, muteID, muteName);
+            return connector.RemoveMute(agentID, muteID, muteName);
         }
 
         #endregion IMuteListService

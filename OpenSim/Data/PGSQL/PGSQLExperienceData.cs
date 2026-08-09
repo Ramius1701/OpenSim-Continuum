@@ -17,5 +17,8 @@ namespace OpenSim.Data.PGSQL
 
         protected override DbConnection CreateConnection() =>
             new NpgsqlConnection(m_connectionString);
+
+        protected override string KeyValueSizeExpression =>
+            "OCTET_LENGTH(key) + OCTET_LENGTH(value)";
     }
 }

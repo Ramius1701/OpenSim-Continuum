@@ -1045,7 +1045,8 @@ namespace OpenSim.Region.ClientStack.Linden
                         // Fix first link number
                         grp.RootPart.LinkNum++;
 
-                        Quaternion rootRotConj = Quaternion.Conjugate(rotations[0]);
+                        Quaternion rootRotation = rotations[0];
+                        Quaternion rootRotConj = Quaternion.Conjugate(in rootRotation);
                         Quaternion tmprot;
                         Vector3 offset;
 
@@ -2259,6 +2260,12 @@ namespace OpenSim.Region.ClientStack.Linden
             string[] ids = query.GetValues("ids") ?? Array.Empty<string>();
             string username = query.Get("username");
             string badUsername = null;
+
+            if (ids.Length > 100)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
 
             if (ids.Length == 0 && !string.IsNullOrWhiteSpace(username))
             {

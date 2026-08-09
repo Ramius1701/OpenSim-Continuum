@@ -26,6 +26,8 @@ Version 0.5.0 preserves the upstream design while correcting integration risks:
 - retries wake operations when a database or row-deletion failure occurs
 - spaces repeated empty-region scans by `EmptyDelaySeconds`
 - inherits the MySQL connection from `[DatabaseService]` when the module-specific connection is blank
+- validates the selected storage provider before starting `PersistSleep`
+- validates an existing sleep table at startup when automatic creation is disabled
 - uses only the module-owned `holo_physics_guard_sleep` table
 - no longer writes directly to OpenSim's `prims` table
 - changes physical state through `SceneObjectPart.UpdatePrimFlags()`
@@ -70,6 +72,12 @@ its own MySQL ledger. SQLite and PostgreSQL deployments may use `ReportOnly`, bu
 must not select `PersistSleep`. This optional module is therefore not considered
 database-portable until dedicated SQLite and PostgreSQL providers and migrations
 are implemented and certified.
+
+When the connection is inherited, `StorageProvider` is inherited from
+`[DatabaseService]`; unsupported providers now disable the module immediately.
+For a module-specific MySQL/MariaDB connection, set
+`StorageProvider = OpenSim.Data.MySQL.dll`. Omitting it with an explicit
+connection retains backward-compatible MySQL selection.
 
 ## Database table
 

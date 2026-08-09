@@ -63,7 +63,7 @@ namespace osWebRtcVoice
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static string LogHeader = "[WEBRTC VOICE SERVICE MODULE]";
 
-        private static bool m_Enabled = false;
+        private bool m_Enabled = false;
         private IConfigSource m_Config;
 
         private IWebRtcVoiceService m_spatialVoiceService;
@@ -123,6 +123,8 @@ namespace osWebRtcVoice
                             m_Enabled = false;
                         }
                     }
+                    else
+                        m_nonSpatialVoiceService = m_spatialVoiceService;
 
                     if (m_Enabled)
                     {
@@ -137,10 +139,9 @@ namespace osWebRtcVoice
         {
             if(VoiceViewerSession.TryGetViewerSessionsByAgentAndRegion(pAgentID, pSceneID, out IEnumerable<KeyValuePair<string, IVoiceViewerSession>> candidates))
             {
-                bool noskip = string.IsNullOrEmpty(pKeepViewerSessionId);
                 foreach (KeyValuePair<string, IVoiceViewerSession> candidate in candidates)
                 {
-                    if (noskip && candidate.Key == pKeepViewerSessionId)
+                    if (!string.IsNullOrEmpty(pKeepViewerSessionId) && candidate.Key == pKeepViewerSessionId)
                         continue;
 
                     m_log.Warn(
@@ -169,6 +170,9 @@ namespace osWebRtcVoice
         // IWebRtcVoiceService.ProvisionVoiceAccountRequest
         public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
+            if (!m_Enabled || pRequest == null)
+                return ErrorResponse("Voice service is unavailable");
+
             IVoiceViewerSession vSession = null;
             if (pRequest.TryGetString("viewer_session", out string viewerSessionId))
             {
@@ -201,6 +205,11 @@ namespace osWebRtcVoice
                     OSDMap resp = null;
                     if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                     {
+                        if (!SessionMatches(vSession, pUserID, pSceneID))
+                        {
+                            m_log.Warn($"{LogHeader} Rejected logout for a viewer session owned by another agent or region");
+                            return ErrorResponse("Logout session not found");
+                        }
                         VoiceViewerSession.RemoveViewerSession(viewerSessionId);
                         resp = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
                     }
@@ -212,7 +221,13 @@ namespace osWebRtcVoice
                 // request has a viewer session. Use that to find the voice service
                 if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                 {
-                    CleanupDuplicateSessions(pUserID, pSceneID, viewerSessionId);
+                    if (SessionMatches(vSession, pUserID, pSceneID))
+                        CleanupDuplicateSessions(pUserID, pSceneID, viewerSessionId);
+                    else
+                    {
+                        m_log.Warn($"{LogHeader} Rejected provisioning for a viewer session owned by another agent or region");
+                        vSession = null;
+                    }
                 }
             }
             else
@@ -266,6 +281,9 @@ namespace osWebRtcVoice
         // IWebRtcVoiceService.VoiceSignalingRequest
         public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
+            if (!m_Enabled || pRequest == null)
+                return ErrorResponse("Voice service is unavailable");
+
             OSDMap response = null;
             IVoiceViewerSession vSession = null;
             if (pRequest.TryGetString("viewer_session", out string viewerSessionId))
@@ -273,7 +291,10 @@ namespace osWebRtcVoice
                 // request has a viewer session. Use that to find the voice service
                 if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                 {
-                    response = vSession.VoiceService.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
+                    if (SessionMatches(vSession, pUserID, pSceneID))
+                        response = vSession.VoiceService.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
+                    else
+                        m_log.Warn($"{LogHeader} Rejected signaling for a viewer session owned by another agent or region");
                 }
                 else
                 {
@@ -285,6 +306,20 @@ namespace osWebRtcVoice
                 m_log.Error($"{LogHeader} VoiceSignalingRequest: no viewer_session in request");
             }
             return response;
+        }
+
+        private static bool SessionMatches(IVoiceViewerSession session, UUID userID, UUID sceneID)
+        {
+            return session != null && session.AgentId == userID && session.RegionId == sceneID;
+        }
+
+        private static OSDMap ErrorResponse(string message)
+        {
+            return new OSDMap
+            {
+                { "response", "error" },
+                { "message", message }
+            };
         }
 
         // This module should never be called with this signature

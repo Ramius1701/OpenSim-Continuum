@@ -40,6 +40,7 @@ namespace OpenSim.Services.UserAccountService
 {
     public class UserAliasService : ServiceBase, IUserAliasService
     {
+        private const int MaxDescriptionLength = 80;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected IUserAliasData m_Database = null;
@@ -180,9 +181,20 @@ namespace OpenSim.Services.UserAccountService
         /// <returns>List<UserAlias>() - A list of aliases or null if none are defined</UUID></returns>
         public List<UserAlias> GetUserAliases(UUID userID)
         {
- //           m_log.DebugFormat("[USER ALIAS SERVICE] Retrieving aliases for user by userid {0}", userID);
+            if (userID == UUID.Zero)
+                return null;
 
-            var aliases = m_Database.GetUserAliases(userID);
+ //           m_log.DebugFormat("[USER ALIAS SERVICE] Retrieving aliases for user by userid {0}", userID);
+            List<UserAliasData> aliases;
+            try
+            {
+                aliases = m_Database.GetUserAliases(userID);
+            }
+            catch (Exception e)
+            {
+                m_log.ErrorFormat("[USER ALIAS SERVICE]: Failed to retrieve aliases for {0}: {1}", userID, e);
+                return null;
+            }
 
             if ((aliases == null) || (aliases.Count == 0))
                 return null;
@@ -205,9 +217,20 @@ namespace OpenSim.Services.UserAccountService
 
         public UserAlias GetUserForAlias(UUID aliasID)
         {
-//            m_log.DebugFormat("[USER ALIAS SERVICE]: Retrieving userID for alias by aliasId ", aliasID);
+            if (aliasID == UUID.Zero)
+                return null;
 
-            var alias = m_Database.GetUserForAlias(aliasID);
+//            m_log.DebugFormat("[USER ALIAS SERVICE]: Retrieving userID for alias by aliasId ", aliasID);
+            UserAliasData alias;
+            try
+            {
+                alias = m_Database.GetUserForAlias(aliasID);
+            }
+            catch (Exception e)
+            {
+                m_log.ErrorFormat("[USER ALIAS SERVICE]: Failed to retrieve alias {0}: {1}", aliasID, e);
+                return null;
+            }
 
             if (alias == null)
             {
@@ -228,6 +251,13 @@ namespace OpenSim.Services.UserAccountService
 
         public UserAlias CreateAlias(UUID AliasID, UUID UserID, string Description)
         {
+            Description ??= string.Empty;
+            if (AliasID == UUID.Zero || UserID == UUID.Zero ||
+                Description.Length > MaxDescriptionLength)
+            {
+                return null;
+            }
+
             var aliasData = new UserAliasData
             {
                 AliasID = AliasID,
@@ -235,9 +265,14 @@ namespace OpenSim.Services.UserAccountService
                 Description = Description
             };
 
-            if (m_Database.Store(aliasData) == true)
+            try
             {
-                return new UserAlias(AliasID, UserID, Description); 
+                if (m_Database.Store(aliasData))
+                    return new UserAlias(AliasID, UserID, Description);
+            }
+            catch (Exception e)
+            {
+                m_log.ErrorFormat("[USER ALIAS SERVICE]: Failed to create alias {0}: {1}", AliasID, e);
             }
 
             return null;
@@ -245,8 +280,18 @@ namespace OpenSim.Services.UserAccountService
 
         public bool DeleteAlias(UUID aliasID)
         {
-            return m_Database.Delete("AliasID", aliasID.ToString());
-            throw new NotImplementedException();
+            if (aliasID == UUID.Zero)
+                return false;
+
+            try
+            {
+                return m_Database.Delete("AliasID", aliasID.ToString());
+            }
+            catch (Exception e)
+            {
+                m_log.ErrorFormat("[USER ALIAS SERVICE]: Failed to delete alias {0}: {1}", aliasID, e);
+                return false;
+            }
         }
     }
 }
