@@ -105,6 +105,7 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private string m_mapTilesDirectory = string.Empty; // directory to load/save map tile images
 
         private bool m_Enabled = false;
+        private readonly object m_renderLock = new object();
         private readonly HashSet<string> m_failedGeometryAssets = new HashSet<string>();
         private readonly HashSet<UUID> m_failedTextureAssets = new HashSet<UUID>();
         private int m_renderStartMS;
@@ -254,10 +255,28 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
 
         public void RemoveRegion(Scene scene)
         {
+            if (!m_Enabled || scene == null || !ReferenceEquals(m_scene, scene))
+                return;
+
+            lock (m_renderLock)
+            {
+                scene.UnregisterModuleInterface<IMapImageGenerator>(this);
+                DisposeSpriteTextures();
+                m_colors = null;
+                m_warpTextures = null;
+                m_spriteTextures = null;
+                m_imgDecoder = null;
+                m_primMesher = null;
+                m_scene = null;
+                m_Enabled = false;
+            }
         }
 
         public void Close()
         {
+            Scene scene = m_scene;
+            if (scene != null)
+                RemoveRegion(scene);
         }
 
         public string Name
@@ -282,6 +301,17 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private bool orto;
 
         public Bitmap CreateMapTile()
+        {
+            lock (m_renderLock)
+            {
+                if (!m_Enabled || m_scene == null)
+                    return null;
+
+                return CreateMapTileLocked();
+            }
+        }
+
+        private Bitmap CreateMapTileLocked()
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
             if (renderers.Count > 0)
@@ -318,6 +348,17 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         }
 
         public Bitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
+        {
+            lock (m_renderLock)
+            {
+                if (!m_Enabled || m_scene == null)
+                    return null;
+
+                return CreateViewImageLocked(camPos, camDir, pfov, width, height, useTextures);
+            }
+        }
+
+        private Bitmap CreateViewImageLocked(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
             if (renderers.Count > 0)
@@ -362,9 +403,11 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             m_spriteTextureDecodesThisPass = 0;
 
             WarpRenderer renderer = new WarpRenderer();
+            try
+            {
 
-            if (!renderer.CreateScene(viewWidth, viewHeight))
-                return new Bitmap(viewWidth, viewHeight);
+                if (!renderer.CreateScene(viewWidth, viewHeight))
+                    return new Bitmap(viewWidth, viewHeight);
 
             #region Camera
 
@@ -394,15 +437,6 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             if (m_drawFlatTextureCardSprites)
                 DrawFlatTextureCardSprites(bitmap);
 
-            renderer.Scene.destroy();
-            renderer.Reset();
-            renderer = null;
-
-            DisposeSpriteTextures();
-            m_colors = null;
-            m_warpTextures = null;
-            m_spriteTextures = null;
-
             if (m_forceGC)
             {
                 GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
@@ -418,6 +452,20 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
                 m_flatTextureCardSkipped, m_spriteCardsSkipped, m_budgetSkipped,
                 Util.EnvironmentTickCountSubtract(Environment.TickCount, m_renderStartMS));
             return bitmap;
+            }
+            finally
+            {
+                if (renderer != null)
+                {
+                    renderer.Scene?.destroy();
+                    renderer.Reset();
+                }
+
+                DisposeSpriteTextures();
+                m_colors = null;
+                m_warpTextures = null;
+                m_spriteTextures = null;
+            }
         }
 
         public byte[] WriteJpeg2000Image()
