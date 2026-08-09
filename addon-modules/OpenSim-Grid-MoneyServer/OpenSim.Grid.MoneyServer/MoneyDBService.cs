@@ -1086,15 +1086,17 @@ namespace OpenSim.Grid.MoneyServer
                 //check the amount
                 if (transaction.Amount >= 0 && balance >= transaction.Amount)
                 {
+                    // Validate the receiver before debiting the sender. The old
+                    // order returned here after a successful withdrawal and
+                    // permanently lost the sender's funds.
+                    if (getBalance(transaction.Receiver) == -1)
+                    {
+                        m_log.ErrorFormat("[MONEY DB]: DoTransfer: Receiver not found in balances table. {0}", transaction.Receiver);
+                        return false;
+                    }
+
                     if (withdrawMoney(transactionUUID, transaction.Sender, transaction.Amount))
                     {
-                        //If receiver not found, add it to DB.
-                        if (getBalance(transaction.Receiver) == -1)
-                        {
-                            m_log.ErrorFormat("[MONEY DB]: DoTransfer: Receiver not found in balances table. {0}", transaction.Receiver);
-                            return false;
-                        }
-
                         if (giveMoney(transactionUUID, transaction.Receiver, transaction.Amount))
                         {
                             do_trans = true;
