@@ -13,6 +13,7 @@ The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743d
 - The four CS9193 warnings have been corrected without changing their quaternion calculations
 - Latest complete Release build: successful with zero warnings and zero errors
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
+- Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
 

@@ -138,6 +138,13 @@
     EstateServerURI = "${Const|PrivURL}:${Const|PrivatePort}"
 
 [Messaging]
+    ;; Grid-wide offline messages are stored by the authenticated private
+    ;; ROBUST endpoint. Mute lists use the selected remote service connector.
+    OfflineMessageModule = "Offline Message Module V2"
+    OfflineMessageURL = "${Const|PrivURL}:${Const|PrivatePort}"
+    ForwardOfflineGroupMessages = true
+    MuteListModule = MuteListModule
+
     ; === HG ONLY ===
     ;; Change this to the address of your Gatekeeper service
     ;; (usually bundled with the rest of the services in one
