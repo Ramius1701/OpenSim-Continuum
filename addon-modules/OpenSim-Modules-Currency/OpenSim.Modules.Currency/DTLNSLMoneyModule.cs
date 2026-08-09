@@ -599,7 +599,7 @@ namespace OpenSim.Modules.Currency
         {
             IClientAPI client = GetLocateClient(agentID);
 
-            if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+            if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
             {
                 int balance = QueryBalanceFromMoneyServer(client);
                 if (balance >= amount) return true;
@@ -618,7 +618,7 @@ namespace OpenSim.Modules.Currency
         {
             IClientAPI client = GetLocateClient(agentID);
 
-            if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+            if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
             {
                 int balance = QueryBalanceFromMoneyServer(client);
                 if (balance >= amount) return true;
@@ -1023,7 +1023,7 @@ namespace OpenSim.Modules.Currency
         {
             if (user != null)
             {
-                if (m_enable_server || string.IsNullOrEmpty(m_moneyServURL))
+                if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
                 {
                     //Scene s = GetLocateScene(user.AgentId);
                     Scene s = (Scene)user.Scene;
