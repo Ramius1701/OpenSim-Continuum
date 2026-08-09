@@ -1067,6 +1067,140 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool DoTransfer(UUID transactionUUID)
         {
+            TransactionData transaction = FetchTransaction(transactionUUID);
+            if (transaction == null || transaction.Status != (int)Status.PENDING_STATUS)
+            {
+                m_log.ErrorFormat("[MONEY DB]: Transaction {0} is missing or is no longer pending.", transactionUUID);
+                return false;
+            }
+
+            if (transaction.Sender == transaction.Receiver || transaction.Amount < 0)
+            {
+                m_log.ErrorFormat("[MONEY DB]: Invalid transfer {0}: sender, receiver or amount is not valid.", transactionUUID);
+                return false;
+            }
+
+            MySQLSuperManager dbm = GetLockedConnection();
+            MySqlTransaction dbTransaction = null;
+            try
+            {
+                MySqlConnection connection = dbm.Manager.dbcon;
+                dbTransaction = connection.BeginTransaction(System.Data.IsolationLevel.ReadCommitted);
+
+                const string lockTransactionSql =
+                    "SELECT status FROM transactions WHERE UUID = ?transactionID FOR UPDATE";
+                using (MySqlCommand command = new MySqlCommand(lockTransactionSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?transactionID", transactionUUID.ToString());
+                    object status = command.ExecuteScalar();
+                    if (status == null || status == DBNull.Value ||
+                        Convert.ToInt32(status) != (int)Status.PENDING_STATUS)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                int senderBalance = -1;
+                int receiverBalance = -1;
+                const string lockBalancesSql =
+                    "SELECT user, balance FROM balances " +
+                    "WHERE user IN (?senderID, ?receiverID) FOR UPDATE";
+                using (MySqlCommand command = new MySqlCommand(lockBalancesSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?senderID", transaction.Sender);
+                    command.Parameters.AddWithValue("?receiverID", transaction.Receiver);
+                    using (MySqlDataReader reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string userID = Convert.ToString(reader["user"]);
+                            int balance = Convert.ToInt32(reader["balance"]);
+                            if (string.Equals(userID, transaction.Sender, StringComparison.OrdinalIgnoreCase))
+                                senderBalance = balance;
+                            else if (string.Equals(userID, transaction.Receiver, StringComparison.OrdinalIgnoreCase))
+                                receiverBalance = balance;
+                        }
+                    }
+                }
+
+                if (senderBalance < transaction.Amount || receiverBalance < 0 ||
+                    (long)receiverBalance + transaction.Amount > int.MaxValue)
+                {
+                    dbTransaction.Rollback();
+                    m_log.ErrorFormat("[MONEY DB]: Transfer {0} failed balance or account validation.", transactionUUID);
+                    return false;
+                }
+
+                int newSenderBalance = senderBalance - transaction.Amount;
+                int newReceiverBalance = receiverBalance + transaction.Amount;
+                const string updateBalanceSql =
+                    "UPDATE balances SET balance = ?balance WHERE user = ?userID";
+                using (MySqlCommand command = new MySqlCommand(updateBalanceSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?balance", newSenderBalance);
+                    command.Parameters.AddWithValue("?userID", transaction.Sender);
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+
+                    command.Parameters["?balance"].Value = newReceiverBalance;
+                    command.Parameters["?userID"].Value = transaction.Receiver;
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                const string completeSql =
+                    "UPDATE transactions SET senderBalance = ?senderBalance, " +
+                    "receiverBalance = ?receiverBalance, status = ?successStatus " +
+                    "WHERE UUID = ?transactionID AND status = ?pendingStatus";
+                using (MySqlCommand command = new MySqlCommand(completeSql, connection, dbTransaction))
+                {
+                    command.Parameters.AddWithValue("?senderBalance", newSenderBalance);
+                    command.Parameters.AddWithValue("?receiverBalance", newReceiverBalance);
+                    command.Parameters.AddWithValue("?successStatus", (int)Status.SUCCESS_STATUS);
+                    command.Parameters.AddWithValue("?transactionID", transactionUUID.ToString());
+                    command.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
+                    if (command.ExecuteNonQuery() != 1)
+                    {
+                        dbTransaction.Rollback();
+                        return false;
+                    }
+                }
+
+                dbTransaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    dbTransaction?.Rollback();
+                }
+                catch
+                {
+                    // Preserve the original transfer failure.
+                }
+
+                m_log.ErrorFormat("[MONEY DB]: Atomic transfer {0} failed: {1}", transactionUUID, ex);
+                return false;
+            }
+            finally
+            {
+                dbTransaction?.Dispose();
+                dbm.Release();
+            }
+
+            setTotalSale(transaction);
+            return true;
+        }
+
+        private bool LegacyDoTransfer(UUID transactionUUID)
+        {
             bool do_trans = false;
 
             TransactionData transaction = new TransactionData();
