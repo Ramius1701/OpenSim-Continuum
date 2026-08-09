@@ -1231,7 +1231,8 @@ namespace OpenSim.Grid.MoneyServer
             string canonicalAvatarID = avatarID.ToString();
             string expectedSession;
 
-            lock (m_secureSessionDic)
+            // Session dictionaries are a pair and share m_sessionDic as their lock.
+            lock (m_sessionDic)
             {
                 if (!m_secureSessionDic.TryGetValue(canonicalAvatarID, out expectedSession) &&
                     !m_secureSessionDic.TryGetValue(agentId, out expectedSession))
