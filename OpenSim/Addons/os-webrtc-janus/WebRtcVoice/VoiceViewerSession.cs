@@ -70,8 +70,10 @@ namespace osWebRtcVoice
         {
             lock (ViewerSessions)
             {
-                pViewerSessions = ViewerSessions.Where(v => v.Value.AgentId == pAgentId);
-                return pViewerSessions.Count() > 0;
+                KeyValuePair<string, IVoiceViewerSession>[] sessions = ViewerSessions
+                    .Where(v => v.Value.AgentId == pAgentId).ToArray();
+                pViewerSessions = sessions;
+                return sessions.Length > 0;
             }
         }
 
@@ -125,8 +127,10 @@ namespace osWebRtcVoice
         {
             lock (ViewerSessions)
             {
-                pViewerSessions = ViewerSessions.Where(v => v.Value.AgentId == pAgentId && v.Value.RegionId == pRegionId);
-                return pViewerSessions.Count() > 0;
+                KeyValuePair<string, IVoiceViewerSession>[] sessions = ViewerSessions
+                    .Where(v => v.Value.AgentId == pAgentId && v.Value.RegionId == pRegionId).ToArray();
+                pViewerSessions = sessions;
+                return sessions.Length > 0;
             }
         }
 
@@ -171,4 +175,3 @@ namespace osWebRtcVoice
             return Task.CompletedTask;        }
     }
 }
-

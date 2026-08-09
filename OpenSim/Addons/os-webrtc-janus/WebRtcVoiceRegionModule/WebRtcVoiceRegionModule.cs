@@ -67,12 +67,15 @@ namespace osWebRtcVoice
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static readonly string LogHeader = "[REGION WEBRTC VOICE]";
+        private const int MaxVoiceRequestBytes = 256 * 1024;
 
         private static byte[] llsdUndefAnswerBytes = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
         private bool _MessageDetails = false;
 
         // Control info
-        private static bool m_Enabled = false;
+        private bool m_Enabled = false;
+        private readonly Dictionary<Scene, (EventManager.RegisterCapsEvent RegisterCaps,
+            EventManager.OnRemovePresenceDelegate RemovePresence)> m_Regions = [];
 
         private IConfig m_Config;
 
@@ -158,6 +161,18 @@ namespace osWebRtcVoice
         // ISharedRegionModule.RemoveRegion
         public void RemoveRegion(Scene scene)
         {
+            (EventManager.RegisterCapsEvent RegisterCaps, EventManager.OnRemovePresenceDelegate RemovePresence) handlers;
+            lock (m_Regions)
+            {
+                if (!m_Regions.Remove(scene, out handlers))
+                    return;
+            }
+
+            scene.EventManager.OnRegisterCaps -= handlers.RegisterCaps;
+            scene.EventManager.OnRemovePresence -= handlers.RemovePresence;
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(OnClientLogOut);
+            scene.RequestModuleInterface<ISimulatorFeaturesModule>()?.RemoveFeature("VoiceServerType");
         }
 
         // ISharedRegionModule.RegionLoaded
@@ -165,16 +180,25 @@ namespace osWebRtcVoice
         {
             if (m_Enabled)
             {
-                scene.EventManager.OnRegisterCaps += delegate (UUID agentID, Caps caps)
+                EventManager.RegisterCapsEvent registerCaps = delegate (UUID agentID, Caps caps)
                 {
                     OnRegisterCaps(scene, agentID, caps);
                 };
 
-                scene.EventManager.OnRemovePresence += delegate (UUID agentID)
+                EventManager.OnRemovePresenceDelegate removePresence = delegate (UUID agentID)
                 {
                     OnRemovePresence(scene, agentID);
                 };
 
+                lock (m_Regions)
+                {
+                    if (m_Regions.ContainsKey(scene))
+                        return;
+                    m_Regions[scene] = (registerCaps, removePresence);
+                }
+
+                scene.EventManager.OnRegisterCaps += registerCaps;
+                scene.EventManager.OnRemovePresence += removePresence;
                 scene.EventManager.OnNewClient += OnNewClient;
 
                 if(gridHash.IsZero())
@@ -193,6 +217,11 @@ namespace osWebRtcVoice
         // ISharedRegionModule.Close
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_Regions)
+                scenes = m_Regions.Keys.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         // ISharedRegionModule.Name
@@ -296,11 +325,10 @@ namespace osWebRtcVoice
         {
             if(VoiceViewerSession.TryGetViewerSessionsByAgentAndRegion(pAgentID, pSceneID, out IEnumerable<KeyValuePair<string, IVoiceViewerSession>> candidates))
             {
-                bool noskip = string.IsNullOrEmpty(pKeepViewerSessionId);
                 List<IVoiceViewerSession> toremove = [];
                 foreach (KeyValuePair<string, IVoiceViewerSession> candidate in candidates)
                 {
-                    if (noskip && candidate.Key == pKeepViewerSessionId)
+                    if (!string.IsNullOrEmpty(pKeepViewerSessionId) && candidate.Key == pKeepViewerSessionId)
                         continue;
 
                     m_log.Warn(
@@ -803,10 +831,27 @@ namespace osWebRtcVoice
         {
             try
             {
-                if (request.InputStream.Length > 0)
-                { 
-                    using Stream inputStream = request.InputStream;
-                    OSD tmp = OSDParser.DeserializeLLSDXml(inputStream);
+                if (request == null || request.InputStream == null || request.ContentLength64 == 0)
+                    return null;
+                if (request.ContentLength64 > MaxVoiceRequestBytes)
+                    throw new InvalidDataException("Voice request exceeds the service limit.");
+
+                using Stream inputStream = request.InputStream;
+                using MemoryStream body = new MemoryStream();
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                int read;
+                while ((read = inputStream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (total > MaxVoiceRequestBytes)
+                        throw new InvalidDataException("Voice request exceeds the service limit.");
+                    body.Write(buffer, 0, read);
+                }
+                if (total > 0)
+                {
+                    body.Position = 0;
+                    OSD tmp = OSDParser.DeserializeLLSDXml(body);
                     if (_MessageDetails)
                         m_log.Debug($"{pCaller} BodyToMap: Request: {tmp}");
                     if(tmp is OSDMap map)
