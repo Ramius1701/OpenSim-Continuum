@@ -38,6 +38,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Transactions;
 using System.Xml;
 using static Mono.Security.X509.X520;
@@ -113,7 +114,7 @@ namespace OpenSim.Grid.MoneyServer
 
 
         // SSL settings
-        private string m_sslCommonName = "";
+        private readonly AsyncLocal<string> m_sslCommonName = new AsyncLocal<string>();
 
         private Dictionary<ulong, Scene> m_scenes = new Dictionary<ulong, Scene>();
 
@@ -365,10 +366,10 @@ namespace OpenSim.Grid.MoneyServer
             m_httpServer.AddXmlRPCHandler("getCurrencyQuote", getCurrencyQuote);
             m_httpServer.AddXmlRPCHandler("buyCurrency", buyCurrency);
 
-            // Money Transfer Test
-            m_httpServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-            m_httpServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-            m_httpServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
+            // Do not publish the recovered callback test handlers on MoneyServer.
+            // Notifications flow outbound to authenticated simulator URLs; these
+            // inbound handlers only logged caller-controlled data and exposed
+            // transaction details without authorization.
 
             // Angebot oder eine Information zu einem Kaufpreis
             // m_httpServer.AddXmlRPCHandler("quote", getCurrencyQuote);
@@ -2509,14 +2510,17 @@ namespace OpenSim.Grid.MoneyServer
 
         private bool IsValidSession(string userID, string sessionID, string secureSessionID)
         {
-            lock (m_sessionDic)
-            {
-                if (!m_sessionDic.TryGetValue(userID, out string expectedSession) || expectedSession != sessionID)
-                    return false;
+            return TryGetSession(userID, out string expectedSession, out string expectedSecureSession) &&
+                expectedSession == sessionID && expectedSecureSession == secureSessionID;
+        }
 
-                return m_secureSessionDic.TryGetValue(userID, out string expectedSecureSession) &&
-                    expectedSecureSession == secureSessionID;
-            }
+        private bool TryGetSession(string userID, out string sessionID, out string secureSessionID)
+        {
+            sessionID = null;
+            secureSessionID = null;
+            lock (m_sessionDic)
+                return m_sessionDic.TryGetValue(userID, out sessionID) &&
+                    m_secureSessionDic.TryGetValue(userID, out secureSessionID);
         }
 
         /// <summary>
@@ -3461,26 +3465,23 @@ namespace OpenSim.Grid.MoneyServer
 
         public string GetSSLCommonName(XmlRpcRequest request)
         {
-            if (request.Params.Count > 5)
-            {
-                m_sslCommonName = (string)request.Params[5];
-            }
-            else if (request.Params.Count == 5)
-            {
-                m_sslCommonName = (string)request.Params[4];
-                if (m_sslCommonName == "gridproxy") m_sslCommonName = "";
-            }
-            else
-            {
-                m_sslCommonName = "";
-            }
-            return m_sslCommonName;
+            string commonName = string.Empty;
+            if (request?.Params != null && request.Params.Count > 5)
+                commonName = request.Params[5] as string ?? string.Empty;
+            else if (request?.Params != null && request.Params.Count == 5)
+                commonName = request.Params[4] as string ?? string.Empty;
+
+            if (commonName == "gridproxy")
+                commonName = string.Empty;
+
+            m_sslCommonName.Value = commonName;
+            return commonName;
         }
 
         /// <summary>Gets the name of the SSL common.</summary>
         public string GetSSLCommonName()
         {
-            return m_sslCommonName;
+            return m_sslCommonName.Value ?? string.Empty;
         }
 
         public bool ObjectGiveMoney(UUID objectID, UUID fromID, UUID toID, int amount, UUID txn, out string result)
@@ -3688,10 +3689,10 @@ namespace OpenSim.Grid.MoneyServer
                             requestTable["clientUUID"] = transaction.Sender;
                             requestTable["receiverUUID"] = transaction.Receiver;
 
-                            if (m_sessionDic.ContainsKey(transaction.Sender) && m_secureSessionDic.ContainsKey(transaction.Sender))
+                            if (TryGetSession(transaction.Sender, out string senderSession, out string senderSecureSession))
                             {
-                                requestTable["clientSessionID"] = m_sessionDic[transaction.Sender];
-                                requestTable["clientSecureSessionID"] = m_secureSessionDic[transaction.Sender];
+                                requestTable["clientSessionID"] = senderSession;
+                                requestTable["clientSecureSessionID"] = senderSecureSession;
                             }
                             else
                             {
@@ -3872,11 +3873,8 @@ namespace OpenSim.Grid.MoneyServer
             // Konfiguriere das maximale Guthaben (dieser Wert kann aus einer Konfigurationsdatei wie MoneyServer.ini geladen werden)
             //int m_CurrencyMaximum = m_CurrencyMaximum;
 
-            if (m_sessionDic.ContainsKey(userID) && m_secureSessionDic.ContainsKey(userID))
+            if (TryGetSession(userID, out sessionID, out secureID))
             {
-                sessionID = m_sessionDic[userID];
-                secureID = m_secureSessionDic[userID];
-
                 // Aktuelles Guthaben des Benutzers abrufen
                 int currentBalance = m_moneyDBService.getBalance(userID);
 
