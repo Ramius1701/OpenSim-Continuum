@@ -75,6 +75,9 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="description">Die Beschreibung.</param>
         bool updateTransactionStatus(UUID transactionID, int status, string description);
 
+        /// <summary>Cancels a transaction only while it is still pending.</summary>
+        bool cancelPendingTransaction(UUID transactionID, string description);
+
         /// <summary>Setzt die Transaktion als abgelaufen.</summary>
         /// <param name="deadTime">Die Ablaufzeit.</param>
         bool SetTransExpired(int deadTime);

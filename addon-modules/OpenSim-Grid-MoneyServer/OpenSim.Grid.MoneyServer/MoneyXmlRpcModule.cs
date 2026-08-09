@@ -2914,6 +2914,14 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
+            if (transaction.Status != (int)Status.PENDING_STATUS)
+            {
+                m_log.WarnFormat(
+                    "[MONEY XMLRPC]: handleCancelTransfer: Transaction {0} is no longer pending.",
+                    transactionID);
+                return response;
+            }
+
             UserInfo user = m_moneyDBService.FetchUserInfo(transaction.Sender);
             if (user == null)
             {
@@ -2927,9 +2935,8 @@ namespace OpenSim.Grid.MoneyServer
                 if (m_moneyDBService.ValidateTransfer(secureCode, transactionUUID))
                 {
                     m_log.InfoFormat("[MONEY XMLRPC]: handleCancelTransfer: User {0} has canceled the transaction {1}", user.Avatar, transactionID);
-                    if (m_moneyDBService.updateTransactionStatus(
+                    if (m_moneyDBService.cancelPendingTransaction(
                         transactionUUID,
-                        (int)Status.FAILED_STATUS,
                         "User canceled the transaction on " + DateTime.UtcNow.ToString()))
                     {
                         responseData["success"] = true;

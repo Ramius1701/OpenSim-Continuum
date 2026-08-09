@@ -945,6 +945,47 @@ namespace OpenSim.Grid.MoneyServer
             }
         }
 
+        public bool cancelPendingTransaction(UUID transactionID, string description)
+        {
+            if (transactionID == UUID.Zero)
+                return false;
+
+            MySQLSuperManager dbm = GetLockedConnection();
+            try
+            {
+                return ExecutePendingCancellation(dbm, transactionID, description);
+            }
+            catch (MySqlException e)
+            {
+                m_log.Error(e);
+                dbm.Manager.Reconnect();
+                return ExecutePendingCancellation(dbm, transactionID, description);
+            }
+            catch (Exception e)
+            {
+                m_log.Error(e);
+                return false;
+            }
+            finally
+            {
+                dbm.Release();
+            }
+        }
+
+        private static bool ExecutePendingCancellation(
+            MySQLSuperManager dbm, UUID transactionID, string description)
+        {
+            const string sql =
+                "UPDATE transactions SET status = ?failedStatus, description = ?description " +
+                "WHERE UUID = ?transactionID AND status = ?pendingStatus";
+            using MySqlCommand command = new MySqlCommand(sql, dbm.Manager.dbcon);
+            command.Parameters.AddWithValue("?failedStatus", (int)Status.FAILED_STATUS);
+            command.Parameters.AddWithValue("?description", description ?? string.Empty);
+            command.Parameters.AddWithValue("?transactionID", transactionID.ToString());
+            command.Parameters.AddWithValue("?pendingStatus", (int)Status.PENDING_STATUS);
+            return command.ExecuteNonQuery() == 1;
+        }
+
         /// <summary>Sets the trans expired.</summary>
         /// <param name="deadTime">The dead time.</param>
         public bool SetTransExpired(int deadTime)
