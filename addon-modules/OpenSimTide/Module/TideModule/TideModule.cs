@@ -42,6 +42,7 @@ namespace TideModule
         private ulong m_cycleTime = 3600;      //low->high->low time in seconds
         private DateTime m_lowTideTime = new DateTime(); // datetime indicating when next low tide will be
         private DateTime m_highTideTime = new DateTime();  // datetime indicating when next hightide will be
+        private bool m_hasTideTimes;
         private bool m_tideDirection = true;    // which direction is the tide travelling, 'Coming In'(true) or 'Going Out'(false)
         private bool m_lastTideDirection = true;
         private bool m_tideInfoDebug = false;  //do we chat the tide to the OpenSim console?
@@ -146,6 +147,9 @@ namespace TideModule
                 m_log.InfoFormat("[{0}]: Info Channel={1}, Water Level Channel={2}, Info Broadcast is {3}, Announce Count={4}", m_name, m_tideInfoChannel, m_tideLevelChannel, m_tideInfoBroadcast, m_tideAnnounceCounter);
 
                 m_frame = 0;
+                m_tideAnnounceCounter = 0;
+                m_tideAnnounceMsg = string.Empty;
+                m_hasTideTimes = false;
                 m_ready = true; // Mark Module Ready for duty
                 m_shoutPos = new Vector3(scene.RegionInfo.RegionSizeX / 2f, scene.RegionInfo.RegionSizeY / 2f, 30f);
                 m_scene = scene;
@@ -177,6 +181,23 @@ namespace TideModule
         // Place your methods here
         public void TideUpdate ()
         {
+            try
+            {
+                UpdateTideState();
+            }
+            catch (Exception e)
+            {
+                Scene scene = m_scene;
+                m_log.WarnFormat(
+                    "[{0}]: Tide update failed in {1}: {2}",
+                    m_name,
+                    scene == null ? "unknown region" : scene.RegionInfo.RegionName,
+                    e.Message);
+            }
+        }
+
+        private void UpdateTideState()
+        {
             ulong timeStamp;
             double cyclePos; //cycles from 0.0000000001 to 0.999999999999
             double cycleRadians;
@@ -196,21 +217,25 @@ namespace TideModule
 
             if (cyclePos < 0.5) m_tideDirection = false; else m_tideDirection = true;
 
-            if (m_tideDirection != m_lastTideDirection)
-            { //if the tide changes re-calculate the tide times
+            bool directionChanged = m_hasTideTimes && m_tideDirection != m_lastTideDirection;
+            if (!m_hasTideTimes || directionChanged)
+            { // initialize or re-calculate the next tide times
                 if (cyclePos < 0.5)
                 { // tide just changed to be high->low
                     m_lowTideTime = now.AddSeconds((double)(m_cycleTime * (0.5 - cyclePos)));
                     m_highTideTime = m_lowTideTime.AddSeconds((double)(m_cycleTime / 2));
-                    m_tideAnnounceMsg = "High Tide";
+                    if (directionChanged)
+                        m_tideAnnounceMsg = "High Tide";
                 }
                 else
                 {   //tide just changed to be low->high
                     m_highTideTime = now.AddSeconds((double)(m_cycleTime * (1.0 - cyclePos)));
                     m_lowTideTime = m_highTideTime.AddSeconds((double)(m_cycleTime / 2));
-                    m_tideAnnounceMsg = "Low Tide";
+                    if (directionChanged)
+                        m_tideAnnounceMsg = "Low Tide";
                 }
                 m_lastTideDirection = m_tideDirection;
+                m_hasTideTimes = true;
             }
             tideRange = (double) (m_highTide - m_lowTide) / 2;
             tideMiddle = (double) m_lowTide + tideRange;
@@ -218,12 +243,12 @@ namespace TideModule
 
             tideLevelMsg = "Current Server Time (UTC): " + now.ToString("T", CultureInfo.InvariantCulture) + "\n";
             tideLevelMsg += "Current Tide Level: " + m_tideLevel.ToString(CultureInfo.InvariantCulture) + "\n";
-            tideLevelMsg += "Low Tide Time: " + m_lowTideTime.ToString("T") + "\n";
-            tideLevelMsg += "Low Tide Level: " + m_lowTide.ToString() + "\n";
-            tideLevelMsg += "High Tide Time: " + m_highTideTime.ToString("T") + "\n";
-            tideLevelMsg += "High Tide Level: " + m_highTide.ToString() + "\n";
+            tideLevelMsg += "Low Tide Time: " + m_lowTideTime.ToString("T", CultureInfo.InvariantCulture) + "\n";
+            tideLevelMsg += "Low Tide Level: " + m_lowTide.ToString(CultureInfo.InvariantCulture) + "\n";
+            tideLevelMsg += "High Tide Time: " + m_highTideTime.ToString("T", CultureInfo.InvariantCulture) + "\n";
+            tideLevelMsg += "High Tide Level: " + m_highTide.ToString(CultureInfo.InvariantCulture) + "\n";
             tideLevelMsg += "Tide Direction: " + ((m_tideDirection) ? "Coming In" : "Going Out") + "\n";
-            tideLevelMsg += "Cycle Position: " + cyclePos.ToString() + "\n";
+            tideLevelMsg += "Cycle Position: " + cyclePos.ToString(CultureInfo.InvariantCulture) + "\n";
             if (m_tideAnnounceMsg != "")
             {
                 if (m_tideAnnounceCounter >= m_tideAnnounceCount)
@@ -272,6 +297,9 @@ namespace TideModule
             }
 
             m_hasOriginalWaterHeight = false;
+            m_hasTideTimes = false;
+            m_tideAnnounceCounter = 0;
+            m_tideAnnounceMsg = string.Empty;
             if (ReferenceEquals(m_scene, scene))
                 m_scene = null;
         }
