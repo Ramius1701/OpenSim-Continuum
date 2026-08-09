@@ -754,8 +754,6 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool BuyCurrency(string userID, int amount)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction.TransUUID = UUID.Random();
             transaction.Sender = UUID.Zero.ToString();  // System sender
@@ -773,10 +771,7 @@ namespace OpenSim.Grid.MoneyServer
 
             bool ret = addTransaction(transaction);
             if (!ret)
-            {
-                dbm.Release();
                 return false;
-            }
 
             try
             {
@@ -786,7 +781,6 @@ namespace OpenSim.Grid.MoneyServer
             catch (MySql.Data.MySqlClient.MySqlException e)
             {
                 m_log.Error("[BuyCurrency]: SQL Exception - " + e.ToString());
-                dbm.Manager.Reconnect();
                 ret = giveMoney(transaction.TransUUID, userID, amount);
             }
             catch (Exception e)
@@ -794,11 +788,6 @@ namespace OpenSim.Grid.MoneyServer
                 m_log.Error("[BuyCurrency]: Exception - " + e.ToString());
                 return false;
             }
-            finally
-            {
-                dbm.Release();
-            }
-
             if (ret)
             {
                 m_log.InfoFormat("[BuyCurrency]: Successfully bought currency for user {0} in amount {1}", userID, amount);
@@ -810,11 +799,10 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="transaction">The transaction.</param>
         public bool setTotalSale(TransactionData transaction)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             if (transaction.Receiver == transaction.Sender) return false;
             if (transaction.Sender == UUID.Zero.ToString()) return false;
 
+            MySQLSuperManager dbm = GetLockedConnection();
             int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
             try
             {
@@ -871,8 +859,6 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="type">The type.</param>
         public bool addUser(string userID, int balance, int status, int type)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction.TransUUID = UUID.Random();
             transaction.Sender = UUID.Zero.ToString();
@@ -890,11 +876,9 @@ namespace OpenSim.Grid.MoneyServer
 
             bool ret = addTransaction(transaction);
             if (!ret)
-            {
-                dbm.Release();
                 return false;
-            }
 
+            MySQLSuperManager dbm = GetLockedConnection();
             try
             {
                 ret = dbm.Manager.addUser(userID, 0, status, type);		// make Balance Table
@@ -1083,8 +1067,6 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool DoTransfer(UUID transactionUUID)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             bool do_trans = false;
 
             TransactionData transaction = new TransactionData();
@@ -1096,7 +1078,6 @@ namespace OpenSim.Grid.MoneyServer
                 if (transaction.Sender == transaction.Receiver)
                 {
                     m_log.ErrorFormat("[MONEY DB]: DoTransfer: Transfer von {0} zu sich selbst ist nicht erlaubt.", transaction.Sender);
-                    dbm.Release();
                     return false;
                 }
 
@@ -1111,7 +1092,6 @@ namespace OpenSim.Grid.MoneyServer
                         if (getBalance(transaction.Receiver) == -1)
                         {
                             m_log.ErrorFormat("[MONEY DB]: DoTransfer: Receiver not found in balances table. {0}", transaction.Receiver);
-                            dbm.Release();
                             return false;
                         }
 
@@ -1157,8 +1137,6 @@ namespace OpenSim.Grid.MoneyServer
                 setTotalSale(transaction);
             }
 
-            dbm.Release();
-
             return do_trans;
         }
 
@@ -1167,8 +1145,6 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="transactionUUID">The transaction UUID.</param>
         public bool DoAddMoney(UUID transactionUUID)
         {
-            MySQLSuperManager dbm = GetLockedConnection();
-
             TransactionData transaction = new TransactionData();
             transaction = FetchTransaction(transactionUUID);
 
@@ -1178,14 +1154,12 @@ namespace OpenSim.Grid.MoneyServer
                 if (getBalance(transaction.Receiver) == -1)
                 {
                     m_log.ErrorFormat("[MONEY DB]: DoAddMoney: Receiver not found in balances table. {0}", transaction.Receiver);
-                    dbm.Release();
                     return false;
                 }
                 //
                 if (giveMoney(transactionUUID, transaction.Receiver, transaction.Amount))
                 {
                     setTotalSale(transaction);
-                    dbm.Release();
                     return true;
                 }
                 else
@@ -1198,8 +1172,6 @@ namespace OpenSim.Grid.MoneyServer
             {	// Can not fetch the transaction or it has expired
                 m_log.ErrorFormat("[MONEY DB]: The transaction:{0} has expired", transactionUUID.ToString());
             }
-
-            dbm.Release();
 
             return false;
         }
