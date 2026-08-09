@@ -273,19 +273,20 @@ namespace osWebRtcVoice
                 OutstandingRequest outReq = new OutstandingRequest
                 {
                     TransactionId = pReq.TransactionId,
-                    RequestTime = DateTime.Now,
-                    TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>()
+                    RequestTime = DateTime.UtcNow,
+                    TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>(
+                        TaskCreationOptions.RunContinuationsAsynchronously)
                 };
                 _OutstandingRequests[pReq.TransactionId] = outReq;
 
                 string reqStr = pReq.ToJson();
 
-                HttpClient httpClient = WebUtil.GetNewGlobalHttpClient(30000);
-                HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
+                HttpClient httpClient = WebUtil.GetGlobalNoRedirHttpClient(30000, 1024 * 1024);
+                using HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
                 reqMsg.Content = new StringContent(reqStr, System.Text.Encoding.UTF8, MediaTypeNames.Application.Json);
                 reqMsg.Headers.TryAddWithoutValidation("Accept", "application/json");
 
-                HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                using HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -307,7 +308,8 @@ namespace osWebRtcVoice
 
                         // Wait on the local TaskCompletionSource instead of re-reading the dictionary.
                         // This avoids a race where the long-poll thread already removed the request.
-                        ret = await outReq.TaskCompletionSource.Task;
+                        ret = await outReq.TaskCompletionSource.Task
+                            .WaitAsync(TimeSpan.FromSeconds(30)).ConfigureAwait(false);
                     }
                     else 
                     {
@@ -350,12 +352,12 @@ namespace osWebRtcVoice
 
             try
             {
-                HttpClient httpClient = WebUtil.GetNewGlobalHttpClient(30000);
-                HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
+                HttpClient httpClient = WebUtil.GetGlobalNoRedirHttpClient(30000, 1024 * 1024);
+                using HttpRequestMessage reqMsg = new(HttpMethod.Post, pURI);
                 string reqStr = pReq.ToJson();
                 reqMsg.Content = new StringContent(reqStr, System.Text.Encoding.UTF8, MediaTypeNames.Application.Json);
                 reqMsg.Headers.TryAddWithoutValidation("Accept", "application/json");
-                HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                using HttpResponseMessage response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
                 string respStr = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                 ret = JanusMessageResp.FromJson(respStr);
             }
