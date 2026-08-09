@@ -2173,7 +2173,7 @@ namespace OpenSim.Grid.MoneyServer
 
             if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
-                senderUUID == receiverUUID || amount < 0)
+                senderUUID == receiverUUID || amount < 0 || (amount == 0 && !m_enableAmountZero))
             {
                 m_log.Warn("[MONEY XMLRPC]: handleForceTransaction: Rejected invalid transfer parameters.");
                 responseData["message"] = "invalid force transfer parameters";
@@ -2663,6 +2663,15 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+
+            if (!UUID.TryParse(bankerID, out UUID bankerUUID) || bankerUUID == UUID.Zero ||
+                amount < 0 || (amount == 0 && !m_enableAmountZero))
+            {
+                m_log.Warn("[MONEY XMLRPC]: handleAddBankerMoney: Rejected invalid credit parameters.");
+                responseData["message"] = "invalid banker credit parameters";
+                responseData["banker"] = false;
+                return response;
+            }
 
             // Check caller IP first. bankerID alone is not a secret (avatar UUIDs are
             // discoverable in-world), so this endpoint must also be restricted to
