@@ -210,6 +210,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private Timer m_autoCycleTimer;
         private Timer m_autoCycleWarningTimer;
         private int m_autoCycleBusy;
+        private int m_autoCycleGeneration;
         private long m_nextAutoCycleTicks;
         private WeatherKind m_pendingAutoCycleWeather;
         private bool m_hasPendingAutoCycleWeather;
@@ -563,7 +564,17 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                     if (m_pendingEntryIMs.TryRemove(agentID, out Timer pending))
                     {
                         pending.Dispose();
-                        SendWeatherIM(agentID);
+                        try
+                        {
+                            SendWeatherIM(agentID);
+                        }
+                        catch (Exception e)
+                        {
+                            m_log.WarnFormat(
+                                "[WEATHER]: Failed to send entry forecast to {0}: {1}",
+                                agentID,
+                                e.Message);
+                        }
                     }
                 },
                 null,
@@ -1001,8 +1012,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 ? m_autoCycleStartupDelaySeconds * 1000
                 : AutoCycleIntervalMS();
 
-            m_autoCycleTimer = new Timer(AutoCycleTimerElapsed, null, Timeout.Infinite, Timeout.Infinite);
-            m_autoCycleWarningTimer = new Timer(AutoCycleForecastWarningElapsed, null, Timeout.Infinite, Timeout.Infinite);
+            int generation = Volatile.Read(ref m_autoCycleGeneration);
+            m_autoCycleTimer = new Timer(AutoCycleTimerElapsed, generation, Timeout.Infinite, Timeout.Infinite);
+            m_autoCycleWarningTimer = new Timer(AutoCycleForecastWarningElapsed, generation, Timeout.Infinite, Timeout.Infinite);
             ScheduleAutoCycle(dueTime);
 
             m_log.InfoFormat(
@@ -1014,6 +1026,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void StopAutoCycle()
         {
+            Interlocked.Increment(ref m_autoCycleGeneration);
             Timer timer = m_autoCycleTimer;
             m_autoCycleTimer = null;
             Timer warningTimer = m_autoCycleWarningTimer;
@@ -1031,6 +1044,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void AutoCycleTimerElapsed(object state)
         {
+            int generation = state is int value ? value : -1;
+            if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                return;
+
             if (Interlocked.Exchange(ref m_autoCycleBusy, 1) != 0)
                 return;
 
@@ -1075,7 +1092,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             finally
             {
                 Interlocked.Exchange(ref m_autoCycleBusy, 0);
-                ScheduleNextAutoCycle();
+                if (generation == Volatile.Read(ref m_autoCycleGeneration))
+                    ScheduleNextAutoCycle();
             }
         }
 
@@ -1135,28 +1153,42 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void AutoCycleForecastWarningElapsed(object state)
         {
+            int generation = state is int value ? value : -1;
+            if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                return;
+
             Scene scene = m_scene;
             if (scene == null || string.IsNullOrEmpty(m_autoCycleForecastWarningMessage))
                 return;
 
-            WeatherKind nextWeather;
-            lock (m_sync)
+            try
             {
-                if (!m_hasPendingAutoCycleWeather)
+                WeatherKind nextWeather;
+                lock (m_sync)
                 {
-                    m_pendingAutoCycleWeather = PickAutoCycleWeather();
-                    m_hasPendingAutoCycleWeather = true;
+                    if (!m_hasPendingAutoCycleWeather)
+                    {
+                        m_pendingAutoCycleWeather = PickAutoCycleWeather();
+                        m_hasPendingAutoCycleWeather = true;
+                    }
+
+                    nextWeather = m_pendingAutoCycleWeather;
                 }
 
-                nextWeather = m_pendingAutoCycleWeather;
+                string message = FormatForecastWarningMessage(scene, nextWeather);
+                scene.ForEachRootScenePresence(sp =>
+                {
+                    if (sp != null && !sp.IsDeleted && sp.ControllingClient != null)
+                        SendRegionWeatherMessage(sp, message);
+                });
             }
-
-            string message = FormatForecastWarningMessage(scene, nextWeather);
-            scene.ForEachRootScenePresence(sp =>
+            catch (Exception e)
             {
-                if (sp != null && !sp.IsDeleted && sp.ControllingClient != null)
-                    SendRegionWeatherMessage(sp, message);
-            });
+                m_log.WarnFormat(
+                    "[WEATHER]: Forecast warning failed in {0}: {1}",
+                    scene.RegionInfo.RegionName,
+                    e.Message);
+            }
         }
 
         private int AutoCycleIntervalMS()
