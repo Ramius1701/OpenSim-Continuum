@@ -48,6 +48,9 @@ namespace OpenSim.Server.Handlers.UserAccounts
 {
     public class UserAccountServerPostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 1024 * 1024;
+        private const int MaxAccountResults = 1000;
+        private const int MaxQueryLength = 256;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IUserAccountService m_UserAccountService;
@@ -73,9 +76,16 @@ namespace OpenSim.Server.Handlers.UserAccounts
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
             string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
+            try
+            {
+                body = ReadBoundedBody(requestData, httpRequest).Trim();
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[USER ACCOUNT HANDLER]: Rejected request: {0}", e.Message);
+                httpResponse.StatusCode = 413;
+                return FailureResult();
+            }
 
             // We need to check the authorization header
             //httpRequest.Headers["authorization"] ...
@@ -179,6 +189,8 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             List<UserAccount> accounts = null;
             string query = oquery.ToString().Trim();
+            if (query.Length > MaxQueryLength)
+                return FailureResult();
             if(!string.IsNullOrEmpty(query))
                 accounts = m_UserAccountService.GetUserAccounts(scopeID, query);
 
@@ -192,6 +204,8 @@ namespace OpenSim.Server.Handlers.UserAccounts
                 int i = 0;
                 foreach (UserAccount acc in accounts)
                 {
+                    if (i >= MaxAccountResults)
+                        break;
                     Dictionary<string, object> rinfoDict = acc.ToKeyValuePairs();
                     result["account" + i] = rinfoDict;
                     i++;
@@ -217,13 +231,13 @@ namespace OpenSim.Server.Handlers.UserAccounts
             }
 
             List<string> lids = oids as List<string>;
-            if (lids == null)
+            if (lids == null || lids.Count > MaxAccountResults)
             {
                 m_log.DebugFormat("[USER SERVICE HANDLER]: GetMultiAccounts input argument was of unexpected type {0} or null", oids.GetType().ToString());
                 return FailureResult();
             }
 
-            List<string> userIDs = new List<string>(lids.Count);
+            HashSet<string> userIDs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (string s in lids)
             {
                 if(UUID.TryParse(s, out UUID tmpid))
@@ -232,7 +246,7 @@ namespace OpenSim.Server.Handlers.UserAccounts
 
             List<UserAccount> accounts = null;
             if (userIDs.Count > 0)
-                accounts = m_UserAccountService.GetUserAccounts(scopeID, userIDs);
+                accounts = m_UserAccountService.GetUserAccounts(scopeID, new List<string>(userIDs));
 
             Dictionary<string, object> result = new Dictionary<string, object>();
             if ((accounts == null) || accounts.Count == 0)
@@ -244,6 +258,8 @@ namespace OpenSim.Server.Handlers.UserAccounts
                 int i = 0;
                 foreach (UserAccount acc in accounts)
                 {
+                    if (i >= MaxAccountResults)
+                        break;
                     if(acc == null)
                         continue;
                     Dictionary<string, object> rinfoDict = acc.ToKeyValuePairs();
@@ -262,14 +278,15 @@ namespace OpenSim.Server.Handlers.UserAccounts
         {
             object otmp;
             UUID principalID = UUID.Zero;
-            if (request.TryGetValue("PrincipalID", out otmp) && !UUID.TryParse(otmp.ToString(), out principalID))
+            if (!request.TryGetValue("PrincipalID", out otmp) ||
+                !UUID.TryParse(otmp?.ToString(), out principalID) || principalID == UUID.Zero)
                 return FailureResult();
 
             UserAccount existingAccount = m_UserAccountService.GetUserAccount(UUID.Zero, principalID);
             if (existingAccount == null)
                 return FailureResult();
 
-            if (!request.TryGetValue("DisplayName", out otmp))
+            if (!request.TryGetValue("DisplayName", out otmp) || otmp == null)
                 return FailureResult();
             
             if (!m_UserAccountService.SetDisplayName(principalID, otmp.ToString()))
@@ -278,6 +295,27 @@ namespace OpenSim.Server.Handlers.UserAccounts
             Dictionary<string, object> result = new Dictionary<string, object>();
             result["result"] = "success";
             return ResultToBytes(result);
+        }
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using MemoryStream body = new MemoryStream();
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > MaxRequestBodyBytes)
+                    throw new InvalidDataException("Request body exceeds the service limit.");
+                body.Write(buffer, 0, read);
+            }
+            return Encoding.UTF8.GetString(body.ToArray());
         }
 
         byte[] StoreAccount(Dictionary<string, object> request)
