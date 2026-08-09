@@ -349,12 +349,11 @@ namespace OpenSim.Grid.MoneyServer
             m_httpServer.AddXmlRPCHandler("SendMoney", handleScriptTransaction);
             m_httpServer.AddXmlRPCHandler("MoveMoney", handleScriptTransaction);
 
-            // this is from original DTL. not check yet.
-            m_httpServer.AddXmlRPCHandler("WebLogin", handleWebLogin);
-            m_httpServer.AddXmlRPCHandler("WebLogout", handleWebLogout);
-            m_httpServer.AddXmlRPCHandler("WebGetBalance", handleWebGetBalance);
-            m_httpServer.AddXmlRPCHandler("WebGetTransaction", handleWebGetTransaction);
-            m_httpServer.AddXmlRPCHandler("WebGetTransactionNum", handleWebGetTransactionNum);
+            // Do not publish the original DTL web handlers. WebLogin accepts a
+            // caller-supplied user/session pair without authoritative login
+            // validation, which would expose resident balances and history.
+            // Keep their implementation only as provenance for a future
+            // authenticated grid-interface integration.
 
             // Do not publish the recovered prototype land-preparation handlers.
             // They perform no authoritative debit. The DTL/NSL region connector
