@@ -54,6 +54,7 @@ namespace OpenSim.Groups
         private GroupsServiceRemoteConnector m_GroupsService;
         private IUserManagement m_UserManagement;
         private List<Scene> m_Scenes;
+        private readonly object m_ScenesLock = new object();
 
         private RemoteConnectorCacheWrapper m_CacheWrapper;
 
@@ -114,8 +115,13 @@ namespace OpenSim.Groups
                 return;
 
             m_log.DebugFormat("[Groups.RemoteConnector]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+            lock (m_ScenesLock)
+            {
+                if (m_Scenes.Contains(scene))
+                    return;
+                m_Scenes.Add(scene);
+            }
             scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
-            m_Scenes.Add(scene);
         }
 
         public void RemoveRegion(Scene scene)
@@ -123,8 +129,12 @@ namespace OpenSim.Groups
             if (!m_Enabled)
                 return;
 
+            lock (m_ScenesLock)
+            {
+                if (!m_Scenes.Remove(scene))
+                    return;
+            }
             scene.UnregisterModuleInterface<IGroupsServicesConnector>(this);
-            m_Scenes.Remove(scene);
         }
 
         public void RegionLoaded(Scene scene)
@@ -145,6 +155,13 @@ namespace OpenSim.Groups
 
         public void Close()
         {
+            if (!m_Enabled || m_Scenes == null)
+                return;
+            Scene[] scenes;
+            lock (m_ScenesLock)
+                scenes = m_Scenes.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         #endregion
