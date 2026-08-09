@@ -36,10 +36,13 @@ namespace OpenSim.Data.SQLite
 
             cmd.CommandText = $"INSERT INTO `{m_Realm}` (`{string.Join("`,`", names)}`) " +
                 $"VALUES ({string.Join(",", values)})";
-            if (ExecuteNonQuery(cmd, m_Connection) <= 0)
-                return false;
-            row.ReportID = (int)m_Connection.LastInsertRowId;
-            return true;
+            lock (m_Connection)
+            {
+                if (ExecuteNonQuery(cmd, m_Connection) <= 0)
+                    return false;
+                row.ReportID = checked((int)m_Connection.LastInsertRowId);
+                return row.ReportID > 0;
+            }
         }
 
         public AbuseReportData Get(int reportID, bool includeImage)

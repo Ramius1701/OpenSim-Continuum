@@ -23,12 +23,18 @@ namespace OpenSim.Services.AbuseReportsService
             : base(config)
         {
             IConfig serviceConfig = config.Configs["AbuseReportsService"];
-            m_MaxScreenshotBytes = Math.Max(0,
-                serviceConfig?.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024) ?? 5 * 1024 * 1024);
-            m_MaxSummaryBytes = Math.Max(256,
-                serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096);
-            m_MaxDetailsBytes = Math.Max(1024,
-                serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536);
+            m_MaxScreenshotBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024) ?? 5 * 1024 * 1024,
+                0,
+                20 * 1024 * 1024);
+            m_MaxSummaryBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096,
+                256,
+                64 * 1024);
+            m_MaxDetailsBytes = Math.Clamp(
+                serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536,
+                1024,
+                1024 * 1024);
 
             m_log.Debug("[ABUSE REPORTS SERVICE]: Starting abuse reports service");
 
