@@ -2310,17 +2310,28 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
             if (requestData.ContainsKey("secretAccessCode")) secretCode = (string)requestData["secretAccessCode"];
 
-            MD5 md5 = MD5.Create();
+            using MD5 md5 = MD5.Create();
             byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(m_scriptAccessKey + "_" + clientIP));
             string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
             code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(hash + "_" + m_scriptIPaddress));
             hash = BitConverter.ToString(code).ToLower().Replace("-", "");
 
-            if (secretCode.ToLower() != hash)
+            if (!string.Equals(secretCode, hash, StringComparison.OrdinalIgnoreCase))
             {
                 m_log.Error("[MONEY XMLRPC]: handleScriptTransaction: Not allowed send money to avatar!!");
                 m_log.Error("[MONEY XMLRPC]: handleScriptTransaction: Not match Script Access Key.");
                 responseData["message"] = "not allowed send money to avatar! not match Script Key";
+                return response;
+            }
+
+            if (!UUID.TryParse(senderID, out UUID senderUUID) ||
+                !UUID.TryParse(receiverID, out UUID receiverUUID) ||
+                (senderUUID == UUID.Zero && receiverUUID == UUID.Zero) ||
+                senderUUID == receiverUUID ||
+                amount < 0 || (amount == 0 && !m_enableAmountZero))
+            {
+                m_log.Warn("[MONEY XMLRPC]: handleScriptTransaction: Rejected invalid transaction parameters.");
+                responseData["message"] = "invalid transaction parameters";
                 return response;
             }
 
