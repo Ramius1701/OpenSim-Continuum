@@ -83,6 +83,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             scene.UnregisterModuleInterface<IExperienceModule>(this);
             lock (m_ExperiencePermissionsLock)
                 m_ExperiencePermissions.Clear();
+            m_ExperienceService = null;
+            m_ScriptModules = null;
             m_scene = null;
         }
 
@@ -114,8 +116,20 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void OnNewClient(IClientAPI client)
         {
-            Dictionary<UUID, bool> permissions = m_ExperienceService.FetchExperiencePermissions(client.AgentId)
-                ?? new Dictionary<UUID, bool>();
+            Dictionary<UUID, bool> permissions;
+            try
+            {
+                permissions = m_ExperienceService?.FetchExperiencePermissions(client.AgentId)
+                    ?? new Dictionary<UUID, bool>();
+            }
+            catch (Exception ex)
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE]: Unable to load permissions for {0}; login will continue with an empty cache: {1}",
+                    client.AgentId,
+                    ex.Message);
+                permissions = new Dictionary<UUID, bool>();
+            }
             lock (m_ExperiencePermissionsLock)
                 m_ExperiencePermissions[client.AgentId] = permissions;
         }
@@ -128,7 +142,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void PostInitialise() {}
 
-        public void Close() {}
+        public void Close()
+        {
+            Scene scene = m_scene;
+            if (scene != null)
+                RemoveRegion(scene);
+        }
 
         public string Name { get { return "ExperienceModule"; } }
 

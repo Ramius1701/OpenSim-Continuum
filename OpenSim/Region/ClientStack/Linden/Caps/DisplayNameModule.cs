@@ -87,7 +87,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void PostInitialise() { }
 
-        public void Close() { }
+        public void Close()
+        {
+            Scene scene = m_Scene;
+            if (scene != null)
+                RemoveRegion(scene);
+        }
 
         public string Name { get { return "DisplayNamesModule"; } }
 
