@@ -318,6 +318,12 @@ namespace OpenSim.Grid.MoneyServer
         /// <param name="amount">The amount.</param>
         public bool withdrawMoney(UUID transactionID, string senderID, int amount)
         {
+            if (transactionID == UUID.Zero || string.IsNullOrWhiteSpace(senderID) || amount < 0)
+            {
+                m_log.WarnFormat("[MONEY DB]: Rejected invalid debit request for transaction {0}.", transactionID);
+                return false;
+            }
+
             MySQLSuperManager dbm = GetLockedConnection();
 
             try
@@ -344,6 +350,12 @@ namespace OpenSim.Grid.MoneyServer
 
         public bool giveMoney(UUID transactionID, string receiverID, int amount)
         {
+            if (transactionID == UUID.Zero || string.IsNullOrWhiteSpace(receiverID) || amount < 0)
+            {
+                m_log.WarnFormat("[MONEY DB]: Rejected invalid credit request for transaction {0}.", transactionID);
+                return false;
+            }
+
             MySQLSuperManager dbm = GetLockedConnection();
             try
             {
@@ -1284,7 +1296,7 @@ namespace OpenSim.Grid.MoneyServer
             TransactionData transaction = new TransactionData();
             transaction = FetchTransaction(transactionUUID);
 
-            if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS)
+            if (transaction != null && transaction.Status == (int)Status.PENDING_STATUS && transaction.Amount >= 0)
             {
                 //If receiver not found, add it to DB.
                 if (getBalance(transaction.Receiver) == -1)
