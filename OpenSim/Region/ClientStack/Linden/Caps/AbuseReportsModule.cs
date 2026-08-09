@@ -38,9 +38,14 @@ namespace OpenSim.Region.ClientStack.Linden
             m_Enabled = config != null && config.GetBoolean("Enabled", false);
             if (config != null)
             {
-                m_MaxScreenshotBytes = Math.Max(0, config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes));
-                m_MaxReportRequestBytes = Math.Max(1024,
-                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes));
+                m_MaxScreenshotBytes = Math.Clamp(
+                    config.GetInt("MaxScreenshotBytes", m_MaxScreenshotBytes),
+                    0,
+                    20 * 1024 * 1024);
+                m_MaxReportRequestBytes = Math.Clamp(
+                    config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes),
+                    1024,
+                    1024 * 1024);
             }
 
             if (m_Enabled)
