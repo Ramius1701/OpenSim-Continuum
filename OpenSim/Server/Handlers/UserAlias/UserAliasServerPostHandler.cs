@@ -47,6 +47,9 @@ namespace OpenSim.Server.Handlers.UserAlias
 {
     public class UserAliasServerPostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 64 * 1024;
+        private const int MaxAliasResults = 1000;
+        private const int MaxDescriptionLength = 255;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IUserAliasService m_UserAliasService;
@@ -64,9 +67,16 @@ namespace OpenSim.Server.Handlers.UserAlias
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
             string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-            body = body.Trim();
+            try
+            {
+                body = ReadBoundedBody(requestData, httpRequest).Trim();
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[USER ALIAS HANDLER]: Rejected request: {0}", e.Message);
+                httpResponse.StatusCode = 413;
+                return FailureResult();
+            }
 
             // We need to check the authorization header
             //httpRequest.Headers["authorization"] ...
@@ -87,6 +97,10 @@ namespace OpenSim.Server.Handlers.UserAlias
                         return GetUserForAlias(request);
                     case "getuseraliases":
                         return GetUserAliases(request);
+                    case "createalias":
+                        return CreateAlias(request);
+                    case "deletealias":
+                        return DeleteAlias(request);
                 }
 
                 m_log.DebugFormat("[USER SERVICE HANDLER]: unknown method request: {0}", method);
@@ -134,6 +148,8 @@ namespace OpenSim.Server.Handlers.UserAlias
                         int i = 0;
                         foreach (Services.Interfaces.UserAlias alias in aliases)
                         {
+                            if (i >= MaxAliasResults)
+                                break;
                             Dictionary<string, object> rinfoDict = alias.ToKeyValuePairs();
                             result["alias" + i] = rinfoDict;
                             i++;
@@ -147,6 +163,72 @@ namespace OpenSim.Server.Handlers.UserAlias
 
             result["result"] = "null";
             return ResultToBytes(result);
+        }
+
+        private byte[] CreateAlias(Dictionary<string, object> request)
+        {
+            if (!TryGetUUID(request, "AliasID", out UUID aliasID) || aliasID == UUID.Zero ||
+                !TryGetUUID(request, "UserID", out UUID userID) || userID == UUID.Zero)
+            {
+                return FailureResult();
+            }
+
+            string description = GetString(request, "Description");
+            if (description.Length > MaxDescriptionLength)
+                return FailureResult();
+
+            Services.Interfaces.UserAlias alias =
+                m_UserAliasService.CreateAlias(aliasID, userID, description);
+            if (alias == null)
+                return FailureResult();
+
+            return ResultToBytes(new Dictionary<string, object>
+            {
+                ["result"] = alias.ToKeyValuePairs()
+            });
+        }
+
+        private byte[] DeleteAlias(Dictionary<string, object> request)
+        {
+            bool deleted = TryGetUUID(request, "AliasID", out UUID aliasID) &&
+                aliasID != UUID.Zero && m_UserAliasService.DeleteAlias(aliasID);
+            return ResultToBytes(new Dictionary<string, object> { ["result"] = deleted });
+        }
+
+        private static bool TryGetUUID(
+            Dictionary<string, object> request, string key, out UUID value)
+        {
+            value = UUID.Zero;
+            return request.TryGetValue(key, out object raw) &&
+                UUID.TryParse(raw?.ToString(), out value);
+        }
+
+        private static string GetString(Dictionary<string, object> request, string key)
+        {
+            return request.TryGetValue(key, out object value)
+                ? value?.ToString() ?? string.Empty
+                : string.Empty;
+        }
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using MemoryStream body = new MemoryStream();
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > MaxRequestBodyBytes)
+                    throw new InvalidDataException("Request body exceeds the service limit.");
+                body.Write(buffer, 0, read);
+            }
+            return Encoding.UTF8.GetString(body.ToArray());
         }
 
         /*
