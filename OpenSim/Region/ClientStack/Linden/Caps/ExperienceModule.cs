@@ -723,18 +723,26 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             UUID[] estateAllowed = m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
             UUID[] estateKey = m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
             UUID[] estateBlocked = m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
-            var estate_experiences = estateAllowed.Union(estateKey);
+            HashSet<UUID> estateExperiences = new(estateAllowed);
+            estateExperiences.UnionWith(estateKey);
 
-            var parcel_experiences = land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED).Select(x => x.AgentID);
+            HashSet<UUID> parcelExperiences = new(
+                land.LandData.ParcelAccessList
+                    .Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED)
+                    .Select(x => x.AgentID));
 
-            var blocked_experiences = estateBlocked.Union(
-                land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED).Select(x => x.AgentID));
+            HashSet<UUID> blockedExperiences = new(estateBlocked);
+            blockedExperiences.UnionWith(
+                land.LandData.ParcelAccessList
+                    .Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED)
+                    .Select(x => x.AgentID));
 
-            UUID[] agent_allowed = GetAllowedExperiences(avatar.UUID);
+            HashSet<UUID> agentAllowed = new(GetAllowedExperiences(avatar.UUID));
 
-            var allowed = estate_experiences.Union(parcel_experiences)
-                .Except(blocked_experiences)
-                .Where(x => agent_allowed.Contains(x));
+            HashSet<UUID> allowed = new(estateExperiences);
+            allowed.UnionWith(parcelExperiences);
+            allowed.IntersectWith(agentAllowed);
+            allowed.ExceptWith(blockedExperiences);
 
             m_scene.ForEachSOG(sog =>
             {
