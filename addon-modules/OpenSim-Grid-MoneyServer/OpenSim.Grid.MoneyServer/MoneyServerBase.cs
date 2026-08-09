@@ -50,6 +50,9 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     private string connectionString = string.Empty;
     private uint m_moneyServerPort = 8008;         // 8008 is default server port
     private Timer checkTimer;
+    private readonly object m_timerLock = new object();
+    private int m_transactionRunActive;
+    private int m_shuttingDown;
 
     // --- OpenSim Continuum addition: Stipends ---
     // Uses deterministic per-avatar/per-cycle transaction IDs and the existing
@@ -182,17 +185,7 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         }
         finally
         {
-            // Stop the timer if it's still running
-            if (checkTimer != null && checkTimer.Enabled)
-            {
-                checkTimer.Stop();
-                checkTimer.Dispose();
-            }
-            if (m_stipendTimer != null && m_stipendTimer.Enabled)
-            {
-                m_stipendTimer.Stop();
-                m_stipendTimer.Dispose();
-            }
+            DisposeWorkTimers();
         }
     }
 
@@ -201,14 +194,23 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     /// </summary>
     private void CheckTransaction(object sender, ElapsedEventArgs e)
     {
+        if (Volatile.Read(ref m_shuttingDown) != 0)
+            return;
+
+        if (Interlocked.Exchange(ref m_transactionRunActive, 1) != 0)
+        {
+            m_log.Warn("[CHECK TRANSACTION]: Previous cleanup is still running; this timer tick was skipped.");
+            return;
+        }
+
+        try
+        {
         if (m_moneyDBService == null)
         {
             m_log.Error("[CHECK TRANSACTION]: m_moneyDBService is null, cannot check transactions.");
             return;
         }
 
-        try
-        {
             long ticksToEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).Ticks;
             int unixEpochTime = (int)((DateTime.UtcNow.Ticks - ticksToEpoch) / 10000000);
             int deadTime = unixEpochTime - DEAD_TIME;
@@ -220,6 +222,10 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         {
             m_log.ErrorFormat("[CHECK TRANSACTION]: Error in CheckTransaction: {0}", ex.Message);
         }
+        finally
+        {
+            Interlocked.Exchange(ref m_transactionRunActive, 0);
+        }
     }
 
     /// <summary>
@@ -229,7 +235,7 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
     /// </summary>
     private void CheckStipends(object sender, ElapsedEventArgs e)
     {
-        if (!m_stipendEnabled || m_moneyXmlRpcModule == null ||
+        if (Volatile.Read(ref m_shuttingDown) != 0 || !m_stipendEnabled || m_moneyXmlRpcModule == null ||
             m_stipendAmount <= 0 || m_stipendEligibleAvatars.Count == 0)
         {
             return;
@@ -329,6 +335,35 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
         string temporaryFile = m_stipendStateFile + ".tmp";
         File.WriteAllText(temporaryFile, cycleKey + Environment.NewLine);
         File.Move(temporaryFile, m_stipendStateFile, true);
+    }
+
+    private void DisposeWorkTimers()
+    {
+        lock (m_timerLock)
+        {
+            if (checkTimer != null)
+            {
+                checkTimer.Stop();
+                checkTimer.Elapsed -= CheckTransaction;
+                checkTimer.Dispose();
+                checkTimer = null;
+            }
+
+            if (m_stipendTimer != null)
+            {
+                m_stipendTimer.Stop();
+                m_stipendTimer.Elapsed -= CheckStipends;
+                m_stipendTimer.Dispose();
+                m_stipendTimer = null;
+            }
+        }
+    }
+
+    protected override void ShutdownSpecific()
+    {
+        Interlocked.Exchange(ref m_shuttingDown, 1);
+        DisposeWorkTimers();
+        base.ShutdownSpecific();
     }
 
     /// <summary>
