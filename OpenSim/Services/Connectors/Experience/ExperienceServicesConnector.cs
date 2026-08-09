@@ -19,6 +19,7 @@ namespace OpenSim.Services.Connectors
 {
     public class ExperienceServicesConnector : BaseServiceConnector, IExperienceService
     {
+        private const int MaxCollectionResults = 1000;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private string m_ServerURI = String.Empty;
@@ -76,28 +77,26 @@ namespace OpenSim.Services.Connectors
             if (reply != string.Empty)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                if (replyData == null)
+                    return experiences;
 
-                int iter = 0;
-                while(true)
+                for (int iter = 0; iter < MaxCollectionResults; iter++)
                 {
                     string key = string.Format("uuid_{0}", iter);
                     string perm = string.Format("perm_{0}", iter);
 
                     if (replyData.ContainsKey(key) && replyData.ContainsKey(perm))
                     {
-                        UUID experience_id;
-                        if (UUID.TryParse(replyData[key].ToString(), out experience_id))
+                        if (UUID.TryParse(replyData[key]?.ToString(), out UUID experienceID) &&
+                            experienceID != UUID.Zero &&
+                            bool.TryParse(replyData[perm]?.ToString(), out bool allow))
                         {
-                            bool allow = bool.Parse(replyData[perm].ToString());
+                            experiences[experienceID] = allow;
 
-                            experiences.Add(experience_id, allow);
-
-                            //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experience_id, allow);
+                            //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experienceID, allow);
                         }
                     }
                     else break;
-
-                    iter++;
                 }
             }
 
@@ -119,14 +118,19 @@ namespace OpenSim.Services.Connectors
 
         public ExperienceInfo[] GetExperienceInfos(UUID[] experiences)
         {
+            if (experiences == null || experiences.Length == 0)
+                return Array.Empty<ExperienceInfo>();
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             sendData["METHOD"] = "getexperienceinfos";
             int i = 0;
-            foreach(UUID id in experiences)
+            foreach (UUID id in experiences.Where(id => id != UUID.Zero).Distinct().Take(MaxCollectionResults))
             {
                 sendData[string.Format("id_{0}", i)] = id.ToString();
                 i++;
             }
+            if (i == 0)
+                return Array.Empty<ExperienceInfo>();
 
             string request_str = ServerUtils.BuildQueryString(sendData);
 
@@ -139,15 +143,27 @@ namespace OpenSim.Services.Connectors
             if (reply != string.Empty)
             {
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                if (replyData == null)
+                    return Array.Empty<ExperienceInfo>();
 
                 Dictionary<string, object>.ValueCollection experienceList = replyData.Values;
 
                 foreach (object ex in experienceList)
                 {
-                    if (ex is Dictionary<string, object>)
+                    if (infos.Count >= MaxCollectionResults)
+                        break;
+                    if (ex is Dictionary<string, object> experience)
                     {
-                        Dictionary<string, object> experience = (Dictionary<string, object>)ex;
-                        infos.Add(new ExperienceInfo(experience));
+                        try
+                        {
+                            infos.Add(new ExperienceInfo(experience));
+                        }
+                        catch (Exception e)
+                        {
+                            m_log.WarnFormat(
+                                "[EXPERIENCE CONNECTOR]: Ignoring malformed Experience info: {0}",
+                                e.Message);
+                        }
                     }
                 }
             }
@@ -208,7 +224,7 @@ namespace OpenSim.Services.Connectors
                 {
                     Dictionary<string, object>.ValueCollection experienceList = replyData.Values;
 
-                    return experienceList.Select(x => UUID.Parse(x.ToString())).ToArray();
+                    return ParseExperienceIDs(experienceList);
                 }
             }
 
@@ -257,10 +273,20 @@ namespace OpenSim.Services.Connectors
 
                 foreach (object ex in experienceList)
                 {
-                    if (ex is Dictionary<string, object>)
+                    if (infos.Count >= MaxCollectionResults)
+                        break;
+                    if (ex is Dictionary<string, object> experience)
                     {
-                        Dictionary<string, object> experience = (Dictionary<string, object>)ex;
-                        infos.Add(new ExperienceInfo(experience));
+                        try
+                        {
+                            infos.Add(new ExperienceInfo(experience));
+                        }
+                        catch (Exception e)
+                        {
+                            m_log.WarnFormat(
+                                "[EXPERIENCE CONNECTOR]: Ignoring malformed Experience search result: {0}",
+                                e.Message);
+                        }
                     }
                 }
             }
@@ -286,7 +312,7 @@ namespace OpenSim.Services.Connectors
                 {
                     Dictionary<string, object>.ValueCollection experienceList = replyData.Values;
 
-                    return experienceList.Select(x => UUID.Parse(x.ToString())).ToArray();
+                    return ParseExperienceIDs(experienceList);
                 }
             }
 
@@ -315,11 +341,24 @@ namespace OpenSim.Services.Connectors
                 {
                     Dictionary<string, object>.ValueCollection experienceList = replyData.Values;
 
-                    return experienceList.Select(x => UUID.Parse(x.ToString())).ToArray();
+                    return ParseExperienceIDs(experienceList);
                 }
             }
 
             return new UUID[0];
+        }
+
+        private static UUID[] ParseExperienceIDs(IEnumerable<object> values)
+        {
+            HashSet<UUID> ids = new HashSet<UUID>();
+            foreach (object value in values)
+            {
+                if (ids.Count >= MaxCollectionResults)
+                    break;
+                if (value != null && UUID.TryParse(value.ToString(), out UUID id) && id != UUID.Zero)
+                    ids.Add(id);
+            }
+            return ids.ToArray();
         }
 
         public string GetKeyValue(UUID experience, string key)

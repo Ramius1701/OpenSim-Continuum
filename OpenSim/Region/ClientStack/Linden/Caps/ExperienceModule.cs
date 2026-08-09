@@ -1397,20 +1397,21 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             if (ids == null)
                 return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            if (ids.Length > 1000)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            }
 
-            List<ExperienceInfo> infos = new();
+            HashSet<UUID> experienceIDs = new();
 
             foreach (string id in ids)
             {
-                if (!UUID.TryParse(id, out UUID experience_id))
-                    continue;
-
-                ExperienceInfo info = m_ExperienceModule.GetExperienceInfo(experience_id);
-
-                if (info != null)
-                    infos.Add(info);
+                if (UUID.TryParse(id, out UUID experienceID) && experienceID != UUID.Zero)
+                    experienceIDs.Add(experienceID);
             }
 
+            ExperienceInfo[] infos = m_ExperienceModule.GetExperienceInfos(experienceIDs.ToArray());
             return ExperienceCapsResponse.SerializeExperiences(infos);
         }
     }
