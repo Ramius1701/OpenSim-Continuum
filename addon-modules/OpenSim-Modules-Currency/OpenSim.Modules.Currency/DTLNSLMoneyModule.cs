@@ -597,6 +597,9 @@ namespace OpenSim.Modules.Currency
         /// <param name="amount">The amount.</param>
         public bool UploadCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
             if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
@@ -616,6 +619,9 @@ namespace OpenSim.Modules.Currency
         /// <param name="amount">The amount.</param>
         public bool AmountCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
             if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
@@ -636,8 +642,15 @@ namespace OpenSim.Modules.Currency
         /// <param name="text">The text.</param>
         public void ApplyUploadCharge(UUID agentID, int amount, string text)
         {
-            ulong regionHandle = GetLocateScene(agentID).RegionInfo.RegionHandle;
-            UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
+            Scene scene = GetLocateScene(agentID);
+            if (scene == null)
+            {
+                m_log.ErrorFormat("[MONEY MODULE] ApplyUploadCharge: root scene for {0} was not found; charge was not submitted", agentID);
+                return;
+            }
+
+            ulong regionHandle = scene.RegionInfo.RegionHandle;
+            UUID regionUUID = scene.RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)TransactionType.UploadCharge, regionHandle, regionUUID, text);
 
             m_log.InfoFormat("[MONEY MODULE] ApplyUploadCharge: {0} {1} {2}", agentID, amount, text);
@@ -663,8 +676,15 @@ namespace OpenSim.Modules.Currency
         /// <param name="text">The text.</param>
         public void ApplyCharge(UUID agentID, int amount, MoneyTransactionType type, string text)
         {
-            ulong regionHandle = GetLocateScene(agentID).RegionInfo.RegionHandle;
-            UUID regionUUID = GetLocateScene(agentID).RegionInfo.RegionID;
+            Scene scene = GetLocateScene(agentID);
+            if (scene == null)
+            {
+                m_log.ErrorFormat("[MONEY MODULE] ApplyCharge: root scene for {0} was not found; charge was not submitted", agentID);
+                return;
+            }
+
+            ulong regionHandle = scene.RegionInfo.RegionHandle;
+            UUID regionUUID = scene.RegionInfo.RegionID;
             PayMoneyCharge(agentID, amount, (int)type, regionHandle, regionUUID, text);
 
             m_log.InfoFormat("[MONEY MODULE] ApplyCharge: {0} {1} {2} {3}", agentID, amount, type, text);

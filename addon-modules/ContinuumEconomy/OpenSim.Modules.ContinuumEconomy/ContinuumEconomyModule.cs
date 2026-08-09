@@ -558,6 +558,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="amount">The amount.</param>
         public bool UploadCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
             if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
@@ -577,6 +580,9 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// <param name="amount">The amount.</param>
         public bool AmountCovered(UUID agentID, int amount)
         {
+            if (amount < 0)
+                return false;
+
             IClientAPI client = GetLocateClient(agentID);
 
             if (m_enable_server && !string.IsNullOrEmpty(m_moneyServURL))
