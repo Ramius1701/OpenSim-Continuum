@@ -46,7 +46,7 @@ namespace OpenSim.OfflineIM
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private bool m_Enabled = false;
-        private readonly List<Scene> m_SceneList = new List<Scene>();
+        private readonly HashSet<Scene> m_SceneList = new HashSet<Scene>();
         private readonly object m_SceneLock = new object();
         IMessageTransferModule m_TransferModule = null;
         private bool m_TransferSubscribed;
@@ -62,69 +62,82 @@ namespace OpenSim.OfflineIM
             if (cnf != null && cnf.GetString("OfflineMessageModule", string.Empty) != Name)
                 return;
 
-            m_Enabled = true;
-
             string serviceLocation = cnf.GetString("OfflineMessageURL", string.Empty);
-            if (serviceLocation.Length == 0)
-                m_OfflineIMService = new OfflineIMService(config);
-            else
-                m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
+            try
+            {
+                if (serviceLocation.Length == 0)
+                    m_OfflineIMService = new OfflineIMService(config);
+                else
+                    m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
+            }
+            catch (Exception e)
+            {
+                m_log.ErrorFormat(
+                    "[OfflineIM.V2]: Service configuration is invalid; offline messages disabled. {0}",
+                    e.Message);
+                return;
+            }
 
             m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
+            m_Enabled = true;
             m_log.DebugFormat("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            scene.RegisterModuleInterface<IOfflineIMService>(this);
             lock (m_SceneLock)
             {
-                if (!m_SceneList.Contains(scene))
-                    m_SceneList.Add(scene);
+                if (!m_Enabled || !m_SceneList.Add(scene))
+                    return;
+
+                scene.RegisterModuleInterface<IOfflineIMService>(this);
+                scene.EventManager.OnNewClient += OnNewClient;
             }
-            scene.EventManager.OnNewClient += OnNewClient;
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            if (m_TransferModule == null)
+            lock (m_SceneLock)
             {
-                m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
+                if (!m_Enabled || !m_SceneList.Contains(scene))
+                    return;
+
                 if (m_TransferModule == null)
                 {
-                    m_log.Error("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
-                    return;
+                    m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
+                    if (m_TransferModule == null)
+                    {
+                        m_log.Error("[OfflineIM.V2]: No message transfer module is enabled; this region cannot store undelivered messages");
+                        return;
+                    }
                 }
-            }
 
-            if (!m_TransferSubscribed)
-            {
-                m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
-                m_TransferSubscribed = true;
+                if (!m_TransferSubscribed)
+                {
+                    m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
+                    m_TransferSubscribed = true;
+                }
             }
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
 
             lock (m_SceneLock)
-                m_SceneList.Remove(scene);
-
-            scene.EventManager.OnNewClient -= OnNewClient;
-            scene.UnregisterModuleInterface<IOfflineIMService>(this);
-
-            scene.ForEachClient(delegate(IClientAPI client)
             {
-                client.OnRetrieveInstantMessages -= RetrieveInstantMessages;
-            });
+                if (!m_SceneList.Remove(scene))
+                    return;
+            }
+
+            DetachRegion(scene);
 
             lock (m_SceneLock)
             {
@@ -155,17 +168,41 @@ namespace OpenSim.OfflineIM
         {
             Scene[] scenes;
             lock (m_SceneLock)
-                scenes = m_SceneList.ToArray();
+            {
+                if (!m_Enabled)
+                    return;
+
+                scenes = new Scene[m_SceneList.Count];
+                m_SceneList.CopyTo(scenes);
+                m_SceneList.Clear();
+                m_Enabled = false;
+
+                if (m_TransferSubscribed)
+                {
+                    m_TransferModule.OnUndeliveredMessage -= UndeliveredMessage;
+                    m_TransferSubscribed = false;
+                }
+                m_TransferModule = null;
+            }
 
             foreach (Scene scene in scenes)
-                RemoveRegion(scene);
+                DetachRegion(scene);
+        }
+
+        private void DetachRegion(Scene scene)
+        {
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.UnregisterModuleInterface<IOfflineIMService>(this);
+
+            scene.ForEachClient(delegate(IClientAPI client)
+            {
+                client.OnRetrieveInstantMessages -= RetrieveInstantMessages;
+            });
         }
 
         private Scene FindScene(UUID agentID)
         {
-            Scene[] scenes;
-            lock (m_SceneLock)
-                scenes = m_SceneList.ToArray();
+            Scene[] scenes = SnapshotScenes();
 
             foreach (Scene s in scenes)
             {
@@ -178,9 +215,7 @@ namespace OpenSim.OfflineIM
 
         private IClientAPI FindClient(UUID agentID)
         {
-            Scene[] scenes;
-            lock (m_SceneLock)
-                scenes = m_SceneList.ToArray();
+            Scene[] scenes = SnapshotScenes();
 
             foreach (Scene s in scenes)
             {
@@ -189,6 +224,16 @@ namespace OpenSim.OfflineIM
                     return presence.ControllingClient;
             }
             return null;
+        }
+
+        private Scene[] SnapshotScenes()
+        {
+            lock (m_SceneLock)
+            {
+                Scene[] scenes = new Scene[m_SceneList.Count];
+                m_SceneList.CopyTo(scenes);
+                return scenes;
+            }
         }
 
         private void OnNewClient(IClientAPI client)
