@@ -92,6 +92,13 @@ namespace osWebRtcVoice
                         _Enabled = false;
                         return;
                     }
+                    if (!TryValidateEndpoint(_JanusServerURI, out _JanusServerURI)
+                        || !TryValidateEndpoint(_JanusAdminURI, out _JanusAdminURI))
+                    {
+                        _log.Error($"{LogHeader} Janus endpoints must be absolute HTTP or HTTPS URLs");
+                        _Enabled = false;
+                        return;
+                    }
 
                     // Debugging options
                     _JanusDebug = janusConfig.GetBoolean("JanusDebug", false);
@@ -150,7 +157,13 @@ namespace osWebRtcVoice
 
         private async Task<bool> ConnectToSessionAndAudioBridge(JanusViewerSession pViewerSession)
         {
-            JanusSession janusSession = new(_JanusServerURI, _JanusAPIToken, _JanusAdminURI, _JanusAdminToken, _MessageDetails);
+            JanusSession janusSession = new(
+                _JanusServerURI,
+                _JanusAPIToken,
+                _JanusAdminURI,
+                _JanusAdminToken,
+                _JanusDebug,
+                _MessageDetails);
             if (await janusSession.CreateSession().ConfigureAwait(false))
             {
                 _log.DebugFormat("{0} JanusSession created", LogHeader);
@@ -167,12 +180,14 @@ namespace osWebRtcVoice
                     pViewerSession.VoiceServiceSessionId = janusSession.SessionId;
                     pViewerSession.Session = janusSession;
                     pViewerSession.AudioBridge = audioBridge;
-                    janusSession.OnDisconnect += Handle_Hangup;
+                    janusSession.OnDisconnect += Handle_Disconnect;
                     janusSession.OnHangup += Handle_Hangup;
 
                     return true;
                 }
                 _log.Error($"{LogHeader} JanusPluginHandle not created");
+                await janusSession.DestroySession().ConfigureAwait(false);
+                janusSession.Dispose();
             }
             _log.Error($"{LogHeader} JanusSession not created");
             return false;
@@ -309,7 +324,11 @@ namespace osWebRtcVoice
                 if (viewerSession.Session is null)
                 {
                     // This is a new session so we must create a new session and handle to the audio bridge
-                    await ConnectToSessionAndAudioBridge(viewerSession).ConfigureAwait(false);
+                    if (!await ConnectToSessionAndAudioBridge(viewerSession).ConfigureAwait(false))
+                    {
+                        errorMsg = "Janus connection failed";
+                        goto ProvisionFailed;
+                    }
                 }
 
                 // Get the parameters that select the room
@@ -317,7 +336,14 @@ namespace osWebRtcVoice
                 int parcel_local_id = pRequest.TryGetInt("parcel_local_id", out int pli) ? pli : JanusAudioBridge.REGION_ROOM_ID;
                 string channel_id = pRequest.TryGetString("channel_id", out string cli) ? cli : string.Empty;
                 string channel_credentials = pRequest.TryGetString("credentials", out string cred) ? cred : string.Empty;
-                string channel_type = pRequest["channel_type"].AsString();
+                string channel_type = pRequest.TryGetString("channel_type", out string channelType)
+                    ? channelType
+                    : string.Empty;
+                if (channel_type != "local" && channel_type != "multiagent")
+                {
+                    errorMsg = "invalid channel type";
+                    goto ProvisionFailed;
+                }
                 string gridHash = pRequest.TryGetValue("gridhash", out OSD ghash) ? ghash.AsString() : string.Empty;
                 bool isSpatial = channel_type == "local";
 
@@ -386,6 +412,7 @@ namespace osWebRtcVoice
                 _log.Error("{LogHeader} ProvisionVoiceAccountRequest: viewersession not JanusViewerSession");
             }
 
+        ProvisionFailed:
             if (!string.IsNullOrEmpty(errorMsg) && ret is null)
             {
                 // The provision failed so build an error messgage to return
@@ -445,30 +472,26 @@ namespace osWebRtcVoice
                 else if (pRequest.TryGetOSDArray("candidates", out OSDArray candidates))
                 {
                     OSDArray candidatesArray = [];
-                    //int sourceCount = candidates.Count;
-                    //int candidateLimit = _MaxSignalingCandidatesPerRequest;
-                    foreach (OSDMap cand in candidates)
+                    int sourceCount = candidates.Count;
+                    foreach (OSD node in candidates)
                     {
-                        // TODO: can not limit candidates blindly
-//                        if (candidateLimit > 0 && candidatesArray.Count >= candidateLimit)
-//                            break;
+                        if (_MaxSignalingCandidatesPerRequest > 0
+                            && candidatesArray.Count >= _MaxSignalingCandidatesPerRequest)
+                            break;
+                        if (node is not OSDMap cand)
+                            continue;
 
                         candidatesArray.Add(new OSDMap() {
-                            { "candidate", cand["candidate"].AsString() },
-                            { "sdpMid", cand["sdpMid"].AsString() },
-                            { "sdpMLineIndex", cand["sdpMLineIndex"].AsLong() }
+                            { "candidate", cand.TryGetValue("candidate", out OSD candidateValue) ? candidateValue.AsString() : string.Empty },
+                            { "sdpMid", cand.TryGetValue("sdpMid", out OSD sdpMid) ? sdpMid.AsString() : string.Empty },
+                            { "sdpMLineIndex", cand.TryGetValue("sdpMLineIndex", out OSD line) ? line.AsLong() : 0 }
                         });
                     }
                     resp = await viewerSession.Session.TrickleCandidates(viewerSession, candidatesArray).ConfigureAwait(false);
-//                    if (candidateLimit > 0 && sourceCount > candidatesArray.Count)
-//                    {
-//                        _log.WarnFormat("{0} VoiceSignalingRequest: capped candidates {1}/{2} (MaxSignalingCandidatesPerRequest={3})",
-//                                LogHeader, candidatesArray.Count, sourceCount, candidateLimit);
-//                    }
-//                    else
-//                    {
+                    if (sourceCount > candidatesArray.Count)
+                        _log.WarnFormat("{0} VoiceSignalingRequest: accepted {1}/{2} candidates", LogHeader, candidatesArray.Count, sourceCount);
+                    else
                         _log.DebugFormat("{0} VoiceSignalingRequest: {1} candidates", LogHeader, candidatesArray.Count);
-//                    }
                 }
                 else
                 {
@@ -513,6 +536,14 @@ namespace osWebRtcVoice
                 AgentId = pUserID,
                 RegionId = pSceneID
             };
+        }
+
+        private static bool TryValidateEndpoint(string value, out string endpoint)
+        {
+            endpoint = (value ?? string.Empty).Trim().TrimEnd('/');
+            return Uri.TryCreate(endpoint, UriKind.Absolute, out Uri uri)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                && !string.IsNullOrEmpty(uri.Host);
         }
 
         // ======================================================================================================
