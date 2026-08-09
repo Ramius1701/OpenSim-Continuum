@@ -2,16 +2,16 @@
 
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-The current integration base is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. This branch is an **alpha integration build**, not a production-test candidate. The complete solution builds, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, and other distributed paths still require donor-regression and multi-service runtime verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md) and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
+The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The repository has subsequently synchronized OpenSim upstream through `a87969840ce2abde50309229347fe7257456e62e` while retaining the audited Continuum feature set. The active hardening branch remains an **alpha integration build**, not a production-approved release. The complete solution builds cleanly, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, voice, and other distributed paths still require the recorded live-grid verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md), [the integration progress ledger](doc/integration-progress.md), and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
 
 ## Project status — alpha
 
 - Target runtime: .NET 8
 - Required deployment targets: Windows standalone with SQLite; Windows grid mode
   with Robust using MySQL/MariaDB or PostgreSQL
-- Baseline build: successful with four known CS9193 compiler warnings
-- Continuum completion build: successful
-- Latest clean Release build: successful with four known CS9193 warnings and zero errors
+- Original baseline build: successful with four known CS9193 compiler warnings
+- The four CS9193 warnings have been corrected without changing their quaternion calculations
+- Latest complete Release build: successful with zero warnings and zero errors
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
@@ -123,8 +123,8 @@ database and an upgrade from the exact schema used by the target deployment.
 
 See [BUILDING.md](BUILDING.md) for the upstream build prerequisites and platform details.
 
-On Windows, build from the repository root (for this integration worktree,
-`S:\Github\OpenSim-Continuum-complete`):
+On Windows, build from the root of the checkout or isolated worktree you intend
+to test. Do not mix binaries from another OpenSim checkout:
 
 ```powershell
 .\runprebuild.bat
@@ -151,6 +151,7 @@ credentials, service URIs, database providers, and optional-module settings.
 
 ## Branches used for testing
 
+- `agent/complete-runtime-readiness`: active production-hardening and runtime-test candidate
 - `codex/complete-opensim-feature-set`: complete OpenSim-side feature candidate
 - `codex/production-feature-integration`: earlier conservative integration checkpoint
 - `codex/testing-ubode-tuning`: experimental ubODE series on the integration candidate
