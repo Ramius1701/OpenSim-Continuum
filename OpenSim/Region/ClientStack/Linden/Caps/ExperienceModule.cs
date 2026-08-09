@@ -216,11 +216,31 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 HashSet<UUID> blockedSet = new(blocked.Where(id => !trustedSet.Contains(id)));
                 allowed = allowed.Where(id => !trustedSet.Contains(id) && !blockedSet.Contains(id)).ToArray();
 
+                HashSet<UUID> enabledPolicyIDs = new(allowed);
+                enabledPolicyIDs.UnionWith(trustedSet);
+                if (enabledPolicyIDs.Count > 0)
+                {
+                    ExperienceInfo[] policyInfos = GetExperienceInfos(enabledPolicyIDs.ToArray(), true);
+                    HashSet<UUID> validPolicyIDs = new(
+                        policyInfos
+                            .Where(info => info != null &&
+                                (info.properties & (int)(ExperienceFlags.Invalid |
+                                    ExperienceFlags.Disabled | ExperienceFlags.Suspended)) == 0)
+                            .Select(info => info.public_id));
+                    if (!enabledPolicyIDs.SetEquals(validPolicyIDs))
+                    {
+                        response.StatusCode = (int)HttpStatusCode.BadRequest;
+                        return;
+                    }
+                }
+
                 EstateSettings settings = m_scene.RegionInfo.EstateSettings;
                 settings.AllowedExperiences = allowed;
                 settings.BlockedExperiences = blockedSet.ToArray();
                 settings.KeyExperiences = trusted;
                 m_scene.EstateDataService.StoreEstateSettings(settings);
+                m_scene.ForEachRootScenePresence(
+                    presence => UpdateScriptExperiencePerms(presence, false));
             }
             else if (request.HttpMethod != "GET")
             {
@@ -230,11 +250,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             OSDMap result = new()
             {
-                ["allowed"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.AllowedExperiences),
-                ["blocked"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.BlockedExperiences),
+                ["allowed"] = ToOSDArray(GetEstateAllowedExperiences()),
+                ["blocked"] = ToOSDArray(GetEstateBlockedExperiences()),
                 ["default"] = UUID.Zero,
                 ["disabled"] = new OSDArray(),
-                ["trusted"] = ToOSDArray(m_scene.RegionInfo.EstateSettings.KeyExperiences)
+                ["trusted"] = ToOSDArray(GetEstateKeyExperiences())
             };
 
             response.ContentType = "application/llsd+xml";
