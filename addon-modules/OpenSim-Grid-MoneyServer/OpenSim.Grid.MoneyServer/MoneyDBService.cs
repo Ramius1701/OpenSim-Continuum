@@ -85,6 +85,7 @@ namespace OpenSim.Grid.MoneyServer
         //}
 
         private const int MAX_ALLOWED_CONNECTIONS = 100;
+        private const int CONNECTION_WAIT_TIMEOUT_MILLISECONDS = 30000;
 
         // Ersetze die Methode Initialise, damit die Verbindungen im Pool korrekt angelegt werden.
         // Füge außerdem eine Schutzmaßnahme in GetLockedConnection hinzu, damit der Index nie außerhalb des Bereichs liegt.
@@ -131,6 +132,8 @@ namespace OpenSim.Grid.MoneyServer
                 }
 
                 int lockedCons = 0;
+                bool waitLogged = false;
+                Stopwatch waitTime = Stopwatch.StartNew();
                 while (true)
                 {
                     m_lastConnect++;
@@ -161,11 +164,24 @@ namespace OpenSim.Grid.MoneyServer
                     }
 
                     lockedCons++;
-                    if (lockedCons > m_maxConnections)
+                    if (lockedCons >= m_maxConnections)
                     {
                         lockedCons = 0;
-                        System.Threading.Thread.Sleep(2000);
-                        m_log.Warn("GetLockedConnection: All connections are in use. Probable cause: Something didn't release a mutex properly, or high volume of requests inbound.");
+                        if (waitTime.ElapsedMilliseconds >= CONNECTION_WAIT_TIMEOUT_MILLISECONDS)
+                        {
+                            throw new TimeoutException(
+                                $"No MoneyServer database connection became available within {CONNECTION_WAIT_TIMEOUT_MILLISECONDS / 1000} seconds.");
+                        }
+
+                        if (!waitLogged)
+                        {
+                            m_log.Warn("GetLockedConnection: All connections are in use; waiting up to 30 seconds for capacity.");
+                            waitLogged = true;
+                        }
+
+                        // Release the allocator lock while waiting so other
+                        // request threads can observe newly available managers.
+                        System.Threading.Monitor.Wait(connectionLock, 50);
                     }
                 }
             }
