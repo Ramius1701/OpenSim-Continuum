@@ -23,7 +23,7 @@ The initial recommendations in this document are retained as the evidence availa
 | WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
-The latest complete Release solution build completed successfully with the four known CS9193 warnings and zero errors, matching the untouched baseline warning count. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
+The latest complete Release solution build completed successfully with zero warnings and zero errors. The untouched baseline's four known CS9193 warnings were corrected without changing the quaternion calculations. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
 
 ## Repository verification
 
@@ -63,7 +63,7 @@ The official baseline already builds successfully. Production work should keep e
 
 | Lane | Items | Integration decision |
 |---|---|---|
-| Focused correctness | Provisional YEngine orphaned-event recovery | Implement first with a regression test because it is narrow and has no schema impact. |
+| Focused correctness | YEngine orphaned-event recovery | Integrated as a narrow guard with defensive exception formatting; retain a corrupt-state restart fixture in the production test gate. |
 | Service enhancements | Mutable Display Names, user aliases, Experiences | Implement on separate branches in dependency/risk order; each requires schema, connector, CAPS, Robust, MySQL, and HG verification. |
 | Optional modules | RegionWeb and recovered addons | Integrate one module per branch with disabled-by-default configuration and failure isolation. |
 | Experimental behaviour | Warp3D sprite renderer, ubODE tuning | Keep out of production until deterministic visual/physics and performance tests pass. |
@@ -76,7 +76,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 | Priority | Candidate | Classification | Donor commit/checkpoint | Recommendation |
 |---:|---|---|---|---|
-| P0 | YEngine orphaned resumed-event guard | upstream-quality bug fix (provisional) | Gunthar `af16af08b66c049d81faef423950b5c98f34eb9` | The throwing path is present; construct a focused state-corruption/restart test before selecting recovery semantics. |
+| Integrated/P0 test | YEngine orphaned resumed-event guard | upstream-quality bug fix | Gunthar `af16af08b66c049d81faef423950b5c98f34eb9`; Continuum `091217b99c82f591a1be10d376447739073eeca8` | The guard drops only the unrecoverable current event, clears transient resume state and keeps the scheduler alive; production certification still requires the corrupt-state/restart fixture. |
 | Closed | Estate connector must not terminate host process | already present in OpenSim Dev | Tranquillity `d978ab12b4c0c05a9ff2016bdce7ed569e7e13f8`; Dev equivalent `a9be42a304d9113c889a59ef2041bdccfc37c6f3` | No port. Current Dev already returns null without terminating the process. |
 | P2 | Warp3D alpha texture-card sprites | experimental feature | Gunthar initial subsystem `50ff704e14f2114ff2b5613be4aa1252fbad6694`, later black-card fix `c2c30d2dcfa95c93421265bcaa18fc12f88aeef7` | Audit the complete 400-line sprite subsystem as an optional renderer enhancement; the later fix cannot stand alone. |
 | P1 | Mutable Display Names | Robust service extension | Tranquillity `0e0953667cdc71a9934bfcdef73a661befcd6619` plus MySQL case fix `45232b2f318e6f225675047fc92edfd20f54b51a` | Dev already serves default names; implement mutable-name persistence as a dedicated production branch. |
@@ -96,14 +96,14 @@ Priority reflects expected value and auditability, not authorization to implemen
 
 - **Feature and intended behaviour:** avoid a YEngine crash when a persisted/resumed script event refers to a script instance that is no longer valid.
 - **Donor and commit:** GuntharDeNiro/opensim, `af16af08b66c049d81faef423950b5c98f34eb9`.
-- **Current Dev equivalent / missing behaviour:** current Dev `ResumeEx()` explicitly throws when `stackFrames` is null, and `RunOne()` does not catch that call locally. The donor clears event state and returns null, which lets the scheduler continue. The missing resilience is real; whether silently dropping the event is the correct recovery remains unproven.
+- **Current Dev equivalent / missing behaviour:** baseline Dev `ResumeEx()` explicitly throws when `stackFrames` is null, and `RunOne()` does not catch that call locally. Continuum commit `091217b99c82f591a1be10d376447739073eeca8` replaces that simulator-level failure with a bounded recovery: it logs the corrupt resume, clears the current event arguments/detect state and transient resume mode, then returns control to the scheduler. It also makes exception-stack formatting tolerate absent exception, stack and object-code metadata.
 - **Affected files and services:** `XMRInstAbstract.cs`, `XMRScriptUThread.cs`; region-side YEngine only. The donor commit also contains an unrelated example LSL file which must be excluded.
 - **Addon versus core:** narrow core bug fix.
 - **Compatibility:** no database impact; Windows-neutral managed code; no intended Robust or Hypergrid impact.
 - **Viewer requirements:** none.
 - **Licensing/provenance:** OpenSim-derived donor; confirm BSD notices and authorship in the source commit before porting.
 - **Tests required:** first create a fixture that reaches `eventCode != None` with `stackFrames == null`; then cover persisted-state restart, deleted/recompiled script race, event-queue concurrency, subsequent queued-event execution, and Debug/Release builds on Windows. Assert that cleanup does not strand suspend/detach state.
-- **Recommendation:** retain at P0 provisionally. Do not port the donor reset sequence until the corrupt-state fixture proves both the crash and safe continuation semantics. Treat the null-safe exception formatter as a separable defensive fix.
+- **Recommendation:** integrated as an upstream-quality bug fix. Keep at P0 in the runtime test matrix until a corrupt persisted-state fixture proves that the bad event is discarded, later queued events execute, and suspend/detach state is not stranded.
 
 ### 2. Estate connector process-termination path
 
@@ -274,7 +274,7 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 
 ## Next audit actions
 
-1. Build the minimal corrupt-state fixture for the remaining provisional P0 YEngine candidate and decide safe recovery semantics.
+1. Build the minimal corrupt-state/restart fixture for the integrated YEngine guard and verify safe continuation semantics.
 2. Produce protocol/data-flow maps for Display Names, aliases, and Experiences, including trust boundaries and MySQL migrations.
 3. Trace RegionWeb and each recovered addon to its original repository/license and enumerate assets separately from code.
 4. Convert each viable item into its own audit checkpoint with exact diff boundaries and test plan. No implementation should be ported until that item's audit is accepted.
