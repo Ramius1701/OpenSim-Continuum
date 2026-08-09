@@ -2128,12 +2128,18 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleForceTransaction(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["message"] = "malformed force transfer request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             int amount = 0;
             int transactionType = 0;
@@ -2145,7 +2151,6 @@ namespace OpenSim.Grid.MoneyServer
             string regionUUID = string.Empty;
             string description = "Newly added on";
 
-            responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
             //
@@ -2170,15 +2175,19 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
-            if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
-            if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
-            if (requestData.ContainsKey("objectID")) objectID = (string)requestData["objectID"];
-            if (requestData.ContainsKey("objectName")) objectName = (string)requestData["objectName"];
-            if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
-            if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
-            if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
-            if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+            if (!TryReadString(requestData, "senderID", ref senderID) ||
+                !TryReadString(requestData, "receiverID", ref receiverID) ||
+                !TryReadInt(requestData, "amount", ref amount) ||
+                !TryReadString(requestData, "objectID", ref objectID) ||
+                !TryReadString(requestData, "objectName", ref objectName) ||
+                !TryReadString(requestData, "regionHandle", ref regionHandle) ||
+                !TryReadString(requestData, "regionUUID", ref regionUUID) ||
+                !TryReadInt(requestData, "transactionType", ref transactionType) ||
+                !TryReadString(requestData, "description", ref description))
+            {
+                responseData["message"] = "malformed force transfer request";
+                return response;
+            }
 
             if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
@@ -2276,22 +2285,27 @@ namespace OpenSim.Grid.MoneyServer
         {
             m_log.InfoFormat("[MONEY XMLRPC]: handleScriptTransaction:");
 
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["message"] = "malformed script transaction request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             int amount = 0;
             int transactionType = 0;
             string senderID = UUID.Zero.ToString();
             string receiverID = UUID.Zero.ToString();
-            string clientIP = remoteClient.Address.ToString();
+            string clientIP = remoteClient?.Address?.ToString() ?? string.Empty;
             string secretCode = string.Empty;
             string description = "Scripted Send Money from/to Avatar on";
 
-            responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
             if (!m_scriptSendMoney || m_scriptAccessKey == "")
@@ -2302,12 +2316,16 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
-            if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
-            if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
-            if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
-            if (requestData.ContainsKey("description")) description = (string)requestData["description"];
-            if (requestData.ContainsKey("secretAccessCode")) secretCode = (string)requestData["secretAccessCode"];
+            if (!TryReadString(requestData, "senderID", ref senderID) ||
+                !TryReadString(requestData, "receiverID", ref receiverID) ||
+                !TryReadInt(requestData, "amount", ref amount) ||
+                !TryReadInt(requestData, "transactionType", ref transactionType) ||
+                !TryReadString(requestData, "description", ref description) ||
+                !TryReadString(requestData, "secretAccessCode", ref secretCode))
+            {
+                responseData["message"] = "malformed script transaction request";
+                return response;
+            }
 
             using MD5 md5 = MD5.Create();
             byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(m_scriptAccessKey + "_" + clientIP));
@@ -2443,6 +2461,46 @@ namespace OpenSim.Grid.MoneyServer
             }
 
             return result;
+        }
+
+        private static bool TryGetRequestData(XmlRpcRequest request, out Hashtable requestData)
+        {
+            requestData = null;
+            if (request?.Params == null || request.Params.Count == 0)
+                return false;
+
+            requestData = request.Params[0] as Hashtable;
+            return requestData != null;
+        }
+
+        private static bool TryReadString(Hashtable requestData, string key, ref string value)
+        {
+            if (!requestData.ContainsKey(key))
+                return true;
+
+            if (requestData[key] is string parsed)
+            {
+                value = parsed;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool TryReadInt(Hashtable requestData, string key, ref int value)
+        {
+            if (!requestData.ContainsKey(key))
+                return true;
+
+            try
+            {
+                value = Convert.ToInt32(requestData[key], System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (Exception e) when (e is FormatException || e is InvalidCastException || e is OverflowException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -2659,12 +2717,19 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleAddBankerMoney(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["message"] = "malformed banker credit request";
+                responseData["banker"] = false;
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             int amount = 0;
             int transactionType = 0;
@@ -2674,15 +2739,19 @@ namespace OpenSim.Grid.MoneyServer
             string regionUUID = UUID.Zero.ToString();
             string description = "Add Money to Avatar on";
 
-            responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("bankerID")) bankerID = (string)requestData["bankerID"];
-            if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
-            if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
-            if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
-            if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
-            if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+            if (!TryReadString(requestData, "bankerID", ref bankerID) ||
+                !TryReadInt(requestData, "amount", ref amount) ||
+                !TryReadString(requestData, "regionHandle", ref regionHandle) ||
+                !TryReadString(requestData, "regionUUID", ref regionUUID) ||
+                !TryReadInt(requestData, "transactionType", ref transactionType) ||
+                !TryReadString(requestData, "description", ref description))
+            {
+                responseData["message"] = "malformed banker credit request";
+                responseData["banker"] = false;
+                return response;
+            }
 
             if (!UUID.TryParse(bankerID, out UUID bankerUUID) || bankerUUID == UUID.Zero ||
                 amount < 0 || (amount == 0 && !m_enableAmountZero))
@@ -2788,12 +2857,18 @@ namespace OpenSim.Grid.MoneyServer
         {
             m_log.InfoFormat("[MONEY XMLRPC]: handlePayMoneyCharge now.");
 
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["message"] = "malformed charge request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             int amount = 0;
             int transactionType = 0;
@@ -2807,21 +2882,23 @@ namespace OpenSim.Grid.MoneyServer
             string regionUUID = string.Empty;
             string description = "Pay Charge on";
 
-            responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            // Parameter aus der Anfrage extrahieren
-            if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
-            if (requestData.ContainsKey("senderSessionID")) senderSessionID = (string)requestData["senderSessionID"];
-            if (requestData.ContainsKey("senderSecureSessionID")) senderSecureSessionID = (string)requestData["senderSecureSessionID"];
-            if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
-            if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
-            if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
-            if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
-            if (requestData.ContainsKey("description")) description = (string)requestData["description"];
-            if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
-            if (requestData.ContainsKey("objectID")) objectID = (string)requestData["objectID"];
-            if (requestData.ContainsKey("objectName")) objectName = (string)requestData["objectName"];
+            if (!TryReadString(requestData, "senderID", ref senderID) ||
+                !TryReadString(requestData, "senderSessionID", ref senderSessionID) ||
+                !TryReadString(requestData, "senderSecureSessionID", ref senderSecureSessionID) ||
+                !TryReadInt(requestData, "amount", ref amount) ||
+                !TryReadString(requestData, "regionHandle", ref regionHandle) ||
+                !TryReadString(requestData, "regionUUID", ref regionUUID) ||
+                !TryReadInt(requestData, "transactionType", ref transactionType) ||
+                !TryReadString(requestData, "description", ref description) ||
+                !TryReadString(requestData, "receiverID", ref receiverID) ||
+                !TryReadString(requestData, "objectID", ref objectID) ||
+                !TryReadString(requestData, "objectName", ref objectName))
+            {
+                responseData["message"] = "malformed charge request";
+                return response;
+            }
 
             if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 amount < 0 || (amount == 0 && !m_enableAmountZero))
