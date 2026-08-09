@@ -19,7 +19,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private readonly List<Scene> m_Scenes = new List<Scene>();
+        private readonly object m_ScenesLock = new object();
+        private readonly HashSet<Scene> m_Scenes = new HashSet<Scene>();
         private IAbuseReportsService m_RemoteConnector;
         private bool m_Enabled;
 
@@ -54,16 +55,17 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            lock (m_Scenes)
+            lock (m_ScenesLock)
             {
-                if (!m_Scenes.Contains(scene))
-                    m_Scenes.Add(scene);
+                if (!m_Enabled || !m_Scenes.Add(scene))
+                    return;
+
+                scene.RegisterModuleInterface<IAbuseReportsService>(this);
             }
 
-            scene.RegisterModuleInterface<IAbuseReportsService>(this);
             m_log.InfoFormat(
                 "[ABUSE REPORTS REMOTE CONNECTOR]: Enabled for region {0}",
                 scene.RegionInfo.RegionName);
@@ -71,10 +73,16 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
 
         public void RemoveRegion(Scene scene)
         {
-            scene.UnregisterModuleInterface<IAbuseReportsService>(this);
+            if (scene == null)
+                return;
 
-            lock (m_Scenes)
-                m_Scenes.Remove(scene);
+            lock (m_ScenesLock)
+            {
+                if (!m_Scenes.Remove(scene))
+                    return;
+            }
+
+            scene.UnregisterModuleInterface<IAbuseReportsService>(this);
         }
 
         public void RegionLoaded(Scene scene)
@@ -87,44 +95,50 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AbuseReports
 
         public void Close()
         {
-            lock (m_Scenes)
-            {
-                foreach (Scene scene in m_Scenes)
-                    scene.UnregisterModuleInterface<IAbuseReportsService>(this);
+            if (!m_Enabled)
+                return;
 
+            Scene[] scenes;
+            lock (m_ScenesLock)
+            {
+                scenes = new Scene[m_Scenes.Count];
+                m_Scenes.CopyTo(scenes);
                 m_Scenes.Clear();
+                m_Enabled = false;
             }
 
-            m_Enabled = false;
-            m_RemoteConnector = null;
+            foreach (Scene scene in scenes)
+                scene.UnregisterModuleInterface<IAbuseReportsService>(this);
         }
 
         public bool ReportAbuse(AbuseReportData report)
         {
-            return m_Enabled &&
-                m_RemoteConnector != null &&
-                m_RemoteConnector.ReportAbuse(report);
+            IAbuseReportsService connector = m_RemoteConnector;
+            return m_Enabled && connector != null && connector.ReportAbuse(report);
         }
 
         public AbuseReportData GetReport(int reportID, bool includeImage)
         {
-            return m_Enabled && m_RemoteConnector != null
-                ? m_RemoteConnector.GetReport(reportID, includeImage)
+            IAbuseReportsService connector = m_RemoteConnector;
+            return m_Enabled && connector != null
+                ? connector.GetReport(reportID, includeImage)
                 : null;
         }
 
         public AbuseReportData[] GetReports(int start, int count, string status)
         {
-            return m_Enabled && m_RemoteConnector != null
-                ? m_RemoteConnector.GetReports(start, count, status)
+            IAbuseReportsService connector = m_RemoteConnector;
+            return m_Enabled && connector != null
+                ? connector.GetReports(start, count, status)
                 : Array.Empty<AbuseReportData>();
         }
 
         public bool UpdateReport(int reportID, string status, string notes,
             UUID moderatorID, string moderatorName)
         {
-            return m_Enabled && m_RemoteConnector != null &&
-                m_RemoteConnector.UpdateReport(reportID, status, notes, moderatorID, moderatorName);
+            IAbuseReportsService connector = m_RemoteConnector;
+            return m_Enabled && connector != null &&
+                connector.UpdateReport(reportID, status, notes, moderatorID, moderatorName);
         }
     }
 }
