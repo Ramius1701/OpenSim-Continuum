@@ -104,7 +104,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private readonly Dictionary<UUID, InventoryCarouselAssetCacheEntry> m_inventoryCarouselAssetCache = new Dictionary<UUID, InventoryCarouselAssetCacheEntry>();
 
         private bool m_enabled;
-        private bool m_handlerRegistered;
+        private bool m_fixedHandlerRegistered;
+        private bool m_variableHandlerRegistered;
         private bool m_autoCreateContent;
         private bool m_showMap;
         private bool m_showStats;
@@ -239,12 +240,12 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
-                if (server.GetSimpleStreamHandlerKeys().Contains(m_basePath, StringComparer.Ordinal))
+                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"));
+                m_variableHandlerRegistered = m_fixedHandlerRegistered && server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true);
+                if (!m_variableHandlerRegistered)
                     throw new InvalidOperationException("HTTP path " + m_basePath + " is already owned by another module");
-
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"));
-                m_handlerRegistered = true;
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true);
 
                 MainConsole.Instance.Commands.AddCommand(
                     "RegionWeb", false, "regionweb show",
@@ -351,13 +352,16 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         private void RemoveHttpHandlers()
         {
-            if (!m_handlerRegistered)
+            if (!m_fixedHandlerRegistered && !m_variableHandlerRegistered)
                 return;
 
             IHttpServer server = MainServer.GetHttpServer(0);
-            server.RemoveSimpleStreamHandler(m_basePath);
-            server.RemoveSimpleStreamHandler(m_basePath);
-            m_handlerRegistered = false;
+            if (m_fixedHandlerRegistered)
+                server.RemoveSimpleStreamHandler(m_basePath);
+            if (m_variableHandlerRegistered)
+                server.RemoveSimpleStreamHandler(m_basePath);
+            m_fixedHandlerRegistered = false;
+            m_variableHandlerRegistered = false;
         }
 
         private void AddOrUpdateScene(Scene scene)
