@@ -53,7 +53,7 @@ namespace OpenSim.Services.Connectors
 
         public MuteListServicesConnector(string serverURI)
         {
-            m_ServerURI = serverURI.TrimEnd('/') + "/mutelist";
+            m_ServerURI = ValidateServerUri(serverURI) + "/mutelist";
         }
 
         public MuteListServicesConnector(IConfigSource source)
@@ -78,7 +78,7 @@ namespace OpenSim.Services.Connectors
                 m_log.Error("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
                 throw new Exception("MuteList connector init error");
             }
-            m_ServerURI = serviceURI + "/mutelist";
+            m_ServerURI = ValidateServerUri(serviceURI) + "/mutelist";
             base.Initialise(source, "MuteListService");
         }
 
@@ -157,10 +157,9 @@ namespace OpenSim.Services.Connectors
                 string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI, reqString, m_Auth);
                 if (reply != string.Empty)
                 {
-                    int indx = reply.IndexOf("success", StringComparison.InvariantCultureIgnoreCase);
-                    if (indx > 0)
-                        return true;
-                    return false;
+                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+                    return replyData.TryGetValue("result", out object result)
+                        && string.Equals(result?.ToString(), "Success", StringComparison.OrdinalIgnoreCase);
                 }
                 else
                     m_log.DebugFormat("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
@@ -171,6 +170,18 @@ namespace OpenSim.Services.Connectors
             }
 
             return false;
+        }
+
+        private static string ValidateServerUri(string value)
+        {
+            string candidate = (value ?? string.Empty).Trim().TrimEnd('/');
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out Uri uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrEmpty(uri.Host))
+            {
+                throw new ArgumentException("MuteListServerURI must be an absolute HTTP or HTTPS URL");
+            }
+            return candidate;
         }
     }
 }
