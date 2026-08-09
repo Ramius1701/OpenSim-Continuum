@@ -105,6 +105,13 @@ namespace OpenSim.Region.Framework.Interfaces
         /// null or empty message falls back to the default invite text.
         /// </summary>
         void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID, string message);
+
+        /// <summary>
+        /// Creates a group invitation and reports whether the backing group
+        /// service accepted it. Callers that need retry semantics should use
+        /// this method instead of assuming the void viewer API succeeded.
+        /// </summary>
+        bool TryInviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID, string message);
         void NotifyChange(UUID GroupID);
 
         ulong GetFullGroupPowers(UUID agentID, UUID groupID);

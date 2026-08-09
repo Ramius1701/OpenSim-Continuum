@@ -218,7 +218,19 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
                 }
 
                 string inviteMessage = FormatInviteMessage(sp, group);
-                groups.InviteGroup(null, inviterID, group.GroupID, agentID, m_roleID, inviteMessage);
+                if (!groups.TryInviteGroup(
+                    null, inviterID, group.GroupID, agentID, m_roleID, inviteMessage))
+                {
+                    if (recordedInvite)
+                    {
+                        m_invitedThisSession.TryRemove(agentID, out _);
+                        recordedInvite = false;
+                    }
+                    m_log.WarnFormat(
+                        "[GROUP AUTO INVITE]: Group service rejected invitation for {0} to {1} ({2}).",
+                        sp.Name, group.GroupName, group.GroupID);
+                    return;
+                }
 
                 m_log.InfoFormat(
                     "[GROUP AUTO INVITE]: Invited {0} to group {1} ({2}) in {3} with message '{4}'.",

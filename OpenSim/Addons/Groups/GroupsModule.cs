@@ -1379,6 +1379,11 @@ namespace OpenSim.Groups
         // and send the actual invite IM.
         public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
         {
+            TryInviteGroup(remoteClient, agentID, groupID, invitedAgentID, roleID, message);
+        }
+
+        public bool TryInviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID, string message)
+        {
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
             string agentName = m_UserManagement.GetUserName(agentID);
@@ -1386,7 +1391,7 @@ namespace OpenSim.Groups
             if (scene == null)
             {
                 m_log.WarnFormat("[Groups]: Cannot send invitation for group {0}; no region is available", groupID);
-                return;
+                return false;
             }
             RegionInfo regionInfo = scene.RegionInfo;
 
@@ -1394,13 +1399,15 @@ namespace OpenSim.Groups
             if (group == null)
             {
                 m_log.DebugFormat("[Groups]: No such group {0}", groupID);
-                return;
+                return false;
             }
 
             // Todo: Security check, probably also want to send some kind of notification
             UUID InviteID = UUID.Random();
 
-            if (m_groupData.AddAgentToGroupInvite(agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString()))
+            bool accepted = m_groupData.AddAgentToGroupInvite(
+                agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString());
+            if (accepted)
             {
                 if (m_msgTransferModule != null)
                 {
@@ -1432,6 +1439,7 @@ namespace OpenSim.Groups
                     OutgoingInstantMessage(msg, invitedAgentID);
                 }
             }
+            return accepted;
         }
 
         private static string FormatInviteMessage(string message, string inviterName, string groupName, string defaultMessage)
