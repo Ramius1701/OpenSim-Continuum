@@ -1007,11 +1007,22 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 item_id = item_id_osd.AsUUID();
             }
 
+            if (object_id == UUID.Zero || item_id == UUID.Zero)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
 
             SceneObjectPart scene_object = m_Scene.GetSceneObjectPart(object_id);
 
             if(scene_object != null)
             {
+                if (!m_Scene.Permissions.CanEditObject(scene_object.ParentGroup.UUID, m_AgentID))
+                {
+                    httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                    return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+                }
+
                 TaskInventoryItem inv_item = scene_object.Inventory.GetInventoryItem(item_id);
 
                 if(inv_item != null)
