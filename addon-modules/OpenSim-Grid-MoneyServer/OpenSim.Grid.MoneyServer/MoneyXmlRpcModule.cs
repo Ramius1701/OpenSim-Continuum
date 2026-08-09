@@ -1482,15 +1482,15 @@ namespace OpenSim.Grid.MoneyServer
         }
         public new IEnumerable<TransactionData> GetTransactionHistory(string userID, int startTime, int endTime)
         {
-            return GetTransactionHistory(userID, startTime, endTime);
+            return base.GetTransactionHistory(userID, startTime, endTime);
         }
         public new UserInfo FetchUserInfo(string userID)
         {
-            return FetchUserInfo(userID);
+            return base.FetchUserInfo(userID);
         }
         public new bool UserExists(string userID)
         {
-            return UserExists(userID);
+            return base.UserExists(userID);
         }
         public bool PerformTransaction(UUID transactionUUID)
         {
@@ -2908,7 +2908,18 @@ namespace OpenSim.Grid.MoneyServer
             }
 
             TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
+            if (transaction == null)
+            {
+                m_log.WarnFormat("[MONEY XMLRPC]: handleCancelTransfer: Transaction {0} was not found.", transactionID);
+                return response;
+            }
+
             UserInfo user = m_moneyDBService.FetchUserInfo(transaction.Sender);
+            if (user == null)
+            {
+                m_log.WarnFormat("[MONEY XMLRPC]: handleCancelTransfer: Sender {0} was not found.", transaction.Sender);
+                return response;
+            }
 
             try
             {
@@ -2916,9 +2927,19 @@ namespace OpenSim.Grid.MoneyServer
                 if (m_moneyDBService.ValidateTransfer(secureCode, transactionUUID))
                 {
                     m_log.InfoFormat("[MONEY XMLRPC]: handleCancelTransfer: User {0} has canceled the transaction {1}", user.Avatar, transactionID);
-                    m_moneyDBService.updateTransactionStatus(transactionUUID, (int)Status.FAILED_STATUS,
-                                                            "User canceled the transaction on " + DateTime.UtcNow.ToString());
-                    responseData["success"] = true;
+                    if (m_moneyDBService.updateTransactionStatus(
+                        transactionUUID,
+                        (int)Status.FAILED_STATUS,
+                        "User canceled the transaction on " + DateTime.UtcNow.ToString()))
+                    {
+                        responseData["success"] = true;
+                    }
+                    else
+                    {
+                        m_log.ErrorFormat(
+                            "[MONEY XMLRPC]: handleCancelTransfer: Failed to persist cancellation for {0}.",
+                            transactionID);
+                    }
                 }
             }
             catch (Exception e)
