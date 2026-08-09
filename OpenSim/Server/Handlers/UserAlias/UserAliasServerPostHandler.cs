@@ -49,7 +49,7 @@ namespace OpenSim.Server.Handlers.UserAlias
     {
         private const int MaxRequestBodyBytes = 64 * 1024;
         private const int MaxAliasResults = 1000;
-        private const int MaxDescriptionLength = 255;
+        private const int MaxDescriptionLength = 80;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IUserAliasService m_UserAliasService;

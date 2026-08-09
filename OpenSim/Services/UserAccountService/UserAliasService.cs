@@ -40,7 +40,7 @@ namespace OpenSim.Services.UserAccountService
 {
     public class UserAliasService : ServiceBase, IUserAliasService
     {
-        private const int MaxDescriptionLength = 255;
+        private const int MaxDescriptionLength = 80;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected IUserAliasData m_Database = null;

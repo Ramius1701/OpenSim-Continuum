@@ -43,6 +43,7 @@ namespace OpenSim.Services.Connectors
     public class UserAliasServicesConnector : BaseServiceConnector, IUserAliasService
     {
         private const int MaxAliasResults = 1000;
+        private const int MaxDescriptionLength = 80;
         private static readonly ILog m_log =
                 LogManager.GetLogger(
                 MethodBase.GetCurrentMethod().DeclaringType);
@@ -165,7 +166,8 @@ namespace OpenSim.Services.Connectors
 
         public UserAlias CreateAlias(UUID AliasID, UUID UserID, string Description)
         {
-            if (AliasID == UUID.Zero || UserID == UUID.Zero)
+            if (AliasID == UUID.Zero || UserID == UUID.Zero ||
+                (Description?.Length ?? 0) > MaxDescriptionLength)
                 return null;
 
             Dictionary<string, object> sendData = new Dictionary<string, object>();
