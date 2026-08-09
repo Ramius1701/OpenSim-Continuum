@@ -68,6 +68,7 @@ namespace OpenSim.OfflineIM
 
     public class OfflineIMServicePostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 1024 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IOfflineIMService m_OfflineIMService;
@@ -81,15 +82,9 @@ namespace OpenSim.OfflineIM
         protected override byte[] ProcessRequest(string path, Stream requestData,
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            StreamReader sr = new StreamReader(requestData);
-            string body = sr.ReadToEnd();
-            sr.Close();
-            body = body.Trim();
-
-            //m_log.DebugFormat("[XXX]: query String: {0}", body);
-
             try
             {
+                string body = ReadBoundedBody(requestData, httpRequest, MaxRequestBodyBytes).Trim();
                 Dictionary<string, object> request =
                         ServerUtils.ParseQueryString(body);
 
@@ -142,11 +137,11 @@ namespace OpenSim.OfflineIM
         {
             Dictionary<string, object> result = new Dictionary<string, object>();
 
-            if (!request.ContainsKey("PrincipalID"))
+            if (!request.TryGetValue("PrincipalID", out object rawPrincipalID)
+                || !UUID.TryParse(rawPrincipalID?.ToString(), out UUID principalID))
                 NullResult(result, "Bad network data");
             else
             {
-                UUID principalID = new UUID(request["PrincipalID"].ToString());
                 List<GridInstantMessage> ims = m_OfflineIMService.GetMessages(principalID);
 
                 Dictionary<string, object> dict = new Dictionary<string, object>();
@@ -165,13 +160,13 @@ namespace OpenSim.OfflineIM
 
         byte[] HandleDelete(Dictionary<string, object> request)
         {
-            if (!request.ContainsKey("UserID"))
+            if (!request.TryGetValue("UserID", out object rawUserID)
+                || !UUID.TryParse(rawUserID?.ToString(), out UUID userID))
             {
                 return FailureResult();
             }
             else
             {
-                UUID userID = new UUID(request["UserID"].ToString());
                 m_OfflineIMService.DeleteMessages(userID);
 
                 return SuccessResult();
@@ -179,6 +174,27 @@ namespace OpenSim.OfflineIM
         }
 
         #region Helpers
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request, int maximumBytes)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > maximumBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using MemoryStream body = new MemoryStream();
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > maximumBytes)
+                    throw new InvalidDataException("Request body exceeds the service limit.");
+                body.Write(buffer, 0, read);
+            }
+            return Encoding.UTF8.GetString(body.ToArray());
+        }
 
         private void NullResult(Dictionary<string, object> result, string reason)
         {
