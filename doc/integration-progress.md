@@ -52,10 +52,9 @@ The complete Release build is now expected to be warning-free.
 - `20f1729fb3`: order land settlement, require an exact committed debit and preserve zero-price sales.
 - `f336752f69`: refresh test-only adapters for current Dev interfaces.
 
-The latest complete incremental Release build passed with one known CS9193
-warning and zero errors. The latest clean complete Release build passed with
-the four known CS9193 warnings and zero errors after synchronizing official
-OpenSimulator master.
+The latest focused module builds and complete incremental Release build pass
+with zero warnings and zero errors. The four baseline CS9193 warnings were
+removed without changing their quaternion calculations, as recorded above.
 Generated
 `bin/*.runtimeconfig.json` files and `.audit/` material are build/test artifacts
 and intentionally remain untracked.
