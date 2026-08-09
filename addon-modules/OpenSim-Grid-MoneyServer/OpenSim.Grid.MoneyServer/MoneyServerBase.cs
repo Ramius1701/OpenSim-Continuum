@@ -43,8 +43,6 @@ using Timer = System.Timers.Timer;
 /// </summary>
 internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
 {
-    private MoneyDBService dbService;
-
     private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string connectionString = string.Empty;
@@ -574,9 +572,6 @@ internal class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
                 }
             }
 
-            // Initialisiere die MoneyDBService mit der Verbindungszeichenkette und der maxDBConnections
-            dbService = new MoneyDBService();
-            dbService.Initialise(connectionString, MAX_DB_CONNECTION);
         }
         catch (Exception ex)
         {
