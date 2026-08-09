@@ -2872,7 +2872,8 @@ namespace OpenSim.Region.Framework.Scenes
                     {
                         fixrot = true;
                         sog = objlist[0];
-                        netRot = Quaternion.Conjugate(sog.RootPart.GetWorldRotation());
+                        Quaternion worldRotation = sog.RootPart.GetWorldRotation();
+                        netRot = Quaternion.Conjugate(in worldRotation);
                         netRot *= rot.Value;
                         Vector3 off;
                         if (atRoot)

@@ -11,6 +11,11 @@ is not production-approved merely because it compiles or passes an isolated
 test. The branch remains an alpha integration build until every applicable live
 grid gate here and in `donor-feature-test-handoff.md` passes.
 
+The four baseline CS9193 warnings were removed by passing local quaternion
+variables with the explicit `in` modifier to the `ref readonly` conjugation API
+without changing calculations.
+The complete Release build is now expected to be warning-free.
+
 ## Current checkpoint
 
 | Area | Implemented | Automated evidence | Remaining live gate |
