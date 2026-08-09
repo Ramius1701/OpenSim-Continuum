@@ -265,6 +265,13 @@ namespace HoloNeon.RegionModules
             lock (m_scenes)
                 m_scenes.Remove(scene);
 
+            // Wait for any sleep/wake operation that already selected this
+            // scene. Later operations re-check membership while holding the
+            // same lock and will not mutate a removed region.
+            lock (m_operationLock)
+            {
+            }
+
             lock (m_regionBecameEmptyAt)
                 m_regionBecameEmptyAt.Remove(scene.RegionInfo.RegionID);
 
@@ -282,6 +289,12 @@ namespace HoloNeon.RegionModules
                 m_timer.Elapsed -= OnTimer;
                 m_timer.Dispose();
                 m_timer = null;
+            }
+
+            // Timer disposal prevents new callbacks but does not wait for one
+            // already running. Make Close a real mutation barrier.
+            lock (m_operationLock)
+            {
             }
 
             lock (m_scenes)
@@ -371,6 +384,9 @@ namespace HoloNeon.RegionModules
 
         private void CheckScene(Scene scene)
         {
+            if (!IsSceneActive(scene))
+                return;
+
             UUID regionID = scene.RegionInfo.RegionID;
             bool occupied = scene.GetRootAgentCount() > 0;
             bool wasOccupied;
@@ -396,7 +412,7 @@ namespace HoloNeon.RegionModules
                     {
                         lock (m_operationLock)
                         {
-                            if (m_enabled)
+                            if (m_enabled && IsSceneActive(scene))
                                 wakeComplete = WakeRegion(scene, "avatar_enter");
                         }
                     }
@@ -442,7 +458,7 @@ namespace HoloNeon.RegionModules
 
             lock (m_operationLock)
             {
-                if (m_enabled && scene.GetRootAgentCount() == 0)
+                if (m_enabled && IsSceneActive(scene) && scene.GetRootAgentCount() == 0)
                     SleepPhysicalObjects(scene);
             }
 
@@ -565,6 +581,9 @@ namespace HoloNeon.RegionModules
 
         private bool WakeRegion(Scene scene, string reason)
         {
+            if (!m_enabled || !IsSceneActive(scene))
+                return false;
+
             List<SleepRow> rows = GetSleepRows(scene.RegionInfo.RegionID);
             if (rows.Count == 0)
                 return true;
@@ -575,6 +594,9 @@ namespace HoloNeon.RegionModules
 
             foreach (SleepRow row in rows)
             {
+                if (!m_enabled || !IsSceneActive(scene))
+                    return false;
+
                 SceneObjectGroup sog = FindSceneObjectGroup(scene, row.ObjectUUID);
 
                 if (sog == null || sog.RootPart == null)
@@ -657,6 +679,12 @@ namespace HoloNeon.RegionModules
             }
 
             return failed == 0;
+        }
+
+        private bool IsSceneActive(Scene scene)
+        {
+            lock (m_scenes)
+                return m_scenes.Contains(scene);
         }
 
         private SceneObjectGroup FindSceneObjectGroup(Scene scene, UUID rootPartUUID)
