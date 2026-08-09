@@ -38,7 +38,7 @@ namespace OpenSimSearch.Modules.OpenSearch
         //
         // Module vars
         //
-        private List<Scene> m_Scenes = new();
+        private readonly List<Scene> m_Scenes = new();
         private string m_SearchServer = "";
         private bool m_Enabled = true;
         private int m_RequestTimeoutMs = 5000;
@@ -95,17 +95,18 @@ namespace OpenSimSearch.Modules.OpenSearch
             if (!m_Enabled)
                 return;
 
-            // Hook up events
-            scene.EventManager.OnNewClient += OnNewClient;
-
-            // Take ownership of the ISearchModule service
-            scene.RegisterModuleInterface<ISearchModule>(this);
-
-            // Add our scene to our list...
+            bool added;
             lock(m_Scenes)
             {
-                m_Scenes.Add(scene);
+                added = !m_Scenes.Contains(scene);
+                if (added)
+                    m_Scenes.Add(scene);
             }
+            if (!added)
+                return;
+
+            scene.EventManager.OnNewClient += OnNewClient;
+            scene.RegisterModuleInterface<ISearchModule>(this);
         }
 
         public void RemoveRegion(Scene scene)
@@ -116,6 +117,7 @@ namespace OpenSimSearch.Modules.OpenSearch
             scene.UnregisterModuleInterface<ISearchModule>(this);
 
             scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(UnsubscribeClient);
 
             lock(m_Scenes)
             {
@@ -138,6 +140,11 @@ namespace OpenSimSearch.Modules.OpenSearch
 
         public void Close()
         {
+            Scene[] scenes;
+            lock (m_Scenes)
+                scenes = m_Scenes.ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         public string Name
@@ -154,25 +161,44 @@ namespace OpenSimSearch.Modules.OpenSearch
         /// New Client Event Handler
         private void OnNewClient(IClientAPI client)
         {
-            // Subscribe to messages
-            client.OnDirPlacesQuery += (remote, query, text, flags, category, sim, start) =>
-                ExecuteSearchRequest(remote, "places", () => DirPlacesQuery(remote, query, text, flags, category, sim, start));
-            client.OnDirFindQuery += (remote, query, text, flags, start) =>
-                ExecuteSearchRequest(remote, "directory", () => DirFindQuery(remote, query, text, flags, start));
-            client.OnDirPopularQuery += (remote, query, flags) =>
-                ExecuteSearchRequest(remote, "popular", () => DirPopularQuery(remote, query, flags));
-            client.OnDirLandQuery += (remote, query, flags, type, price, area, start) =>
-                ExecuteSearchRequest(remote, "land", () => DirLandQuery(remote, query, flags, type, price, area, start));
-            client.OnDirClassifiedQuery += (remote, query, text, flags, category, start) =>
-                ExecuteSearchRequest(remote, "classifieds", () => DirClassifiedQuery(remote, query, text, flags, category, start));
-            // Response after Directory Queries
-            client.OnEventInfoRequest += (remote, eventID) =>
-                ExecuteSearchRequest(remote, "event details", () => EventInfoRequest(remote, eventID));
-            client.OnClassifiedInfoRequest += (classifiedID, remote) =>
-                ExecuteSearchRequest(remote, "classified details", () => ClassifiedInfoRequest(classifiedID, remote));
-            client.OnMapItemRequest += (remote, flags, estate, godlike, type, handle) =>
-                ExecuteSearchRequest(remote, "map items", () => HandleMapItemRequest(remote, flags, estate, godlike, type, handle));
+            client.OnDirPlacesQuery += OnDirPlacesQuery;
+            client.OnDirFindQuery += OnDirFindQuery;
+            client.OnDirPopularQuery += OnDirPopularQuery;
+            client.OnDirLandQuery += OnDirLandQuery;
+            client.OnDirClassifiedQuery += OnDirClassifiedQuery;
+            client.OnEventInfoRequest += OnEventInfoRequest;
+            client.OnClassifiedInfoRequest += OnClassifiedInfoRequest;
+            client.OnMapItemRequest += OnMapItemRequest;
         }
+
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            client.OnDirPlacesQuery -= OnDirPlacesQuery;
+            client.OnDirFindQuery -= OnDirFindQuery;
+            client.OnDirPopularQuery -= OnDirPopularQuery;
+            client.OnDirLandQuery -= OnDirLandQuery;
+            client.OnDirClassifiedQuery -= OnDirClassifiedQuery;
+            client.OnEventInfoRequest -= OnEventInfoRequest;
+            client.OnClassifiedInfoRequest -= OnClassifiedInfoRequest;
+            client.OnMapItemRequest -= OnMapItemRequest;
+        }
+
+        private void OnDirPlacesQuery(IClientAPI remote, UUID query, string text, int flags, int category, string sim, int start) =>
+            ExecuteSearchRequest(remote, "places", () => DirPlacesQuery(remote, query, text, flags, category, sim, start));
+        private void OnDirFindQuery(IClientAPI remote, UUID query, string text, uint flags, int start) =>
+            ExecuteSearchRequest(remote, "directory", () => DirFindQuery(remote, query, text, flags, start));
+        private void OnDirPopularQuery(IClientAPI remote, UUID query, uint flags) =>
+            ExecuteSearchRequest(remote, "popular", () => DirPopularQuery(remote, query, flags));
+        private void OnDirLandQuery(IClientAPI remote, UUID query, uint flags, uint type, int price, int area, int start) =>
+            ExecuteSearchRequest(remote, "land", () => DirLandQuery(remote, query, flags, type, price, area, start));
+        private void OnDirClassifiedQuery(IClientAPI remote, UUID query, string text, uint flags, uint category, int start) =>
+            ExecuteSearchRequest(remote, "classifieds", () => DirClassifiedQuery(remote, query, text, flags, category, start));
+        private void OnEventInfoRequest(IClientAPI remote, uint eventID) =>
+            ExecuteSearchRequest(remote, "event details", () => EventInfoRequest(remote, eventID));
+        private void OnClassifiedInfoRequest(UUID classifiedID, IClientAPI remote) =>
+            ExecuteSearchRequest(remote, "classified details", () => ClassifiedInfoRequest(classifiedID, remote));
+        private void OnMapItemRequest(IClientAPI remote, uint flags, uint estate, bool godlike, uint type, ulong handle) =>
+            ExecuteSearchRequest(remote, "map items", () => HandleMapItemRequest(remote, flags, estate, godlike, type, handle));
 
         private void ExecuteSearchRequest(IClientAPI client, string operation, Action request)
         {
