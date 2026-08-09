@@ -372,30 +372,42 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             byte[] response_bytes = new byte[0];
 
-            if (map.Keys.Count == 1)
+            if (map.Keys.Count != 1)
             {
-                string first_key = map.Keys.First();
-                if (!UUID.TryParse(first_key, out UUID experience_id) || map[first_key] is not OSDMap m)
-                {
-                    response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    return;
-                }
-
-                if (m.ContainsKey("permission"))
-                {
-                    bool allowed = m["permission"].AsString() == "Allow";
-
-                    SetExperiencePermissions(agentID, experience_id, allowed);
-
-                    string response_str = "<llsd><map><key>blocked</key><array>" +
-                    (allowed == false ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                        "</array><key>experiences</key><array>" +
-                    (allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                        "</array></map></llsd>";
-
-                    response_bytes = Encoding.UTF8.GetBytes(response_str);
-                }
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
             }
+
+            string first_key = map.Keys.First();
+            if (!UUID.TryParse(first_key, out UUID experience_id) || experience_id == UUID.Zero ||
+                map[first_key] is not OSDMap permissionMap ||
+                !permissionMap.TryGetValue("permission", out OSD permissionValue))
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            string permission = permissionValue.AsString();
+            if (permission != "Allow" && permission != "Block")
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            bool allowed = permission == "Allow";
+            if (!SetExperiencePermissions(agentID, experience_id, allowed))
+            {
+                response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
+
+            string response_str = "<llsd><map><key>blocked</key><array>" +
+                (!allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
+                "</array><key>experiences</key><array>" +
+                (allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
+                "</array></map></llsd>";
+
+            response_bytes = Encoding.UTF8.GetBytes(response_str);
 
             response.RawBuffer = response_bytes;
             response.StatusCode = (int)HttpStatusCode.OK;
@@ -544,10 +556,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public bool SetExperiencePermission(UUID avatar_id, UUID experience_id, ExperiencePermission perm)
         {
             if (perm == ExperiencePermission.None)
-                ForgetExperiencePermissions(avatar_id, experience_id);
-            else
-                SetExperiencePermissions(avatar_id, experience_id, perm == ExperiencePermission.Allowed);
-            return true;
+                return ForgetExperiencePermissions(avatar_id, experience_id);
+
+            return SetExperiencePermissions(
+                avatar_id,
+                experience_id,
+                perm == ExperiencePermission.Allowed);
         }
 
         public ExperienceInfo[] FindExperiencesByName(string query)
