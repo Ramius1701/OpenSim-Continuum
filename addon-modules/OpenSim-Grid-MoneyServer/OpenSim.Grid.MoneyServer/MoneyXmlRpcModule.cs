@@ -1743,15 +1743,20 @@ namespace OpenSim.Grid.MoneyServer
         {
             m_log.InfoFormat("[MONEY XMLRPC]: handleClientLogin: Start.");
 
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
 
             responseData["success"] = false;
             responseData["clientBalance"] = 0;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["description"] = "Malformed login request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             // Check Client Cert
             if (m_moneyCore.IsCheckClientCert())
@@ -1781,14 +1786,21 @@ namespace OpenSim.Grid.MoneyServer
             int avatarType = (int)AvatarType.UNKNOWN_AVATAR;
             int avatarClass = (int)AvatarType.UNKNOWN_AVATAR;
 
-            if (requestData.ContainsKey("clientUUID")) clientUUID = (string)requestData["clientUUID"];
-            if (requestData.ContainsKey("clientSessionID")) sessionID = (string)requestData["clientSessionID"];
-            if (requestData.ContainsKey("clientSecureSessionID")) secureID = (string)requestData["clientSecureSessionID"];
-            if (requestData.ContainsKey("universalID")) universalID = (string)requestData["universalID"];
-            if (requestData.ContainsKey("userName")) userName = (string)requestData["userName"];
-            if (requestData.ContainsKey("openSimServIP")) simIP = (string)requestData["openSimServIP"];
-            if (requestData.ContainsKey("avatarType")) avatarType = Convert.ToInt32(requestData["avatarType"]);
-            if (requestData.ContainsKey("avatarClass")) avatarClass = Convert.ToInt32(requestData["avatarClass"]);
+            if (!TryReadString(requestData, "clientUUID", ref clientUUID) ||
+                !TryReadString(requestData, "clientSessionID", ref sessionID) ||
+                !TryReadString(requestData, "clientSecureSessionID", ref secureID) ||
+                !TryReadString(requestData, "universalID", ref universalID) ||
+                !TryReadString(requestData, "userName", ref userName) ||
+                !TryReadString(requestData, "openSimServIP", ref simIP) ||
+                !TryReadInt(requestData, "avatarType", ref avatarType) ||
+                !TryReadInt(requestData, "avatarClass", ref avatarClass) ||
+                !UUID.TryParse(clientUUID, out UUID parsedClientUUID) || parsedClientUUID == UUID.Zero ||
+                !UUID.TryParse(sessionID, out UUID parsedSessionID) || parsedSessionID == UUID.Zero ||
+                !UUID.TryParse(secureID, out UUID parsedSecureID) || parsedSecureID == UUID.Zero)
+            {
+                responseData["description"] = "Malformed login request";
+                return response;
+            }
 
             string firstName = string.Empty;
             string lastName = string.Empty;
@@ -1856,24 +1868,6 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            //Update the session and secure session dictionary
-            lock (m_sessionDic)
-            {
-                if (!m_sessionDic.ContainsKey(clientUUID))
-                {
-                    m_sessionDic.Add(clientUUID, sessionID);
-                }
-                else m_sessionDic[clientUUID] = sessionID;
-            }
-            lock (m_secureSessionDic)
-            {
-                if (!m_secureSessionDic.ContainsKey(clientUUID))
-                {
-                    m_secureSessionDic.Add(clientUUID, secureID);
-                }
-                else m_secureSessionDic[clientUUID] = secureID;
-            }
-
             try
             {
                 if (userInfo == null) userInfo = new UserInfo();
@@ -1889,7 +1883,6 @@ namespace OpenSim.Grid.MoneyServer
                 if (!m_moneyDBService.TryAddUserInfo(userInfo))
                 {
                     m_log.ErrorFormat("[MONEY XMLRPC]: handleClientLogin: Unable to refresh information for user \"{0}\" in DB.", userName);
-                    responseData["success"] = true;         // for FireStorm
                     responseData["description"] = "Update or add user information to db failed";
                     return response;
                 }
@@ -1914,6 +1907,7 @@ namespace OpenSim.Grid.MoneyServer
 
                     if (m_moneyDBService.addUser(clientUUID, default_balance, 0, avatarType))
                     {
+                        SetSession(clientUUID, sessionID, secureID);
                         responseData["success"] = true;
                         responseData["description"] = "add user successfully";
                         responseData["clientBalance"] = default_balance;
@@ -1926,6 +1920,7 @@ namespace OpenSim.Grid.MoneyServer
                 //Success
                 else if (balance >= 0)
                 {
+                    SetSession(clientUUID, sessionID, secureID);
                     responseData["success"] = true;
                     responseData["description"] = "get user balance successfully";
                     responseData["clientBalance"] = balance;
@@ -1965,18 +1960,8 @@ namespace OpenSim.Grid.MoneyServer
             {
                 lock (m_sessionDic)
                 {
-                    if (m_sessionDic.ContainsKey(clientUUID))
-                    {
-                        m_sessionDic.Remove(clientUUID);
-                    }
-                }
-
-                lock (m_secureSessionDic)
-                {
-                    if (m_secureSessionDic.ContainsKey(clientUUID))
-                    {
-                        m_secureSessionDic.Remove(clientUUID);
-                    }
+                    m_sessionDic.Remove(clientUUID);
+                    m_secureSessionDic.Remove(clientUUID);
                 }
             }
             catch (Exception e)
@@ -2049,11 +2034,9 @@ namespace OpenSim.Grid.MoneyServer
             m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Transfering money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
             m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Object ID = {0}, Object Name = {1}", objectID, objectName);
 
-            if (m_sessionDic.ContainsKey(senderID) && m_secureSessionDic.ContainsKey(senderID))
+            if (IsValidSession(senderID, senderSessionID, senderSecureSessionID))
             {
-                if (m_sessionDic[senderID] == senderSessionID && m_secureSessionDic[senderID] == senderSecureSessionID)
-                {
-                    m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Transfering money from {0} to {1}", senderID, receiverID);
+                m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Transfering money from {0} to {1}", senderID, receiverID);
                     int time = (int)((DateTime.UtcNow.Ticks - TicksToEpoch) / 10000000);
                     try
                     {
@@ -2130,8 +2113,7 @@ namespace OpenSim.Grid.MoneyServer
                     {
                         m_log.Error("[MONEY XMLRPC]: handleTransaction: Exception occurred while adding transaction: " + e.ToString());
                     }
-                    return response;
-                }
+                return response;
             }
 
             m_log.Error("[MONEY XMLRPC]: handleTransaction: Session authentication failure for sender " + senderID);
@@ -2513,6 +2495,27 @@ namespace OpenSim.Grid.MoneyServer
             catch (Exception e) when (e is FormatException || e is InvalidCastException || e is OverflowException)
             {
                 return false;
+            }
+        }
+
+        private void SetSession(string userID, string sessionID, string secureSessionID)
+        {
+            lock (m_sessionDic)
+            {
+                m_sessionDic[userID] = sessionID;
+                m_secureSessionDic[userID] = secureSessionID;
+            }
+        }
+
+        private bool IsValidSession(string userID, string sessionID, string secureSessionID)
+        {
+            lock (m_sessionDic)
+            {
+                if (!m_sessionDic.TryGetValue(userID, out string expectedSession) || expectedSession != sessionID)
+                    return false;
+
+                return m_secureSessionDic.TryGetValue(userID, out string expectedSecureSession) &&
+                    expectedSecureSession == secureSessionID;
             }
         }
 
@@ -2928,18 +2931,9 @@ namespace OpenSim.Grid.MoneyServer
             {
                 m_log.Info("[MONEY XMLRPC]: handlePayMoneyCharge: Sender is the configured banker; session check skipped.");
             }
-            else if (m_sessionDic.ContainsKey(senderID) && m_secureSessionDic.ContainsKey(senderID))
+            else if (!IsValidSession(senderID, senderSessionID, senderSecureSessionID))
             {
-                if (m_sessionDic[senderID] != senderSessionID || m_secureSessionDic[senderID] != senderSecureSessionID)
-                {
-                    m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Sitzungsprüfung für Sender fehlgeschlagen " + senderID);
-                    responseData["message"] = "Session check failure, please re-login later!";
-                    return response;
-                }
-            }
-            else
-            {
-                m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Sitzungsprüfung für Sender fehlgeschlagen " + senderID);
+                m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Session check failed for sender " + senderID);
                 responseData["message"] = "Session check failure, please re-login later!";
                 return response;
             }
@@ -3116,19 +3110,9 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (m_sessionDic.ContainsKey(clientID) && m_secureSessionDic.ContainsKey(clientID))
+            if (IsValidSession(clientID, sessionID, secureID))
             {
-                if (m_sessionDic[clientID] == sessionID && m_secureSessionDic[clientID] == secureID)
-                {
-                    //
-                    if (string.IsNullOrEmpty(transactionID))
-                    {
-                        responseData["description"] = "TransactionID is empty";
-                        m_log.Error("[MONEY XMLRPC]: handleGetTransaction: TransactionID is empty.");
-                        return response;
-                    }
-
-                    try
+                try
                     {
                         TransactionData transaction = m_moneyDBService.FetchTransaction(transactionUUID);
                         if (transaction != null)
@@ -3153,8 +3137,7 @@ namespace OpenSim.Grid.MoneyServer
                         m_log.ErrorFormat("[MONEY XMLRPC]: handleGetTransaction: {0}", e.ToString());
                         m_log.ErrorFormat("[MONEY XMLRPC]: handleGetTransaction: Can't get transaction information for {0}", transactionUUID.ToString());
                     }
-                    return response;
-                }
+                return response;
             }
 
             responseData["success"] = false;
@@ -3795,11 +3778,9 @@ namespace OpenSim.Grid.MoneyServer
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleGetBalance: Getting balance for user {0}", clientUUID);
 
-            if (m_sessionDic.ContainsKey(clientUUID) && m_secureSessionDic.ContainsKey(clientUUID))
+            if (IsValidSession(clientUUID, sessionID, secureID))
             {
-                if (m_sessionDic[clientUUID] == sessionID && m_secureSessionDic[clientUUID] == secureID)
-                {
-                    try
+                try
                     {
                         balance = m_moneyDBService.getBalance(clientUUID);
                         if (balance == -1) // User not found
@@ -3819,8 +3800,7 @@ namespace OpenSim.Grid.MoneyServer
                     {
                         m_log.ErrorFormat("[MONEY XMLRPC]: handleGetBalance: Can't get balance for user {0}, Exception {1}", clientUUID, e.ToString());
                     }
-                    return response;
-                }
+                return response;
             }
 
             m_log.Error("[MONEY XMLRPC]: handleGetBalance: Session authentication failed when getting balance for user " + clientUUID);
