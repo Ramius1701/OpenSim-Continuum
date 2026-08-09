@@ -76,6 +76,9 @@ namespace OpenSim.Services.Connectors
 
         public AbuseReportData GetReport(int reportID, bool includeImage)
         {
+            if (reportID < 1)
+                return null;
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "get",
@@ -88,6 +91,11 @@ namespace OpenSim.Services.Connectors
 
         public AbuseReportData[] GetReports(int start, int count, string status)
         {
+            if (start < 0 || count < 1)
+                return Array.Empty<AbuseReportData>();
+
+            count = Math.Min(count, 200);
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "list",
@@ -109,6 +117,9 @@ namespace OpenSim.Services.Connectors
         public bool UpdateReport(int reportID, string status, string notes,
             UUID moderatorID, string moderatorName)
         {
+            if (reportID < 1)
+                return false;
+
             Dictionary<string, object> request = new Dictionary<string, object>
             {
                 ["METHOD"] = "update",
@@ -154,7 +165,7 @@ namespace OpenSim.Services.Connectors
                 }
 
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-                if (!replyData.ContainsKey("result"))
+                if (replyData == null || !replyData.ContainsKey("result"))
                 {
                     m_log.WarnFormat(
                         "[ABUSE REPORTS CONNECTOR]: {0} reply did not contain a result field",
@@ -204,8 +215,23 @@ namespace OpenSim.Services.Connectors
             report.ModeratorNotes = GetString(data, prefix + "notes");
             report.ModeratorName = GetString(data, prefix + "moderator-name");
             string image = GetString(data, prefix + "image-data");
-            report.ImageData = string.IsNullOrEmpty(image) ? Array.Empty<byte>() : Convert.FromBase64String(image);
+            report.ImageData = TryDecodeImage(image);
             return report;
+        }
+
+        private static byte[] TryDecodeImage(string image)
+        {
+            if (string.IsNullOrEmpty(image))
+                return Array.Empty<byte>();
+
+            try
+            {
+                return Convert.FromBase64String(image);
+            }
+            catch (FormatException)
+            {
+                return Array.Empty<byte>();
+            }
         }
 
         private static bool TryGetInt(Dictionary<string, object> data, string key, out int value)
