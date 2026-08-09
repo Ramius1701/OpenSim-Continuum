@@ -21,7 +21,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
                 LogManager.GetLogger(
                 MethodBase.GetCurrentMethod().DeclaringType);
 
-        private List<Scene> m_Scenes = new List<Scene>();
+        private readonly object m_ScenesLock = new object();
+        private readonly HashSet<Scene> m_Scenes = new HashSet<Scene>();
         protected IExperienceService m_service = null;
 
         private bool m_Enabled = false;
@@ -88,16 +89,32 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
 
         public void Close()
         {
+            if (!m_Enabled)
+                return;
+
+            Scene[] scenes;
+            lock (m_ScenesLock)
+            {
+                scenes = new Scene[m_Scenes.Count];
+                m_Scenes.CopyTo(scenes);
+                m_Scenes.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in scenes)
+                scene.UnregisterModuleInterface<IExperienceService>(this);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            lock(m_Scenes)
+            lock(m_ScenesLock)
             {
-                m_Scenes.Add(scene);
+                if (!m_Enabled || !m_Scenes.Add(scene))
+                    return;
+
                 scene.RegisterModuleInterface<IExperienceService>(this);
             }
         }
@@ -112,17 +129,16 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
 
-            lock(m_Scenes)
+            lock(m_ScenesLock)
             {
-                if (m_Scenes.Contains(scene))
-                {
-                    m_Scenes.Remove(scene);
-                    scene.UnregisterModuleInterface<IExperienceService>(this);
-                }
+                if (!m_Scenes.Remove(scene))
+                    return;
             }
+
+            scene.UnregisterModuleInterface<IExperienceService>(this);
         }
 
         #endregion ISharedRegionModule

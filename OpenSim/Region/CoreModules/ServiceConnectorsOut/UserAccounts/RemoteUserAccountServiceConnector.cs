@@ -125,12 +125,11 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
             {
                 if (!m_Enabled || !m_Regions.Add(scene))
                     return;
+
+                scene.RegisterModuleInterface<IUserAccountService>(this);
+                scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
+                scene.EventManager.OnNewClient += OnNewClient;
             }
-
-            scene.RegisterModuleInterface<IUserAccountService>(this);
-            scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
-
-            scene.EventManager.OnNewClient += OnNewClient;
         }
 
         public void RemoveRegion(Scene scene)

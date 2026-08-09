@@ -146,12 +146,12 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
             {
                 if (!m_Enabled || !m_Regions.Add(scene))
                     return;
-            }
 
-            // FIXME: Why do we bother setting this module and caching up if we just end up registering the inner
-            // user account service?!
-            scene.RegisterModuleInterface<IUserAccountService>(UserAccountService);
-            scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
+                // FIXME: Why do we bother setting this module and caching up if we just end up registering the inner
+                // user account service?!
+                scene.RegisterModuleInterface<IUserAccountService>(UserAccountService);
+                scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
+            }
         }
 
         public void RemoveRegion(Scene scene)
