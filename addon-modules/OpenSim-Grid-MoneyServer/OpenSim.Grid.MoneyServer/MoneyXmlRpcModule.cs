@@ -2024,7 +2024,8 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+            if (!requestData.ContainsKey("amount") ||
+                !UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
                 senderUUID == receiverUUID ||
                 amount < 0 || (amount == 0 && !m_enableAmountZero))
@@ -2186,7 +2187,8 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+            if (!requestData.ContainsKey("amount") ||
+                !UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
                 senderUUID == receiverUUID || amount < 0 || (amount == 0 && !m_enableAmountZero))
             {
@@ -2338,7 +2340,8 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (!UUID.TryParse(senderID, out UUID senderUUID) ||
+            if (!requestData.ContainsKey("amount") ||
+                !UUID.TryParse(senderID, out UUID senderUUID) ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) ||
                 (senderUUID == UUID.Zero && receiverUUID == UUID.Zero) ||
                 senderUUID == receiverUUID ||
@@ -2774,7 +2777,8 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (!UUID.TryParse(bankerID, out UUID bankerUUID) || bankerUUID == UUID.Zero ||
+            if (!requestData.ContainsKey("amount") ||
+                !UUID.TryParse(bankerID, out UUID bankerUUID) || bankerUUID == UUID.Zero ||
                 amount < 0 || (amount == 0 && !m_enableAmountZero))
             {
                 m_log.Warn("[MONEY XMLRPC]: handleAddBankerMoney: Rejected invalid credit parameters.");
@@ -2921,7 +2925,8 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
-            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+            if (!requestData.ContainsKey("amount") ||
+                !UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 amount < 0 || (amount == 0 && !m_enableAmountZero))
             {
                 m_log.Warn("[MONEY XMLRPC]: handlePayMoneyCharge: Rejected invalid charge parameters.");
@@ -2934,6 +2939,19 @@ namespace OpenSim.Grid.MoneyServer
             // The configured banker is trusted to submit service charges without an avatar session.
             if (senderID == m_bankerAvatar)
             {
+                IPAddress callerIP = remoteClient?.Address;
+                if (callerIP != null && callerIP.IsIPv4MappedToIPv6)
+                    callerIP = callerIP.MapToIPv4();
+                string callerAddress = callerIP?.ToString() ?? string.Empty;
+                if (!m_bankerAllowedIPs.Contains(callerAddress))
+                {
+                    m_log.ErrorFormat(
+                        "[MONEY XMLRPC]: handlePayMoneyCharge: Rejected banker charge from disallowed address {0}",
+                        callerAddress);
+                    responseData["message"] = "Banker charge source is not allowed.";
+                    return response;
+                }
+
                 m_log.Info("[MONEY XMLRPC]: handlePayMoneyCharge: Sender is the configured banker; session check skipped.");
             }
             else if (!IsValidSession(senderID, senderSessionID, senderSecureSessionID))
