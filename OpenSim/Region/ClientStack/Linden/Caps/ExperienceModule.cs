@@ -1183,40 +1183,47 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
 
             if (currentInfo == null)
-                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
-
-            bool is_admin = m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id);
-
-            if(is_admin)
             {
-                currentInfo.name = name;
-                currentInfo.description = desc;
-                currentInfo.group_id = group_id;
-
-                if (slurl != "last")
-                    currentInfo.slurl = slurl;
-
-                currentInfo.marketplace = marketplace;
-                currentInfo.logo = logo;
-                currentInfo.maturity = maturity;
-
-                if((properties & (int)ExperienceFlags.Disabled) != 0)
-                {
-                    currentInfo.properties |= (int)ExperienceFlags.Disabled;
-                }
-                else
-                {
-                    currentInfo.properties &= ~(int)ExperienceFlags.Disabled;
-                }
-
-                var updated_info = m_ExperienceModule.UpdateExperienceInfo(currentInfo);
-                if(updated_info != null)
-                {
-                    currentInfo = updated_info;
-                }
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
             }
 
-            return ExperienceCapsResponse.SerializeExperiences(new[] { currentInfo });
+            if (!m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id) ||
+                group_id != currentInfo.group_id)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
+            int updatedProperties = currentInfo.properties;
+            if ((properties & (int)ExperienceFlags.Disabled) != 0)
+                updatedProperties |= (int)ExperienceFlags.Disabled;
+            else
+                updatedProperties &= ~(int)ExperienceFlags.Disabled;
+
+            ExperienceInfo requestedInfo = new()
+            {
+                public_id = currentInfo.public_id,
+                owner_id = currentInfo.owner_id,
+                group_id = currentInfo.group_id,
+                name = name,
+                description = desc,
+                slurl = slurl == "last" ? currentInfo.slurl : slurl,
+                marketplace = marketplace,
+                logo = logo,
+                maturity = maturity,
+                properties = updatedProperties,
+                quota = currentInfo.quota
+            };
+
+            ExperienceInfo updatedInfo = m_ExperienceModule.UpdateExperienceInfo(requestedInfo);
+            if (updatedInfo == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
+            }
+
+            return ExperienceCapsResponse.SerializeExperiences(new[] { updatedInfo });
         }
     }
 
