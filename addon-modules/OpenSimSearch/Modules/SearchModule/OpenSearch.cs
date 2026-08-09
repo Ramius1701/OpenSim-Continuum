@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Threading;
 using System.Xml;
 using OpenMetaverse;
 using log4net;
@@ -41,6 +42,8 @@ namespace OpenSimSearch.Modules.OpenSearch
         private string m_SearchServer = "";
         private bool m_Enabled = true;
         private int m_RequestTimeoutMs = 5000;
+        private int m_MaxConcurrentRequests = 8;
+        private int m_ActiveRequests;
 
         #region IRegionModuleBase implementation
         public void Initialise(IConfigSource config)
@@ -74,11 +77,16 @@ namespace OpenSimSearch.Modules.OpenSearch
                 searchConfig.GetInt("RequestTimeoutMs", m_RequestTimeoutMs),
                 1000,
                 30000);
+            m_MaxConcurrentRequests = Math.Clamp(
+                searchConfig.GetInt("MaxConcurrentRequests", m_MaxConcurrentRequests),
+                1,
+                64);
 
             m_log.InfoFormat(
-                "[SEARCH] OpenSimSearch module is active; endpoint {0}, timeout {1}ms",
+                "[SEARCH] OpenSimSearch module is active; endpoint {0}, timeout {1}ms, concurrency {2}",
                 m_SearchServer,
-                m_RequestTimeoutMs);
+                m_RequestTimeoutMs,
+                m_MaxConcurrentRequests);
             m_Enabled = true;
         }
 
@@ -166,17 +174,39 @@ namespace OpenSimSearch.Modules.OpenSearch
                 ExecuteSearchRequest(remote, "map items", () => HandleMapItemRequest(remote, flags, estate, godlike, type, handle));
         }
 
-        private static void ExecuteSearchRequest(IClientAPI client, string operation, Action request)
+        private void ExecuteSearchRequest(IClientAPI client, string operation, Action request)
         {
-            try
+            int activeRequests = Interlocked.Increment(ref m_ActiveRequests);
+            if (activeRequests > m_MaxConcurrentRequests)
             {
-                request();
+                Interlocked.Decrement(ref m_ActiveRequests);
+                m_log.WarnFormat(
+                    "[SEARCH]: Rejected {0} request because {1} backend requests are already active",
+                    operation,
+                    m_MaxConcurrentRequests);
+                client.SendAgentAlertMessage("Search is busy. Please try again.", false);
+                return;
             }
-            catch (Exception e)
+
+            // An external search service may consume the complete timeout. Keep
+            // that wait off the simulator client-event thread, while bounding
+            // work so a failed backend cannot exhaust the shared worker pool.
+            Util.FireAndForget(_ =>
             {
-                m_log.WarnFormat("[SEARCH]: Rejected malformed {0} response: {1}", operation, e.Message);
-                client.SendAgentAlertMessage("Unable to search at this time.", false);
-            }
+                try
+                {
+                    request();
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[SEARCH]: Rejected malformed {0} response: {1}", operation, e.Message);
+                    client.SendAgentAlertMessage("Unable to search at this time.", false);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref m_ActiveRequests);
+                }
+            }, null, $"OpenSimSearch.{operation}");
         }
 
         //
