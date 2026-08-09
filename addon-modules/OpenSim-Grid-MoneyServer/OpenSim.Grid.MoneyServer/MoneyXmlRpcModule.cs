@@ -1945,15 +1945,20 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleClientLogout(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+                return response;
+
+            GetSSLCommonName(request);
 
             string clientUUID = string.Empty;
-            if (requestData.ContainsKey("clientUUID")) clientUUID = (string)requestData["clientUUID"];
+            if (!TryReadString(requestData, "clientUUID", ref clientUUID) ||
+                !UUID.TryParse(clientUUID, out UUID parsedClientUUID) || parsedClientUUID == UUID.Zero)
+                return response;
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleClientLogout: User {0} is logging off.", clientUUID);
             try
@@ -1989,12 +1994,18 @@ namespace OpenSim.Grid.MoneyServer
         {
             m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction:");
 
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["message"] = "malformed transaction request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             int amount = 0;
             int transactionType = 0;
@@ -2008,16 +2019,23 @@ namespace OpenSim.Grid.MoneyServer
             string regionUUID = string.Empty;
             string description = "Newly added on";
 
-            responseData["success"] = false;
             UUID transactionUUID = UUID.Random();
 
-            if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
-            if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
-            if (requestData.ContainsKey("senderSessionID")) senderSessionID = (string)requestData["senderSessionID"];
-            if (requestData.ContainsKey("senderSecureSessionID")) senderSecureSessionID = (string)requestData["senderSecureSessionID"];
-            if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
-            if (requestData.ContainsKey("objectID")) objectID = (string)requestData["objectID"];
-            if (requestData.ContainsKey("objectName")) objectName = (string)requestData["objectName"];
+            if (!TryReadString(requestData, "senderID", ref senderID) ||
+                !TryReadString(requestData, "receiverID", ref receiverID) ||
+                !TryReadString(requestData, "senderSessionID", ref senderSessionID) ||
+                !TryReadString(requestData, "senderSecureSessionID", ref senderSecureSessionID) ||
+                !TryReadInt(requestData, "amount", ref amount) ||
+                !TryReadString(requestData, "objectID", ref objectID) ||
+                !TryReadString(requestData, "objectName", ref objectName) ||
+                !TryReadString(requestData, "regionHandle", ref regionHandle) ||
+                !TryReadString(requestData, "regionUUID", ref regionUUID) ||
+                !TryReadInt(requestData, "transactionType", ref transactionType) ||
+                !TryReadString(requestData, "description", ref description))
+            {
+                responseData["message"] = "malformed transaction request";
+                return response;
+            }
 
             if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
                 !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
@@ -2028,11 +2046,6 @@ namespace OpenSim.Grid.MoneyServer
                 responseData["message"] = "invalid transaction parameters";
                 return response;
             }
-            if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
-            if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
-            if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
-            if (requestData.ContainsKey("description")) description = (string)requestData["description"];
-
             m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Transfering money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
             m_log.InfoFormat("[MONEY XMLRPC]: handleTransaction: Object ID = {0}, Object Name = {1}", objectID, objectName);
 
@@ -2997,25 +3010,24 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleCancelTransfer(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+                return response;
+
+            GetSSLCommonName(request);
 
             string secureCode = string.Empty;
             string transactionID = string.Empty;
             UUID transactionUUID = UUID.Zero;
 
-            responseData["success"] = false;
-
-            if (requestData.ContainsKey("secureCode")) secureCode = (string)requestData["secureCode"];
-            if (requestData.ContainsKey("transactionID"))
-            {
-                transactionID = (string)requestData["transactionID"];
-                UUID.TryParse(transactionID, out transactionUUID);
-            }
+            if (!TryReadString(requestData, "secureCode", ref secureCode) ||
+                !TryReadString(requestData, "transactionID", ref transactionID) ||
+                !UUID.TryParse(transactionID, out transactionUUID) || transactionUUID == UUID.Zero)
+                return response;
 
             if (string.IsNullOrEmpty(secureCode) || string.IsNullOrEmpty(transactionID))
             {
@@ -3074,12 +3086,18 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleGetTransaction(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["description"] = "Malformed transaction request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             string clientID = string.Empty;
             string sessionID = string.Empty;
@@ -3087,16 +3105,15 @@ namespace OpenSim.Grid.MoneyServer
             string transactionID = string.Empty;
             UUID transactionUUID = UUID.Zero;
 
-            responseData["success"] = false;
-
-            if (requestData.ContainsKey("clientUUID")) clientID = (string)requestData["clientUUID"];
-            if (requestData.ContainsKey("clientSessionID")) sessionID = (string)requestData["clientSessionID"];
-            if (requestData.ContainsKey("clientSecureSessionID")) secureID = (string)requestData["clientSecureSessionID"];
-
-            if (requestData.ContainsKey("transactionID"))
+            if (!TryReadString(requestData, "clientUUID", ref clientID) ||
+                !TryReadString(requestData, "clientSessionID", ref sessionID) ||
+                !TryReadString(requestData, "clientSecureSessionID", ref secureID) ||
+                !TryReadString(requestData, "transactionID", ref transactionID) ||
+                !UUID.TryParse(clientID, out UUID parsedClientID) || parsedClientID == UUID.Zero ||
+                !UUID.TryParse(transactionID, out transactionUUID) || transactionUUID == UUID.Zero)
             {
-                transactionID = (string)requestData["transactionID"];
-                UUID.TryParse(transactionID, out transactionUUID);
+                responseData["description"] = "Malformed transaction request";
+                return response;
             }
 
             if (m_sessionDic.ContainsKey(clientID) && m_secureSessionDic.ContainsKey(clientID))
@@ -3749,23 +3766,32 @@ namespace OpenSim.Grid.MoneyServer
 
         public XmlRpcResponse handleGetBalance(XmlRpcRequest request, IPEndPoint remoteClient)
         {
-            GetSSLCommonName(request);
-
-            Hashtable requestData = (Hashtable)request.Params[0];
             XmlRpcResponse response = new XmlRpcResponse();
             Hashtable responseData = new Hashtable();
             response.Value = responseData;
+            responseData["success"] = false;
+
+            if (!TryGetRequestData(request, out Hashtable requestData))
+            {
+                responseData["description"] = "Malformed balance request";
+                return response;
+            }
+
+            GetSSLCommonName(request);
 
             string clientUUID = string.Empty;
             string sessionID = string.Empty;
             string secureID = string.Empty;
             int balance;
 
-            responseData["success"] = false;
-
-            if (requestData.ContainsKey("clientUUID")) clientUUID = (string)requestData["clientUUID"];
-            if (requestData.ContainsKey("clientSessionID")) sessionID = (string)requestData["clientSessionID"];
-            if (requestData.ContainsKey("clientSecureSessionID")) secureID = (string)requestData["clientSecureSessionID"];
+            if (!TryReadString(requestData, "clientUUID", ref clientUUID) ||
+                !TryReadString(requestData, "clientSessionID", ref sessionID) ||
+                !TryReadString(requestData, "clientSecureSessionID", ref secureID) ||
+                !UUID.TryParse(clientUUID, out UUID parsedClientUUID) || parsedClientUUID == UUID.Zero)
+            {
+                responseData["description"] = "Malformed balance request";
+                return response;
+            }
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleGetBalance: Getting balance for user {0}", clientUUID);
 
