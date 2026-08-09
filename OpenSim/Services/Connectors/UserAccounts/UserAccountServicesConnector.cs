@@ -42,6 +42,8 @@ namespace OpenSim.Services.Connectors
 {
     public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountService
     {
+        private const int MaxAccountResults = 1000;
+        private const int MaxQueryLength = 256;
         private static readonly ILog m_log =
                 LogManager.GetLogger(
                 MethodBase.GetCurrentMethod().DeclaringType);
@@ -93,6 +95,9 @@ namespace OpenSim.Services.Connectors
 
         public virtual UserAccount GetUserAccount(UUID scopeID, string firstName, string lastName)
         {
+            if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+                return null;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -100,14 +105,17 @@ namespace OpenSim.Services.Connectors
             sendData["METHOD"] = "getaccount";
 
             sendData["ScopeID"] = scopeID;
-            sendData["FirstName"] = firstName.ToString();
-            sendData["LastName"] = lastName.ToString();
+            sendData["FirstName"] = firstName;
+            sendData["LastName"] = lastName;
 
             return SendAndGetReply(sendData);
         }
 
         public virtual UserAccount GetUserAccount(UUID scopeID, string email)
         {
+            if (string.IsNullOrWhiteSpace(email))
+                return null;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -122,6 +130,9 @@ namespace OpenSim.Services.Connectors
 
         public virtual UserAccount GetUserAccount(UUID scopeID, UUID userID)
         {
+            if (userID == UUID.Zero)
+                return null;
+
             //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccount {0}", userID);
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
@@ -137,6 +148,10 @@ namespace OpenSim.Services.Connectors
 
         public List<UserAccount> GetUserAccounts(UUID scopeID, string query)
         {
+            query = query?.Trim();
+            if (string.IsNullOrEmpty(query) || query.Length > MaxQueryLength)
+                return new List<UserAccount>();
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -146,34 +161,14 @@ namespace OpenSim.Services.Connectors
             sendData["ScopeID"] = scopeID.ToString();
             sendData["query"] = query;
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
             List<UserAccount> accounts = new List<UserAccount>();
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "GetUserAccounts");
 
             if (replyData != null)
             {
-                if (replyData.ContainsKey("result") && replyData["result"].ToString() == "null")
+                if (replyData.TryGetValue("result", out object result) &&
+                    string.Equals(result?.ToString(), "null", StringComparison.OrdinalIgnoreCase))
                 {
                     return accounts;
                 }
@@ -182,14 +177,17 @@ namespace OpenSim.Services.Connectors
                 //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
                 foreach (object acc in accountList)
                 {
+                    if (accounts.Count >= MaxAccountResults)
+                        break;
                     if (acc is Dictionary<string, object>)
                     {
-                        UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
-                        accounts.Add(pinfo);
+                        UserAccount account = ParseAccount((Dictionary<string, object>)acc);
+                        if (account != null)
+                            accounts.Add(account);
                     }
                     else
                         m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received invalid response type {0}",
-                            acc.GetType());
+                            acc?.GetType());
                 }
             }
             else
@@ -200,6 +198,9 @@ namespace OpenSim.Services.Connectors
 
         public virtual List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
         {
+            if (IDs == null || IDs.Count == 0 || IDs.Count > MaxAccountResults)
+                return new List<UserAccount>();
+
             List<UserAccount> accs = new List<UserAccount>();
             bool multisuported = true;
             accs = doGetMultiUserAccounts(scopeID, IDs, out multisuported);
@@ -212,7 +213,11 @@ namespace OpenSim.Services.Connectors
             foreach(string id in IDs)
             {
                 if(UUID.TryParse(id, out uuid) && !uuid.IsZero())
-                    accs.Add(GetUserAccount(scopeID,uuid));
+                {
+                    UserAccount account = GetUserAccount(scopeID, uuid);
+                    if (account != null)
+                        accs.Add(account);
+                }
             }
 
             return accs;
@@ -230,39 +235,18 @@ namespace OpenSim.Services.Connectors
             sendData["ScopeID"] = scopeID.ToString();
             sendData["IDS"] = new List<string>(IDs);
 
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
             List<UserAccount> accounts = new List<UserAccount>();
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "GetMultiUserAccounts");
 
             if (replyData != null)
             {
-                if (replyData.ContainsKey("result"))
+                if (replyData.TryGetValue("result", out object result))
                 {
-                    if(replyData["result"].ToString() == "null")
+                    if (string.Equals(result?.ToString(), "null", StringComparison.OrdinalIgnoreCase))
                         return accounts;
 
-                    if(replyData["result"].ToString() == "Failure")
+                    if (string.Equals(result?.ToString(), "Failure", StringComparison.OrdinalIgnoreCase))
                     {
                         suported = false;
                         return accounts;
@@ -273,14 +257,17 @@ namespace OpenSim.Services.Connectors
                 //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
                 foreach (object acc in accountList)
                 {
+                    if (accounts.Count >= MaxAccountResults)
+                        break;
                     if (acc is Dictionary<string, object>)
                     {
-                        UserAccount pinfo = new UserAccount((Dictionary<string, object>)acc);
-                        accounts.Add(pinfo);
+                        UserAccount account = ParseAccount((Dictionary<string, object>)acc);
+                        if (account != null)
+                            accounts.Add(account);
                     }
                     else
                         m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received invalid response type {0}",
-                            acc.GetType());
+                            acc?.GetType());
                 }
             }
             else
@@ -296,6 +283,9 @@ namespace OpenSim.Services.Connectors
 
         public bool SetDisplayName(UUID agentID, string displayName)
         {
+            if (agentID == UUID.Zero)
+                return false;
+
             //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: SetDisplayName {0}", agentID);
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -315,6 +305,9 @@ namespace OpenSim.Services.Connectors
 
         public virtual bool StoreUserAccount(UserAccount data)
         {
+            if (data == null || data.PrincipalID == UUID.Zero)
+                return false;
+
             Dictionary<string, object> sendData = new Dictionary<string, object>();
             //sendData["SCOPEID"] = scopeID.ToString();
             sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -368,35 +361,15 @@ namespace OpenSim.Services.Connectors
 
         private UserAccount SendAndGetReply(Dictionary<string, object> sendData)
         {
-            string reply = string.Empty;
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
-            {
-                reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (string.IsNullOrEmpty(reply))
-                {
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccount received null or empty reply");
-                    return null;
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
-            }
-
-            Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+            Dictionary<string, object> replyData = DoPost(reqString, "GetUserAccount");
             UserAccount account = null;
 
             if ((replyData != null) && replyData.ContainsKey("result") && (replyData["result"] != null))
             {
                 if (replyData["result"] is Dictionary<string, object>)
                 {
-                    account = new UserAccount((Dictionary<string, object>)replyData["result"]);
+                    account = ParseAccount((Dictionary<string, object>)replyData["result"]);
                 }
             }
 
@@ -407,39 +380,46 @@ namespace OpenSim.Services.Connectors
         private bool SendAndGetBoolReply(Dictionary<string, object> sendData)
         {
             string reqString = ServerUtils.BuildQueryString(sendData);
-            string uri = m_ServerURI + "/accounts";
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
-            try
+            Dictionary<string, object> replyData = DoPost(reqString, "SetUserAccount");
+            if (replyData != null && replyData.TryGetValue("result", out object result))
             {
-                string reply = SynchronousRestFormsRequester.MakeRequest("POST",
-                        uri,
-                        reqString,
-                        m_Auth);
-                if (reply != string.Empty)
-                {
-                    //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: reply = {0}", reply);
-                    Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
-
-                    if (replyData.ContainsKey("result"))
-                    {
-                        if (replyData["result"].ToString().ToLower() == "success")
-                            return true;
-                        else
-                            return false;
-                    }
-                    else
-                        m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount reply data does not contain result field");
-
-                }
-                else
-                    m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount received empty reply");
-            }
-            catch (Exception e)
-            {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+                return string.Equals(
+                    result?.ToString(), "success", StringComparison.OrdinalIgnoreCase);
             }
 
             return false;
+        }
+
+        private Dictionary<string, object> DoPost(string requestString, string method)
+        {
+            string uri = m_ServerURI + "/accounts";
+            try
+            {
+                string reply = SynchronousRestFormsRequester.MakeRequest(
+                    "POST", uri, requestString, m_Auth);
+                if (string.IsNullOrEmpty(reply))
+                    return null;
+                return ServerUtils.ParseXmlResponse(reply);
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[ACCOUNT CONNECTOR]: {0} failed contacting {1}: {2}",
+                    method, uri, e.Message);
+                return null;
+            }
+        }
+
+        private static UserAccount ParseAccount(Dictionary<string, object> data)
+        {
+            try
+            {
+                return new UserAccount(data);
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
