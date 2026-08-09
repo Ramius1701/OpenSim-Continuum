@@ -56,6 +56,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         private UserAccountCache m_Cache;
 
         private bool m_Enabled = false;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         #region ISharedRegionModule
 
@@ -119,12 +121,32 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             if (!m_Enabled)
                 return;
+
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                DetachRegion(scene);
+
+            m_Cache?.Dispose();
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
+            }
 
             // FIXME: Why do we bother setting this module and caching up if we just end up registering the inner
             // user account service?!
@@ -134,8 +156,22 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+            }
+
+            DetachRegion(scene);
+        }
+
+        private void DetachRegion(Scene scene)
+        {
+            scene.UnregisterModuleInterface<IUserAccountService>(UserAccountService);
+            scene.UnregisterModuleInterface<IUserAccountCacheModule>(m_Cache);
         }
 
         public void RegionLoaded(Scene scene)
@@ -250,7 +286,10 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         public bool SetDisplayName(UUID agentID, string displayName)
         {
-            return UserAccountService.SetDisplayName(agentID, displayName);
+            bool updated = UserAccountService.SetDisplayName(agentID, displayName);
+            if (updated)
+                m_Cache?.Remove(agentID);
+            return updated;
         }
 
         #endregion

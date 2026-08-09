@@ -277,11 +277,11 @@ namespace OpenSim.Services.Connectors
         }
 
 
-        public void InvalidateCache(UUID userID)
+        public virtual void InvalidateCache(UUID userID)
         {
         }
 
-        public bool SetDisplayName(UUID agentID, string displayName)
+        public virtual bool SetDisplayName(UUID agentID, string displayName)
         {
             if (agentID == UUID.Zero)
                 return false;

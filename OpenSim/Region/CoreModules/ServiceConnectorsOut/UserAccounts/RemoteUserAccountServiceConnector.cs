@@ -52,6 +52,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         private bool m_Enabled = false;
         private UserAccountCache m_Cache;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         public Type ReplaceableInterface
         {
@@ -98,12 +100,32 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             if (!m_Enabled)
                 return;
+
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                DetachRegion(scene);
+
+            m_Cache?.Dispose();
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
+            }
 
             scene.RegisterModuleInterface<IUserAccountService>(this);
             scene.RegisterModuleInterface<IUserAccountCacheModule>(m_Cache);
@@ -113,8 +135,23 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+            }
+
+            DetachRegion(scene);
+        }
+
+        private void DetachRegion(Scene scene)
+        {
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.UnregisterModuleInterface<IUserAccountService>(this);
+            scene.UnregisterModuleInterface<IUserAccountCacheModule>(m_Cache);
         }
 
         public void RegionLoaded(Scene scene)
@@ -128,7 +165,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         // flags, title, etc. And country, don't forget country!
         private void OnNewClient(IClientAPI client)
         {
-            m_Cache.Remove(client.Name);
+            if (client != null)
+                m_Cache?.Remove(client.AgentId);
         }
 
         #region Overwritten methods from IUserAccountService
@@ -205,6 +243,19 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts
         {
             // This remote connector refuses to serve this method
             return false;
+        }
+
+        public override void InvalidateCache(UUID userID)
+        {
+            m_Cache?.Invalidate(userID);
+        }
+
+        public override bool SetDisplayName(UUID agentID, string displayName)
+        {
+            bool updated = base.SetDisplayName(agentID, displayName);
+            if (updated)
+                m_Cache?.Remove(agentID);
+            return updated;
         }
 
         #endregion
