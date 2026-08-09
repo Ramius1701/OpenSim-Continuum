@@ -66,7 +66,7 @@ namespace osWebRtcVoice
 
         public string PluginId { get; set; }
 
-//        private CancellationTokenSource _CancelTokenSource = new();
+        private readonly CancellationTokenSource _LongPollCancellation = new();
 
         public bool IsConnected { get; set; }
 
@@ -90,6 +90,8 @@ namespace osWebRtcVoice
             {
                 _ = DestroySession();
             }
+            else
+                _LongPollCancellation.Cancel();
         }
 
         /// <summary>
@@ -175,7 +177,7 @@ namespace osWebRtcVoice
                 m_log.Error($"{LogHeader} DestroySession: exception ", e);
             }
             IsConnected = false;
-//            _CancelTokenSource.Cancel();
+            _LongPollCancellation.Cancel();
 
             return ret;
         }
@@ -443,7 +445,10 @@ namespace osWebRtcVoice
         /// </summary>
         /// <param name="pURI"></param>
         /// <returns></returns>
-        public async Task<JanusMessageResp> GetFromJanus(string pURI, int timeout = 30000)
+        public async Task<JanusMessageResp> GetFromJanus(
+            string pURI,
+            int timeout = 30000,
+            CancellationToken cancellationToken = default)
         {
             if (!string.IsNullOrEmpty(_JanusAPIToken))
             {
@@ -461,7 +466,7 @@ namespace osWebRtcVoice
                 HttpResponseMessage response = null;
                 try
                 {
-                    response = await httpClient.SendAsync(reqMsg).ConfigureAwait(false);
+                    response = await httpClient.SendAsync(reqMsg, cancellationToken).ConfigureAwait(false);
 
                     if (response is not null && response.IsSuccessStatusCode)
                     {
@@ -564,7 +569,10 @@ namespace osWebRtcVoice
                 {
                     try
                     {
-                        JanusMessageResp resp = await GetFromJanus(SessionUri, 60000).ConfigureAwait(false);
+                        JanusMessageResp resp = await GetFromJanus(
+                            SessionUri,
+                            60000,
+                            _LongPollCancellation.Token).ConfigureAwait(false);
                         if (resp is not null)
                         {
                             //_ = Task.Run(() =>
