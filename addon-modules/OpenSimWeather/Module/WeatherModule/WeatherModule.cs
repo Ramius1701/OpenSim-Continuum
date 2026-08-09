@@ -1039,7 +1039,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
             Interlocked.Exchange(ref m_autoCycleBusy, 0);
             m_nextAutoCycleTicks = 0;
-            m_hasPendingAutoCycleWeather = false;
+            lock (m_sync)
+                m_hasPendingAutoCycleWeather = false;
         }
 
         private void AutoCycleTimerElapsed(object state)
@@ -1060,6 +1061,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 WeatherKind weather;
                 lock (m_sync)
                 {
+                    if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                        return;
                     weather = m_hasPendingAutoCycleWeather ? m_pendingAutoCycleWeather : PickAutoCycleWeather();
                     m_hasPendingAutoCycleWeather = false;
                 }
@@ -1166,6 +1169,8 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 WeatherKind nextWeather;
                 lock (m_sync)
                 {
+                    if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                        return;
                     if (!m_hasPendingAutoCycleWeather)
                     {
                         m_pendingAutoCycleWeather = PickAutoCycleWeather();
@@ -1174,6 +1179,9 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
                     nextWeather = m_pendingAutoCycleWeather;
                 }
+
+                if (generation != Volatile.Read(ref m_autoCycleGeneration))
+                    return;
 
                 string message = FormatForecastWarningMessage(scene, nextWeather);
                 scene.ForEachRootScenePresence(sp =>
