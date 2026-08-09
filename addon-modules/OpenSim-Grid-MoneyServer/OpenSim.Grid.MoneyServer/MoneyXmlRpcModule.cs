@@ -62,6 +62,7 @@ namespace OpenSim.Grid.MoneyServer
         public int m_defaultBalance = 1000;
 
         private bool m_forceTransfer = false;
+        private HashSet<string> m_forceTransferAllowedIPs = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "127.0.0.1", "::1" };
         private string m_bankerAvatar = "";
         // IP addresses allowed to call the AddBankerMoney admin endpoint. Defaults to
         // localhost-only so this uncapped, un-rate-limited money-grant call can't be
@@ -184,6 +185,8 @@ namespace OpenSim.Grid.MoneyServer
             // Load configuration values
             m_defaultBalance = serverConfig.GetInt("DefaultBalance", m_defaultBalance);
             m_forceTransfer = serverConfig.GetBoolean("EnableForceTransfer", m_forceTransfer);
+            m_forceTransferAllowedIPs = ParseAllowedIPs(serverConfig.GetString(
+                "ForceTransferAllowedIPs", string.Join(",", m_forceTransferAllowedIPs)));
             m_bankerAvatar = serverConfig.GetString("BankerAvatar", m_bankerAvatar).ToLower();
             m_bankerAllowedIPs = ParseAllowedIPs(serverConfig.GetString("BankerAllowedIPs", string.Join(",", m_bankerAllowedIPs)));
 
@@ -208,6 +211,8 @@ namespace OpenSim.Grid.MoneyServer
             m_defaultBalance = m_server_config.GetInt("DefaultBalance", m_defaultBalance);
 
             m_forceTransfer = m_server_config.GetBoolean("EnableForceTransfer", m_forceTransfer);
+            m_forceTransferAllowedIPs = ParseAllowedIPs(m_server_config.GetString(
+                "ForceTransferAllowedIPs", string.Join(",", m_forceTransferAllowedIPs)));
 
             string banker = m_server_config.GetString("BankerAvatar", m_bankerAvatar);
             m_bankerAvatar = banker.ToLower();
@@ -2143,6 +2148,19 @@ namespace OpenSim.Grid.MoneyServer
                 return response;
             }
 
+            IPAddress callerIP = remoteClient?.Address;
+            if (callerIP != null && callerIP.IsIPv4MappedToIPv6)
+                callerIP = callerIP.MapToIPv4();
+            string callerAddress = callerIP?.ToString() ?? string.Empty;
+            if (!m_forceTransferAllowedIPs.Contains(callerAddress))
+            {
+                m_log.ErrorFormat(
+                    "[MONEY XMLRPC]: handleForceTransaction: Rejected call from disallowed address {0}",
+                    callerAddress);
+                responseData["message"] = "not allowed force transfer of Money!";
+                return response;
+            }
+
             if (requestData.ContainsKey("senderID")) senderID = (string)requestData["senderID"];
             if (requestData.ContainsKey("receiverID")) receiverID = (string)requestData["receiverID"];
             if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
@@ -2152,6 +2170,15 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
             if (requestData.ContainsKey("description")) description = (string)requestData["description"];
+
+            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+                !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
+                senderUUID == receiverUUID || amount < 0)
+            {
+                m_log.Warn("[MONEY XMLRPC]: handleForceTransaction: Rejected invalid transfer parameters.");
+                responseData["message"] = "invalid force transfer parameters";
+                return response;
+            }
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleForceTransaction: Force transfering money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
             m_log.InfoFormat("[MONEY XMLRPC]: handleForceTransaction: Object ID = {0}, Object Name = {1}", objectID, objectName);

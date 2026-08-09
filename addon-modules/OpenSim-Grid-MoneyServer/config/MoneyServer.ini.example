@@ -31,6 +31,10 @@
 
     ;; Administrative/forced transfers.
     EnableForceTransfer = false
+    ;; Exact trusted simulator/service source IPs permitted to call
+    ;; ForceTransferMoney. Add every remote simulator host that uses the
+    ;; compatibility connector; never expose this endpoint broadly.
+    ForceTransferAllowedIPs = "127.0.0.1,::1"
     BankerAvatar = "00000000-0000-0000-0000-000000000000"
 
     ;; Exact trusted source IP addresses permitted to call AddBankerMoney.
