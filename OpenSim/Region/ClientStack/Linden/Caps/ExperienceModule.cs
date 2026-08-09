@@ -690,17 +690,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public UUID[] GetEstateAllowedExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.AllowedExperiences;
+            return m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
         }
 
         public UUID[] GetEstateKeyExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.KeyExperiences;
+            return m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
         }
 
         public UUID[] GetEstateBlockedExperiences()
         {
-            return m_scene.RegionInfo.EstateSettings.BlockedExperiences;
+            return m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
         }
 
 
@@ -711,12 +711,23 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
         {
             var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
+            if (land == null)
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE]: Unable to evaluate parcel Experience policy for avatar {0} at {1}",
+                    avatar.UUID,
+                    avatar.AbsolutePosition);
+                return;
+            }
 
-            var estate_experiences = m_scene.RegionInfo.EstateSettings.AllowedExperiences.Union(m_scene.RegionInfo.EstateSettings.KeyExperiences);
+            UUID[] estateAllowed = m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
+            UUID[] estateKey = m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
+            UUID[] estateBlocked = m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
+            var estate_experiences = estateAllowed.Union(estateKey);
 
             var parcel_experiences = land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_ALLOWED).Select(x => x.AgentID);
 
-            var blocked_experiences = m_scene.RegionInfo.EstateSettings.BlockedExperiences.Union(
+            var blocked_experiences = estateBlocked.Union(
                 land.LandData.ParcelAccessList.Where(x => (int)x.Flags == ACCESS_LIST_BLOCKED).Select(x => x.AgentID));
 
             UUID[] agent_allowed = GetAllowedExperiences(avatar.UUID);
@@ -753,7 +764,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 });
 
 
-                if (sog.IsAttachment && sog.AttachedExperienceID != UUID.Zero)
+                if (sog.IsAttachment && sog.AttachedAvatar == avatar.UUID &&
+                    sog.AttachedExperienceID != UUID.Zero)
                 {
                     if (!allowed.Contains(sog.AttachedExperienceID))
                     {
