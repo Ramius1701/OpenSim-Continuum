@@ -2019,6 +2019,16 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("amount")) amount = Convert.ToInt32(requestData["amount"]);
             if (requestData.ContainsKey("objectID")) objectID = (string)requestData["objectID"];
             if (requestData.ContainsKey("objectName")) objectName = (string)requestData["objectName"];
+
+            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+                !UUID.TryParse(receiverID, out UUID receiverUUID) || receiverUUID == UUID.Zero ||
+                senderUUID == receiverUUID ||
+                amount < 0 || (amount == 0 && !m_enableAmountZero))
+            {
+                m_log.Warn("[MONEY XMLRPC]: handleTransaction: Rejected invalid transaction parameters.");
+                responseData["message"] = "invalid transaction parameters";
+                return response;
+            }
             if (requestData.ContainsKey("regionHandle")) regionHandle = (string)requestData["regionHandle"];
             if (requestData.ContainsKey("regionUUID")) regionUUID = (string)requestData["regionUUID"];
             if (requestData.ContainsKey("transactionType")) transactionType = Convert.ToInt32(requestData["transactionType"]);
@@ -2803,12 +2813,20 @@ namespace OpenSim.Grid.MoneyServer
             if (requestData.ContainsKey("objectID")) objectID = (string)requestData["objectID"];
             if (requestData.ContainsKey("objectName")) objectName = (string)requestData["objectName"];
 
+            if (!UUID.TryParse(senderID, out UUID senderUUID) || senderUUID == UUID.Zero ||
+                amount < 0 || (amount == 0 && !m_enableAmountZero))
+            {
+                m_log.Warn("[MONEY XMLRPC]: handlePayMoneyCharge: Rejected invalid charge parameters.");
+                responseData["message"] = "invalid charge parameters";
+                return response;
+            }
+
             m_log.InfoFormat("[MONEY XMLRPC]: handlePayMoneyCharge: Transfering money from {0} to {1}, Amount = {2}", senderID, receiverID, amount);
 
-            // Sitzungsprüfung überspringen für SYSTEM oder Banker
-            if (senderID == m_bankerAvatar || senderID == "SYSTEM")
+            // The configured banker is trusted to submit service charges without an avatar session.
+            if (senderID == m_bankerAvatar)
             {
-                m_log.InfoFormat("[MONEY XMLRPC]: handlePayMoneyCharge: Sender ist SYSTEM oder BankerAvatar. Sitzungsprüfung wird übersprungen.");
+                m_log.Info("[MONEY XMLRPC]: handlePayMoneyCharge: Sender is the configured banker; session check skipped.");
             }
             else if (m_sessionDic.ContainsKey(senderID) && m_secureSessionDic.ContainsKey(senderID))
             {
@@ -2865,34 +2883,9 @@ namespace OpenSim.Grid.MoneyServer
                         {
                             if (!NotifyTransfer(transactionUUID, "", "", ""))
                             {
-                                m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Gutschrift fehlgeschlagen, versuche manuell Geld hinzuzufügen.");
-
-                                Hashtable addMoneyParams = new Hashtable();
-                                addMoneyParams["bankerID"] = "SYSTEM";
-                                addMoneyParams["amount"] = amount;
-                                addMoneyParams["regionHandle"] = regionHandle;
-                                addMoneyParams["regionUUID"] = regionUUID;
-                                addMoneyParams["transactionType"] = transactionType;
-                                addMoneyParams["description"] = "Manuelle Gutschrift nach Fehlermeldung";
-
-                                XmlRpcResponse addMoneyResponse = handleAddBankerMoney(
-                                    new XmlRpcRequest("AddBankerMoney", new object[] { addMoneyParams }),
-                                    remoteClient
-                                );
-
-                                Hashtable responseValue = addMoneyResponse.Value as Hashtable;
-                                bool addMoneySuccess = addMoneyResponse != null
-                                    && responseValue != null
-                                    && responseValue.ContainsKey("success")
-                                    && (bool)responseValue["success"];
-
-                                responseData["success"] = addMoneySuccess;
-
-                                if (!addMoneySuccess)
-                                {
-                                    responseData["message"] = "Manuelles Hinzufügen des Geldes fehlgeschlagen.";
-                                }
-
+                                m_log.Error("[MONEY XMLRPC]: handlePayMoneyCharge: Charge transfer failed.");
+                                responseData["success"] = false;
+                                responseData["message"] = "Charge transfer failed.";
                                 return response;
                             }
 
