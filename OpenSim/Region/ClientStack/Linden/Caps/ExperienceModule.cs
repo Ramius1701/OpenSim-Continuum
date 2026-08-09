@@ -867,11 +867,22 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             string page_size = query.Get("page_size");
             string query_str = query.Get("query");
 
-            // todo: handle pages
+            int pageNumber = 1;
+            int pageSize = 30;
+            if ((!string.IsNullOrEmpty(page) && !int.TryParse(page, out pageNumber)) ||
+                (!string.IsNullOrEmpty(page_size) && !int.TryParse(page_size, out pageSize)) ||
+                pageNumber < 1 || pageSize < 1 || pageSize > 100)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+            }
 
             ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str);
+            long offset = ((long)pageNumber - 1) * pageSize;
+            if (offset >= results.Length)
+                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
 
-            return ExperienceCapsResponse.SerializeExperiences(results);
+            return ExperienceCapsResponse.SerializeExperiences(results.Skip((int)offset).Take(pageSize));
         }
     }
 

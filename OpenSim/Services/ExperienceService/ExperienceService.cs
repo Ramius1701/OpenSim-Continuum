@@ -210,10 +210,14 @@ namespace OpenSim.Services.ExperienceService
 
             foreach (var data in datas)
             {
+                ExperienceInfo info = new ExperienceInfo(data.ToDictionary());
+                if ((info.properties & (int)(ExperienceFlags.Invalid | ExperienceFlags.Private |
+                    ExperienceFlags.Disabled | ExperienceFlags.Suspended)) != 0)
+                    continue;
+
+                infos.Add(info);
                 if (infos.Count >= MAX_SEARCH_RESULTS)
                     break;
-                ExperienceInfo info = new ExperienceInfo(data.ToDictionary());
-                infos.Add(info);
             }
 
             return infos.ToArray();
