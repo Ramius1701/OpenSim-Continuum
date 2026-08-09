@@ -1001,14 +1001,8 @@ namespace OpenSim.Modules.Currency
 
             if (client.AgentId == agentID && client.SessionId == SessionID)
             {
-                int balance = 0;
-                //
-                if (m_enable_server)
-                {
-                    balance = QueryBalanceFromMoneyServer(client);
-                }
-
-                client.SendMoneyBalance(TransactionID, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+                int balance = QueryBalanceFromMoneyServer(client, out bool succeeded);
+                client.SendMoneyBalance(TransactionID, succeeded, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
             }
             else
             {
@@ -1268,7 +1262,7 @@ namespace OpenSim.Modules.Currency
                         string secureid = (string)requestParam["clientSecureSessionID"];
                         if (client != null && secureid == client.SecureSessionId.ToString() && (sessionid == UUID.Zero.ToString() || sessionid == client.SessionId.ToString()))
                         {
-                            balance = QueryBalanceFromMoneyServer(client);
+                            balance = QueryBalanceFromMoneyServer(client, out ret);
                         }
                     }
                 }
@@ -1818,7 +1812,13 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private int QueryBalanceFromMoneyServer(IClientAPI client)
         {
+            return QueryBalanceFromMoneyServer(client, out _);
+        }
+
+        private int QueryBalanceFromMoneyServer(IClientAPI client, out bool succeeded)
+        {
             int balance = 0;
+            succeeded = false;
 
             if (client != null)
             {
@@ -1838,6 +1838,7 @@ namespace OpenSim.Modules.Currency
                         if ((bool)resultTable["success"] == true)
                         {
                             balance = (int)resultTable["clientBalance"];
+                            succeeded = true;
                             m_log.InfoFormat("[MONEY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                         }
                     }
@@ -1847,6 +1848,7 @@ namespace OpenSim.Modules.Currency
                     if (m_moneyServer.ContainsKey(client.AgentId))
                     {
                         balance = m_moneyServer[client.AgentId];
+                        succeeded = true;
                         m_log.InfoFormat("[MONEY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                     }
                 }
