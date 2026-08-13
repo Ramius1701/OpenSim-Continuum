@@ -48,7 +48,8 @@ namespace OpenSim.Region.ClientStack.Linden
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private int m_nscenes;
+        private readonly object m_ScenesLock = new object();
+        private readonly HashSet<Scene> m_Scenes = new HashSet<Scene>();
         private IPeople m_People = null;
         private bool m_Enabled = false;
 
@@ -76,31 +77,63 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public void RemoveRegion(Scene s)
         {
-            if (!m_Enabled)
+            if (s == null)
                 return;
 
-            s.EventManager.OnRegisterCaps -= RegisterCaps;
-            --m_nscenes;
-            if(m_nscenes >= 0)
+            lock (m_ScenesLock)
+            {
+                if (!m_Scenes.Remove(s))
+                    return;
+
+                s.EventManager.OnRegisterCaps -= RegisterCaps;
                 m_People = null;
+                foreach (Scene scene in m_Scenes)
+                {
+                    m_People = scene.RequestModuleInterface<IPeople>();
+                    if (m_People != null)
+                        break;
+                }
+            }
         }
 
         public void RegionLoaded(Scene s)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || s == null)
                 return;
 
-            if(m_People == null)
-                m_People = s.RequestModuleInterface<IPeople>();
-            s.EventManager.OnRegisterCaps += RegisterCaps;
-            ++m_nscenes;
+            lock (m_ScenesLock)
+            {
+                if (!m_Enabled || !m_Scenes.Add(s))
+                    return;
+
+                if (m_People == null)
+                    m_People = s.RequestModuleInterface<IPeople>();
+                s.EventManager.OnRegisterCaps += RegisterCaps;
+            }
         }
 
         public void PostInitialise()
         {
         }
 
-        public void Close() { }
+        public void Close()
+        {
+            Scene[] scenes;
+            lock (m_ScenesLock)
+            {
+                if (!m_Enabled)
+                    return;
+
+                scenes = new Scene[m_Scenes.Count];
+                m_Scenes.CopyTo(scenes);
+                m_Scenes.Clear();
+                m_People = null;
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in scenes)
+                scene.EventManager.OnRegisterCaps -= RegisterCaps;
+        }
 
         public string Name { get { return "AvatarPickerSearchModule"; } }
 
@@ -113,14 +146,22 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public void RegisterCaps(UUID agentID, Caps caps)
         {
+            if (!m_Enabled || caps == null)
+                return;
+
             UUID capID = UUID.Random();
 
             if (m_URL == "localhost")
             {
                 // m_log.DebugFormat("[AVATAR PICKER SEARCH]: /CAPS/{0} in region {1}", capID, m_scene.RegionInfo.RegionName);
-                if(m_People != null)
+                lock (m_ScenesLock)
+                {
+                    if (m_People == null)
+                        return;
+
                     caps.RegisterSimpleHandler("AvatarPickerSearch",
                         new SimpleStreamHandler("/" + UUID.Random(), ProcessRequest));
+                }
             }
             else
             {
@@ -142,7 +183,7 @@ namespace OpenSim.Region.ClientStack.Linden
             string psize = query.GetOne("page_size");
             string pnumber = query.GetOne("page");
 
-            if (string.IsNullOrEmpty(names) || names.Length < 3)
+            if (string.IsNullOrEmpty(names) || names.Length < 3 || names.Length > 255)
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
@@ -160,8 +201,32 @@ namespace OpenSim.Region.ClientStack.Linden
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
             }
+            if (page_size < 1 || page_size > 500 || page_number < 1 || page_number > 10000)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            IPeople people;
+            lock (m_ScenesLock)
+                people = m_Enabled ? m_People : null;
+            if (people == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
+
             // Full content request
-            List<UserData> users = m_People.GetUserData(names, page_size, page_number);
+            List<UserData> users;
+            try
+            {
+                users = people.GetUserData(names, page_size, page_number) ?? new List<UserData>();
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
 
             LLSDAvatarPicker osdReply = new LLSDAvatarPicker();
             osdReply.next_page_url = httpRequest.RawUrl;
