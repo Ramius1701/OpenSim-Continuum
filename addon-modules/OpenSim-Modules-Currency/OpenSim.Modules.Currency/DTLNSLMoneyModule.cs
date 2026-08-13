@@ -819,7 +819,8 @@ namespace OpenSim.Modules.Currency
             IClientAPI client = agent.ControllingClient;
 
             bool loggedIn = LoginMoneyServer(agent, out balance);
-            client.SendMoneyBalance(UUID.Zero, true, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+            client.SendMoneyBalance(UUID.Zero, loggedIn, new byte[0], Math.Max(0, balance), 0,
+                UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
 
             if (!loggedIn)
                 m_log.WarnFormat("[MONEY MODULE] MoneyServer login failed for {0}; other residents and regions remain active", client.AgentId);
@@ -892,11 +893,28 @@ namespace OpenSim.Modules.Currency
 
                 if (moneyEvent.transactiontype == (int)TransactionType.PayObject)
                 {
-                    objectID = scene.GetSceneObjectPart(moneyEvent.receiver).UUID;
+                    SceneObjectPart paidPart = scene.GetSceneObjectPart(moneyEvent.receiver);
+                    if (paidPart == null)
+                    {
+                        GetLocateClient(moneyEvent.sender)?.SendAgentAlertMessage(
+                            "Unable to complete the payment because the object is no longer available.", false);
+                        return;
+                    }
+                    objectID = paidPart.UUID;
                 }
             }
 
-            TransferMoney(moneyEvent.sender, receiver, moneyEvent.amount, moneyEvent.transactiontype, objectID, regionHandle, regionUUID, "OnMoneyTransfer event");
+            bool transferred = TransferMoney(
+                moneyEvent.sender,
+                receiver,
+                moneyEvent.amount,
+                moneyEvent.transactiontype,
+                objectID,
+                regionHandle,
+                regionUUID,
+                String.IsNullOrWhiteSpace(moneyEvent.description) ? "Viewer money transfer" : moneyEvent.description);
+            if (!transferred)
+                GetLocateClient(moneyEvent.sender)?.SendAgentAlertMessage("Unable to complete the payment.", false);
             return;
         }
 
@@ -993,21 +1011,27 @@ namespace OpenSim.Modules.Currency
                         UUID regionUUID = sceneObj.RegionID;
                         bool ret = false;
                         //
-                        if (salePrice >= 0)
+                        if (salePrice == 0)
+                        {
+                            // Free delivery is an inventory operation and must not
+                            // depend on MoneyServer accepting a zero-value ledger row.
+                            ret = true;
+                        }
+                        else if (salePrice > 0)
                         {
                             if (!string.IsNullOrEmpty(m_moneyServURL))
                             {
                                 ret = TransferMoney(remoteClient.AgentId, receiverId, salePrice,
                                                 (int)TransactionType.PayObject, sceneObj.UUID, regionHandle, regionUUID, "Object Buy");
                             }
-                            else if (salePrice == 0)
-                            {    // amount is 0 with No Money Server
-                                ret = true;
-                            }
                         }
                         if (ret)
                         {
                             mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                        }
+                        else
+                        {
+                            remoteClient.SendAgentAlertMessage("Unable to complete the object purchase", false);
                         }
                     }
                 }
@@ -1035,8 +1059,17 @@ namespace OpenSim.Modules.Currency
 
             if (client.AgentId == agentID && client.SessionId == SessionID)
             {
-                int balance = QueryBalanceFromMoneyServer(client, out bool succeeded);
-                client.SendMoneyBalance(TransactionID, succeeded, new byte[0], balance, 0, UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+                int balance = 0;
+                if (m_enable_server)
+                {
+                    balance = QueryBalanceFromMoneyServer(client, out bool succeeded);
+                    client.SendMoneyBalance(TransactionID, succeeded, new byte[0], Math.Max(0, balance), 0,
+                        UUID.Zero, false, UUID.Zero, false, 0, String.Empty);
+                    return;
+                }
+
+                client.SendMoneyBalance(TransactionID, false, new byte[0], balance, 0, UUID.Zero,
+                    false, UUID.Zero, false, 0, String.Empty);
             }
             else
             {
