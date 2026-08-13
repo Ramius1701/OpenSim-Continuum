@@ -21,6 +21,7 @@ The initial recommendations in this document are retained as the evidence availa
 | Warp3D sprites | Integrated behind opt-in renderer settings for visual/performance testing. |
 | ubODE tuning | Kept on `codex/testing-ubode-tuning`; it is not part of the default production candidate. |
 | WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
+| opensim-lickx archive | Added as an audit donor/reference for its optional Lickx script API, OpenSimMutelist, DTL/NSL-derived currency tree and historical OpenSimSearch helpers. No code selected yet. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
 The latest complete Release solution build completed successfully with zero warnings and zero errors. The untouched baseline's four known CS9193 warnings were corrected without changing the quaternion calculations. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
@@ -53,6 +54,7 @@ The earlier official baseline build passed with four known CS9193 warnings. This
 - Mobius is the original donor lineage for Display Names, Experiences, and Abuse Reports. The recovered local archive has no Git metadata, so exact Mobius commit provenance still needs recovery before code-level attribution is complete.
 - Tranquillity enhances the Mobius Display Names and Experiences work and is the leading traceable service-level donor for those implementations.
 - Gunthar implements a separate Experience-Lite series. It must be reconciled against the fuller Mobius/Tranquillity service implementation rather than treated as a replacement.
+- `S:\Github\opensim-lickx` is the user-preserved last available copy of a project no longer hosted on GitHub. Its evidence checkpoint is `6614599b7506b63861763e6cae5eefde861f8749` on `master`, dated 2026-08-07. It has no configured Git remote and consists of one archival commit, so original upstream commit provenance is unresolved. Preserve that archive unchanged and treat it as evidence and a candidate source, never as authority over current OpenSim Dev or an automatic wholesale port.
 - Previous Continuum branches and recovered archives are evidence and staging references, not proof that a change belongs in official core. This checkpoint does not use the local Casperia checkout.
 - Gunthar commit identities and history in this checkpoint were verified directly from a temporary clone of `https://github.com/GuntharDeNiro/opensim.git` (`origin/master` observed at `6c7021cc36fd6890db27200cd65fd4bb37bd60fd`).
 - A candidate is not eligible to port until its original upstream license and complete provenance chain are confirmed. OpenSim-derived code is generally BSD-3-Clause, but bundled assets and third-party addons must be checked individually.
@@ -264,6 +266,19 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 - **Licensing/provenance:** blocked for code use until commit and license are tied to the archive.
 - **Tests required:** protocol comparison against Tranquillity and current viewers; no code tests until provenance is resolved.
 - **Recommendation:** retain as required provenance and behavioral comparison. Use Tranquillity's traceable enhancement commits for integration while preserving Mobius attribution.
+
+### 14. opensim-lickx archival candidates
+
+- **Donor and checkpoint:** user-preserved last available copy at `S:\Github\opensim-lickx`, archival commit `6614599b7506b63861763e6cae5eefde861f8749`; the project is no longer on GitHub and the archive has no configured remote or earlier Git history.
+- **Feature and intended behaviour:** an optional `Lickx_Api` exposing viewer-name lookup to scripts; an OpenSimMutelist module; a DTL/NSL-derived MoneyServer/currency distribution; and historical PHP/MySQL OpenSimSearch crawler/helper files.
+- **Current Dev/Continuum equivalent:** Continuum already has current script APIs and viewer circuit metadata, native mute-list support, separately preserved MoneyServer Compatibility plus ContinuumEconomy, and a hardened optional OpenSimSearch viewer connector. The archive does not establish that any of these should replace the selected implementations.
+- **Genuinely missing behaviour:** `lxGetAgentViewer()` is a narrow optional script convenience not currently exposed under that donor API name. Any missing mute, economy, or search behaviour must be demonstrated by code and runtime comparison rather than inferred from file presence.
+- **Affected files and services:** script API registration/runtime; mute-list region module; MoneyServer, MySQL wrapper, region currency connector and helper URI; search crawler database and PHP endpoints.
+- **Addon versus core:** prefer optional addons. Do not add a donor-specific core script API until its registration, threat model and compatibility value are proven. Currency and crawler code must remain outside core.
+- **Compatibility:** archive documentation targets OpenSim 0.9.x, .NET 8 and MySQL for currency. SQLite/PostgreSQL, current Windows service operation, Robust, Hypergrid trust, current viewer and multi-region behaviour are unproven.
+- **Licensing and provenance:** the OpenSim tree declares BSD-3-Clause. `opensim.currency-lickx` separately declares MIT and credits DTL/NSL. Preserve both lineages. Embedded certificate files, PHP helpers and every other addon asset require separate provenance/security review; archival commit identity is not original upstream provenance.
+- **Tests required:** compare APIs and schemas with current Continuum; build each candidate separately; test script permissions and viewer privacy, mute persistence/crossings, MoneyServer migration and all supported database boundaries, helper authentication, search privacy/paging/deletion, Windows paths, Robust restart and Hypergrid inputs.
+- **Recommendation:** audit-only donor. Evaluate the narrow Lickx API and Mutelist first; use currency only as a MoneyServer parity reference; quarantine bundled certificates and historical PHP search/economy helpers unless independently secured and justified.
 
 ## Already-present and unsuitable observations
 

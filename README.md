@@ -168,11 +168,14 @@ The integration draws on work from:
 - Mobius-Team/Mobius
 - OpenSim-NGC/OpenSim-Tranquillity
 - WhiteCoreSim/WhiteCore-Dev as a first-class behavioural and viewer-protocol reference; its divergent architecture still rules out wholesale source-tree ports
+- the local `S:\Github\opensim-lickx` archival snapshot as a donor/reference for the optional Lickx script API, OpenSimMutelist, the DTL/NSL-derived `opensim.currency-lickx` lineage, and historical OpenSimSearch helper files
 - WhiteCore directory/search behaviour as the completeness reference for hardening OpenSimSearch across people, places, land, events, classifieds, map results, privacy, paging, and grid-scale indexing
 - Previous OpenSim Continuum and opensim-enhanced branches
 - Original repositories for Gloebit, HoloPhysicsGuard, MoneyServer, OpenSimSearch, OpenSimTide, OpenSimWeather, and recovered addons
 
 Mobius is the original lineage for Display Names, Experiences, and Abuse Reports. Tranquillity provides the traceable enhanced Experience and identity service implementation used as the production base. Gunthar provides the closest active OpenSim-derived fixes, scripting work, RegionWeb, rendering changes, physics experiments, and optional modules.
+
+`opensim-lickx` is the user-preserved last available copy of a project that is no longer on GitHub. The untouched local archive is recorded at commit `6614599b7506b63861763e6cae5eefde861f8749`. It has no configured upstream remote, so that commit identifies the preserved tree rather than complete original history. Its OpenSim-derived code uses the BSD-3-Clause project license; the bundled `opensim.currency-lickx` addon separately declares the MIT license and DTL/NSL lineage. It is audit-only until each candidate is compared with current Continuum equivalents. Any selected code must retain its notices and enter Continuum through a separately reviewed commit; the archive itself must not be rewritten.
 
 Licensing and attribution must be reviewed per addon and asset. The OpenSimulator-derived code is BSD licensed; third-party modules, media, fonts, JavaScript, service SDKs, and external APIs may carry separate terms. See [LICENSE.txt](LICENSE.txt), [CONTRIBUTORS.txt](CONTRIBUTORS.txt), `ThirdPartyLicenses`, and the license files inside individual addons.
 
