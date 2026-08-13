@@ -326,10 +326,24 @@ namespace OpenSim.Modules.Currency
 
             if (scene == null) return;
 
-            scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
-
             lock (m_sceneList)
             {
+                if (!m_enabled)
+                    return;
+
+                if (m_sceneList.TryGetValue(scene.RegionInfo.RegionHandle, out Scene activeScene))
+                {
+                    if (ReferenceEquals(activeScene, scene))
+                        return;
+
+                    m_log.ErrorFormat(
+                        "[MONEY MODULE]: Region handle {0} already has an active scene instance; replacement attachment ignored",
+                        scene.RegionInfo.RegionHandle);
+                    return;
+                }
+
+                scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
+
                 if (m_sceneList.Count == 0)
                 {
                     if (m_enable_server)
@@ -349,24 +363,17 @@ namespace OpenSim.Modules.Currency
                     }
                 }
 
-                if (m_sceneList.ContainsKey(scene.RegionInfo.RegionHandle))
-                {
-                    m_sceneList[scene.RegionInfo.RegionHandle] = scene;
-                }
-                else
-                {
-                    m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
-                }
+                m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
+
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+                scene.EventManager.OnMakeChildAgent += MakeChildAgent;
+
+                // for OpenSim
+                scene.EventManager.OnMoneyTransfer += MoneyTransferAction;
+                scene.EventManager.OnValidateLandBuy += ValidateLandBuy;
+                scene.EventManager.OnLandBuy += processLandBuy;
             }
-
-            scene.EventManager.OnNewClient += OnNewClient;
-            scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            scene.EventManager.OnMakeChildAgent += MakeChildAgent;
-
-            // for OpenSim
-            scene.EventManager.OnMoneyTransfer += MoneyTransferAction;
-            scene.EventManager.OnValidateLandBuy += ValidateLandBuy;
-            scene.EventManager.OnLandBuy += processLandBuy;
 
             m_log.InfoFormat("[MONEY MODULE]: AddRegion: {0}", scene.RegionInfo.RegionName);
 
@@ -383,8 +390,19 @@ namespace OpenSim.Modules.Currency
             if (!m_enabled) return;
             if (scene == null) return;
 
+            DetachRegion(scene);
+        }
+
+        private void DetachRegion(Scene scene)
+        {
             lock (m_sceneList)
             {
+                if (!m_sceneList.TryGetValue(scene.RegionInfo.RegionHandle, out Scene activeScene)
+                    || !ReferenceEquals(activeScene, scene))
+                {
+                    return;
+                }
+
                 scene.EventManager.OnNewClient -= OnNewClient;
                 scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
                 scene.EventManager.OnMakeChildAgent -= MakeChildAgent;
@@ -475,10 +493,13 @@ namespace OpenSim.Modules.Currency
         {
             Scene[] scenes;
             lock (m_sceneList)
+            {
+                m_enabled = false;
                 scenes = new List<Scene>(m_sceneList.Values).ToArray();
+            }
 
             foreach (Scene scene in scenes)
-                RemoveRegion(scene);
+                DetachRegion(scene);
 
             RemoveMoneyServerCallbacks();
         }
