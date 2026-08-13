@@ -1289,7 +1289,21 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
             }
 
             // Should check to see if OpenEnrollment, or if there's an outstanding invitation
-            m_groupData.AddAgentToGroup(GetRequestingAgentID(remoteClient), GetRequestingAgentID(remoteClient), groupID, UUID.Zero);
+            UUID requestingAgentID = GetRequestingAgentID(remoteClient);
+            m_groupData.AddAgentToGroup(requestingAgentID, requestingAgentID, groupID, UUID.Zero);
+
+            // The legacy XML-RPC connector has a void mutation contract. Read
+            // back authoritative membership before charging or reporting success.
+            GroupMembershipData joinedMembership =
+                m_groupData.GetAgentGroupMembership(requestingAgentID, requestingAgentID, groupID);
+            if (joinedMembership == null)
+            {
+                if (reservedMoney != null && chargeReservation != UUID.Zero)
+                    reservedMoney.CancelCharge(chargeReservation, remoteClient.AgentId);
+                remoteClient.SendAlertMessage("The group service could not confirm your membership.");
+                remoteClient.SendJoinGroupReply(groupID, false);
+                return;
+            }
 
             if (reservedMoney != null && chargeReservation != UUID.Zero)
             {
@@ -1298,7 +1312,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
                         remoteClient.AgentId, groupID, chargeReservation);
             }
             else if (money != null && groupRecord.MembershipFee > 0)
-                money.ApplyCharge(GetRequestingAgentID(remoteClient), groupRecord.MembershipFee,
+                money.ApplyCharge(requestingAgentID, groupRecord.MembershipFee,
                     MoneyTransactionType.GroupJoin, groupRecord.GroupName);
 
             remoteClient.SendJoinGroupReply(groupID, true);
