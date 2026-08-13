@@ -55,6 +55,7 @@ namespace TideModule
         private bool m_restoreWaterOnStop = true;
         private double m_originalWaterHeight;
         private bool m_hasOriginalWaterHeight;
+        private readonly object m_lifecycleSync = new object();
 
         public Scene m_scene;
         public IConfigSource m_config;
@@ -82,6 +83,22 @@ namespace TideModule
 
         public void AddRegion (Scene scene)
         {
+            if (scene == null)
+                return;
+
+            lock (m_lifecycleSync)
+            {
+                if (ReferenceEquals(m_scene, scene))
+                    return;
+                if (m_scene != null)
+                {
+                    m_log.ErrorFormat(
+                        "[{0}]: AddRegion called for a second region on a non-shared module instance; request ignored",
+                        m_name);
+                    return;
+                }
+            }
+
             IConfig cnf;
             m_log.InfoFormat("[{0}]: Adding region '{1}' to this module", m_name, scene.RegionInfo.RegionName);
 
@@ -146,16 +163,28 @@ namespace TideModule
                 m_log.InfoFormat("[{0}]: Enabled with an update rate every {1} frames, Low Water={2}m, High Water={3}m, Cycle Time={4} secs", m_name, m_frameUpdateRate, m_lowTide, m_highTide, m_cycleTime);
                 m_log.InfoFormat("[{0}]: Info Channel={1}, Water Level Channel={2}, Info Broadcast is {3}, Announce Count={4}", m_name, m_tideInfoChannel, m_tideLevelChannel, m_tideInfoBroadcast, m_tideAnnounceCounter);
 
-                m_frame = 0;
-                m_tideAnnounceCounter = 0;
-                m_tideAnnounceMsg = string.Empty;
-                m_hasTideTimes = false;
-                m_ready = true; // Mark Module Ready for duty
-                m_shoutPos = new Vector3(scene.RegionInfo.RegionSizeX / 2f, scene.RegionInfo.RegionSizeY / 2f, 30f);
-                m_scene = scene;
-                m_originalWaterHeight = scene.RegionInfo.RegionSettings.WaterHeight;
-                m_hasOriginalWaterHeight = true;
-                scene.EventManager.OnFrame += TideUpdate;
+                lock (m_lifecycleSync)
+                {
+                    if (m_scene != null)
+                    {
+                        m_log.ErrorFormat(
+                            "[{0}]: Region ownership changed while loading {1}; tide was not attached",
+                            m_name,
+                            scene.RegionInfo.RegionName);
+                        return;
+                    }
+
+                    m_frame = 0;
+                    m_tideAnnounceCounter = 0;
+                    m_tideAnnounceMsg = string.Empty;
+                    m_hasTideTimes = false;
+                    m_shoutPos = new Vector3(scene.RegionInfo.RegionSizeX / 2f, scene.RegionInfo.RegionSizeY / 2f, 30f);
+                    m_scene = scene;
+                    m_originalWaterHeight = scene.RegionInfo.RegionSettings.WaterHeight;
+                    m_hasOriginalWaterHeight = true;
+                    scene.EventManager.OnFrame += TideUpdate;
+                    m_ready = true; // Mark Module Ready only after ownership and callback registration are complete.
+                }
             }
             else
             {
@@ -280,28 +309,36 @@ namespace TideModule
 
         private void StopTide(Scene scene)
         {
-            m_ready = false;
-            scene.EventManager.OnFrame -= TideUpdate;
+            if (scene == null)
+                return;
 
-            if (m_restoreWaterOnStop && m_hasOriginalWaterHeight)
+            lock (m_lifecycleSync)
             {
-                float original = (float)m_originalWaterHeight;
-                scene.RegionInfo.RegionSettings.WaterHeight = original;
-                scene.EventManager.TriggerRequestChangeWaterHeight(original);
-                scene.EventManager.TriggerTerrainTick();
-                m_log.InfoFormat(
-                    "[{0}]: Restored water height to {1:0.###}m in Region: {2}",
-                    m_name,
-                    original,
-                    scene.RegionInfo.RegionName);
-            }
+                if (!ReferenceEquals(m_scene, scene))
+                    return;
 
-            m_hasOriginalWaterHeight = false;
-            m_hasTideTimes = false;
-            m_tideAnnounceCounter = 0;
-            m_tideAnnounceMsg = string.Empty;
-            if (ReferenceEquals(m_scene, scene))
+                m_ready = false;
+                scene.EventManager.OnFrame -= TideUpdate;
+
+                if (m_restoreWaterOnStop && m_hasOriginalWaterHeight)
+                {
+                    float original = (float)m_originalWaterHeight;
+                    scene.RegionInfo.RegionSettings.WaterHeight = original;
+                    scene.EventManager.TriggerRequestChangeWaterHeight(original);
+                    scene.EventManager.TriggerTerrainTick();
+                    m_log.InfoFormat(
+                        "[{0}]: Restored water height to {1:0.###}m in Region: {2}",
+                        m_name,
+                        original,
+                        scene.RegionInfo.RegionName);
+                }
+
+                m_hasOriginalWaterHeight = false;
+                m_hasTideTimes = false;
+                m_tideAnnounceCounter = 0;
+                m_tideAnnounceMsg = string.Empty;
                 m_scene = null;
+            }
         }
         #endregion
     }
