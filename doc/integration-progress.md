@@ -115,6 +115,11 @@ resident from an undecided resident, reject missing Experience records without a
 null dereference, correlate viewer replies to both object and script item, persist
 denials, and grant local script permissions only after Robust confirms persistence.
 
+The common Experience land-policy check now applies estate and parcel blocks before
+trusted/allowed entries. This single policy path governs script permissions, KVP,
+Experience sit, attachments and environment actions, so a block can no longer be
+bypassed merely because the same Experience also appears in an allowed list.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.

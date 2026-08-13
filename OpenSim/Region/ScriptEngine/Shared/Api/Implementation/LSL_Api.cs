@@ -424,26 +424,23 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         // Experience Stuff
         bool CheckExperienceAccessAtPos(Vector3 pos, UUID experience)
         {
-            if (World.ExperienceModule == null)
+            if (World.ExperienceModule == null || experience == UUID.Zero)
                 return false;
 
-            if (World.RegionInfo.EstateSettings.KeyExperiences.Contains(experience))
-                return true;
-
-            if (World.RegionInfo.EstateSettings.AllowedExperiences.Contains(experience))
-                return true;
-
             var land = World.LandChannel.GetLandObject(pos);
-            int idx = land.LandData.ParcelAccessList.FindIndex(
-                            delegate (LandAccessEntry e)
-                            {
-                                // It's not actually an AgentID
-                                if (e.AgentID == experience && (uint)e.Flags == 8u /*AccessList.Allowed*/) // todo: replace with AccessList.Allowed
-                                    return true;
-                                return false;
-                            });
+            if (land == null)
+                return false;
 
-            return idx != -1;
+            UUID[] estateBlocked = World.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
+            if (estateBlocked.Contains(experience) || land.LandData.ParcelAccessList.Any(
+                entry => entry.AgentID == experience && (uint)entry.Flags == 0x10u))
+                return false;
+
+            UUID[] estateKey = World.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
+            UUID[] estateAllowed = World.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
+            return estateKey.Contains(experience) || estateAllowed.Contains(experience) ||
+                land.LandData.ParcelAccessList.Any(
+                    entry => entry.AgentID == experience && (uint)entry.Flags == 8u);
         }
 
         private void SendExperienceEvent(ExperienceEvent action)
