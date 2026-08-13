@@ -90,6 +90,11 @@ and negative group membership fees before persistence. Native and XML-RPC group
 front ends enforce the same rule; legitimate zero-cost listings and memberships
 remain supported.
 
+The Robust Experience handler rejects unknown permission actions instead of
+silently treating them as permission removal. Identity and collection inputs are
+validated, searches are bounded, and service responses are capped and deduplicated
+before serialization.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.

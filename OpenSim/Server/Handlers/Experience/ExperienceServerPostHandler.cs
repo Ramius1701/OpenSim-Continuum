@@ -22,6 +22,7 @@ namespace OpenSim.Server.Handlers.Experience
     public class ExperienceServerPostHandler : BaseStreamHandler
     {
         private const int MaxRequestBodyBytes = 1024 * 1024;
+        private const int MaxCollectionResults = 1000;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private IExperienceService m_service;
@@ -95,7 +96,7 @@ namespace OpenSim.Server.Handlers.Experience
         {
             List<UUID> groups = new List<UUID>();
             int i = 0;
-            while (true)
+            while (i < MaxCollectionResults)
             {
                 string key = string.Format("id_{0}", i);
                 if (request.ContainsKey(key) == false)
@@ -103,8 +104,8 @@ namespace OpenSim.Server.Handlers.Experience
 
                 UUID group_id;
 
-                if (!UUID.TryParse(request[key].ToString(), out group_id))
-                    break;
+                if (!UUID.TryParse(request[key].ToString(), out group_id) || group_id == UUID.Zero)
+                    return FailureResult();
 
                 groups.Add(group_id);
                 i++;
@@ -115,7 +116,7 @@ namespace OpenSim.Server.Handlers.Experience
             UUID[] experiences = m_service.GetExperiencesForGroups(groups.ToArray());
 
             i = 0;
-            foreach (var id in experiences)
+            foreach (var id in experiences.Where(id => id != UUID.Zero).Distinct().Take(MaxCollectionResults))
                 result.Add("id_" + i++, id.ToString());
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
@@ -126,14 +127,14 @@ namespace OpenSim.Server.Handlers.Experience
         {
             UUID group_id;
 
-            if (!UUID.TryParse(request["GROUP"].ToString(), out group_id))
+            if (!UUID.TryParse(request["GROUP"].ToString(), out group_id) || group_id == UUID.Zero)
                 return FailureResult();
 
             UUID[] experiences = m_service.GetGroupExperiences(group_id);
             Dictionary<string, object> result = new Dictionary<string, object>();
 
             int i = 0;
-            foreach (var id in experiences)
+            foreach (var id in experiences.Where(id => id != UUID.Zero).Distinct().Take(MaxCollectionResults))
                 result.Add("id_" + i++, id.ToString());
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
@@ -146,6 +147,8 @@ namespace OpenSim.Server.Handlers.Experience
                 return FailureResult();
 
             string search = request["SEARCH"].ToString();
+            if (string.IsNullOrWhiteSpace(search) || search.Length > 256)
+                return FailureResult();
 
             ExperienceInfo[] infos = m_service.FindExperiencesByName(search);
 
@@ -157,7 +160,7 @@ namespace OpenSim.Server.Handlers.Experience
             else
             {
                 int n = 0;
-                foreach (ExperienceInfo ex in infos)
+                foreach (ExperienceInfo ex in infos.Take(MaxCollectionResults))
                 {
                     if (ex == null)
                         continue;
@@ -174,7 +177,7 @@ namespace OpenSim.Server.Handlers.Experience
         byte[] GetPermissions(Dictionary<string, object> request)
         {
 			UUID agent_id;
-            if( !UUID.TryParse(request["agent_id"].ToString(), out agent_id))
+			if( !UUID.TryParse(request["agent_id"].ToString(), out agent_id) || agent_id == UUID.Zero)
                 return FailureResult();
 
             Dictionary<UUID, bool> reply_data = m_service.FetchExperiencePermissions(agent_id);
@@ -191,7 +194,9 @@ namespace OpenSim.Server.Handlers.Experience
 
             int i = 0;
 
-            foreach(var pair in reply_data)
+            foreach(var pair in reply_data
+                .Where(pair => pair.Key != UUID.Zero)
+                .Take(MaxCollectionResults))
             {
                 XmlElement key = doc.CreateElement("", string.Format("uuid_{0}", i), "");
                 key.AppendChild(doc.CreateTextNode(pair.Key.ToString()));
@@ -211,14 +216,14 @@ namespace OpenSim.Server.Handlers.Experience
         {
             UUID agent_id;
 
-            if (!UUID.TryParse(request["AGENT"].ToString(), out agent_id))
+            if (!UUID.TryParse(request["AGENT"].ToString(), out agent_id) || agent_id == UUID.Zero)
                 return FailureResult();
 
             UUID[] experiences = m_service.GetAgentExperiences(agent_id);
             Dictionary<string, object> result = new Dictionary<string, object>();
 
             int i = 0;
-            foreach (var id in experiences) 
+            foreach (var id in experiences.Where(id => id != UUID.Zero).Distinct().Take(MaxCollectionResults))
                 result.Add("id_" + i++, id.ToString());
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
@@ -230,17 +235,23 @@ namespace OpenSim.Server.Handlers.Experience
             UUID agent_id;
             UUID experience;
 
-            if (!UUID.TryParse(request["agent_id"].ToString(), out agent_id))
+            if (!UUID.TryParse(request["agent_id"].ToString(), out agent_id) || agent_id == UUID.Zero)
                 return FailureResult();
 
-            if (!UUID.TryParse(request["experience"].ToString(), out experience))
+            if (!UUID.TryParse(request["experience"].ToString(), out experience) || experience == UUID.Zero)
                 return FailureResult();
 
             string perm = request["permission"].ToString();
 
-            ExperiencePermission permissions = ExperiencePermission.None;
-            if (perm == "allow") permissions = ExperiencePermission.Allowed;
-            else if (perm == "block") permissions = ExperiencePermission.Blocked;
+            ExperiencePermission permissions;
+            if (perm == "allow")
+                permissions = ExperiencePermission.Allowed;
+            else if (perm == "block")
+                permissions = ExperiencePermission.Blocked;
+            else if (perm == "forget")
+                permissions = ExperiencePermission.None;
+            else
+                return FailureResult();
 
             return m_service.UpdateExperiencePermissions(agent_id, experience, permissions) ? SuccessResult() : FailureResult();
         }
@@ -249,7 +260,7 @@ namespace OpenSim.Server.Handlers.Experience
         {
             List<UUID> experiences = new List<UUID>();
             int i = 0;
-            while(true)
+            while(i < MaxCollectionResults)
             {
                 string key = string.Format("id_{0}", i);
                 if (request.ContainsKey(key) == false)
@@ -257,8 +268,8 @@ namespace OpenSim.Server.Handlers.Experience
 
                 UUID experience_id;
 
-                if (!UUID.TryParse(request[key].ToString(), out experience_id))
-                    break;
+                if (!UUID.TryParse(request[key].ToString(), out experience_id) || experience_id == UUID.Zero)
+                    return FailureResult();
 
                 experiences.Add(experience_id);
                 i++;
@@ -274,7 +285,7 @@ namespace OpenSim.Server.Handlers.Experience
             else
             {
                 int n = 0;
-                foreach (ExperienceInfo ex in infos)
+                foreach (ExperienceInfo ex in infos.Take(MaxCollectionResults))
                 {
                     if (ex == null)
                         continue;
