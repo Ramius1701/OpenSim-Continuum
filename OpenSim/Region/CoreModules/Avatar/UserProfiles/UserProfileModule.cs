@@ -731,6 +731,12 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
                                          uint queryParentEstate, UUID querySnapshotID, Vector3 queryGlobalPos, byte queryclassifiedFlags,
                                          int queryclassifiedPrice, IClientAPI remoteClient)
         {
+            if (queryclassifiedPrice < 0)
+            {
+                remoteClient.SendAgentAlertMessage("Classified listing prices cannot be negative.", false);
+                return;
+            }
+
             Scene s = (Scene)remoteClient.Scene;
             Vector3 pos = remoteClient.SceneAgent.AbsolutePosition;
             ILandObject land = s.LandChannel.GetLandObject(pos.X, pos.Y);

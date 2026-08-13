@@ -85,6 +85,11 @@ module discovery order cannot transfer paid land before settlement.
 
 ## Release sequence
 
+The paid-operation input boundary now rejects negative classified listing prices
+and negative group membership fees before persistence. Native and XML-RPC group
+front ends enforce the same rule; legitimate zero-cost listings and memberships
+remain supported.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.

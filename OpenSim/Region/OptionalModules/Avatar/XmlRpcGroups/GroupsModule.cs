@@ -989,6 +989,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         {
             if (m_debugEnabled) m_log.DebugFormat("[GROUPS]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
+            if (membershipFee < 0)
+            {
+                remoteClient.SendAgentAlertMessage("Group membership fees cannot be negative.", false);
+                return;
+            }
+
             // Note: Permissions checking for modification rights is handled by the Groups Server/Service
             m_groupData.UpdateGroup(GetRequestingAgentID(remoteClient), groupID, charter, showInList, insigniaID, membershipFee, openEnrollment, allowPublish, maturePublish);
         }
@@ -1004,6 +1010,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
         public UUID CreateGroup(IClientAPI remoteClient, string name, string charter, bool showInList, UUID insigniaID, int membershipFee, bool openEnrollment, bool allowPublish, bool maturePublish)
         {
             if (m_debugEnabled) m_log.DebugFormat("[GROUPS]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
+
+            if (membershipFee < 0)
+            {
+                remoteClient.SendCreateGroupReply(UUID.Zero, false, "Group membership fees cannot be negative.");
+                return UUID.Zero;
+            }
 
             GroupRecord groupRecord = m_groupData.GetGroupRecord(GetRequestingAgentID(remoteClient), UUID.Zero, name);
 

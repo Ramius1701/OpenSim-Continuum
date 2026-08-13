@@ -882,6 +882,12 @@ namespace OpenSim.Groups
         {
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
+            if (membershipFee < 0)
+            {
+                remoteClient.SendAgentAlertMessage("Group membership fees cannot be negative.", false);
+                return;
+            }
+
             // Note: Permissions checking for modification rights is handled by the Groups Server/Service
             string reason = string.Empty;
             if (!m_groupData.UpdateGroup(GetRequestingAgentIDStr(remoteClient), groupID, charter, showInList, insigniaID, membershipFee,
@@ -900,6 +906,12 @@ namespace OpenSim.Groups
         public UUID CreateGroup(IClientAPI remoteClient, string name, string charter, bool showInList, UUID insigniaID, int membershipFee, bool openEnrollment, bool allowPublish, bool maturePublish)
         {
             if (m_debugEnabled) m_log.DebugFormat("[Groups]: {0} called in {1}", System.Reflection.MethodBase.GetCurrentMethod().Name, remoteClient.Scene.RegionInfo.RegionName);
+
+            if (membershipFee < 0)
+            {
+                remoteClient.SendCreateGroupReply(UUID.Zero, false, "Group membership fees cannot be negative.");
+                return UUID.Zero;
+            }
 
             if (m_groupData.GetGroupRecord(GetRequestingAgentIDStr(remoteClient), UUID.Zero, name) != null)
             {
