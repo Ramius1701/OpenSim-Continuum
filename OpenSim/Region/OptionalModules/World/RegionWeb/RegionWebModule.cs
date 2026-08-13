@@ -294,7 +294,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             if (!m_enabled)
                 return;
 
-            AddOrUpdateScene(scene);
+            if (!AddOrUpdateScene(scene))
+                return;
 
             if (m_autoCreateContent)
                 EnsureRegionContent(scene);
@@ -304,11 +305,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
             lock (m_sync)
             {
+                if (!m_scenesByID.TryGetValue(scene.RegionInfo.RegionID, out Scene activeScene)
+                    || !ReferenceEquals(activeScene, scene))
+                {
+                    return;
+                }
+
                 m_scenesByID.Remove(scene.RegionInfo.RegionID);
 
                 List<string> deadSlugs = new List<string>();
@@ -329,6 +336,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
             lock (m_sync)
             {
+                m_enabled = false;
                 m_scenesByID.Clear();
                 m_regionIDsBySlug.Clear();
             }
@@ -364,15 +372,35 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             m_variableHandlerRegistered = false;
         }
 
-        private void AddOrUpdateScene(Scene scene)
+        private bool AddOrUpdateScene(Scene scene)
         {
+            if (scene == null)
+                return false;
+
             string slug = MakeSlug(scene.RegionInfo.RegionName);
 
             lock (m_sync)
             {
+                if (!m_enabled)
+                    return false;
+
+                List<string> staleSlugs = new List<string>();
+                foreach (KeyValuePair<string, UUID> kvp in m_regionIDsBySlug)
+                {
+                    if (kvp.Value == scene.RegionInfo.RegionID
+                        && !kvp.Key.Equals(scene.RegionInfo.RegionID.ToString(), StringComparison.OrdinalIgnoreCase)
+                        && !kvp.Key.Equals(slug, StringComparison.OrdinalIgnoreCase))
+                    {
+                        staleSlugs.Add(kvp.Key);
+                    }
+                }
+                foreach (string staleSlug in staleSlugs)
+                    m_regionIDsBySlug.Remove(staleSlug);
+
                 m_scenesByID[scene.RegionInfo.RegionID] = scene;
                 m_regionIDsBySlug[slug] = scene.RegionInfo.RegionID;
                 m_regionIDsBySlug[scene.RegionInfo.RegionID.ToString()] = scene.RegionInfo.RegionID;
+                return true;
             }
         }
 

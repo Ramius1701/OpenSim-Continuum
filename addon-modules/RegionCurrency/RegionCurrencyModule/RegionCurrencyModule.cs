@@ -3056,11 +3056,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
             lock (m_sync)
-                m_scenesByID.Remove(scene.RegionInfo.RegionID);
+            {
+                if (m_scenesByID.TryGetValue(scene.RegionInfo.RegionID, out Scene activeScene)
+                    && ReferenceEquals(activeScene, scene))
+                {
+                    m_scenesByID.Remove(scene.RegionInfo.RegionID);
+                }
+            }
         }
 
         public void Close()
@@ -3068,7 +3074,10 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
             RemoveHttpHandlers();
 
             lock (m_sync)
+            {
+                m_enabled = false;
                 m_scenesByID.Clear();
+            }
 
             lock (m_currencyAuthLock)
             {
@@ -3100,8 +3109,15 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
         private void AddOrUpdateScene(Scene scene)
         {
+            if (scene == null)
+                return;
+
             lock (m_sync)
+            {
+                if (!m_enabled)
+                    return;
                 m_scenesByID[scene.RegionInfo.RegionID] = scene;
+            }
         }
 
         /// <summary>
