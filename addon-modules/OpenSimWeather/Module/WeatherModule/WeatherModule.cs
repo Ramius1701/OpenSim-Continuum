@@ -139,6 +139,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly object m_sync = new object();
+        private readonly object m_lifecycleSync = new object();
         private readonly object m_weatherChangeSync = new object();
         private readonly object m_randomSync = new object();
         private readonly List<SceneObjectGroup> m_emitters = new List<SceneObjectGroup>();
@@ -440,13 +441,24 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         public void AddRegion(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
-            m_scene = scene;
-            m_scene.EventManager.OnChatFromClient += OnChatFromClient;
-            m_scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            m_scene.EventManager.OnClientClosed += OnClientClosed;
+            lock (m_lifecycleSync)
+            {
+                if (ReferenceEquals(m_scene, scene))
+                    return;
+                if (m_scene != null)
+                {
+                    m_log.Error("[WEATHER]: AddRegion called for a second region on a non-shared module instance; request ignored.");
+                    return;
+                }
+
+                m_scene = scene;
+                scene.EventManager.OnChatFromClient += OnChatFromClient;
+                scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+                scene.EventManager.OnClientClosed += OnClientClosed;
+            }
             m_log.InfoFormat(
                 "[WEATHER]: Enabled in region {0} on channel {1}",
                 scene.RegionInfo.RegionName,
@@ -455,25 +467,33 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         public void RemoveRegion(Scene scene)
         {
+            TeardownRegion(scene);
+        }
+
+        private void TeardownRegion(Scene expectedScene)
+        {
+            lock (m_lifecycleSync)
+            {
+                Scene activeScene = m_scene;
+                if (activeScene == null || (expectedScene != null && !ReferenceEquals(activeScene, expectedScene)))
+                    return;
+
             StopAutoCycle();
             StopActiveAreaRefresh();
             StopSurfaceTimer();
             CancelPendingEntryIMs();
 
-            Scene activeScene = m_scene;
-            if (activeScene != null)
-            {
                 activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
                 activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
                 activeScene.EventManager.OnClientClosed -= OnClientClosed;
-            }
 
-            lock (m_weatherChangeSync)
-            {
-                ClearWeather(false, true, true);
-                m_scene = null;
-                m_environmentModule = null;
-                m_windModule = null;
+                lock (m_weatherChangeSync)
+                {
+                    ClearWeather(false, true, true);
+                    m_scene = null;
+                    m_environmentModule = null;
+                    m_windModule = null;
+                }
             }
         }
 
@@ -481,6 +501,12 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         {
             if (!m_enabled)
                 return;
+
+            lock (m_lifecycleSync)
+            {
+                if (!ReferenceEquals(m_scene, scene))
+                    return;
+            }
 
             m_environmentModule = scene.RequestModuleInterface<IEnvironmentModule>();
             if (m_adjustClouds && m_environmentModule == null)
@@ -520,26 +546,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         public void Close()
         {
-            StopAutoCycle();
-            StopActiveAreaRefresh();
-            StopSurfaceTimer();
-            CancelPendingEntryIMs();
-
-            Scene activeScene = m_scene;
-            if (activeScene != null)
-            {
-                activeScene.EventManager.OnChatFromClient -= OnChatFromClient;
-                activeScene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-                activeScene.EventManager.OnClientClosed -= OnClientClosed;
-            }
-
-            lock (m_weatherChangeSync)
-            {
-                ClearWeather(false, true, true);
-                m_scene = null;
-                m_environmentModule = null;
-                m_windModule = null;
-            }
+            TeardownRegion(null);
         }
 
         private void OnMakeRootAgent(ScenePresence sp)
