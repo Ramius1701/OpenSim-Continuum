@@ -46,7 +46,7 @@ namespace HoloNeon.RegionModules
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private readonly List<Scene> m_scenes = new List<Scene>();
+        private readonly Dictionary<UUID, Scene> m_scenes = new Dictionary<UUID, Scene>();
         private readonly object m_operationLock = new object();
 
         private readonly Dictionary<UUID, DateTime> m_regionBecameEmptyAt =
@@ -223,8 +223,19 @@ namespace HoloNeon.RegionModules
 
             lock (m_scenes)
             {
-                if (!m_scenes.Contains(scene))
-                    m_scenes.Add(scene);
+                UUID regionID = scene.RegionInfo.RegionID;
+                if (m_scenes.TryGetValue(regionID, out Scene activeScene))
+                {
+                    if (ReferenceEquals(activeScene, scene))
+                        return;
+
+                    m_log.ErrorFormat(
+                        "[HOLO PHYSICS GUARD]: Region {0} already has an active scene instance; replacement attachment ignored",
+                        regionID);
+                    return;
+                }
+
+                m_scenes[regionID] = scene;
             }
 
             lock (m_regionWasOccupied)
@@ -239,7 +250,7 @@ namespace HoloNeon.RegionModules
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_enabled || !m_wakeOnStart || !IsPersistMode())
+            if (!m_enabled || !IsSceneActive(scene) || !m_wakeOnStart || !IsPersistMode())
                 return;
 
             try
@@ -262,8 +273,19 @@ namespace HoloNeon.RegionModules
 
         public void RemoveRegion(Scene scene)
         {
+            if (scene == null)
+                return;
+
             lock (m_scenes)
-                m_scenes.Remove(scene);
+            {
+                UUID regionID = scene.RegionInfo.RegionID;
+                if (!m_scenes.TryGetValue(regionID, out Scene activeScene)
+                    || !ReferenceEquals(activeScene, scene))
+                {
+                    return;
+                }
+                m_scenes.Remove(regionID);
+            }
 
             // Wait for any sleep/wake operation that already selected this
             // scene. Later operations re-check membership while holding the
@@ -355,7 +377,7 @@ namespace HoloNeon.RegionModules
                 List<Scene> scenes;
 
                 lock (m_scenes)
-                    scenes = new List<Scene>(m_scenes);
+                    scenes = new List<Scene>(m_scenes.Values);
 
                 foreach (Scene scene in scenes)
                 {
@@ -683,8 +705,12 @@ namespace HoloNeon.RegionModules
 
         private bool IsSceneActive(Scene scene)
         {
+            if (scene == null)
+                return false;
+
             lock (m_scenes)
-                return m_scenes.Contains(scene);
+                return m_scenes.TryGetValue(scene.RegionInfo.RegionID, out Scene activeScene)
+                    && ReferenceEquals(activeScene, scene);
         }
 
         private SceneObjectGroup FindSceneObjectGroup(Scene scene, UUID rootPartUUID)
