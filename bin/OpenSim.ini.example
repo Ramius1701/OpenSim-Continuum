@@ -1011,6 +1011,9 @@
     ;; Continuum: enable viewer display-name changes. In grid mode these are
     ;; persisted by the grid-wide UserAccountService hosted in Robust.
     Cap_SetDisplayName = "localhost"
+    ;; Poll the authoritative account value for connected root avatars so
+    ;; display-name changes propagate between simulator processes.
+    ;DisplayNameRefreshIntervalSeconds = 60
 
 
 [SimulatorFeatures]

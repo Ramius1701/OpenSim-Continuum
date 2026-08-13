@@ -12,6 +12,7 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework;
 using System.Net;
 using System.IO;
+using System.Threading;
 
 namespace OpenSim.Region.ClientStack.LindenCaps
 {
@@ -26,6 +27,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         protected Scene m_Scene = null;
 
         private bool m_Enabled = false;
+        private int m_RefreshIntervalSeconds = 60;
+        private Timer m_RefreshTimer;
+        private int m_RefreshRunning;
 
         #region ISharedRegionModule
 
@@ -38,6 +42,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             string url = config.GetString("Cap_SetDisplayName", string.Empty);
             if (url == "localhost")
                 m_Enabled = true;
+
+            m_RefreshIntervalSeconds = Math.Clamp(
+                config.GetInt("DisplayNameRefreshIntervalSeconds", 60), 15, 3600);
 
             if (!m_Enabled)
                 return;
@@ -62,6 +69,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (!m_Enabled)
                 return;
 
+            Timer refreshTimer = Interlocked.Exchange(ref m_RefreshTimer, null);
+            refreshTimer?.Dispose();
+
             scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
             scene.EventManager.OnNewClient -= OnNewClient;
             scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
@@ -83,6 +93,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             }
 
             scene.EventManager.OnRegisterCaps += OnRegisterCaps;
+            m_RefreshTimer = new Timer(
+                RefreshConnectedDisplayNames,
+                scene,
+                TimeSpan.FromSeconds(m_RefreshIntervalSeconds),
+                TimeSpan.FromSeconds(m_RefreshIntervalSeconds));
         }
 
         public void PostInitialise() { }
@@ -146,6 +161,54 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             DateTime nextUpdate = userData.NameChanged.AddDays(7);
             OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
             m_Scene.ForEachClient(client => m_EventQueue.Enqueue(update, client.AgentId));
+        }
+
+        private void RefreshConnectedDisplayNames(object state)
+        {
+            Scene scene = state as Scene;
+            IEventQueue eventQueue = m_EventQueue;
+            if (scene == null || !ReferenceEquals(m_Scene, scene) || eventQueue == null ||
+                Interlocked.CompareExchange(ref m_RefreshRunning, 1, 0) != 0)
+                return;
+
+            try
+            {
+                scene.ForEachRootScenePresence(presence =>
+                {
+                    if (presence == null || presence.IsDeleted || presence.IsChildAgent)
+                        return;
+
+                    UserData cached = scene.UserManagementModule.GetUserData(presence.UUID);
+                    string oldDisplayName = cached?.ViewerDisplayName ?? presence.Name;
+                    DateTime oldChanged = cached?.NameChanged ?? DateTime.MinValue;
+
+                    scene.UserManagementModule.RemoveUser(presence.UUID);
+                    UserData current = scene.UserManagementModule.GetUserData(presence.UUID);
+                    if (current == null ||
+                        (string.Equals(oldDisplayName, current.ViewerDisplayName, StringComparison.Ordinal) &&
+                         oldChanged == current.NameChanged))
+                        return;
+
+                    DateTime nextUpdate = current.NameChanged.AddDays(7);
+                    OSD update = FormatDisplayNameUpdate(oldDisplayName, current, nextUpdate);
+                    scene.ForEachClient(client => eventQueue.Enqueue(update, client.AgentId));
+                    m_log.InfoFormat(
+                        "[DISPLAY NAMES]: Refreshed grid display name for {0} in region {1}",
+                        presence.UUID,
+                        scene.RegionInfo.RegionName);
+                });
+            }
+            catch (Exception e)
+            {
+                m_log.WarnFormat(
+                    "[DISPLAY NAMES]: Authoritative refresh failed in region {0}: {1}",
+                    scene.RegionInfo.RegionName,
+                    e.Message);
+            }
+            finally
+            {
+                Volatile.Write(ref m_RefreshRunning, 0);
+            }
         }
 
         private void OnRegisterCaps(UUID agentID, Caps caps)

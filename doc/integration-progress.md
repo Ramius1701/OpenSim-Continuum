@@ -95,6 +95,11 @@ silently treating them as permission removal. Identity and collection inputs are
 validated, searches are bounded, and service responses are capped and deduplicated
 before serialization.
 
+Display Names now refresh connected root avatars from the authoritative grid
+account service on a bounded configurable interval. A simulator broadcasts a
+viewer update only when the stored display name or change timestamp differs,
+closing the cross-simulator stale-nameplate gap without grid-wide chat notices.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.
