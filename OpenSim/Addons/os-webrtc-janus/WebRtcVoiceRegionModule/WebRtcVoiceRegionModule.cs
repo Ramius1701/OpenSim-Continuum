@@ -474,7 +474,14 @@ namespace osWebRtcVoice
                                     continue;
                                 vreq["viewer_session"] = v.ViewerSessionID;
                                 VoiceViewerSession.RemoveViewerSession(v.ViewerSessionID);
-                                v.VoiceService.ProvisionVoiceAccountRequest(v, vreq , agentID, scene.RegionInfo.RegionID);
+                                try
+                                {
+                                    v.VoiceService?.ProvisionVoiceAccountRequest(v, vreq, agentID, v.RegionId);
+                                }
+                                catch (Exception ex)
+                                {
+                                    m_log.Warn($"{LogHeader} Voice logout failed: {ex.Message}");
+                                }
                             }
                         }
 
@@ -486,8 +493,23 @@ namespace osWebRtcVoice
                     OSDMap logoutresp = null;
                     if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                     {
-                        VoiceViewerSession.RemoveViewerSession(viewerSessionId);
-                        logoutresp = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, map, agentID, scene.RegionInfo.RegionID);
+                        if (!SessionMatches(vSession, agentID, scene.RegionInfo.RegionID))
+                        {
+                            m_log.Warn($"{LogHeader} Rejected logout for a viewer session owned by another agent or region");
+                        }
+                        else
+                        {
+                            VoiceViewerSession.RemoveViewerSession(viewerSessionId);
+                            try
+                            {
+                                logoutresp = vSession.VoiceService?.ProvisionVoiceAccountRequest(
+                                    vSession, map, agentID, scene.RegionInfo.RegionID);
+                            }
+                            catch (Exception ex)
+                            {
+                                m_log.Warn($"{LogHeader} Voice logout failed: {ex.Message}");
+                            }
+                        }
                     }
                     logoutresp ??= new OSDMap() {
                         { "response", "error" },
@@ -501,7 +523,13 @@ namespace osWebRtcVoice
                 // request has a viewer session. Use that to find the voice service
                 if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                 {
-                    CleanupDuplicateSessions(agentID, scene.RegionInfo.RegionID, viewerSessionId);
+                    if (SessionMatches(vSession, agentID, scene.RegionInfo.RegionID))
+                        CleanupDuplicateSessions(agentID, scene.RegionInfo.RegionID, viewerSessionId);
+                    else
+                    {
+                        m_log.Warn($"{LogHeader} Rejected provisioning for a viewer session owned by another agent or region");
+                        vSession = null;
+                    }
                 }
             }
             else
@@ -630,7 +658,15 @@ namespace osWebRtcVoice
             OSDMap resp = null;
             if (vSession is not null)
             {
-                resp = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, map, agentID, scene.RegionInfo.RegionID);
+                try
+                {
+                    resp = vSession.VoiceService?.ProvisionVoiceAccountRequest(
+                        vSession, map, agentID, scene.RegionInfo.RegionID);
+                }
+                catch (Exception ex)
+                {
+                    m_log.Warn($"{LogHeader} Voice provisioning failed: {ex.Message}");
+                }
             }
 
             if (resp is null)
@@ -682,7 +718,20 @@ namespace osWebRtcVoice
                 // request has a viewer session. Use that to find the voice service
                 if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out IVoiceViewerSession vSession))
                 {
-                    resp = vSession.VoiceService.VoiceSignalingRequest(vSession, map, agentID, scene.RegionInfo.RegionID);
+                    if (SessionMatches(vSession, agentID, scene.RegionInfo.RegionID))
+                    {
+                        try
+                        {
+                            resp = vSession.VoiceService?.VoiceSignalingRequest(
+                                vSession, map, agentID, scene.RegionInfo.RegionID);
+                        }
+                        catch (Exception ex)
+                        {
+                            m_log.Warn($"{LogHeader} Voice signaling failed: {ex.Message}");
+                        }
+                    }
+                    else
+                        m_log.Warn($"{LogHeader} Rejected signaling for a viewer session owned by another agent or region");
                 }
                 else
                 {
@@ -701,6 +750,11 @@ namespace osWebRtcVoice
             response.RawBuffer = llsdUndefAnswerBytes;
             response.StatusCode = (int)HttpStatusCode.OK;
             return;
+        }
+
+        private static bool SessionMatches(IVoiceViewerSession session, UUID agentID, UUID regionID)
+        {
+            return session != null && session.AgentId == agentID && session.RegionId == regionID;
         }
 
         /// <summary>

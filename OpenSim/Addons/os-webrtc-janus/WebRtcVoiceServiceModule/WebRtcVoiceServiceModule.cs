@@ -170,7 +170,7 @@ namespace osWebRtcVoice
         // IWebRtcVoiceService.ProvisionVoiceAccountRequest
         public OSDMap ProvisionVoiceAccountRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
-            if (!m_Enabled || pRequest == null)
+            if (!m_Enabled || pRequest == null || pUserID == UUID.Zero || pSceneID == UUID.Zero)
                 return ErrorResponse("Voice service is unavailable");
 
             IVoiceViewerSession vSession = null;
@@ -195,7 +195,14 @@ namespace osWebRtcVoice
                                 vreq["viewer_session"] = v.ViewerSessionID;
 
                                 VoiceViewerSession.RemoveViewerSession(v.ViewerSessionID);
-                                v.VoiceService.ProvisionVoiceAccountRequest(v, vreq , pUserID, pSceneID);
+                                try
+                                {
+                                    v.VoiceService?.ProvisionVoiceAccountRequest(v, vreq, pUserID, v.RegionId);
+                                }
+                                catch (Exception ex)
+                                {
+                                    m_log.Warn($"{LogHeader} Voice logout failed: {ex.Message}");
+                                }
                             }
                         }
 
@@ -211,7 +218,15 @@ namespace osWebRtcVoice
                             return ErrorResponse("Logout session not found");
                         }
                         VoiceViewerSession.RemoveViewerSession(viewerSessionId);
-                        resp = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
+                        try
+                        {
+                            resp = vSession.VoiceService?.ProvisionVoiceAccountRequest(
+                                vSession, pRequest, pUserID, pSceneID);
+                        }
+                        catch (Exception ex)
+                        {
+                            m_log.Warn($"{LogHeader} Voice logout failed: {ex.Message}");
+                        }
                     }
                     return resp ?? new OSDMap() {
                         { "response", "error" },
@@ -240,7 +255,7 @@ namespace osWebRtcVoice
                     if (channelType == "local")
                     {
                         // TODO: check if this userId is making a new session (case that user is reconnecting)
-                        vSession = m_spatialVoiceService.CreateViewerSession(pRequest, pUserID, pSceneID);
+                        vSession = CreateViewerSessionSafely(m_spatialVoiceService, pRequest, pUserID, pSceneID);
                         if(vSession != null)
                         {
                             if(pRequest.TryGetInt("parcel_local_id", out int parcelID))
@@ -253,7 +268,7 @@ namespace osWebRtcVoice
                     else
                     {
                         // TODO: check if this userId is making a new session (case that user is reconnecting)
-                        vSession = m_nonSpatialVoiceService.CreateViewerSession(pRequest, pUserID, pSceneID);
+                        vSession = CreateViewerSessionSafely(m_nonSpatialVoiceService, pRequest, pUserID, pSceneID);
                         if(vSession != null) VoiceViewerSession.AddViewerSession(vSession);
                     }
                 }
@@ -263,7 +278,14 @@ namespace osWebRtcVoice
 
             if (vSession is not null)
             {
-                response = vSession.VoiceService.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
+                try
+                {
+                    response = vSession.VoiceService?.ProvisionVoiceAccountRequest(vSession, pRequest, pUserID, pSceneID);
+                }
+                catch (Exception ex)
+                {
+                    m_log.Warn($"{LogHeader} Voice provisioning failed: {ex.Message}");
+                }
             }
 
             if (response is null)
@@ -281,7 +303,7 @@ namespace osWebRtcVoice
         // IWebRtcVoiceService.VoiceSignalingRequest
         public OSDMap VoiceSignalingRequest(OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
-            if (!m_Enabled || pRequest == null)
+            if (!m_Enabled || pRequest == null || pUserID == UUID.Zero || pSceneID == UUID.Zero)
                 return ErrorResponse("Voice service is unavailable");
 
             OSDMap response = null;
@@ -292,7 +314,16 @@ namespace osWebRtcVoice
                 if (VoiceViewerSession.TryGetViewerSession(viewerSessionId, out vSession))
                 {
                     if (SessionMatches(vSession, pUserID, pSceneID))
-                        response = vSession.VoiceService.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
+                    {
+                        try
+                        {
+                            response = vSession.VoiceService?.VoiceSignalingRequest(vSession, pRequest, pUserID, pSceneID);
+                        }
+                        catch (Exception ex)
+                        {
+                            m_log.Warn($"{LogHeader} Voice signaling failed: {ex.Message}");
+                        }
+                    }
                     else
                         m_log.Warn($"{LogHeader} Rejected signaling for a viewer session owned by another agent or region");
                 }
@@ -305,7 +336,24 @@ namespace osWebRtcVoice
             {
                 m_log.Error($"{LogHeader} VoiceSignalingRequest: no viewer_session in request");
             }
-            return response;
+            return response ?? ErrorResponse("Voice session not found or signaling failed");
+        }
+
+        private static IVoiceViewerSession CreateViewerSessionSafely(
+            IWebRtcVoiceService service, OSDMap request, UUID userID, UUID sceneID)
+        {
+            if (service == null)
+                return null;
+
+            try
+            {
+                return service.CreateViewerSession(request, userID, sceneID);
+            }
+            catch (Exception ex)
+            {
+                m_log.Warn($"{LogHeader} Voice session creation failed: {ex.Message}");
+                return null;
+            }
         }
 
         private static bool SessionMatches(IVoiceViewerSession session, UUID userID, UUID sceneID)
@@ -322,21 +370,22 @@ namespace osWebRtcVoice
             };
         }
 
-        // This module should never be called with this signature
+        // Routing modules do not own backend viewer sessions. Fail closed if a
+        // misconfigured caller invokes a backend-only signature.
         public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
-            throw new NotImplementedException();
+            return ErrorResponse("Invalid voice service route");
         }
 
         // This module should never be called with this signature
         public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
-            throw new NotImplementedException();
+            return ErrorResponse("Invalid voice service route");
         }
 
         public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pSceneID)
         {
-            throw new NotImplementedException();
+            return null;
         }
     }
 }
