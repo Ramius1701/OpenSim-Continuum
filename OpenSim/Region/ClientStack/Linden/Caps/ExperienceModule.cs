@@ -329,59 +329,49 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void HandleDeleteExperiencePreferences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
         {
-            byte[] response_bytes = new byte[0];
-
             string[] split = request.Url.ToString().Split(new[] { request.UriPath.ToString() }, StringSplitOptions.None);
-
-            if (split.Length == 2)
+            if (split.Length != 2)
             {
-                string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
-
-                if (!UUID.TryParse(key_str, out UUID experience_id))
-                {
-                    response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    return;
-                }
-
-                ForgetExperiencePermissions(agentID, experience_id);
-
-                string response_str = "<llsd><map><key>blocked</key><undef /><key>experiences</key><undef /></map></llsd>";
-
-                response_bytes = Encoding.UTF8.GetBytes(response_str);
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
             }
 
-            response.RawBuffer = response_bytes;
+            string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
+
+            if (!UUID.TryParse(key_str, out UUID experience_id) || experience_id == UUID.Zero)
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            if (!ForgetExperiencePermissions(agentID, experience_id))
+            {
+                response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
+
+            WriteExperiencePreferences(response, experience_id, ExperiencePermission.None);
             response.StatusCode = (int)HttpStatusCode.OK;
         }
 
         private void HandleGetExperiencePreferences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
         {
-            byte[] response_bytes = new byte[0];
-
             string[] split = request.Url.ToString().Split(new[] { request.UriPath.ToString() }, StringSplitOptions.None);
-
-            if (split.Length == 2)
+            if (split.Length != 2)
             {
-                string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
-
-                if (!UUID.TryParse(key_str, out UUID experience_id))
-                {
-                    response.StatusCode = (int)HttpStatusCode.BadRequest;
-                    return;
-                }
-
-                ExperiencePermission experiencePermission = GetExperiencePermission(agentID, experience_id);
-
-                string response_str = "<llsd><map><key>blocked</key><array>" +
-                    (experiencePermission == ExperiencePermission.Blocked ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                    "</array><key>experiences</key><array>" +
-                    (experiencePermission == ExperiencePermission.Allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                    "</array></map></llsd>";
-
-                response_bytes = Encoding.UTF8.GetBytes(response_str);
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
             }
 
-            response.RawBuffer = response_bytes;
+            string key_str = split[1].StartsWith("?") ? split[1].Remove(0, 1) : split[1];
+
+            if (!UUID.TryParse(key_str, out UUID experience_id) || experience_id == UUID.Zero)
+            {
+                response.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+
+            WriteExperiencePreferences(response, experience_id, GetExperiencePermission(agentID, experience_id));
             response.StatusCode = (int)HttpStatusCode.OK;
         }
 
@@ -408,8 +398,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 response.StatusCode = (int)HttpStatusCode.BadRequest;
                 return;
             }
-
-            byte[] response_bytes = new byte[0];
 
             if (map.Keys.Count != 1)
             {
@@ -440,16 +428,30 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
             }
 
-            string response_str = "<llsd><map><key>blocked</key><array>" +
-                (!allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                "</array><key>experiences</key><array>" +
-                (allowed ? string.Format("<uuid>{0}</uuid>", experience_id) : "<undef />") +
-                "</array></map></llsd>";
-
-            response_bytes = Encoding.UTF8.GetBytes(response_str);
-
-            response.RawBuffer = response_bytes;
+            WriteExperiencePreferences(
+                response,
+                experience_id,
+                allowed ? ExperiencePermission.Allowed : ExperiencePermission.Blocked);
             response.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private static void WriteExperiencePreferences(
+            IOSHttpResponse response, UUID experienceID, ExperiencePermission permission)
+        {
+            OSDArray blocked = new();
+            OSDArray allowed = new();
+            if (permission == ExperiencePermission.Blocked)
+                blocked.Add(experienceID);
+            else if (permission == ExperiencePermission.Allowed)
+                allowed.Add(experienceID);
+
+            OSDMap result = new()
+            {
+                ["blocked"] = blocked,
+                ["experiences"] = allowed
+            };
+            response.ContentType = "application/llsd+xml";
+            response.RawBuffer = OSDParser.SerializeLLSDXmlBytes(result);
         }
 
         private static byte[] ReadBoundedCapsBody(IOSHttpRequest request)
@@ -477,6 +479,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public bool SetExperiencePermissions(UUID avatar_id, UUID experience_id, bool allow)
         {
+            if (avatar_id == UUID.Zero || experience_id == UUID.Zero)
+                return false;
+
             bool updated = m_ExperienceService.UpdateExperiencePermissions(avatar_id, experience_id, allow ? ExperiencePermission.Allowed : ExperiencePermission.Blocked);
             if(updated)
             {
@@ -504,6 +509,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public bool ForgetExperiencePermissions(UUID avatar_id, UUID experience_id)
         {
+            if (avatar_id == UUID.Zero || experience_id == UUID.Zero)
+                return false;
+
             bool updated = m_ExperienceService.UpdateExperiencePermissions(
                 avatar_id, experience_id, ExperiencePermission.None);
             if (updated)

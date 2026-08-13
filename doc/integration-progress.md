@@ -105,6 +105,11 @@ abandoned upload URLs on retry, and unregister every pending URL when the region
 module is removed. Remote moderation requests require a nonzero moderator identity;
 direct Robust console moderation remains available as the auditable console actor.
 
+Experience preference CAPS now return valid empty LLSD arrays rather than arrays
+containing undefined values. Permission removal reports a service failure instead
+of claiming success when Robust rejected it, and zero avatar/Experience identities
+are rejected before persistence.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.
