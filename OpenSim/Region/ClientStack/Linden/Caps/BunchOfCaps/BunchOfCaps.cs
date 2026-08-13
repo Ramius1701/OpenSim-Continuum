@@ -548,24 +548,35 @@ namespace OpenSim.Region.ClientStack.Linden
                         cost = baseCost;
                     }
 
-                    if (cost > 0 && mm != null)
+                    if (cost > 0)
                     {
-                        // check for test upload
-
-                        if (ConfigOptions.ForceFreeTestUpload) // all are test
+                        if (ConfigOptions.ForceFreeTestUpload)
                         {
-                            if (!(assetName.Length > 5 && assetName.StartsWith("TEST-"))) // has normal name lets change it
+                            if (!(assetName.Length > 5 && assetName.StartsWith("TEST-")))
                                 assetName = "TEST-" + assetName;
-
                             IsAtestUpload = true;
                         }
-
-                        else if (ConfigOptions.enableFreeTestUpload) // only if prefixed with "TEST-"
+                        else if (ConfigOptions.enableFreeTestUpload)
                         {
-
-                            IsAtestUpload = (assetName.Length > 5 && assetName.StartsWith("TEST-"));
+                            IsAtestUpload = assetName.Length > 5 && assetName.StartsWith("TEST-");
                         }
+                    }
 
+                    if (cost > 0 && !IsAtestUpload && mm == null)
+                    {
+                        LLSDAssetUploadError resperror = new LLSDAssetUploadError();
+                        resperror.message = "Economy service is unavailable";
+                        resperror.identifier = UUID.Zero;
+
+                        LLSDAssetUploadResponse errorResponse = new LLSDAssetUploadResponse();
+                        errorResponse.uploader = "";
+                        errorResponse.state = "error";
+                        errorResponse.error = resperror;
+                        return errorResponse;
+                    }
+
+                    if (cost > 0 && mm != null)
+                    {
                         if(IsAtestUpload) // let user know, still showing cost estimation
                             warning += "Upload will have no cost, for testing purposes only. Other uses are prohibited. Items will be local to region only, Inventory entry will be lost on logout";
 
@@ -688,7 +699,12 @@ namespace OpenSim.Region.ClientStack.Linden
             string creatorIDstr = creatorID.ToString();
 
             IMoneyModule mm = m_Scene.RequestModuleInterface<IMoneyModule>();
-            if (mm != null)
+            if (cost > 0 && !istest && mm == null)
+            {
+                error = "Economy service is unavailable.";
+                return;
+            }
+            if (cost > 0 && !istest && mm != null)
             {
                 // make sure client still has enougth credit
                 if (!mm.UploadCovered(m_HostCapsObj.AgentID, (int)cost))

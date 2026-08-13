@@ -772,6 +772,14 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             if (!exists)
             {
                 money = s.RequestModuleInterface<IMoneyModule>();
+                if (queryclassifiedPrice > 0 && money is null)
+                {
+                    remoteClient.SendAgentAlertMessage(
+                        "Unable to create this paid classified because the economy service is unavailable.", false);
+                    if(uce is not null && uce.classifiedsLists is not null)
+                        remoteClient.SendAvatarClassifiedReply(remoteClient.AgentId, uce.classifiedsLists);
+                    return;
+                }
                 if (money is not null)
                 {
                     if (!money.AmountCovered(remoteClient.AgentId, queryclassifiedPrice))
