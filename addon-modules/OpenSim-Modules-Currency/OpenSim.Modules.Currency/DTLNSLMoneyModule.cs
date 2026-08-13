@@ -955,6 +955,16 @@ namespace OpenSim.Modules.Currency
                 {
                     landBuyEvent.transactionID = Util.UnixTimeSinceEpoch();
 
+                    if (landBuyEvent.parcelPrice == 0)
+                    {
+                        landBuyEvent.amountDebited = 0;
+                        return;
+                    }
+
+                    // The earlier balance check is not a debit reservation.
+                    // Fail closed unless the authoritative transfer succeeds.
+                    landBuyEvent.economyValidated = false;
+
                     ulong parcelID = (ulong)landBuyEvent.parcelLocalID;
                     UUID regionUUID = UUID.Zero;
                     if (sender is Scene) regionUUID = ((Scene)sender).RegionInfo.RegionID;
@@ -963,6 +973,7 @@ namespace OpenSim.Modules.Currency
                                       landBuyEvent.parcelPrice, (int)TransactionType.LandSale, regionUUID, parcelID, regionUUID, "Land Purchase"))
                     {
                         landBuyEvent.amountDebited = landBuyEvent.parcelPrice;
+                        landBuyEvent.economyValidated = true;
                     }
                 }
             }
@@ -982,11 +993,16 @@ namespace OpenSim.Modules.Currency
         /// <param name="salePrice">The sale price.</param>
         public void OnObjectBuy(IClientAPI remoteClient, UUID agentID, UUID sessionID, UUID groupID, UUID categoryID, uint localID, byte saleType, int salePrice)
         {
-            m_log.InfoFormat("[MONEY MODULE]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
-
             // Handle the parameters error.
             if (!m_sellEnabled) return;
-            if (remoteClient == null || salePrice < 0) return;
+            if (remoteClient == null || remoteClient.AgentId != agentID
+                || remoteClient.SessionId != sessionID || salePrice < 0)
+            {
+                m_log.WarnFormat("[MONEY MODULE]: Rejected invalid object-buy identity or price for agent {0}", agentID);
+                return;
+            }
+
+            m_log.InfoFormat("[MONEY MODULE]: OnObjectBuy: agent = {0}, {1}", agentID, remoteClient.AgentId);
 
             // Get the balance from money server.
             int balance = QueryBalanceFromMoneyServer(remoteClient);
