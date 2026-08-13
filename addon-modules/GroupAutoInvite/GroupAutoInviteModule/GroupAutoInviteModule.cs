@@ -46,6 +46,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         private readonly ConcurrentDictionary<UUID, byte> m_invitedThisSession = new ConcurrentDictionary<UUID, byte>();
         private readonly ConcurrentDictionary<UUID, Timer> m_pendingInvites = new ConcurrentDictionary<UUID, Timer>();
+        private readonly object m_lifecycleSync = new object();
 
         private Scene m_scene;
         private IGroupsModule m_groupsModule;
@@ -80,12 +81,23 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         public void AddRegion(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
-            m_scene = scene;
-            m_scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            m_scene.EventManager.OnClientClosed += OnClientClosed;
+            lock (m_lifecycleSync)
+            {
+                if (!m_enabled || ReferenceEquals(m_scene, scene))
+                    return;
+                if (m_scene != null)
+                {
+                    m_log.Error("[GROUP AUTO INVITE]: AddRegion called for a second region on a non-shared module instance; request ignored.");
+                    return;
+                }
+
+                m_scene = scene;
+                scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+                scene.EventManager.OnClientClosed += OnClientClosed;
+            }
         }
 
         public void RemoveRegion(Scene scene)
@@ -93,38 +105,52 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
             if (!m_enabled || scene == null)
                 return;
 
-            scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-            scene.EventManager.OnClientClosed -= OnClientClosed;
-            CancelPendingInvites();
-            m_invitedThisSession.Clear();
-            m_groupsModule = null;
-            if (ReferenceEquals(m_scene, scene))
+            lock (m_lifecycleSync)
+            {
+                if (!ReferenceEquals(m_scene, scene))
+                    return;
+
+                scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                scene.EventManager.OnClientClosed -= OnClientClosed;
+                CancelPendingInvites();
+                m_invitedThisSession.Clear();
+                m_groupsModule = null;
                 m_scene = null;
+            }
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
-            m_groupsModule = scene.RequestModuleInterface<IGroupsModule>();
+            lock (m_lifecycleSync)
+            {
+                if (!m_enabled || !ReferenceEquals(m_scene, scene))
+                    return;
+                m_groupsModule = scene.RequestModuleInterface<IGroupsModule>();
+            }
             if (m_groupsModule == null)
                 m_log.WarnFormat("[GROUP AUTO INVITE]: Groups module is not available in {0}.", scene.RegionInfo.RegionName);
         }
 
         public void Close()
         {
-            Scene scene = m_scene;
-            if (scene != null)
+            lock (m_lifecycleSync)
             {
-                scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
-                scene.EventManager.OnClientClosed -= OnClientClosed;
-            }
+                m_enabled = false;
+                Scene scene = m_scene;
+                if (scene != null)
+                {
+                    scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
+                    scene.EventManager.OnClientClosed -= OnClientClosed;
+                }
 
-            CancelPendingInvites();
-            m_invitedThisSession.Clear();
-            m_groupsModule = null;
-            m_scene = null;
+                CancelPendingInvites();
+                m_invitedThisSession.Clear();
+                m_groupsModule = null;
+                m_scene = null;
+            }
         }
 
         private void OnMakeRootAgent(ScenePresence sp)
@@ -176,6 +202,9 @@ namespace OpenSim.Region.OptionalModules.Avatar.GroupAutoInvite
 
         private void TryInvite(UUID agentID)
         {
+            if (!m_enabled)
+                return;
+
             Scene scene = m_scene;
             if (scene == null)
                 return;
