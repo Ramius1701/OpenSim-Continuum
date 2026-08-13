@@ -326,28 +326,34 @@ namespace OpenSim.Modules.ContinuumEconomy
 
             if (scene == null) return;
 
-            scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
-
             lock (m_sceneList)
             {
-                if (m_sceneList.ContainsKey(scene.RegionInfo.RegionHandle))
+                if (!m_enabled)
+                    return;
+
+                if (m_sceneList.TryGetValue(scene.RegionInfo.RegionHandle, out Scene activeScene))
                 {
-                    m_sceneList[scene.RegionInfo.RegionHandle] = scene;
+                    if (ReferenceEquals(activeScene, scene))
+                        return;
+
+                    m_log.ErrorFormat(
+                        "[CONTINUUM ECONOMY MODULE]: Region handle {0} already has an active scene instance; replacement attachment ignored",
+                        scene.RegionInfo.RegionHandle);
+                    return;
                 }
-                else
-                {
-                    m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
-                }
+
+                scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
+                m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
+
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+                scene.EventManager.OnMakeChildAgent += MakeChildAgent;
+
+                // for OpenSim
+                scene.EventManager.OnMoneyTransfer += MoneyTransferAction;
+                scene.EventManager.OnValidateLandBuy += ValidateLandBuy;
+                scene.EventManager.OnLandBuy += processLandBuy;
             }
-
-            scene.EventManager.OnNewClient += OnNewClient;
-            scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
-            scene.EventManager.OnMakeChildAgent += MakeChildAgent;
-
-            // for OpenSim
-            scene.EventManager.OnMoneyTransfer += MoneyTransferAction;
-            scene.EventManager.OnValidateLandBuy += ValidateLandBuy;
-            scene.EventManager.OnLandBuy += processLandBuy;
 
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: AddRegion: {0}", scene.RegionInfo.RegionName);
 
@@ -364,8 +370,19 @@ namespace OpenSim.Modules.ContinuumEconomy
             if (!m_enabled) return;
             if (scene == null) return;
 
+            DetachRegion(scene);
+        }
+
+        private void DetachRegion(Scene scene)
+        {
             lock (m_sceneList)
             {
+                if (!m_sceneList.TryGetValue(scene.RegionInfo.RegionHandle, out Scene activeScene)
+                    || !ReferenceEquals(activeScene, scene))
+                {
+                    return;
+                }
+
                 scene.EventManager.OnNewClient -= OnNewClient;
                 scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
                 scene.EventManager.OnMakeChildAgent -= MakeChildAgent;
@@ -374,6 +391,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 scene.EventManager.OnMoneyTransfer -= MoneyTransferAction;
                 scene.EventManager.OnValidateLandBuy -= ValidateLandBuy;
                 scene.EventManager.OnLandBuy -= processLandBuy;
+                scene.ForEachClient(UnsubscribeClient);
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
                 scene.UnregisterModuleInterface<IMoneyModule>(this);
@@ -453,10 +471,13 @@ namespace OpenSim.Modules.ContinuumEconomy
         {
             Scene[] scenes;
             lock (m_sceneList)
+            {
+                m_enabled = false;
                 scenes = new List<Scene>(m_sceneList.Values).ToArray();
+            }
 
             foreach (Scene scene in scenes)
-                RemoveRegion(scene);
+                DetachRegion(scene);
         }
 
         /// <summary>Objects the give money.</summary>
@@ -773,6 +794,18 @@ namespace OpenSim.Modules.ContinuumEconomy
             client.OnObjectBuy += OnObjectBuy;
 
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnNewClient: {0}", client.AgentId);
+        }
+
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            if (client == null)
+                return;
+
+            client.OnEconomyDataRequest -= OnEconomyDataRequest;
+            client.OnLogout -= ClientClosed;
+            client.OnMoneyBalanceRequest -= OnMoneyBalanceRequest;
+            client.OnRequestPayPrice -= OnRequestPayPrice;
+            client.OnObjectBuy -= OnObjectBuy;
         }
 
 

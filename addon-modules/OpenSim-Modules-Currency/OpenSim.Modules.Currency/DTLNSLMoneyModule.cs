@@ -411,6 +411,7 @@ namespace OpenSim.Modules.Currency
                 scene.EventManager.OnMoneyTransfer -= MoneyTransferAction;
                 scene.EventManager.OnValidateLandBuy -= ValidateLandBuy;
                 scene.EventManager.OnLandBuy -= processLandBuy;
+                scene.ForEachClient(UnsubscribeClient);
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
                 scene.UnregisterModuleInterface<IMoneyModule>(this);
@@ -795,6 +796,18 @@ namespace OpenSim.Modules.Currency
             client.OnObjectBuy += OnObjectBuy;
 
             m_log.InfoFormat("[MONEY MODULE] OnNewClient: {0}", client.AgentId);
+        }
+
+        private void UnsubscribeClient(IClientAPI client)
+        {
+            if (client == null)
+                return;
+
+            client.OnEconomyDataRequest -= OnEconomyDataRequest;
+            client.OnLogout -= ClientClosed;
+            client.OnMoneyBalanceRequest -= OnMoneyBalanceRequest;
+            client.OnRequestPayPrice -= OnRequestPayPrice;
+            client.OnObjectBuy -= OnObjectBuy;
         }
 
 
