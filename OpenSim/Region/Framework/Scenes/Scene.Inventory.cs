@@ -122,8 +122,10 @@ namespace OpenSim.Region.Framework.Scenes
                 return;
             }
 
-            money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
-            AddInventoryItem(item);
+            // Legacy money modules cannot reserve a fee. Never debit before
+            // knowing that the inventory delivery succeeded.
+            if (AddInventoryItem(item))
+                money?.ApplyUploadCharge(agentID, (int)cost, "Asset upload");
         }
 
         public bool AddInventoryItemReturned(UUID AgentId, InventoryItemBase item)

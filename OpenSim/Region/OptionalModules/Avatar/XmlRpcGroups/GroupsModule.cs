@@ -1049,8 +1049,6 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
                         return UUID.Zero;
                     }
                 }
-                else
-                    money.ApplyCharge(GetRequestingAgentID(remoteClient), money.GroupCreationCharge, MoneyTransactionType.GroupCreate, name);
             }
             UUID groupID = m_groupData.CreateGroup(GetRequestingAgentID(remoteClient), name, charter, showInList, insigniaID, membershipFee, openEnrollment, allowPublish, maturePublish, GetRequestingAgentID(remoteClient));
 
@@ -1061,10 +1059,15 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
                 remoteClient.SendCreateGroupReply(UUID.Zero, false, "The group service could not create the group.");
                 return UUID.Zero;
             }
-            if (reservedMoney != null && chargeReservation != UUID.Zero &&
-                !reservedMoney.CaptureCharge(chargeReservation, remoteClient.AgentId))
-                m_log.ErrorFormat("[GROUPS]: Group {0} was created but fee reservation {1} requires reconciliation",
-                    groupID, chargeReservation);
+            if (reservedMoney != null && chargeReservation != UUID.Zero)
+            {
+                if (!reservedMoney.CaptureCharge(chargeReservation, remoteClient.AgentId))
+                    m_log.ErrorFormat("[GROUPS]: Group {0} was created but fee reservation {1} requires reconciliation",
+                        groupID, chargeReservation);
+            }
+            else if (money != null && money.GroupCreationCharge > 0)
+                money.ApplyCharge(GetRequestingAgentID(remoteClient), money.GroupCreationCharge,
+                    MoneyTransactionType.GroupCreate, name);
 
             remoteClient.SendCreateGroupReply(groupID, true, "Group created successfully");
 
