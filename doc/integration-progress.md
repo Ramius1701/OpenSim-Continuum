@@ -110,6 +110,11 @@ containing undefined values. Permission removal reports a service failure instea
 of claiming success when Robust rejected it, and zero avatar/Experience identities
 are rejected before persistence.
 
+Experience script permission requests now distinguish an explicitly blocked
+resident from an undecided resident, reject missing Experience records without a
+null dereference, correlate viewer replies to both object and script item, persist
+denials, and grant local script permissions only after Robust confirms persistence.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.

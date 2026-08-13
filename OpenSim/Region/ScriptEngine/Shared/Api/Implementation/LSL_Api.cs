@@ -20421,6 +20421,16 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                 ExperienceInfo experienceInfo = World.ExperienceModule.GetExperienceInfo(experience_key);
 
+                if (experienceInfo == null)
+                {
+                    m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                            "experience_permissions_denied", new Object[] {
+                                    new LSL_Key(agentID.ToString()),
+                                    new LSL_Integer(ScriptBaseClass.XP_ERROR_INVALID_EXPERIENCE)},
+                                            new DetectParams[0]));
+                    return;
+                }
+
                 if ((experienceInfo.properties & (int)ExperienceFlags.Disabled) != 0)
                 {
                     m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
@@ -20469,7 +20479,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                                             new DetectParams[0]));
                     return;
                 }
-                else if (experiencePermission == ExperiencePermission.Allowed)
+                else if (experiencePermission == ExperiencePermission.Blocked)
                 {
                     m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
                             "experience_permissions_denied", new Object[] {
@@ -20501,7 +20511,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         void handleScriptExperienceAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
         {
-            if (taskID != m_host.UUID)
+            if (taskID != m_host.UUID || itemID != m_item.ItemID)
                 return;
 
             client.OnScriptAnswer -= handleScriptExperienceAnswer;
@@ -20518,7 +20528,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 m_log.InfoFormat("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
 
-                World.ExperienceModule.SetExperiencePermission(client.AgentId, m_item.ExperienceID, ExperiencePermission.Allowed);
+                IExperienceModule experienceModule = World.ExperienceModule;
+                if (experienceModule == null || !experienceModule.SetExperiencePermission(
+                    client.AgentId, m_item.ExperienceID, ExperiencePermission.Allowed))
+                {
+                    m_host.TaskInventory[m_item.ItemID].PermsMask = 0;
+                    m_host.TaskInventory[m_item.ItemID].PermsGranter = UUID.Zero;
+                    m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                        "experience_permissions_denied", new Object[] {
+                            new LSL_Key(client.AgentId.ToString()),
+                            new LSL_Integer(ScriptBaseClass.XP_ERROR_RETRY_UPDATE)},
+                        new DetectParams[0]));
+                    m_host.TaskInventory.LockItemsForWrite(false);
+                    return;
+                }
+
                 SendExperienceEvent(ExperienceEvent.Permissions);
 
                 m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
@@ -20531,6 +20555,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
             else
             {
+                IExperienceModule experienceModule = World.ExperienceModule;
+                if (experienceModule == null || !experienceModule.SetExperiencePermission(
+                    client.AgentId, m_item.ExperienceID, ExperiencePermission.Blocked))
+                    m_log.WarnFormat(
+                        "[EXPERIENCE] Unable to persist permission denial by {0} for {1}",
+                        client.AgentId, m_item.ExperienceID);
                 m_host.TaskInventory[m_item.ItemID].PermsMask = 0;
                 m_host.TaskInventory[m_item.ItemID].PermsGranter = UUID.Zero;
 
