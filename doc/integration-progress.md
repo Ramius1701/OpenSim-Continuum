@@ -100,6 +100,11 @@ account service on a bounded configurable interval. A simulator broadcasts a
 viewer update only when the stored display name or change timestamp differs,
 closing the cross-simulator stale-nameplate gap without grid-wide chat notices.
 
+Abuse Reports retain only one pending screenshot uploader per resident, replace
+abandoned upload URLs on retry, and unregister every pending URL when the region
+module is removed. Remote moderation requests require a nonzero moderator identity;
+direct Robust console moderation remains available as the auditable console actor.
+
 1. Build from this isolated candidate checkout or a fresh clone of the branch;
    do not mix its binaries into an older OpenSim build directory.
 2. Certify clean and upgrade migrations on every supported database.

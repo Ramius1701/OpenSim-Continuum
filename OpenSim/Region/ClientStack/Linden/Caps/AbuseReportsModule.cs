@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Text;
+using System.Collections.Generic;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -28,6 +29,9 @@ namespace OpenSim.Region.ClientStack.Linden
         private IUserManagement m_UserManager;
         private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
         private int m_MaxReportRequestBytes = 128 * 1024;
+        private readonly object m_UploadersLock = new object();
+        private readonly Dictionary<string, IHttpServer> m_PendingUploaders = new Dictionary<string, IHttpServer>();
+        private readonly Dictionary<UUID, string> m_AgentUploaders = new Dictionary<UUID, string>();
 
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
@@ -106,6 +110,20 @@ namespace OpenSim.Region.ClientStack.Linden
                 m_Connector = null;
                 m_UserManager = null;
             }
+
+            KeyValuePair<string, IHttpServer>[] uploaders;
+            lock (m_UploadersLock)
+            {
+                uploaders = new KeyValuePair<string, IHttpServer>[m_PendingUploaders.Count];
+                int index = 0;
+                foreach (KeyValuePair<string, IHttpServer> uploader in m_PendingUploaders)
+                    uploaders[index++] = uploader;
+                m_PendingUploaders.Clear();
+                m_AgentUploaders.Clear();
+            }
+
+            foreach (KeyValuePair<string, IHttpServer> uploader in uploaders)
+                uploader.Value.RemoveStreamHandler("POST", uploader.Key);
         }
 
         public void Close()
@@ -246,6 +264,13 @@ namespace OpenSim.Region.ClientStack.Linden
                     (data, uploadPath, uploadParam) =>
                     {
                         caps.HttpListener.RemoveStreamHandler("POST", uploadPath);
+                        lock (m_UploadersLock)
+                        {
+                            m_PendingUploaders.Remove(uploadPath);
+                            if (m_AgentUploaders.TryGetValue(caps.AgentID, out string agentPath) &&
+                                string.Equals(agentPath, uploadPath, StringComparison.Ordinal))
+                                m_AgentUploaders.Remove(caps.AgentID);
+                        }
 
                         OSDMap uploadResponse = new OSDMap();
                         try
@@ -295,7 +320,16 @@ namespace OpenSim.Region.ClientStack.Linden
                     "AbuseReportScreenshotUploader",
                     null);
 
-                caps.HttpListener.AddStreamHandler(uploader);
+                lock (m_UploadersLock)
+                {
+                    if (m_AgentUploaders.TryGetValue(caps.AgentID, out string previousPath) &&
+                        m_PendingUploaders.Remove(previousPath, out IHttpServer previousServer))
+                        previousServer.RemoveStreamHandler("POST", previousPath);
+
+                    caps.HttpListener.AddStreamHandler(uploader);
+                    m_PendingUploaders[uploader.Path] = caps.HttpListener;
+                    m_AgentUploaders[caps.AgentID] = uploader.Path;
+                }
 
                 OSDMap response = new OSDMap
                 {

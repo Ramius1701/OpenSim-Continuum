@@ -121,7 +121,7 @@ namespace OpenSim.Server.Handlers.AbuseReports
         private byte[] UpdateReport(Dictionary<string, object> request)
         {
             if (!TryGetInt(request, "report-id", -1, out int reportID) || reportID <= 0 ||
-                !TryGetUUID(request, "moderator-id", out UUID moderatorID))
+                !TryGetUUID(request, "moderator-id", out UUID moderatorID) || moderatorID == UUID.Zero)
             {
                 return FailureResult();
             }
