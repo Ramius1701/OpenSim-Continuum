@@ -128,11 +128,14 @@ public sealed class MarketplaceModule : ISharedRegionModule
 
     public void AddRegion(Scene scene)
     {
-        if (!m_enabled || scene.RegionInfo.RegionID != m_serviceRegionId)
+        if (!m_enabled || scene == null || scene.RegionInfo.RegionID != m_serviceRegionId)
             return;
 
         lock (m_sceneSync)
         {
+            if (!m_enabled)
+                return;
+
             if (m_serviceScene != null && !ReferenceEquals(m_serviceScene, scene))
                 throw new Exception("[OpenSimMarketplace] More than one scene matched ServiceRegionUUID.");
 
@@ -173,6 +176,9 @@ public sealed class MarketplaceModule : ISharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
+        if (scene == null)
+            return;
+
         lock (m_sceneSync)
         {
             if (ReferenceEquals(m_serviceScene, scene))
@@ -184,10 +190,10 @@ public sealed class MarketplaceModule : ISharedRegionModule
     {
         lock (m_sceneSync)
         {
+            m_enabled = false;
             m_serviceScene = null;
             UnregisterHandlers();
         }
-        m_inflight.Clear();
     }
 
     private void UnregisterHandlers()
@@ -456,7 +462,7 @@ public sealed class MarketplaceModule : ISharedRegionModule
     {
         Scene? scene;
         lock (m_sceneSync)
-            scene = m_serviceScene;
+            scene = m_enabled ? m_serviceScene : null;
         if (scene == null)
             Write(response, 503, new { ok = false, retryable = true, message = "Marketplace service region is unavailable." });
         return scene;
@@ -466,6 +472,14 @@ public sealed class MarketplaceModule : ISharedRegionModule
     {
         response.AddHeader("Cache-Control", "no-store");
         response.AddHeader("X-Content-Type-Options", "nosniff");
+        lock (m_sceneSync)
+        {
+            if (!m_enabled)
+            {
+                Write(response, 503, new { ok = false, retryable = true, message = "Marketplace service is shutting down." });
+                return false;
+            }
+        }
         if (!string.Equals(request.HttpMethod, "POST", StringComparison.OrdinalIgnoreCase))
         {
             response.AddHeader("Allow", "POST");
