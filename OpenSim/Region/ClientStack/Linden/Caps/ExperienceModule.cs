@@ -972,6 +972,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 x => (int)x.Flags == ACCESS_LIST_ALLOWED && x.AgentID == experience_id);
         }
 
+        public void RefreshExperiencePolicy()
+        {
+            m_scene.ForEachRootScenePresence(
+                presence => UpdateScriptExperiencePerms(presence, false));
+        }
+
         public string GetKeyValue(UUID experience, string key)
         {
             return m_ExperienceService.GetKeyValue(experience, key);

@@ -35,6 +35,7 @@ using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Interfaces;
 
 using OpenMetaverse;
 using log4net;
@@ -115,7 +116,10 @@ namespace OpenSim.Region.CoreModules.World.Estate
             foreach (Scene s in m_EstateModule.Scenes)
             {
                 if (s.RegionInfo.EstateSettings.EstateID == EstateID)
+                {
                     s.ReloadEstateData();
+                    s.RequestModuleInterface<IExperienceModule>()?.RefreshExperiencePolicy();
+                }
             }
 
             SendToEstate(EstateID, sendData);

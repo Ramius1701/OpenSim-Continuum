@@ -281,7 +281,10 @@ namespace OpenSim.Region.CoreModules.World.Estate
             foreach (Scene s in m_EstateModule.Scenes)
             {
                 if (s.RegionInfo.EstateSettings.EstateID == (uint)EstateID)
+                {
                     s.ReloadEstateData();
+                    s.RequestModuleInterface<IExperienceModule>()?.RefreshExperiencePolicy();
+                }
             }
             return SuccessResult();
         }

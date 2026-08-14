@@ -35,6 +35,7 @@ namespace OpenSim.Region.Framework.Interfaces
 
         bool IsExperienceEnabled(UUID experience_id);
         bool IsExperienceAllowedAtCurrentParcel(UUID avatar_id, UUID experience_id);
+        void RefreshExperiencePolicy();
 
         string GetKeyValue(UUID experience, string key);
         string CreateKeyValue(UUID experience, string key, string value);
