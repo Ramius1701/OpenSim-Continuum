@@ -199,6 +199,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [OpenSimSearch and future grid directory donor-parity audit](doc/parity-search.md)
 - [RegionWeb, OpenSimWeather, and OpenSimTide donor-parity audit](doc/parity-regionweb-environment.md)
 - [User aliases, mute lists, and Groups donor-parity audit](doc/parity-social-services.md)
+- [OpenSimMarketplace and WebRTC/Janus voice donor-parity audit](doc/parity-marketplace-voice.md)
 - [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Current integration progress and release gates](doc/integration-progress.md)

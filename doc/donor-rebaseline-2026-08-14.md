@@ -76,8 +76,10 @@ carried forward by Tranquillity must not be ported a second time from Mobius.
 5. Search (see [`parity-search.md`](parity-search.md)); RegionWeb, Weather and
    Tide (see [`parity-regionweb-environment.md`](parity-regionweb-environment.md));
    Groups, aliases and mute list (see
-   [`parity-social-services.md`](parity-social-services.md)); Marketplace,
-   voice/WebRTC, rendering, physics, scripting and every recovered addon.
+   [`parity-social-services.md`](parity-social-services.md)); Marketplace and
+   voice/WebRTC (see
+   [`parity-marketplace-voice.md`](parity-marketplace-voice.md)); rendering,
+   physics, scripting and every recovered addon.
 6. Package a controlled OpenSim live-test candidate.
 7. Start the separate OpenSim-Grid-Interface and WhiteCore WebUI phase.
 
