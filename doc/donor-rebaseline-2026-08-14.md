@@ -96,3 +96,27 @@ route structure, navigation, permissions and visible workflows unless a specific
 security, licensing or current-platform incompatibility is documented. Embedded
 or generated HTML must not be overlooked. A newly invented website does not
 satisfy this requirement.
+
+### OpenSim-Grid-Interface gap-fill rule
+
+The local `S:\Github\OpenSim-Grid-Interface` repository is recorded at
+`ecb377d42b5a1f0ec7a969a65f48596c8e5dbe87` on `main`, under the MIT license.
+It is the secondary implementation donor used to complete unfinished or missing
+WhiteCore WebUI behavior. Its README's production-ready claim is donor metadata,
+not Continuum certification.
+
+For each portal capability:
+
+1. retain the WhiteCore WebUI implementation when it is complete and compatible;
+2. identify a concrete missing, stubbed or broken WhiteCore workflow;
+3. use the corresponding OpenSim-Grid-Interface implementation to fill that gap;
+4. present the result through the WhiteCore WebUI route, page structure and visual
+   workflow unless a documented compatibility requirement prevents it;
+5. avoid duplicate routes, account systems, admin pages and portal shells; and
+6. write new behavior only when neither donor provides a viable implementation.
+
+OpenSim-Grid-Interface is particularly relevant for current viewer/Robust
+endpoints, map tiles, search, avatar registration/picker, messaging, grid status,
+destinations, accounts and administration. Its PHP/MySQL assumptions, bundled
+dependencies, live-style configuration files, helper endpoints and security
+boundaries require audit before use. Gloebit and Podex remain out of scope.

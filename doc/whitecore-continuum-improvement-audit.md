@@ -521,3 +521,10 @@ under `WhiteCoreSim/bin/html`, and its `WebInterface` routing/page framework.
 OpenSim/Robust service adapters may replace incompatible WhiteCore backend
 architecture, but a newly designed replacement website is explicitly out of
 scope unless the user separately requests one.
+
+OpenSim-Grid-Interface at local checkpoint
+`ecb377d42b5a1f0ec7a969a65f48596c8e5dbe87` is the designated secondary donor
+for gaps in that WebUI. It contributes missing functionality into the WhiteCore
+portal rather than becoming a competing replacement shell. Every portal page and
+endpoint requires a WhiteCore-present / WhiteCore-incomplete / Grid-Interface
+gap-fill / genuinely-missing disposition before implementation.
