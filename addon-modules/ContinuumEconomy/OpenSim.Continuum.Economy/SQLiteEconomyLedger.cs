@@ -70,7 +70,9 @@ namespace OpenSim.Continuum.Economy
         {
             if (request == null || request.OperationID == Guid.Empty || request.AccountID == Guid.Empty ||
                 request.ActorID == Guid.Empty || request.Amount <= 0 || String.IsNullOrWhiteSpace(request.Reason) ||
-                request.Reason.Length > 255 || !Enum.IsDefined(request.Kind))
+                request.Reason.Length > 255 || !Enum.IsDefined(request.Kind) ||
+                request.MaximumBalance < 0 || request.DailyCreditLimit < 0 ||
+                request.WeeklyCreditLimit < 0 || request.MonthlyCreditLimit < 0)
                 return Adjustment(request?.OperationID ?? Guid.Empty, LedgerResultCode.InvalidRequest, 0, "Invalid adjustment request");
             string hash = Hash(String.Join("|", request.AccountID, request.ActorID, request.Amount,
                 (int)request.Kind, request.TransactionType, request.Reason, request.MaximumBalance,
@@ -87,14 +89,26 @@ namespace OpenSim.Continuum.Economy
                     failure = "Insufficient funds";
                 if (request.Kind == LedgerAdjustmentKind.Credit)
                 {
-                    if (request.MaximumBalance > 0 && balance + request.Amount > request.MaximumBalance) failure = "Maximum balance exceeded";
+                    if (request.MaximumBalance > 0 &&
+                        (balance > request.MaximumBalance || request.Amount > request.MaximumBalance - balance))
+                        failure = "Maximum balance exceeded";
                     DateTime now=DateTime.UtcNow, day=now.Date, week=now.Date.AddDays(-(((int)now.DayOfWeek+6)%7)), month=new(now.Year,now.Month,1,0,0,0,DateTimeKind.Utc);
                     if (failure.Length==0 && Exceeds(c,t,request.AccountID,request.TransactionType,day,request.DailyCreditLimit,request.Amount)) failure="Daily credit limit exceeded";
                     if (failure.Length==0 && Exceeds(c,t,request.AccountID,request.TransactionType,week,request.WeeklyCreditLimit,request.Amount)) failure="Weekly credit limit exceeded";
                     if (failure.Length==0 && Exceeds(c,t,request.AccountID,request.TransactionType,month,request.MonthlyCreditLimit,request.Amount)) failure="Monthly credit limit exceeded";
                 }
                 if (failure.Length != 0) status=2;
-                else { checked { balance += request.Kind==LedgerAdjustmentKind.Credit ? request.Amount : -request.Amount; } SetBalance(c,t,request.AccountID,balance); }
+                else
+                {
+                    try { checked { balance += request.Kind==LedgerAdjustmentKind.Credit ? request.Amount : -request.Amount; } }
+                    catch (OverflowException)
+                    {
+                        t.Rollback();
+                        return Adjustment(request.OperationID, LedgerResultCode.InvalidRequest, balance,
+                            "The adjustment exceeds the supported balance range");
+                    }
+                    SetBalance(c,t,request.AccountID,balance);
+                }
                 InsertAdjustment(c,t,request,hash,status,balance,failure); t.Commit();
                 return Adjustment(request.OperationID,status==1?LedgerResultCode.Committed:LedgerResultCode.InsufficientFunds,balance,status==1?"Adjustment committed":failure);
             }
