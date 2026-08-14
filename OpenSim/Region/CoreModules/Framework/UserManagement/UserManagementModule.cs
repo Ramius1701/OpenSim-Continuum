@@ -1298,7 +1298,15 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
 
         public bool RemoveUser(UUID uuid)
         {
-            return m_userCacheByID.Remove(uuid);
+            // User data is cached twice in grid mode: here and by the remote
+            // IUserAccountService connector.  Clearing only this cache simply
+            // repopulates it with the connector's stale account record.  That
+            // prevents mutable grid-wide fields (notably DisplayName and
+            // NameChanged) from propagating between simulators until the lower
+            // cache happens to expire.
+            bool removed = m_userCacheByID.Remove(uuid);
+            m_userAccountService?.InvalidateCache(uuid);
+            return removed;
         }
 
         #endregion
