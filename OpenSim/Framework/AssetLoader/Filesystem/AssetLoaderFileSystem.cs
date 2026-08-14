@@ -54,7 +54,8 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
             {
                 //m_log.InfoFormat("[ASSETS]: Loading: [{0}][{1}]", name, path);
 
-                LoadAsset(asset, path);
+                if (!LoadAsset(asset, path))
+                    return null;
             }
             else
             {
@@ -65,7 +66,7 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
             return asset;
         }
 
-        protected static void LoadAsset(AssetBase info, string path)
+        protected static bool LoadAsset(AssetBase info, string path)
         {
 //            bool image =
 //               (info.Type == (sbyte)AssetType.Texture ||
@@ -73,21 +74,23 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
 //                info.Type == (sbyte)AssetType.ImageJPEG ||
 //                info.Type == (sbyte)AssetType.ImageTGA);
 
-            FileInfo fInfo = new FileInfo(path);
-            long numBytes = fInfo.Length;
-            if (fInfo.Exists)
+            if (!File.Exists(path))
             {
-                FileStream fStream = new FileStream(path, FileMode.Open, FileAccess.Read);
-                BinaryReader br = new BinaryReader(fStream);
-                byte[] idata = br.ReadBytes((int)numBytes);
-                br.Close();
-                fStream.Close();
-                info.Data = idata;
-                //info.loaded=true;
+                m_log.ErrorFormat("[ASSETS]: file: [{0}] not found; asset [{1}] was skipped.", path, info.Name);
+                return false;
             }
-            else
+
+            try
             {
-                m_log.ErrorFormat("[ASSETS]: file: [{0}] not found !", path);
+                info.Data = File.ReadAllBytes(path);
+                return true;
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                m_log.ErrorFormat(
+                    "[ASSETS]: unable to read file [{0}] for asset [{1}]; asset was skipped: {2}",
+                    path, info.Name, e.Message);
+                return false;
             }
         }
 
@@ -153,8 +156,11 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
                         else
                             newAsset = CreateAsset(assetIdStr, name, Path.Combine(dir, assetPath), type);
 
-                        newAsset.Type = type;
-                        assets.Add(newAsset);
+                        if (newAsset != null)
+                        {
+                            newAsset.Type = type;
+                            assets.Add(newAsset);
+                        }
                     }
                 }
                 catch (XmlException e)
