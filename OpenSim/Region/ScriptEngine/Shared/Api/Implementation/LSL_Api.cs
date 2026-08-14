@@ -429,6 +429,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         };
 
         // Experience Stuff
+        // The viewer is asked only for JoinAnExperience. Once consent exists,
+        // the simulator applies the automatic Experience permission set used
+        // by the script runtime.
+        private const int ExperiencePermissionsMask = 408628;
+
         bool CheckExperienceAccessAtPos(Vector3 pos, UUID experience)
         {
             if (World.ExperienceModule == null || experience == UUID.Zero)
@@ -464,7 +469,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         bool CheckExperiencePermissions()
         {
             int perms = m_item.PermsMask;
-            if (perms == 408628)
+            if ((perms & PermissionJoinExperience) != 0)
             {
                 ScenePresence presence = World.GetScenePresence(m_item.PermsGranter);
                 if (presence != null && World.ExperienceModule != null)
@@ -20478,7 +20483,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 {
                     m_host.TaskInventory.LockItemsForWrite(true);
                     m_host.TaskInventory[m_item.ItemID].PermsGranter = agentID;
-                    m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
+                    m_host.TaskInventory[m_item.ItemID].PermsMask = ExperiencePermissionsMask;
                     m_host.TaskInventory.LockItemsForWrite(false);
 
                     SendExperienceEvent(ExperienceEvent.Permissions);
@@ -20516,7 +20521,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                         m_host.TaskInventory.LockItemsForWrite(true);
                         m_host.TaskInventory[m_item.ItemID].PermsGranter = agentID;
-                        m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
+                        m_host.TaskInventory[m_item.ItemID].PermsMask = ExperiencePermissionsMask;
                         m_host.TaskInventory.LockItemsForWrite(false);
 
                         SendExperienceEvent(ExperienceEvent.Permissions);
@@ -20553,10 +20558,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                             ScriptExperienceAnswerTimeoutMs, Timeout.Infinite);
                     }
 
-                    // todo: decode: 408628
-
                     presence.ControllingClient.SendScriptQuestion(
-                        m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_item.ItemID, 408628, m_item.ExperienceID);
+                        m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_item.ItemID,
+                        PermissionJoinExperience, m_item.ExperienceID);
                 }
             }
             else
@@ -20610,7 +20614,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     return;
                 }
 
-                m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
+                m_host.TaskInventory[m_item.ItemID].PermsMask = ExperiencePermissionsMask;
                 m_host.TaskInventory[m_item.ItemID].PermsGranter = client.AgentId;
 
                 SendExperienceEvent(ExperienceEvent.Permissions);

@@ -119,22 +119,27 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void OnNewClient(IClientAPI client)
         {
-            Dictionary<UUID, bool> permissions;
+            LoadExperiencePermissions(client.AgentId);
+        }
+
+        private Dictionary<UUID, bool> LoadExperiencePermissions(UUID agentID)
+        {
             try
             {
-                permissions = m_ExperienceService?.FetchExperiencePermissions(client.AgentId)
+                Dictionary<UUID, bool> permissions = m_ExperienceService?.FetchExperiencePermissions(agentID)
                     ?? new Dictionary<UUID, bool>();
+                lock (m_ExperiencePermissionsLock)
+                    m_ExperiencePermissions[agentID] = permissions;
+                return permissions;
             }
             catch (Exception ex)
             {
                 m_log.WarnFormat(
-                    "[EXPERIENCE]: Unable to load permissions for {0}; login will continue with an empty cache: {1}",
-                    client.AgentId,
+                    "[EXPERIENCE]: Unable to load permissions for {0}; the next permission request will retry: {1}",
+                    agentID,
                     ex.Message);
-                permissions = new Dictionary<UUID, bool>();
+                return null;
             }
-            lock (m_ExperiencePermissionsLock)
-                m_ExperiencePermissions[client.AgentId] = permissions;
         }
 
         private void OnClientClosed(UUID agentID, Scene scene)
@@ -532,6 +537,13 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public ExperiencePermission GetExperiencePermission(UUID avatar_id, UUID experience_id)
         {
+            bool loaded;
+            lock (m_ExperiencePermissionsLock)
+                loaded = m_ExperiencePermissions.ContainsKey(avatar_id);
+
+            if (!loaded)
+                LoadExperiencePermissions(avatar_id);
+
             lock (m_ExperiencePermissionsLock)
             {
                 if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions) &&
@@ -591,22 +603,36 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public UUID[] GetAllowedExperiences(UUID avatar_id)
         {
+            bool loaded;
+            lock (m_ExperiencePermissionsLock)
+                loaded = m_ExperiencePermissions.ContainsKey(avatar_id);
+
+            if (!loaded)
+                LoadExperiencePermissions(avatar_id);
+
             lock (m_ExperiencePermissionsLock)
             {
-                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
-                    return permissions.Where(x => x.Value).Select(x => x.Key).ToArray();
+                return m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions)
+                    ? permissions.Where(x => x.Value).Select(x => x.Key).ToArray()
+                    : Array.Empty<UUID>();
             }
-            return Array.Empty<UUID>();
         }
 
         public UUID[] GetBlockedExperiences(UUID avatar_id)
         {
+            bool loaded;
+            lock (m_ExperiencePermissionsLock)
+                loaded = m_ExperiencePermissions.ContainsKey(avatar_id);
+
+            if (!loaded)
+                LoadExperiencePermissions(avatar_id);
+
             lock (m_ExperiencePermissionsLock)
             {
-                if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
-                    return permissions.Where(x => !x.Value).Select(x => x.Key).ToArray();
+                return m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions)
+                    ? permissions.Where(x => !x.Value).Select(x => x.Key).ToArray()
+                    : Array.Empty<UUID>();
             }
-            return Array.Empty<UUID>();
         }
 
         public UUID[] GetAgentExperiences(UUID agent_id)
@@ -861,8 +887,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 {
                     foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
                     {
-                        // Todo: fix the enum and make a constant for the perm mask
-                        if (item.PermsMask == 408628 && item.PermsGranter == avatar.UUID)
+                        // JoinAnExperience identifies an active Experience grant;
+                        // do not depend on an exact aggregate runtime mask.
+                        if ((item.PermsMask & 0x2000) != 0 && item.PermsGranter == avatar.UUID)
                         {
                             if (!allowed.Contains(item.ExperienceID))
                             {
