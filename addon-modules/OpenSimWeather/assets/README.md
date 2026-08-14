@@ -3,6 +3,14 @@
 OpenSimWeather configuration uses **asset UUIDs**. A local PNG/WAV filename or
 an inventory item name cannot be resolved by the region module.
 
+The bundled `Weather_assets_*.png`, `Weather_assets.pdn`, `ThunderSound.wav`,
+and `ThunderSound2.wav` files were imported from
+`ManfredAabye/OpenSimWeather` commit
+`401fc0ff67a8ed9c2888151d4fdab4bc10fb592d`. The donor identifies Manfred
+Zainhofer as the texture author; its permission statement is preserved in
+`ManfredAabye-textures-LICENSE.txt`. Upload the files you want to test and use
+the resulting grid asset UUIDs—the module does not load these files directly.
+
 ## Particle textures
 
 Recommended source images:
@@ -39,6 +47,9 @@ solid disk.
 Upload a thunder sound supported by the grid/viewer and configure its asset UUID
 as `ThunderSound`. `ThunderEnabled = true` with an empty or invalid UUID leaves
 visual lightning enabled but produces no thunder audio.
+
+The donor does not separately identify the recording source for the two bundled
+WAV variants, so their exact repository and commit provenance above is retained.
 
 This package deliberately does not ship invented or grid-specific UUIDs. Asset
 UUIDs are only meaningful when the corresponding assets actually exist in the
