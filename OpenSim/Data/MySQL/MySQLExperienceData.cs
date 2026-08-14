@@ -175,7 +175,12 @@ namespace OpenSim.Data.MySQL
             {
                 dbcon.Open();
 
-                using (MySqlCommand cmd = new MySqlCommand("replace into `experiences` (public_id, owner_id, name, description, group_id, logo, marketplace, slurl, maturity, properties) VALUES (?public_id, ?owner_id, ?name, ?description, ?group_id, ?logo, ?marketplace, ?slurl, ?maturity, ?properties)", dbcon))
+                using (MySqlCommand cmd = new MySqlCommand(
+                    "INSERT INTO `experiences` (public_id, owner_id, name, description, group_id, logo, marketplace, slurl, maturity, properties) " +
+                    "VALUES (?public_id, ?owner_id, ?name, ?description, ?group_id, ?logo, ?marketplace, ?slurl, ?maturity, ?properties) " +
+                    "ON DUPLICATE KEY UPDATE owner_id=VALUES(owner_id), name=VALUES(name), description=VALUES(description), " +
+                    "group_id=VALUES(group_id), logo=VALUES(logo), marketplace=VALUES(marketplace), slurl=VALUES(slurl), " +
+                    "maturity=VALUES(maturity), properties=VALUES(properties)", dbcon))
                 {
                     cmd.Parameters.AddWithValue("?public_id", data.public_id.ToString());
                     cmd.Parameters.AddWithValue("?owner_id", data.owner_id.ToString());
