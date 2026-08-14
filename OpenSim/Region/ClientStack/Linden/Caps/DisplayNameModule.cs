@@ -159,7 +159,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
 
             DateTime nextUpdate = userData.NameChanged.AddDays(7);
-            OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
+            // A root-agent transition is also a viewer cache resynchronization.
+            // Reporting the authoritative value as both old and new allows the
+            // viewer to discard the event as a no-op after a restart. Use the
+            // scene presence's legacy name as the prior value so the persisted
+            // display name is actively restored to the nameplate cache.
+            OSD update = FormatDisplayNameUpdate(presence.Name, userData, nextUpdate);
             m_Scene.ForEachClient(client => m_EventQueue.Enqueue(update, client.AgentId));
         }
 
@@ -354,7 +359,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             var body = new OSDMap();
             body["agent"] = agentData;
-            body["agent_id"] = OSD.FromString(userData.Id.ToString());
+            body["agent_id"] = OSD.FromUUID(userData.Id);
             body["old_display_name"] = OSD.FromString(oldName);
 
             var nameReply = new OSDMap();

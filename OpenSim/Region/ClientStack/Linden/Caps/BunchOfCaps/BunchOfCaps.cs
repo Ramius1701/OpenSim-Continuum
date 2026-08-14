@@ -390,6 +390,7 @@ namespace OpenSim.Region.ClientStack.Linden
             {
                 "AgentExperiences",
                 "ExperiencePreferences",
+                "ExperienceQuery",
                 "FindExperienceByName",
                 "GetAdminExperiences",
                 "GetCreatorExperiences",

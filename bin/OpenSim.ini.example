@@ -1289,6 +1289,10 @@
     ;; Enables viewer Experience capabilities and parcel/region Experience UI.
     Enabled = true
 
+    ;; Controls who sees and may use the viewer's Acquire Experience button.
+    ;; Values: EstateManagersAndRegionOwners, AdminsOnly, Anyone.
+    ExperienceCreators = EstateManagersAndRegionOwners
+
 [ScriptExperiences]
     ;; OpenSim Experience-Lite auto grants for trusted estate scripts.
     ;; This is disabled by default. Enable only for trusted estate environments.

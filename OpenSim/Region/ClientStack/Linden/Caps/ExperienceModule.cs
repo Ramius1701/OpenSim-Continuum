@@ -43,6 +43,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private bool m_Enabled = false;
 
         private int CacheTimeout = 1 * 60;
+        private string m_AcquirePolicy = "EstateManagersAndRegionOwners";
 
         public void Initialise(IConfigSource source)
         {
@@ -51,6 +52,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
 
             m_Enabled = config.GetBoolean("Enabled", false);
+            m_AcquirePolicy = config.GetString(
+                "ExperienceCreators", "EstateManagersAndRegionOwners").Trim();
 
             if (!m_Enabled)
                 return;
@@ -163,7 +166,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             caps.RegisterHandler("GetExperiences", new GetExperiencesGetHandler(agent, this));
             caps.RegisterHandler("GetAdminExperiences", new GetAdminExperiencesGetHandler(agent, this));
             caps.RegisterHandler("GetCreatorExperiences", new GetCreatorExperiencesGetHandler(agent, this));
-            caps.RegisterHandler("AgentExperiences", new AgentExperiencesGetHandler(agent, this));
+            caps.RegisterSimpleHandler("AgentExperiences",
+                new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+                {
+                    HandleAgentExperiences(httpRequest, httpResponse, agent);
+                }));
             caps.RegisterHandler("GetExperienceInfo", new GetExperienceInfoGetHandler(agent, this));
             caps.RegisterHandler("IsExperienceAdmin", new IsExperienceAdminGetHandler(agent, this));
             caps.RegisterHandler("IsExperienceContributor", new IsExperienceContributorGetHandler(agent, this));
@@ -176,6 +183,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             caps.RegisterHandler("GetMetadata", new GetMetadataPostHandler(agent, this, m_scene));
             caps.RegisterHandler("GroupExperiences", new GroupExperiencesGetHandler(agent, this));
             caps.RegisterHandler("FindExperienceByName", new FindExperienceByNameGetHandler(agent, this));
+            caps.RegisterHandler("ExperienceQuery", new ExperienceQueryGetHandler(agent, this));
 
             caps.RegisterSimpleHandler("ExperiencePreferences",
                 new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -186,6 +194,62 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             m_log.DebugFormat(
                 "[EXPERIENCE]: Registered viewer capabilities for agent {0} in region {1}",
                 agent, m_scene.RegionInfo.RegionName);
+        }
+
+        private void HandleAgentExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
+        {
+            bool canAcquire = CanAcquireExperience(agentID);
+
+            if (request.HttpMethod == "POST")
+            {
+                if (canAcquire)
+                {
+                    ExperienceInfo created = new()
+                    {
+                        public_id = UUID.Random(),
+                        owner_id = agentID,
+                        properties = (int)ExperienceFlags.Grid
+                    };
+
+                    if (UpdateExperienceInfo(created) == null)
+                    {
+                        response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                        return;
+                    }
+                }
+            }
+            else if (request.HttpMethod != "GET")
+            {
+                response.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+                return;
+            }
+
+            OSDArray ids = new();
+            foreach (UUID id in GetAgentExperiences(agentID) ?? Array.Empty<UUID>())
+                ids.Add(id);
+
+            OSDMap result = new()
+            {
+                ["experience_ids"] = ids
+            };
+
+            // The viewer enables Acquire based on the presence of this key.
+            if (canAcquire)
+                result["purchase"] = 0;
+
+            response.ContentType = "application/llsd+xml";
+            response.RawBuffer = OSDParser.SerializeLLSDXmlBytes(result);
+            response.StatusCode = (int)HttpStatusCode.OK;
+        }
+
+        private bool CanAcquireExperience(UUID agentID)
+        {
+            if (m_AcquirePolicy.Equals("Anyone", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (m_AcquirePolicy.Equals("AdminsOnly", StringComparison.OrdinalIgnoreCase))
+                return m_scene.Permissions.IsAdministrator(agentID);
+
+            return m_scene.Permissions.CanIssueEstateCommand(agentID, false);
         }
 
         private void HandleRegionExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
@@ -840,6 +904,37 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             return false;
         }
 
+        public bool IsExperienceAllowedAtCurrentParcel(UUID avatar_id, UUID experience_id)
+        {
+            if (experience_id == UUID.Zero ||
+                GetExperiencePermission(avatar_id, experience_id) != ExperiencePermission.Allowed)
+                return false;
+
+            ScenePresence avatar = m_scene.GetScenePresence(avatar_id);
+            if (avatar == null || avatar.IsChildAgent)
+                return false;
+
+            var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
+            if (land == null)
+                return false;
+
+            UUID[] estateBlocked = m_scene.RegionInfo.EstateSettings.BlockedExperiences ?? Array.Empty<UUID>();
+            if (estateBlocked.Contains(experience_id))
+                return false;
+
+            if (land.LandData.ParcelAccessList.Any(
+                x => (int)x.Flags == ACCESS_LIST_BLOCKED && x.AgentID == experience_id))
+                return false;
+
+            UUID[] estateAllowed = m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
+            UUID[] estateKey = m_scene.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
+            if (estateAllowed.Contains(experience_id) || estateKey.Contains(experience_id))
+                return true;
+
+            return land.LandData.ParcelAccessList.Any(
+                x => (int)x.Flags == ACCESS_LIST_ALLOWED && x.AgentID == experience_id);
+        }
+
         public string GetKeyValue(UUID experience, string key)
         {
             return m_ExperienceService.GetKeyValue(experience, key);
@@ -958,12 +1053,97 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
             }
 
-            ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str);
+            ExperienceInfo[] results =
+                m_ExperienceModule.FindExperiencesByName(query_str) ?? Array.Empty<ExperienceInfo>();
             long offset = ((long)pageNumber - 1) * pageSize;
             if (offset >= results.Length)
-                return ExperienceCapsResponse.SerializeExperiences(Array.Empty<ExperienceInfo>());
+                return SerializeSearchResults(
+                    Array.Empty<ExperienceInfo>(), httpRequest.Url.AbsolutePath,
+                    query_str, pageNumber, pageSize, false);
 
-            return ExperienceCapsResponse.SerializeExperiences(results.Skip((int)offset).Take(pageSize));
+            ExperienceInfo[] pageResults = results.Skip((int)offset).Take(pageSize).ToArray();
+            bool hasNext = offset + pageResults.Length < results.Length;
+            return SerializeSearchResults(
+                pageResults, httpRequest.Url.AbsolutePath,
+                query_str, pageNumber, pageSize, hasNext);
+        }
+
+        private static byte[] SerializeSearchResults(
+            IEnumerable<ExperienceInfo> infos, string basePath, string query,
+            int page, int pageSize, bool hasNext)
+        {
+            OSDArray experiences = new();
+            foreach (ExperienceInfo info in infos)
+                experiences.Add(ExperienceCapsResponse.ToExperienceMap(info));
+
+            OSDMap result = new()
+            {
+                ["experience_keys"] = experiences
+            };
+
+            if (hasNext)
+                result["next_page_url"] = PageUrl(basePath, query, page + 1, pageSize);
+            if (page > 1)
+                result["previous_page_url"] = PageUrl(basePath, query, page - 1, pageSize);
+
+            return OSDParser.SerializeLLSDXmlBytes(result);
+        }
+
+        private static string PageUrl(string basePath, string query, int page, int pageSize)
+        {
+            return (basePath ?? string.Empty) + "?page=" + page +
+                "&page_size=" + pageSize + "&query=" +
+                Uri.EscapeDataString(query ?? string.Empty);
+        }
+    }
+
+    public class ExperienceQueryGetHandler : BaseStreamHandler
+    {
+        private const int MaxExperienceQueryIDs = 256;
+        private readonly UUID m_AgentID;
+        private readonly IExperienceModule m_ExperienceModule;
+
+        public ExperienceQueryGetHandler(UUID agent_id, IExperienceModule experienceModule)
+            : this(string.Format("/caps/{0}", UUID.Random()), agent_id, experienceModule)
+        {
+        }
+
+        public ExperienceQueryGetHandler(string path, UUID agent_id, IExperienceModule experienceModule)
+            : base("GET", path, null, null)
+        {
+            m_AgentID = agent_id;
+            m_ExperienceModule = experienceModule;
+        }
+
+        protected override byte[] ProcessRequest(
+            string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+        {
+            NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
+            OSDMap permissions = new();
+            string requested = query.Get("experiences");
+
+            if (!string.IsNullOrWhiteSpace(requested))
+            {
+                int count = 0;
+                foreach (string part in requested.Split(','))
+                {
+                    if (count >= MaxExperienceQueryIDs)
+                        break;
+                    if (!UUID.TryParse(part.Trim(), out UUID experienceID) ||
+                        permissions.ContainsKey(experienceID.ToString()))
+                        continue;
+
+                    permissions[experienceID.ToString()] =
+                        m_ExperienceModule.IsExperienceAllowedAtCurrentParcel(
+                            m_AgentID, experienceID);
+                    count++;
+                }
+            }
+
+            return OSDParser.SerializeLLSDXmlBytes(new OSDMap
+            {
+                ["experiences"] = permissions
+            });
         }
     }
 
@@ -1215,12 +1395,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
             }
 
-            if (!m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id) ||
-                group_id != currentInfo.group_id)
+            if (!m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id))
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
                 return Encoding.UTF8.GetBytes("<llsd><undef/></llsd>");
             }
+
+            // Experience administrators may edit the profile, but only the
+            // owning resident may change the associated group.
+            UUID updatedGroup = currentInfo.group_id;
+            if (group_id != currentInfo.group_id && currentInfo.owner_id == m_AgentID)
+                updatedGroup = group_id;
 
             int updatedProperties = currentInfo.properties;
             if ((properties & (int)ExperienceFlags.Disabled) != 0)
@@ -1232,7 +1417,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             {
                 public_id = currentInfo.public_id,
                 owner_id = currentInfo.owner_id,
-                group_id = currentInfo.group_id,
+                group_id = updatedGroup,
                 name = name,
                 description = desc,
                 slurl = slurl == "last" ? currentInfo.slurl : slurl,

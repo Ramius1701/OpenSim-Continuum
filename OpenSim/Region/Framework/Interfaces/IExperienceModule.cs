@@ -34,6 +34,7 @@ namespace OpenSim.Region.Framework.Interfaces
         UUID[] GetEstateBlockedExperiences();
 
         bool IsExperienceEnabled(UUID experience_id);
+        bool IsExperienceAllowedAtCurrentParcel(UUID avatar_id, UUID experience_id);
 
         string GetKeyValue(UUID experience, string key);
         string CreateKeyValue(UUID experience, string key, string value);
