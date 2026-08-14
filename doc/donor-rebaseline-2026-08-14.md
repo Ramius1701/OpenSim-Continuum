@@ -73,8 +73,9 @@ carried forward by Tranquillity must not be ported a second time from Mobius.
    Gunthar RegionCurrency evidence and WhiteCore economy behavior kept as
    distinct lines. Findings are recorded in
    [`parity-economy.md`](parity-economy.md).
-5. Search, RegionWeb, Weather, Tide, Marketplace, Groups, aliases, mute list,
-   voice/WebRTC, rendering, physics, scripting and every recovered addon.
+5. Search (see [`parity-search.md`](parity-search.md)), RegionWeb, Weather,
+   Tide, Marketplace, Groups, aliases, mute list, voice/WebRTC, rendering,
+   physics, scripting and every recovered addon.
 6. Package a controlled OpenSim live-test candidate.
 7. Start the separate OpenSim-Grid-Interface and WhiteCore WebUI phase.
 

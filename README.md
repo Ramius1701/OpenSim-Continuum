@@ -196,6 +196,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [Experiences donor-lineage and 1.x parity audit](doc/parity-experiences.md)
 - [Abuse Reports donor-lineage and WhiteCore workflow parity audit](doc/parity-abuse-reports.md)
 - [MoneyServer Compatibility and ContinuumEconomy donor-parity audit](doc/parity-economy.md)
+- [OpenSimSearch and future grid directory donor-parity audit](doc/parity-search.md)
 - [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Current integration progress and release gates](doc/integration-progress.md)
