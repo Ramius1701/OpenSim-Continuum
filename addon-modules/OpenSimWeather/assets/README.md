@@ -8,8 +8,14 @@ and `ThunderSound2.wav` files were imported from
 `ManfredAabye/OpenSimWeather` commit
 `401fc0ff67a8ed9c2888151d4fdab4bc10fb592d`. The donor identifies Manfred
 Zainhofer as the texture author; its permission statement is preserved in
-`ManfredAabye-textures-LICENSE.txt`. Upload the files you want to test and use
-the resulting grid asset UUIDs—the module does not load these files directly.
+`ManfredAabye-textures-LICENSE.txt`. The module consumes asset UUIDs rather
+than these editable source filenames directly.
+
+Viewer-ready JPEG2000 textures and an Ogg Vorbis thunder sound also ship in
+`bin/assets/WeatherAssetSet`. OpenSim's default asset loader inserts them into
+the standalone or Robust asset service using stable UUIDs, so the supplied
+configuration examples work without manual uploads. The PNG/WAV files remain
+available as editable source media.
 
 ## Particle textures
 
@@ -24,8 +30,8 @@ Square source canvases generally behave most predictably as particle textures.
 Keep transparent padding modest; excessive padding makes particles appear much
 smaller than their configured scale.
 
-Upload each texture to the grid, obtain its asset UUID, and place the UUID in
-the `[Weather]` section. The UUID must be available to viewers through the grid
+Custom replacements may be uploaded and their asset UUIDs placed in the
+`[Weather]` section. Every configured UUID must be available through the grid
 asset service.
 
 Blank particle texture settings use OpenSim's blank texture. This is safe but
@@ -44,13 +50,12 @@ solid disk.
 
 ## Thunder sound
 
-Upload a thunder sound supported by the grid/viewer and configure its asset UUID
-as `ThunderSound`. `ThunderEnabled = true` with an empty or invalid UUID leaves
-visual lightning enabled but produces no thunder audio.
+The supplied example configures the bundled sound UUID. `ThunderEnabled` stays
+opt-in; enabling it with an empty or invalid UUID leaves visual lightning
+enabled but produces no thunder audio.
 
 The donor does not separately identify the recording source for the two bundled
 WAV variants, so their exact repository and commit provenance above is retained.
 
-This package deliberately does not ship invented or grid-specific UUIDs. Asset
-UUIDs are only meaningful when the corresponding assets actually exist in the
-target grid's asset service.
+The stable bundled UUIDs are meaningful because the corresponding assets are
+part of the default asset set and are inserted into the target asset service.

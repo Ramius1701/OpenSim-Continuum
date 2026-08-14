@@ -1,0 +1,58 @@
+<Nini>
+  <!-- Particle/surface textures and thunder sound for the OpenSimWeather addon
+       module. Source art courtesy of Manfred Zainhofer (ManfredAabye/OpenSimWeather
+       on GitHub), converted from PNG/WAV to the JPEG2000/OGG Vorbis formats the
+       asset service expects. See addon-modules/OpenSimWeather/assets/copyright.txt
+       for licensing ("may generally be used freely"). The preserved donor
+       notice is addon-modules/OpenSimWeather/assets/ManfredAabye-textures-LICENSE.txt. -->
+
+  <Section Name="Weather Rain Texture">
+    <Key Name="assetID" Value="8b3abcad-4d33-420e-b1be-a598a9defe66" />
+    <Key Name="name" Value="Weather Rain Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_rain.jp2" />
+  </Section>
+
+  <Section Name="Weather Storm Texture">
+    <Key Name="assetID" Value="474c95d8-b6c0-41ed-ab92-d823587a279a" />
+    <Key Name="name" Value="Weather Storm Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_storm.jp2" />
+  </Section>
+
+  <Section Name="Weather Snow Texture">
+    <Key Name="assetID" Value="64eb249a-956e-4ab5-a780-26f5845d01f0" />
+    <Key Name="name" Value="Weather Snow Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_snow.jp2" />
+  </Section>
+
+  <Section Name="Weather Lightning Texture">
+    <Key Name="assetID" Value="b7a57ead-1093-478d-b79d-b3e80dcae357" />
+    <Key Name="name" Value="Weather Lightning Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_lightning.jp2" />
+  </Section>
+
+  <Section Name="Weather Puddle Texture">
+    <Key Name="assetID" Value="14a1d7fd-c48a-4d42-af42-4f0d67a1ee52" />
+    <Key Name="name" Value="Weather Puddle Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_puddle.jp2" />
+  </Section>
+
+  <Section Name="Weather Snow Surface Texture">
+    <Key Name="assetID" Value="b50a3526-58f5-4d4c-aad1-53fa7b0cca4f" />
+    <Key Name="name" Value="Weather Snow Surface Texture" />
+    <Key Name="assetType" Value="0" />
+    <Key Name="fileName" Value="weather_snowsurface.jp2" />
+  </Section>
+
+  <Section Name="Weather Thunder Sound">
+    <Key Name="assetID" Value="bf51f599-920b-4ceb-94a2-531032d6a610" />
+    <Key Name="name" Value="Weather Thunder Sound" />
+    <Key Name="assetType" Value="1" />
+    <Key Name="fileName" Value="weather_thunder.ogg" />
+  </Section>
+
+</Nini>

@@ -58,12 +58,11 @@
     ;; PARTICLE AND LIGHTNING ASSETS
     ;; ------------------------------------------------------------------------
 
-    ;; Configure uploaded alpha textures here. Blank values use OpenSim's blank
-    ;; texture and can produce visible square/rectangular particle billboards.
-    RainTexture =
-    StormTexture =
-    SnowTexture =
-    LightningTexture =
+    ;; Stable UUIDs from the viewer-ready assets bundled in bin/assets.
+    RainTexture = 8b3abcad-4d33-420e-b1be-a598a9defe66
+    StormTexture = 474c95d8-b6c0-41ed-ab92-d823587a279a
+    SnowTexture = 64eb249a-956e-4ab5-a780-26f5845d01f0
+    LightningTexture = b7a57ead-1093-478d-b79d-b3e80dcae357
 
     ;; ------------------------------------------------------------------------
     ;; BUILDING / COVER SUPPRESSION
@@ -133,10 +132,10 @@
     LightningMinDelayMS = 7000
     LightningMaxDelayMS = 18000
 
-    ;; Thunder requires a valid uploaded sound asset UUID.
+    ;; The default asset set supplies this sound UUID.
     ThunderEnabled = false
     ThunderVolume = 1.0
-    ThunderSound =
+    ThunderSound = bf51f599-920b-4ceb-94a2-531032d6a610
 
     ;; ------------------------------------------------------------------------
     ;; AUTOMATIC WEATHER
@@ -177,8 +176,8 @@
 
     ;; Alpha textures are required. Blank values automatically disable the
     ;; corresponding effect to avoid solid default disks.
-    PuddleTexture =
-    SnowSurfaceTexture =
+    PuddleTexture = 14a1d7fd-c48a-4d42-af42-4f0d67a1ee52
+    SnowSurfaceTexture = b50a3526-58f5-4d4c-aad1-53fa7b0cca4f
 
     ;; Static regional temperature used by the accumulation/melt model.
     TemperatureC = 10.0
