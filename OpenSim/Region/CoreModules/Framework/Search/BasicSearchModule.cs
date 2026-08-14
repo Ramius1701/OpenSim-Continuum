@@ -94,7 +94,12 @@ namespace OpenSim.Region.CoreModules.Framework.Search
         {
             if (m_Enabled)
             {
-                m_Scenes.Add(scene);
+                lock (m_Scenes)
+                {
+                    if (m_Scenes.Contains(scene))
+                        return;
+                    m_Scenes.Add(scene);
+                }
 
                 scene.EventManager.OnMakeRootAgent += new Action<ScenePresence>(EventManager_OnMakeRootAgent);
                 scene.EventManager.OnMakeChildAgent += new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
@@ -105,10 +110,15 @@ namespace OpenSim.Region.CoreModules.Framework.Search
         {
             if (m_Enabled)
             {
-                m_Scenes.Remove(scene);
+                lock (m_Scenes)
+                {
+                    if (!m_Scenes.Remove(scene))
+                        return;
+                }
 
                 scene.EventManager.OnMakeRootAgent -= new Action<ScenePresence>(EventManager_OnMakeRootAgent);
                 scene.EventManager.OnMakeChildAgent -= new EventManager.OnMakeChildAgentDelegate(EventManager_OnMakeChildAgent);
+                scene.ForEachClient(client => client.OnDirFindQuery -= OnDirFindQuery);
             }
         }
 
@@ -133,7 +143,11 @@ namespace OpenSim.Region.CoreModules.Framework.Search
 
         public void Close()
         {
-            m_Scenes.Clear();
+            Scene[] scenes;
+            lock (m_Scenes)
+                scenes = new List<Scene>(m_Scenes).ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
         }
 
         #endregion ISharedRegionModule
@@ -162,11 +176,24 @@ namespace OpenSim.Region.CoreModules.Framework.Search
             if (((DirFindFlags)queryFlags & DirFindFlags.People) == DirFindFlags.People)
             {
                 if (string.IsNullOrEmpty(queryText))
+                {
                     remoteClient.SendDirPeopleReply(queryID, new DirPeopleReplyData[0]);
+                    return;
+                }
 
                 List<UserAccount> accounts;
                 if (!queryPeopleCache.TryGetValue(queryText, out accounts))
-                    accounts = m_Scenes[0].UserAccountService.GetUserAccounts(m_Scenes[0].RegionInfo.ScopeID, queryText);
+                {
+                    Scene scene = GetSearchScene();
+                    if (scene == null)
+                    {
+                        remoteClient.SendDirPeopleReply(queryID, Array.Empty<DirPeopleReplyData>());
+                        return;
+                    }
+                    accounts = scene.UserAccountService.GetUserAccounts(scene.RegionInfo.ScopeID, queryText);
+                }
+
+                accounts ??= new List<UserAccount>();
 
                 queryPeopleCache.AddOrUpdate(queryText, accounts, 30.0);
 
@@ -218,11 +245,16 @@ namespace OpenSim.Region.CoreModules.Framework.Search
                 }
 
                 if (string.IsNullOrEmpty(queryText))
+                {
                     remoteClient.SendDirGroupsReply(queryID, new DirGroupsReplyData[0]);
+                    return;
+                }
 
                 List<DirGroupsReplyData> answer;
                 if (!queryGroupCache.TryGetValue(queryText, out answer))
                     answer = m_GroupsService.FindGroups(remoteClient, queryText);
+
+                answer ??= new List<DirGroupsReplyData>();
 
                 queryGroupCache.AddOrUpdate(queryText, answer, 30.0);
 
@@ -241,6 +273,9 @@ namespace OpenSim.Region.CoreModules.Framework.Search
                         result[count++] = dgrd;
                 }
                 answer = null;
+
+                if (count != result.Length)
+                    Array.Resize(ref result, count);
 
                 // viewers don't sent sorting, so results they show are a nice mess
                 if ((queryStart > 0) && (queryStart < count))
@@ -262,6 +297,12 @@ namespace OpenSim.Region.CoreModules.Framework.Search
                 // TODO: This currently ignores pretty much all the query flags including Mature and sort order
                 remoteClient.SendDirGroupsReply(queryID, result);
             }
+        }
+
+        private Scene GetSearchScene()
+        {
+            lock (m_Scenes)
+                return m_Scenes.Count == 0 ? null : m_Scenes[0];
         }
 
         #endregion Event Handlers
