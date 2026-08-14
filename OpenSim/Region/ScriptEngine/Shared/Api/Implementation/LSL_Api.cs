@@ -128,7 +128,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         private IClientAPI m_scriptExperienceAnswerClient;
         private UUID m_scriptExperienceAnswerAgent = UUID.Zero;
         private Timer m_scriptExperienceAnswerTimer;
-        private const int ScriptExperienceAnswerTimeoutMs = 30000;
+        // SL keeps the Experience consent dialog available for at least five minutes.
+        private const int ScriptExperienceAnswerTimeoutMs = 300000;
+        private const int PermissionJoinExperience = 0x2000;
         protected bool m_automaticLinkPermission = false;
         protected int m_notecardLineReadCharsMax = 255;
         protected int m_scriptConsoleChannel = 0;
@@ -20414,7 +20416,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             ScenePresence presence = World.GetScenePresence(agentID);
 
-            if (presence != null)
+            if (presence != null && !presence.IsChildAgent)
             {
                 UUID experience_key = m_item.ExperienceID;
                 if (experience_key == UUID.Zero || World.ExperienceModule == null)
@@ -20474,12 +20476,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 ExperiencePermission experiencePermission = World.ExperienceModule.GetExperiencePermission(agentID, experience_key);
                 if (experiencePermission == ExperiencePermission.Allowed)
                 {
-                    SendExperienceEvent(ExperienceEvent.Permissions);
-
                     m_host.TaskInventory.LockItemsForWrite(true);
                     m_host.TaskInventory[m_item.ItemID].PermsGranter = agentID;
                     m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
                     m_host.TaskInventory.LockItemsForWrite(false);
+
+                    SendExperienceEvent(ExperienceEvent.Permissions);
 
                     m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
                             "experience_permissions", new Object[] {
@@ -20498,6 +20500,33 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 }
                 else
                 {
+                    UUID[] trustedExperiences = World.RegionInfo.EstateSettings.KeyExperiences ?? Array.Empty<UUID>();
+                    if (trustedExperiences.Contains(experience_key))
+                    {
+                        if (!World.ExperienceModule.SetExperiencePermission(
+                            agentID, experience_key, ExperiencePermission.Allowed))
+                        {
+                            m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                                "experience_permissions_denied", new Object[] {
+                                new LSL_Key(agentID.ToString()),
+                                new LSL_Integer(ScriptBaseClass.XP_ERROR_RETRY_UPDATE)},
+                                Array.Empty<DetectParams>()));
+                            return;
+                        }
+
+                        m_host.TaskInventory.LockItemsForWrite(true);
+                        m_host.TaskInventory[m_item.ItemID].PermsGranter = agentID;
+                        m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
+                        m_host.TaskInventory.LockItemsForWrite(false);
+
+                        SendExperienceEvent(ExperienceEvent.Permissions);
+                        m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                            "experience_permissions", new Object[] {
+                            new LSL_Key(agentID.ToString()) },
+                            Array.Empty<DetectParams>()));
+                        return;
+                    }
+
                     string ownerName = resolveName(m_host.ParentGroup.RootPart.OwnerID);
                     if (ownerName == String.Empty)
                         ownerName = "(hippos)";
@@ -20515,6 +20544,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         }
 
                         presence.ControllingClient.OnScriptAnswer += handleScriptExperienceAnswer;
+                        presence.ControllingClient.OnConnectionClosed += handleScriptExperienceConnectionClosed;
                         m_waitingForScriptExperienceAnswer = true;
                         m_scriptExperienceAnswerClient = presence.ControllingClient;
                         m_scriptExperienceAnswerAgent = agentID;
@@ -20529,7 +20559,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_item.ItemID, 408628, m_item.ExperienceID);
                 }
             }
-            else Error("llRequestExperiencePermissions", "Unable to find specified agent to request experience permissions.");
+            else
+            {
+                m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                    "experience_permissions_denied", new Object[] {
+                    new LSL_Key(agentID.ToString()),
+                    new LSL_Integer(ScriptBaseClass.XP_ERROR_NOT_PERMITTED)},
+                    Array.Empty<DetectParams>()));
+            }
         }
 
         void handleScriptExperienceAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
@@ -20554,7 +20591,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             m_host.TaskInventory.LockItemsForWrite(true);
 
-            if (answer != 0)
+            if ((answer & PermissionJoinExperience) != 0)
             {
                 m_log.InfoFormat("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
 
@@ -20573,10 +20610,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     return;
                 }
 
-                SendExperienceEvent(ExperienceEvent.Permissions);
-
                 m_host.TaskInventory[m_item.ItemID].PermsMask = 408628;
                 m_host.TaskInventory[m_item.ItemID].PermsGranter = client.AgentId;
+
+                SendExperienceEvent(ExperienceEvent.Permissions);
 
                 m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
                     "experience_permissions", new Object[] {
@@ -20585,12 +20622,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
             else
             {
-                IExperienceModule experienceModule = World.ExperienceModule;
-                if (experienceModule == null || !experienceModule.SetExperiencePermission(
-                    client.AgentId, m_item.ExperienceID, ExperiencePermission.Blocked))
-                    m_log.WarnFormat(
-                        "[EXPERIENCE] Unable to persist permission denial by {0} for {1}",
-                        client.AgentId, m_item.ExperienceID);
+                // Declining one consent dialog is transient. A durable block is
+                // created only by the viewer's explicit Block action through
+                // ExperiencePreferences.
                 m_host.TaskInventory[m_item.ItemID].PermsMask = 0;
                 m_host.TaskInventory[m_item.ItemID].PermsGranter = UUID.Zero;
 
@@ -20624,10 +20658,33 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 Array.Empty<DetectParams>()));
         }
 
+        private void handleScriptExperienceConnectionClosed(IClientAPI client)
+        {
+            UUID agentID;
+
+            lock (m_scriptExperienceAnswerLock)
+            {
+                if (!m_waitingForScriptExperienceAnswer || m_scriptExperienceAnswerClient != client)
+                    return;
+
+                agentID = m_scriptExperienceAnswerAgent;
+                ClearScriptExperienceAnswerWait();
+            }
+
+            m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                "experience_permissions_denied", new Object[] {
+                    new LSL_Key(agentID.ToString()),
+                    new LSL_Integer(ScriptBaseClass.XP_ERROR_NOT_PERMITTED)},
+                Array.Empty<DetectParams>()));
+        }
+
         private void ClearScriptExperienceAnswerWait()
         {
             if (m_scriptExperienceAnswerClient != null)
+            {
                 m_scriptExperienceAnswerClient.OnScriptAnswer -= handleScriptExperienceAnswer;
+                m_scriptExperienceAnswerClient.OnConnectionClosed -= handleScriptExperienceConnectionClosed;
+            }
 
             m_scriptExperienceAnswerTimer?.Dispose();
             m_scriptExperienceAnswerTimer = null;
@@ -20651,9 +20708,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             ScenePresence presence = World.GetScenePresence(agentID);
 
-            if (presence != null)
+            if (presence != null && !presence.IsChildAgent)
             {
-                bool is_allowed = CheckExperienceAccessAtPos(presence.AbsolutePosition, m_item.ExperienceID);
+                bool is_allowed = CheckExperienceAccessAtPos(presence.AbsolutePosition, m_item.ExperienceID) &&
+                    CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID);
 
                 if (is_allowed)
                 {

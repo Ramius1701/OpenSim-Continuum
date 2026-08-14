@@ -44,7 +44,7 @@ namespace OpenSim.Services.Interfaces
 
         public DateTime CachedTime = DateTime.Now;
 
-        public int quota = 16;
+        public int quota = 128;
 
         public Dictionary<string, object> ToDictionary()
         {

@@ -21,7 +21,8 @@ namespace OpenSim.Services.ExperienceService
 
         private IUserAccountService m_UserService = null;
 
-        private const int MAX_QUOTA = 1024 * 1024 * 16;
+        // Second Life exposes a 128 MiB key-value quota per Experience.
+        private const int MAX_QUOTA = 1024 * 1024 * 128;
         private const int MAX_NAME_LENGTH = 42;
         private const int MAX_DESCRIPTION_LENGTH = 128;
         private const int MAX_SLURL_LENGTH = 256;
