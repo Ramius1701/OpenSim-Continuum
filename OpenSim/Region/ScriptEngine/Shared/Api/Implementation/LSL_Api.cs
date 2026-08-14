@@ -124,6 +124,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         protected double m_timer = Util.GetTimeStamp();
         protected bool m_waitingForScriptAnswer = false;
         protected bool m_waitingForScriptExperienceAnswer = false;
+        private readonly object m_scriptExperienceAnswerLock = new();
+        private IClientAPI m_scriptExperienceAnswerClient;
+        private UUID m_scriptExperienceAnswerAgent = UUID.Zero;
+        private Timer m_scriptExperienceAnswerTimer;
+        private const int ScriptExperienceAnswerTimeoutMs = 30000;
         protected bool m_automaticLinkPermission = false;
         protected int m_notecardLineReadCharsMax = 255;
         protected int m_scriptConsoleChannel = 0;
@@ -20380,6 +20385,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
             if (agentID == UUID.Zero) // Releasing permissions
             {
+                lock (m_scriptExperienceAnswerLock)
+                {
+                    if (m_waitingForScriptExperienceAnswer)
+                        ClearScriptExperienceAnswerWait();
+                }
+
                 llReleaseControls();
 
                 m_item.PermsGranter = UUID.Zero;
@@ -20491,10 +20502,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     if (ownerName == String.Empty)
                         ownerName = "(hippos)";
 
-                    if (!m_waitingForScriptExperienceAnswer)
+                    lock (m_scriptExperienceAnswerLock)
                     {
+                        if (m_waitingForScriptExperienceAnswer)
+                        {
+                            m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                                "experience_permissions_denied", new Object[] {
+                                new LSL_Key(agentID.ToString()),
+                                new LSL_Integer(ScriptBaseClass.XP_ERROR_THROTTLED)},
+                                Array.Empty<DetectParams>()));
+                            return;
+                        }
+
                         presence.ControllingClient.OnScriptAnswer += handleScriptExperienceAnswer;
                         m_waitingForScriptExperienceAnswer = true;
+                        m_scriptExperienceAnswerClient = presence.ControllingClient;
+                        m_scriptExperienceAnswerAgent = agentID;
+                        m_scriptExperienceAnswerTimer = new Timer(
+                            handleScriptExperienceAnswerTimeout, null,
+                            ScriptExperienceAnswerTimeoutMs, Timeout.Infinite);
                     }
 
                     // todo: decode: 408628
@@ -20511,8 +20537,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (taskID != m_host.UUID || itemID != m_item.ItemID)
                 return;
 
-            client.OnScriptAnswer -= handleScriptExperienceAnswer;
-            m_waitingForScriptExperienceAnswer = false;
+            lock (m_scriptExperienceAnswerLock)
+            {
+                if (!m_waitingForScriptExperienceAnswer ||
+                    m_scriptExperienceAnswerClient != client ||
+                    m_scriptExperienceAnswerAgent != client.AgentId)
+                    return;
+
+                ClearScriptExperienceAnswerWait();
+            }
 
             m_log.InfoFormat("[EXPERIENCE] Script answer from {0} is {1}", client.AgentId, answer);
 
@@ -20569,6 +20602,38 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
 
             m_host.TaskInventory.LockItemsForWrite(false);
+        }
+
+        private void handleScriptExperienceAnswerTimeout(object state)
+        {
+            UUID agentID;
+
+            lock (m_scriptExperienceAnswerLock)
+            {
+                if (!m_waitingForScriptExperienceAnswer)
+                    return;
+
+                agentID = m_scriptExperienceAnswerAgent;
+                ClearScriptExperienceAnswerWait();
+            }
+
+            m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
+                "experience_permissions_denied", new Object[] {
+                    new LSL_Key(agentID.ToString()),
+                    new LSL_Integer(ScriptBaseClass.XP_ERROR_REQUEST_PERM_TIMEOUT)},
+                Array.Empty<DetectParams>()));
+        }
+
+        private void ClearScriptExperienceAnswerWait()
+        {
+            if (m_scriptExperienceAnswerClient != null)
+                m_scriptExperienceAnswerClient.OnScriptAnswer -= handleScriptExperienceAnswer;
+
+            m_scriptExperienceAnswerTimer?.Dispose();
+            m_scriptExperienceAnswerTimer = null;
+            m_scriptExperienceAnswerClient = null;
+            m_scriptExperienceAnswerAgent = UUID.Zero;
+            m_waitingForScriptExperienceAnswer = false;
         }
 
         public LSL_Integer llAgentInExperience(string agent)
