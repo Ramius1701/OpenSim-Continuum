@@ -186,9 +186,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             try
             {
-                scene.ForEachRootScenePresence(presence =>
+                // Neighboring avatars are represented as child agents. Their
+                // display names must be refreshed too or viewers near a region
+                // border retain stale nameplates after a rename on another sim.
+                scene.ForEachScenePresence(presence =>
                 {
-                    if (presence == null || presence.IsDeleted || presence.IsChildAgent)
+                    if (presence == null || presence.IsDeleted)
                         return;
 
                     UserData cached = scene.UserManagementModule.GetUserData(presence.UUID);
