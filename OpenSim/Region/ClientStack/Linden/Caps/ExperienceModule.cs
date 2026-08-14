@@ -637,7 +637,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public UUID[] GetAgentExperiences(UUID agent_id)
         {
-            return m_ExperienceService.GetAgentExperiences(agent_id);
+            return m_ExperienceService.GetAgentExperiences(agent_id) ?? Array.Empty<UUID>();
         }
 
         public ExperienceInfo GetExperienceInfo(UUID experience_id, bool fetch)
@@ -647,7 +647,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return (ExperienceInfo)m_ExperienceInfoCache[experience_id];
             }
 
-            ExperienceInfo[] infos = m_ExperienceService.GetExperienceInfos(new UUID[] { experience_id });
+            ExperienceInfo[] infos = m_ExperienceService.GetExperienceInfos(new UUID[] { experience_id })
+                ?? Array.Empty<ExperienceInfo>();
             if (infos.Length == 1)
             {
                 m_ExperienceInfoCache.AddOrUpdate(experience_id, infos[0], CacheTimeout);
@@ -678,7 +679,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             }
             else missing.AddRange(experience_ids);
 
-            ExperienceInfo[] retrieved = m_ExperienceService.GetExperienceInfos(missing.ToArray());
+            ExperienceInfo[] retrieved = m_ExperienceService.GetExperienceInfos(missing.ToArray())
+                ?? Array.Empty<ExperienceInfo>();
 
             foreach(var info in retrieved)
             {
@@ -703,12 +705,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public ExperienceInfo[] FindExperiencesByName(string query)
         {
-            return m_ExperienceService.FindExperiencesByName(query);
+            return m_ExperienceService.FindExperiencesByName(query) ?? Array.Empty<ExperienceInfo>();
         }
 
         public UUID[] GetGroupExperiences(UUID group_id)
         {
-            return m_ExperienceService.GetGroupExperiences(group_id);
+            return m_ExperienceService.GetGroupExperiences(group_id) ?? Array.Empty<UUID>();
         }
 
         public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
@@ -745,7 +747,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (groups.Count == 0)
                 return experiences.ToArray();
 
-            var fetched_groups = m_ExperienceService.GetExperiencesForGroups(groups.ToArray());
+            var fetched_groups = m_ExperienceService.GetExperiencesForGroups(groups.ToArray())
+                ?? Array.Empty<UUID>();
             return experiences.Union(fetched_groups).ToArray();
         }
 
@@ -773,7 +776,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (groups.Count == 0)
                 return experiences.ToArray();
 
-            var fetched_groups = m_ExperienceService.GetExperiencesForGroups(groups.ToArray());
+            var fetched_groups = m_ExperienceService.GetExperiencesForGroups(groups.ToArray())
+                ?? Array.Empty<UUID>();
             return experiences.Union(fetched_groups).ToArray();
         }
 
