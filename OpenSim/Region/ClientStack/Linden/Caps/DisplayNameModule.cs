@@ -297,6 +297,18 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             }
 
             string oldName = userData.ViewerDisplayName;
+            string expectedOldName = name[0].AsString();
+            if (!string.Equals(expectedOldName, oldName, StringComparison.Ordinal))
+            {
+                SendSetDisplayNameReply(
+                    oldName, expectedOldName, userData,
+                    userData.NameChanged.AddDays(7),
+                    (int)HttpStatusCode.Conflict,
+                    "Display name changed; refresh and try again.");
+                WriteSetDisplayNameAccepted(httpResponse);
+                return;
+            }
+
             string newName = name[1].AsString().Trim();
             bool resetting = string.IsNullOrWhiteSpace(newName);
             if (resetting)
@@ -329,9 +341,14 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             m_Scene.ForEachClient(x => m_EventQueue.Enqueue(update, x.AgentId));
             SendSetDisplayNameReply(newName, oldName, userData, next_update);
 
-            httpResponse.ContentType = "application/llsd+xml";
-            httpResponse.RawBuffer = Utils.StringToBytes("<llsd><undef/></llsd>");
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            WriteSetDisplayNameAccepted(httpResponse);
+        }
+
+        private static void WriteSetDisplayNameAccepted(IOSHttpResponse response)
+        {
+            response.ContentType = "application/llsd+xml";
+            response.RawBuffer = Utils.StringToBytes("<llsd><undef/></llsd>");
+            response.StatusCode = (int)HttpStatusCode.OK;
         }
 
         private static byte[] ReadBoundedBody(IOSHttpRequest request)
@@ -379,7 +396,10 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             return nameReply;
         }
 
-        public void SendSetDisplayNameReply(string newDisplayName, string oldDisplayName, UserData nameInfo, DateTime nextUpdate)
+        public void SendSetDisplayNameReply(
+            string newDisplayName, string oldDisplayName, UserData nameInfo,
+            DateTime nextUpdate, int status = (int)HttpStatusCode.OK,
+            string reason = "OK")
         {
             var content = new OSDMap();
             content["display_name"] = OSD.FromString(nameInfo.ViewerDisplayName);
@@ -392,8 +412,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             var body = new OSDMap();
             body["content"] = content;
-            body["reason"] = OSD.FromString("OK");
-            body["status"] = OSD.FromInteger(200);
+            body["reason"] = OSD.FromString(reason);
+            body["status"] = OSD.FromInteger(status);
 
             var nameReply = new OSDMap();
             nameReply["body"] = body;
