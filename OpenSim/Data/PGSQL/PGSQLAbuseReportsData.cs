@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
+using System.Linq;
 using Npgsql;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -57,14 +58,17 @@ namespace OpenSim.Data.PGSQL
         {
             start = Math.Max(0, start);
             count = Math.Clamp(count, 1, 200);
-            string options = $"ORDER BY \"ReportID\" DESC LIMIT {count} OFFSET {start}";
-            AbuseReportData[] reports = string.IsNullOrWhiteSpace(status)
-                ? Get("1=1 " + options)
-                : Get("\"Status\" = :Status " + options,
-                    new NpgsqlParameter("Status", status));
-            foreach (AbuseReportData report in reports)
-                report.ImageData = Array.Empty<byte>();
-            return reports;
+            string columns = string.Join(",", m_Fields.Keys
+                .Where(name => name != nameof(AbuseReportData.ImageData))
+                .Select(name => "\"" + name + "\""));
+            using NpgsqlCommand cmd = new NpgsqlCommand();
+            cmd.CommandText = $"SELECT {columns}, '\\x'::bytea AS \"ImageData\" " +
+                "FROM AbuseReports " +
+                (string.IsNullOrWhiteSpace(status) ? string.Empty : "WHERE \"Status\"=:Status ") +
+                $"ORDER BY \"ReportID\" DESC LIMIT {count} OFFSET {start}";
+            if (!string.IsNullOrWhiteSpace(status))
+                cmd.Parameters.AddWithValue("Status", status);
+            return DoQuery(cmd);
         }
 
         public bool UpdateModeration(int reportID, string status, string notes,

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Reflection;
+using System.Linq;
 using MySql.Data.MySqlClient;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -79,14 +80,17 @@ namespace OpenSim.Data.MySQL
         {
             start = Math.Max(0, start);
             count = Math.Clamp(count, 1, 200);
-            string options = $"ORDER BY `ReportID` DESC LIMIT {start},{count}";
-            AbuseReportData[] reports = string.IsNullOrWhiteSpace(status)
-                ? Get("1=1 " + options)
-                : Get(new[] { nameof(AbuseReportData.Status) }, new[] { status }, options);
-
-            foreach (AbuseReportData report in reports)
-                report.ImageData = Array.Empty<byte>();
-            return reports;
+            string columns = string.Join(",", m_Fields.Keys
+                .Where(name => name != nameof(AbuseReportData.ImageData))
+                .Select(name => "`" + name + "`"));
+            using MySqlCommand cmd = new MySqlCommand();
+            cmd.CommandText = $"SELECT {columns}, CAST('' AS BINARY) AS `ImageData` " +
+                "FROM `AbuseReports` " +
+                (string.IsNullOrWhiteSpace(status) ? string.Empty : "WHERE `Status`=?Status ") +
+                $"ORDER BY `ReportID` DESC LIMIT {start},{count}";
+            if (!string.IsNullOrWhiteSpace(status))
+                cmd.Parameters.AddWithValue("Status", status);
+            return DoQuery(cmd);
         }
 
         public bool UpdateModeration(int reportID, string status, string notes,
