@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.Reflection;
+using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 
@@ -9,6 +11,8 @@ namespace OpenSim.Data
 {
     public abstract class SqlExperienceDataBase : IExperienceData
     {
+        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
         protected abstract DbConnection CreateConnection();
         protected abstract string KeyValueSizeExpression { get; }
 
@@ -138,21 +142,43 @@ namespace OpenSim.Data
             using DbDataReader reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                infos.Add(new ExperienceInfoData
-                {
-                    public_id = UUID.Parse(Convert.ToString(reader["public_id"])),
-                    owner_id = UUID.Parse(Convert.ToString(reader["owner_id"])),
-                    group_id = UUID.Parse(Convert.ToString(reader["group_id"])),
-                    name = Convert.ToString(reader["name"]),
-                    description = Convert.ToString(reader["description"]),
-                    logo = UUID.Parse(Convert.ToString(reader["logo"])),
-                    marketplace = Convert.ToString(reader["marketplace"]),
-                    slurl = Convert.ToString(reader["slurl"]),
-                    maturity = Convert.ToInt32(reader["maturity"]),
-                    properties = Convert.ToInt32(reader["properties"])
-                });
+                if (TryReadExperienceInfo(reader, out ExperienceInfoData info))
+                    infos.Add(info);
             }
             return infos.ToArray();
+        }
+
+        private static bool TryReadExperienceInfo(DbDataReader reader, out ExperienceInfoData info)
+        {
+            info = null;
+            string publicID = Convert.ToString(reader["public_id"]);
+            if (!UUID.TryParse(publicID, out UUID parsedPublicID) || parsedPublicID == UUID.Zero ||
+                !UUID.TryParse(Convert.ToString(reader["owner_id"]), out UUID ownerID) || ownerID == UUID.Zero ||
+                !UUID.TryParse(Convert.ToString(reader["group_id"]), out UUID groupID) ||
+                !UUID.TryParse(Convert.ToString(reader["logo"]), out UUID logoID) ||
+                !int.TryParse(Convert.ToString(reader["maturity"]), out int maturity) ||
+                !int.TryParse(Convert.ToString(reader["properties"]), out int properties))
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE DATA]: Ignoring malformed experience profile row {0}.",
+                    string.IsNullOrEmpty(publicID) ? "(missing public_id)" : publicID);
+                return false;
+            }
+
+            info = new ExperienceInfoData
+            {
+                public_id = parsedPublicID,
+                owner_id = ownerID,
+                group_id = groupID,
+                name = Convert.ToString(reader["name"]),
+                description = Convert.ToString(reader["description"]),
+                logo = logoID,
+                marketplace = Convert.ToString(reader["marketplace"]),
+                slurl = Convert.ToString(reader["slurl"]),
+                maturity = maturity,
+                properties = properties
+            };
+            return true;
         }
 
         private UUID[] QueryIDs(string sql, params (string Name, object Value)[] args)

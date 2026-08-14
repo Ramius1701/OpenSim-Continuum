@@ -12,6 +12,8 @@ namespace OpenSim.Data.MySQL
 {
     public class MySqlExperienceData : MySqlFramework, IExperienceData
     {
+        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
         protected virtual Assembly Assembly
         {
             get { return GetType().Assembly; }
@@ -125,19 +127,8 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            ExperienceInfoData info = new ExperienceInfoData();
-                            info.public_id = UUID.Parse(result["public_id"].ToString());
-                            info.owner_id = UUID.Parse(result["owner_id"].ToString());
-                            info.group_id = UUID.Parse(result["group_id"].ToString());
-                            info.name = result["name"].ToString();
-                            info.description = result["description"].ToString();
-                            info.logo = UUID.Parse(result["logo"].ToString());
-                            info.marketplace = result["marketplace"].ToString();
-                            info.slurl = result["slurl"].ToString();
-                            info.maturity = int.Parse(result["maturity"].ToString());
-                            info.properties = int.Parse(result["properties"].ToString());
-
-                            infos.Add(info);
+                            if (TryReadExperienceInfo(result, out ExperienceInfoData info))
+                                infos.Add(info);
                         }
                     }
                 }
@@ -218,19 +209,8 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            ExperienceInfoData info = new ExperienceInfoData();
-                            info.public_id = UUID.Parse(result["public_id"].ToString());
-                            info.owner_id = UUID.Parse(result["owner_id"].ToString());
-                            info.group_id = UUID.Parse(result["group_id"].ToString());
-                            info.name = result["name"].ToString();
-                            info.description = result["description"].ToString();
-                            info.logo = UUID.Parse(result["logo"].ToString());
-                            info.marketplace = result["marketplace"].ToString();
-                            info.slurl = result["slurl"].ToString();
-                            info.maturity = int.Parse(result["maturity"].ToString());
-                            info.properties = int.Parse(result["properties"].ToString());
-
-                            experiences.Add(info);
+                            if (TryReadExperienceInfo(result, out ExperienceInfoData info))
+                                experiences.Add(info);
                         }
                     }
                 }
@@ -239,6 +219,39 @@ namespace OpenSim.Data.MySQL
             }
 
             return experiences.ToArray();
+        }
+
+        private static bool TryReadExperienceInfo(IDataRecord result, out ExperienceInfoData info)
+        {
+            info = null;
+            string publicID = result["public_id"].ToString();
+            if (!UUID.TryParse(publicID, out UUID parsedPublicID) || parsedPublicID == UUID.Zero ||
+                !UUID.TryParse(result["owner_id"].ToString(), out UUID ownerID) || ownerID == UUID.Zero ||
+                !UUID.TryParse(result["group_id"].ToString(), out UUID groupID) ||
+                !UUID.TryParse(result["logo"].ToString(), out UUID logoID) ||
+                !int.TryParse(result["maturity"].ToString(), out int maturity) ||
+                !int.TryParse(result["properties"].ToString(), out int properties))
+            {
+                m_log.WarnFormat(
+                    "[EXPERIENCE DATA]: Ignoring malformed experience profile row {0}.",
+                    string.IsNullOrEmpty(publicID) ? "(missing public_id)" : publicID);
+                return false;
+            }
+
+            info = new ExperienceInfoData
+            {
+                public_id = parsedPublicID,
+                owner_id = ownerID,
+                group_id = groupID,
+                name = result["name"].ToString(),
+                description = result["description"].ToString(),
+                logo = logoID,
+                marketplace = result["marketplace"].ToString(),
+                slurl = result["slurl"].ToString(),
+                maturity = maturity,
+                properties = properties
+            };
+            return true;
         }
 
         public UUID[] GetGroupExperiences(UUID group_id)
