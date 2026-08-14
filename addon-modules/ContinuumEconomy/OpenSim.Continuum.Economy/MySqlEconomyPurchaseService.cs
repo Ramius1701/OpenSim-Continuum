@@ -88,8 +88,20 @@ namespace OpenSim.Continuum.Economy
                     LedgerPurchaseState.Authorized, buyerBalance, 0, sellerBalance,
                     "Authorized funds are no longer present; capture refused");
             }
-            long newBuyer = checked(buyerBalance - row.Amount);
-            long newSeller = checked(sellerBalance + row.Amount);
+            long newBuyer;
+            long newSeller;
+            try
+            {
+                newBuyer = checked(buyerBalance - row.Amount);
+                newSeller = checked(sellerBalance + row.Amount);
+            }
+            catch (OverflowException)
+            {
+                transaction.Rollback();
+                return Result(purchaseID, LedgerResultCode.InvalidRequest,
+                    LedgerPurchaseState.Authorized, buyerBalance, 0, sellerBalance,
+                    "The purchase exceeds the supported balance range");
+            }
             UpdateBalance(connection, transaction, row.BuyerID, newBuyer);
             UpdateBalance(connection, transaction, row.SellerID, newSeller);
             InsertCapturedTransfer(connection, transaction, row, newBuyer, newSeller);

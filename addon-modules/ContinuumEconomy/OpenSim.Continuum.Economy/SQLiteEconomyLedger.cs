@@ -59,7 +59,13 @@ namespace OpenSim.Continuum.Economy
                     Insert(c, t, request, hash, 2, sender, receiver, "Insufficient funds");
                     t.Commit(); return Result(request.TransactionID, LedgerResultCode.InsufficientFunds, sender, receiver, "Insufficient funds");
                 }
-                checked { sender -= request.Amount; receiver += request.Amount; }
+                try { checked { sender -= request.Amount; receiver += request.Amount; } }
+                catch (OverflowException)
+                {
+                    t.Rollback();
+                    return Result(request.TransactionID, LedgerResultCode.InvalidRequest, sender, receiver,
+                        "The transfer exceeds the supported balance range");
+                }
                 SetBalance(c, t, request.SenderID, sender); SetBalance(c, t, request.ReceiverID, receiver);
                 Insert(c, t, request, hash, 1, sender, receiver, String.Empty); t.Commit();
                 return Result(request.TransactionID, LedgerResultCode.Committed, sender, receiver, "Transfer committed");
