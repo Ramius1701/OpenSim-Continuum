@@ -398,8 +398,15 @@ namespace OpenSim.Region.Framework.Scenes
 
             item.ScriptRunning = isScriptRunning;
             AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
-            AssetService.Store(asset);
-            newAssetID = asset.FullID;
+            string storedAsset = AssetService.Store(asset);
+            if (!UUID.TryParse(storedAsset, out newAssetID) || newAssetID.IsZero())
+            {
+                m_log.ErrorFormat(
+                    "[PRIM INVENTORY]: Asset service failed to store updated script {0} in prim {1}",
+                    itemId, primId);
+                remoteClient.SendAgentAlertMessage("Unable to store the updated script asset; the existing script was not changed.", false);
+                return new ArrayList { "Unable to store the updated script asset" };
+            }
 
             //m_log.DebugFormat(
             //    "[PRIM INVENTORY]: Stored asset {0} when updating item {1} in prim {2} for {3}",
@@ -437,7 +444,7 @@ namespace OpenSim.Region.Framework.Scenes
             }
 
             // Update item with new asset
-            item.AssetID = asset.FullID;
+            item.AssetID = newAssetID;
             item.ExperienceID = experience;
             group.UpdateInventoryItem(item);
             group.InvalidateEffectivePerms();
