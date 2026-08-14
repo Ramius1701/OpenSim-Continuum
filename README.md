@@ -16,6 +16,7 @@ The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743d
 - Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
 - OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
+- When that portal phase begins, the target is the actual WhiteCore-Dev integrated WebUI—including its C# page sources, HTML templates and static assets—not a newly designed substitute; only incompatible WhiteCore backend/service boundaries are to be adapted to OpenSim/Robust
 
 Do not replace a running production installation in place. Build a separate test deployment, back up all databases and configuration, and rehearse every migration against a copy of production data.
 

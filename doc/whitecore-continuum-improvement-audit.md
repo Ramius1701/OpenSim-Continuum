@@ -512,3 +512,12 @@ predate current .NET OpenSim work. The useful performance lessons are narrower:
    disabled-by-default addons after P0 runtime acceptance.
 
 No WhiteCore WebUI implementation code is included by this audit.
+
+For the subsequent portal phase, that statement is a staging boundary rather
+than a rejection of the donor implementation. The required target is the actual
+integrated WhiteCore WebUI: its page/controller `.cs` files under
+`WhiteCore/Modules/Web/html`, its deployable `.html` templates and static assets
+under `WhiteCoreSim/bin/html`, and its `WebInterface` routing/page framework.
+OpenSim/Robust service adapters may replace incompatible WhiteCore backend
+architecture, but a newly designed replacement website is explicitly out of
+scope unless the user separately requests one.

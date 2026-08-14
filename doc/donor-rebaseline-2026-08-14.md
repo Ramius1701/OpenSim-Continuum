@@ -75,3 +75,24 @@ carried forward by Tranquillity must not be ported a second time from Mobius.
 
 No candidate advances because it compiles. Runtime certification remains a
 separate gate.
+
+## WhiteCore WebUI port contract
+
+The portal target is WhiteCore-Dev's integrated WebUI at
+`f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`, not a replacement website designed
+from scratch and not Gunthar RegionWeb. The donor contains all of the following
+and they must be inventoried together:
+
+- `WhiteCore/Modules/Web/WebInterface.cs` and the `IWebInterfacePage` contract;
+- page/controller source under `WhiteCore/Modules/Web/html/**/*.cs`;
+- deployable HTML templates under `WhiteCoreSim/bin/html/**/*.html`;
+- CSS, JavaScript, map resources, fonts, images, translations and configuration;
+- public, resident and administrator page families, including Abuse Reports,
+  estates, regions, users, purchases, transactions, search, map and profiles.
+
+Porting may replace WhiteCore registry, generic-data, authentication and service
+calls with OpenSim/Robust adapters, but it must preserve the donor's page content,
+route structure, navigation, permissions and visible workflows unless a specific
+security, licensing or current-platform incompatibility is documented. Embedded
+or generated HTML must not be overlooked. A newly invented website does not
+satisfy this requirement.
