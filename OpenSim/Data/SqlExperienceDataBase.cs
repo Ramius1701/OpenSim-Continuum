@@ -24,8 +24,14 @@ namespace OpenSim.Data
                 "SELECT experience, allow FROM experience_permissions WHERE avatar=@avatar",
                 ("@avatar", agentID.ToString()));
             using DbDataReader reader = cmd.ExecuteReader();
-            while (reader.Read() && UUID.TryParse(reader.GetString(0), out UUID experienceID))
-                permissions[experienceID] = Convert.ToBoolean(reader.GetValue(1));
+            while (reader.Read())
+            {
+                if (UUID.TryParse(Convert.ToString(reader.GetValue(0)), out UUID experienceID) &&
+                    experienceID != UUID.Zero)
+                {
+                    permissions[experienceID] = Convert.ToBoolean(reader.GetValue(1));
+                }
+            }
             return permissions;
         }
 
@@ -155,8 +161,11 @@ namespace OpenSim.Data
             using DbConnection conn = OpenConnection();
             using DbCommand cmd = Command(conn, sql, args);
             using DbDataReader reader = cmd.ExecuteReader();
-            while (reader.Read() && UUID.TryParse(Convert.ToString(reader.GetValue(0)), out UUID id))
-                ids.Add(id);
+            while (reader.Read())
+            {
+                if (UUID.TryParse(Convert.ToString(reader.GetValue(0)), out UUID id) && id != UUID.Zero)
+                    ids.Add(id);
+            }
             return ids.ToArray();
         }
 

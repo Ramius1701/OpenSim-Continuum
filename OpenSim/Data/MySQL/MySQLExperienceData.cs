@@ -52,9 +52,9 @@ namespace OpenSim.Data.MySQL
                             bool allow = result.GetBoolean(2);
 
                             UUID experience_key;
-                            if(UUID.TryParse(uuid, out experience_key))
+                            if(UUID.TryParse(uuid, out experience_key) && experience_key != UUID.Zero)
                             {
-                                experiencePermissions.Add(experience_key, allow);
+                                experiencePermissions[experience_key] = allow;
                             }
                         }
 
@@ -163,7 +163,11 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            experiences.Add(UUID.Parse(result["public_id"].ToString()));
+                            if (UUID.TryParse(result["public_id"].ToString(), out UUID experienceID) &&
+                                experienceID != UUID.Zero)
+                            {
+                                experiences.Add(experienceID);
+                            }
                         }
                     }
                 }
@@ -252,7 +256,11 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            experiences.Add(UUID.Parse(result["public_id"].ToString()));
+                            if (UUID.TryParse(result["public_id"].ToString(), out UUID experienceID) &&
+                                experienceID != UUID.Zero)
+                            {
+                                experiences.Add(experienceID);
+                            }
                         }
                     }
                 }
@@ -288,7 +296,11 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            experiences.Add(UUID.Parse(result["public_id"].ToString()));
+                            if (UUID.TryParse(result["public_id"].ToString(), out UUID experienceID) &&
+                                experienceID != UUID.Zero)
+                            {
+                                experiences.Add(experienceID);
+                            }
                         }
                     }
                 }
