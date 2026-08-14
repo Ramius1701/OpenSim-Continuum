@@ -51,7 +51,7 @@ The earlier official baseline build passed with four known CS9193 warnings. This
 
 - GuntharDeNiro/opensim is the closest active OpenSim-derived donor. RegionWeb is a per-region website module, not a grid portal.
 - WhiteCore WebUI is a separate grid-wide public/administrative interface. WhiteCore is a behavioural reference because its service, data, and module architecture is substantially divergent.
-- Mobius is the original donor lineage for Display Names, Experiences, and Abuse Reports. The recovered local archive has no Git metadata, so exact Mobius commit provenance still needs recovery before code-level attribution is complete.
+- Mobius is the original donor lineage for Display Names, Experiences, and Abuse Reports. Its GitHub repository is currently reachable and has been captured as audit ref `mobius-current/master` at `7b69b4d545b03cc909afced09b1a5431f4412349`. Traceable master-history commits include Display Names `20f50f7502` plus Hypergrid follow-up `924deef165`, and Abuse Reports `8687793883`. The separately recovered archive remains useful evidence for material not present on master.
 - Tranquillity enhances the Mobius Display Names and Experiences work and is the leading traceable service-level donor for those implementations.
 - Gunthar implements a separate Experience-Lite series. It must be reconciled against the fuller Mobius/Tranquillity service implementation rather than treated as a replacement.
 - `S:\Github\opensim-lickx` is the user-preserved last available copy of a project no longer hosted on GitHub. Its evidence checkpoint is `6614599b7506b63861763e6cae5eefde861f8749` on `master`, dated 2026-08-07. It has no configured Git remote and consists of one archival commit, so original upstream commit provenance is unresolved. Preserve that archive unchanged and treat it as evidence and a candidate source, never as authority over current OpenSim Dev or an automatic wholesale port.
@@ -90,7 +90,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 | P2 | First-run Windows setup wizard | optional addon module | Gunthar `603aa2c983e2f4d52495947010ad19656d951893`, timing fix `db1509cdc43a97df1244e72999f76e7bf838bebe` | Generalize branding/config assumptions before considering a tools package. |
 | P3 | ubODE social, contact, and water tuning | experimental feature | Gunthar series culminating in `95aec15852ce206b0acc0147a3487c6721f0c83a` | Do not port as a batch; require deterministic physics benchmarks and opt-in settings. |
 | P3 | WhiteCore WebUI | obsolete or unsuitable (as a direct donor) | WhiteCore `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa` snapshot | Use only for behavioural requirements; architecture is not a suitable OpenSim module transplant. |
-| Provenance | Mobius Display Names implementation | original feature lineage | recovered `mobius-master` archive; commit unknown | Preserve Mobius attribution while using Tranquillity's traceable enhancement history for integration. |
+| Provenance | Mobius Display Names implementation | original feature lineage | Mobius `20f50f7502`; HG follow-up `924deef165` | Compare directly while retaining Tranquillity's later enhancement history. |
 
 ## Candidate records
 
@@ -141,7 +141,7 @@ Priority reflects expected value and auditability, not authorization to implemen
 - **Addon versus core:** opt-in Robust service extension with narrowly required core interfaces/caps wiring.
 - **Compatibility:** needs standalone and Robust modes; MySQL migration/rollback and mixed-case table tests; Windows-neutral managed code; HG trust, caching, spoofing, and fallback-name rules are central. The feature commit's migration incorrectly names `useraccounts` and requires follow-up `45232b2...` to use `UserAccounts`, demonstrating that the feature commit is not safe alone on case-sensitive MySQL deployments.
 - **Viewer requirements:** viewers supporting standard Display Names caps; legacy viewers must retain account-name fallback.
-- **Licensing/provenance:** preserve Mobius as original feature lineage and Tranquillity contributors for the enhanced integration. Exact Mobius archive commit remains unresolved; both are OpenSim-derived, but file-level attribution must be retained and verified.
+- **Licensing/provenance:** preserve Mobius commits `20f50f7502` and `924deef165` as original traceable lineage and retain Tranquillity contributors for the enhanced integration. Both are OpenSim-derived; file-level attribution must be retained and verified.
 - **Tests required:** CAPS conformance, cache expiry, rate limits, Unicode/normalization, MySQL upgrade, search, HG foreign-user fallback, old viewer regression.
 - **Recommendation:** P1 production enhancement on a dedicated branch. Treat the approximately 495-added-line/17-file donor change as a design source, not a blind cherry-pick candidate.
 
@@ -257,11 +257,11 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 ### 13. Mobius Display Names origin
 
 - **Feature and intended behaviour:** original Display Names feature lineage, including caps and Hypergrid handlers later enhanced by Tranquillity.
-- **Donor and commit:** Mobius-Team/Mobius, but the recovered `mobius-master` directory lacks `.git`; exact source commit is not yet established.
+- **Donor and commit:** Mobius-Team/Mobius `20f50f7502` with Hypergrid follow-up `924deef165`; current master evidence checkpoint `7b69b4d545b03cc909afced09b1a5431f4412349`. The recovered metadata-less archive remains secondary evidence.
 - **Current Dev equivalent / missing behaviour:** Dev lacks complete Display Names; the archive contains `DisplayNamesModule`, `GetDisplayNames` handlers, and HG connectors.
 - **Affected files and services:** CAPS, region module interfaces, HG handlers/connectors, user lookup.
 - **Addon versus core:** historical reference for a Robust service extension, not an import source.
-- **Compatibility:** unknown until the exact Mobius revision is recovered; assume no current MySQL/Windows/Robust compatibility. HG protocol behaviour is useful comparative evidence.
+- **Compatibility:** the exact master revisions are now available, but their older OpenSim base still requires current MySQL/SQLite/PostgreSQL, Windows, Robust and Hypergrid comparison. HG protocol behaviour is direct comparative evidence, not an automatic port.
 - **Viewer requirements:** Display Names-capable viewer.
 - **Licensing/provenance:** blocked for code use until commit and license are tied to the archive.
 - **Tests required:** protocol comparison against Tranquillity and current viewers; no code tests until provenance is resolved.

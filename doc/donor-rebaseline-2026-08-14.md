@@ -1,0 +1,60 @@
+# Continuum donor re-baseline — 2026-08-14
+
+This checkpoint restarts the integration audit from donor evidence. Existing
+Continuum work remains preserved, but it is treated as an unverified candidate
+until each feature passes donor parity, current-OpenSim compatibility and runtime
+tests. No destructive history operation is authorized or required.
+
+## Verified checkpoints
+
+| Source | Evidence checkpoint | Role |
+|---|---|---|
+| Official OpenSim master | `78cb44c0c93dcb2af2b73b46f8cbdb56d2d7e0b7` | Current core baseline; candidate contains it and is zero commits behind. |
+| Original OpenSim Dev baseline | `247b9182c1ca0f11743de06a2808f003bc8e2a90` | Both baseline tags and `baseline/opensim-dev-2026-08-01` resolve here. |
+| Continuum candidate | `7ab7ab719421a855edefdd2c0e4607ad72c88663` | Frozen audit input; not the behavioral specification. |
+| Preserved stabilization work | `065769b51ce356819aad23ec7d8d93621aa20831` | Retained on `origin/fix/continuum-runtime-stabilization`. |
+| Mobius | `7b69b4d545b03cc909afced09b1a5431f4412349` | Original Display Names and Abuse Reports lineage; audit ref `mobius-current/master`. |
+| Tranquillity develop | `6180f402603f31e5e01e18da68fdde59d589f939` | Current donor development line. |
+| Tranquillity 1.x release | `40703bb4fccb91a06ec9091c7bf2cde32bb6ab46` | `release/v1.0` / `tranquillity-rel-1.0.37.rc` evidence. |
+| Gunthar | `6c7021cc36fd6890db27200cd65fd4bb37bd60fd` | Active OpenSim-derived fixes and optional modules. |
+| WhiteCore | `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa` | Behavioral, viewer-protocol, economy, search and later WebUI reference. |
+| opensim-lickx | `6614599b7506b63861763e6cae5eefde861f8749` | User-preserved last available archive; keep untouched. |
+
+The isolated worktree has no tracked modifications. Generated
+`bin/*.runtimeconfig.json` files remain untracked build artifacts.
+
+## Mandatory decision sequence
+
+For every candidate:
+
+1. Identify original donor files and commits, including later donor fixes.
+2. Identify current official OpenSim behavior and interfaces.
+3. Compare the candidate implementation line-by-line with both.
+4. Classify it using the donor-inventory categories.
+5. Prefer donor code and semantics. Adapt only for demonstrated current-OpenSim,
+   database, Windows, Robust, Hypergrid, security or licensing requirements.
+6. Record every retained, replaced and newly written behavior.
+7. Build focused projects and the complete solution.
+8. Run automated tests, then the documented live-grid matrix.
+
+Viewer behavior is an acceptance-test target. It is not used to invent private
+Second Life server implementation details.
+
+## Audit order
+
+1. Display Names: Mobius `20f50f7502` and `924deef165`, Tranquillity
+   `0e0953667c`, current Tranquillity 1.x, WhiteCore protocol evidence.
+2. Experiences: Tranquillity `26d3971448`, current 1.x conformance commit
+   `81e5c2449d`, Gunthar script surface, Mobius archive evidence and WhiteCore
+   viewer protocol.
+3. Abuse Reports: Mobius `8687793883`, WhiteCore moderation behavior and the
+   Continuum Robust/database adaptations.
+4. MoneyServer Compatibility and ContinuumEconomy: DTL/NSL, opensim-lickx,
+   Gunthar RegionCurrency and WhiteCore economy behavior kept as distinct lines.
+5. Search, RegionWeb, Weather, Tide, Marketplace, Groups, aliases, mute list,
+   voice/WebRTC, rendering, physics, scripting and every recovered addon.
+6. Package a controlled OpenSim live-test candidate.
+7. Start the separate OpenSim-Grid-Interface and WhiteCore WebUI phase.
+
+No candidate advances because it compiles. Runtime certification remains a
+separate gate.
