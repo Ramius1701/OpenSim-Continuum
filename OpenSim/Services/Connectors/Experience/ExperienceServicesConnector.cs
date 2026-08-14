@@ -2,6 +2,7 @@ using log4net;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -74,30 +75,30 @@ namespace OpenSim.Services.Connectors
             Dictionary<UUID, bool> experiences = new Dictionary<UUID, bool>();
 
             string reply = MakeRequest(request_str);
-            if (reply != string.Empty)
+            if (reply == string.Empty)
+                throw new WebException("Experience permission service returned no response");
+
+            Dictionary<string, object> replyData = ParseReply(reply);
+            if (replyData == null)
+                throw new InvalidDataException("Experience permission service returned a malformed response");
+
+            for (int iter = 0; iter < MaxCollectionResults; iter++)
             {
-                Dictionary<string, object> replyData = ParseReply(reply);
-                if (replyData == null)
-                    return experiences;
+                string key = string.Format("uuid_{0}", iter);
+                string perm = string.Format("perm_{0}", iter);
 
-                for (int iter = 0; iter < MaxCollectionResults; iter++)
+                if (replyData.ContainsKey(key) && replyData.ContainsKey(perm))
                 {
-                    string key = string.Format("uuid_{0}", iter);
-                    string perm = string.Format("perm_{0}", iter);
-
-                    if (replyData.ContainsKey(key) && replyData.ContainsKey(perm))
+                    if (UUID.TryParse(replyData[key]?.ToString(), out UUID experienceID) &&
+                        experienceID != UUID.Zero &&
+                        bool.TryParse(replyData[perm]?.ToString(), out bool allow))
                     {
-                        if (UUID.TryParse(replyData[key]?.ToString(), out UUID experienceID) &&
-                            experienceID != UUID.Zero &&
-                            bool.TryParse(replyData[perm]?.ToString(), out bool allow))
-                        {
-                            experiences[experienceID] = allow;
+                        experiences[experienceID] = allow;
 
-                            //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experienceID, allow);
-                        }
+                        //m_log.InfoFormat("[EXPERIENCE SERVICE CONNECTOR]: {0} = {1}", experienceID, allow);
                     }
-                    else break;
                 }
+                else break;
             }
 
             return experiences;
