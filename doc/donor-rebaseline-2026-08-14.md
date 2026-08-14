@@ -64,7 +64,8 @@ carried forward by Tranquillity must not be ported a second time from Mobius.
    [`parity-display-names.md`](parity-display-names.md).
 2. Experiences: Tranquillity `26d3971448`, current 1.x conformance commit
    `81e5c2449d`, Gunthar script surface, Mobius archive evidence and WhiteCore
-   viewer protocol.
+   viewer protocol. Findings are recorded in
+   [`parity-experiences.md`](parity-experiences.md).
 3. Abuse Reports: Mobius `8687793883`, any carried-forward Tranquillity version,
    WhiteCore moderation behavior and the Continuum Robust/database adaptations.
 4. MoneyServer Compatibility and ContinuumEconomy: DTL/NSL, opensim-lickx,
