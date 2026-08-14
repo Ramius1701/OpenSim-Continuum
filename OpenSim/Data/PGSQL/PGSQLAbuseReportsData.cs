@@ -46,11 +46,23 @@ namespace OpenSim.Data.PGSQL
 
         public AbuseReportData Get(int reportID, bool includeImage)
         {
-            AbuseReportData[] reports = Get(nameof(AbuseReportData.ReportID), reportID.ToString());
+            AbuseReportData[] reports;
+            if (includeImage)
+            {
+                reports = Get(nameof(AbuseReportData.ReportID), reportID.ToString());
+            }
+            else
+            {
+                string columns = string.Join(",", m_Fields.Keys
+                    .Where(name => name != nameof(AbuseReportData.ImageData))
+                    .Select(name => "\"" + name + "\""));
+                using NpgsqlCommand cmd = new NpgsqlCommand(
+                    $"SELECT {columns}, '\\x'::bytea AS \"ImageData\" FROM AbuseReports WHERE \"ReportID\"=:ReportID LIMIT 1");
+                cmd.Parameters.AddWithValue("ReportID", reportID);
+                reports = DoQuery(cmd);
+            }
             if (reports.Length == 0)
                 return null;
-            if (!includeImage)
-                reports[0].ImageData = Array.Empty<byte>();
             return reports[0];
         }
 
