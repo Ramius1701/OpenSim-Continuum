@@ -40,15 +40,32 @@ For every candidate:
 Viewer behavior is an acceptance-test target. It is not used to invent private
 Second Life server implementation details.
 
+## Mobius-to-Tranquillity lineage rule
+
+Mobius and Tranquillity are not assumed to be independent implementations.
+Tranquillity incorporated portions of Mobius, then carried later fixes and
+enhancements. For each affected feature the audit must establish:
+
+1. the original Mobius introduction and follow-up commits;
+2. the point at which that code entered Tranquillity;
+3. Tranquillity-only changes after incorporation; and
+4. any later Tranquillity 1.x replacement or redesign.
+
+The selected implementation is the latest compatible lineage, not the union of
+duplicate Mobius and Tranquillity patches. Mobius retains original attribution;
+Tranquillity contributors retain attribution for their deltas. A behavior already
+carried forward by Tranquillity must not be ported a second time from Mobius.
+
 ## Audit order
 
-1. Display Names: Mobius `20f50f7502` and `924deef165`, Tranquillity
-   `0e0953667c`, current Tranquillity 1.x, WhiteCore protocol evidence.
+1. Display Names: trace Mobius `20f50f7502` and `924deef165` into Tranquillity
+   `0e0953667c`, then audit only the Tranquillity and current 1.x deltas;
+   WhiteCore remains protocol evidence.
 2. Experiences: Tranquillity `26d3971448`, current 1.x conformance commit
    `81e5c2449d`, Gunthar script surface, Mobius archive evidence and WhiteCore
    viewer protocol.
-3. Abuse Reports: Mobius `8687793883`, WhiteCore moderation behavior and the
-   Continuum Robust/database adaptations.
+3. Abuse Reports: Mobius `8687793883`, any carried-forward Tranquillity version,
+   WhiteCore moderation behavior and the Continuum Robust/database adaptations.
 4. MoneyServer Compatibility and ContinuumEconomy: DTL/NSL, opensim-lickx,
    Gunthar RegionCurrency and WhiteCore economy behavior kept as distinct lines.
 5. Search, RegionWeb, Weather, Tide, Marketplace, Groups, aliases, mute list,
