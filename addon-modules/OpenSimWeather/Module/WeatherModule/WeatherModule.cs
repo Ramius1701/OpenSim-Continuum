@@ -1660,6 +1660,10 @@ namespace OpenSim.Region.OptionalModules.World.Weather
 
         private void CreateLightningFlash(UUID ownerId, Vector3 position)
         {
+            Scene scene = m_scene;
+            if (scene == null)
+                return;
+
             float flashHeight = RandomRange(26f, 46f);
             Vector3 flashCenter = new Vector3(position.X, position.Y, position.Z + flashHeight * 0.5f);
 
@@ -1684,7 +1688,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             flash.TemporaryInstance = true;
             flash.SetGroup(UUID.Zero, null);
 
-            if (!m_scene.AddNewSceneObject(flash, false))
+            if (!scene.AddNewSceneObject(flash, false))
                 return;
 
             flash.RootPart.SendFullUpdateToAllClients();
@@ -1694,21 +1698,21 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 o =>
                 {
                     Thread.Sleep(RandomRange(420, 820));
-                    DeleteLightningFlash(flash);
+                    DeleteLightningFlash(scene, flash);
                 },
                 null,
                 "WeatherModule.LightningFlash",
                 false);
         }
 
-        private void DeleteLightningFlash(SceneObjectGroup flash)
+        private void DeleteLightningFlash(Scene scene, SceneObjectGroup flash)
         {
-            if (m_scene == null || flash == null || flash.IsDeleted)
+            if (scene == null || flash == null || flash.IsDeleted)
                 return;
 
             try
             {
-                m_scene.DeleteSceneObject(flash, false, false);
+                scene.DeleteSceneObject(flash, false, false);
             }
             catch (Exception e)
             {
