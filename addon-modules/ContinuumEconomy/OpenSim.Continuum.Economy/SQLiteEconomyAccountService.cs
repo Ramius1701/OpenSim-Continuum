@@ -27,6 +27,12 @@ namespace OpenSim.Continuum.Economy
                     SQLiteEconomyStore.Add(prior,"@id",request.OperationID.ToString());object value=prior.ExecuteScalar();
                     if(value!=null){t.Commit();if(!String.Equals(Convert.ToString(value),hash,StringComparison.Ordinal)){message="The operation ID is already associated with different registration data";return LedgerResultCode.TransactionConflict;}message="Economy account already registered";return LedgerResultCode.Replayed;}
                 }
+                using(SQLiteCommand operation=c.CreateCommand())
+                {
+                    operation.Transaction=t;operation.CommandText="SELECT 1 FROM continuum_economy_operations WHERE operation_id=@id";
+                    SQLiteEconomyStore.Add(operation,"@id",request.OperationID.ToString());
+                    if(operation.ExecuteScalar()!=null){t.Commit();message="The operation ID is already associated with another economy operation";return LedgerResultCode.TransactionConflict;}
+                }
                 int? existing=null;using(SQLiteCommand q=c.CreateCommand()){q.Transaction=t;q.CommandText="SELECT account_type FROM continuum_economy_accounts WHERE account_id=@id";SQLiteEconomyStore.Add(q,"@id",request.AccountID.ToString());object value=q.ExecuteScalar();if(value!=null)existing=Convert.ToInt32(value);}
                 int type=(int)request.AccountType;if(existing.HasValue&&existing.Value!=type){t.Rollback();message="The UUID already belongs to a different economy account class";return LedgerResultCode.TransactionConflict;}
                 using(SQLiteCommand q=c.CreateCommand())

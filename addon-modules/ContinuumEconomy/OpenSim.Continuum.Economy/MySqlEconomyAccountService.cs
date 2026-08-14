@@ -90,7 +90,11 @@ namespace OpenSim.Continuum.Economy
             {
                 using MySqlConnection connection = new(m_connectionString);
                 connection.Open();
-                return ReadPrior(connection, null, request.OperationID, hash, out message) ?? LedgerResultCode.TransactionConflict;
+                LedgerResultCode? prior = ReadPrior(connection, null, request.OperationID, hash, out message);
+                if (prior.HasValue)
+                    return prior.Value;
+                message = "The operation ID is already associated with another economy operation";
+                return LedgerResultCode.TransactionConflict;
             }
         }
 
