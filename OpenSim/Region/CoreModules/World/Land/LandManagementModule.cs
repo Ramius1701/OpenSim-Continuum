@@ -722,6 +722,18 @@ namespace OpenSim.Region.CoreModules.World.Land
                         land, requiredPowers, false))
                 {
                     land.UpdateAccessList(flags, transactionID, entries);
+                    // Parcel Experience allow/block entries share the legacy
+                    // access-list transport. Persist every accepted update and
+                    // immediately revoke or grant runtime Experience policy;
+                    // otherwise the viewer appears to save the lists but they
+                    // are lost on restart and active scripts retain stale grants
+                    // until an avatar crosses a parcel boundary.
+                    m_scene.EventManager.TriggerLandObjectUpdated(
+                        (uint)land.LandData.LocalID, land);
+
+                    if ((flags & (8u | 0x10u)) != 0)
+                        m_scene.RequestModuleInterface<IExperienceModule>()?
+                            .RefreshExperiencePolicy();
                 }
             }
             else
