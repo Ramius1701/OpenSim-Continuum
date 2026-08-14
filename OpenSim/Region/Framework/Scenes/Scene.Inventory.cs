@@ -367,8 +367,10 @@ namespace OpenSim.Region.Framework.Scenes
         /// <param name="isScriptRunning">Indicates whether the script to update is currently running</param>
         /// <param name="data"></param>
         public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
-                                                       UUID primId, bool isScriptRunning, UUID experience, byte[] data)
+            UUID primId, bool isScriptRunning, UUID experience, byte[] data,
+            out UUID newAssetID)
         {
+            newAssetID = UUID.Zero;
             if (!Permissions.CanEditScript(itemId, primId, remoteClient.AgentId))
             {
                 remoteClient.SendAgentAlertMessage("Insufficient permissions to edit script", false);
@@ -397,6 +399,7 @@ namespace OpenSim.Region.Framework.Scenes
             item.ScriptRunning = isScriptRunning;
             AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
             AssetService.Store(asset);
+            newAssetID = asset.FullID;
 
             //m_log.DebugFormat(
             //    "[PRIM INVENTORY]: Stored asset {0} when updating item {1} in prim {2} for {3}",
@@ -459,15 +462,18 @@ namespace OpenSim.Region.Framework.Scenes
         /// <see>CapsUpdateTaskInventoryScriptAsset(IClientAPI, UUID, UUID, bool, byte[])</see>
         /// </summary>
         public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
-                                                        UUID primId, bool isScriptRunning, UUID experience, byte[] data)
+            UUID primId, bool isScriptRunning, UUID experience, byte[] data,
+            out UUID newAssetID)
         {
             if (TryGetScenePresence(avatarId, out ScenePresence avatar))
             {
                 return CapsUpdateTaskInventoryScriptAsset(
-                    avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data);
+                    avatar.ControllingClient, itemId, primId, isScriptRunning,
+                    experience, data, out newAssetID);
             }
             else
             {
+                newAssetID = UUID.Zero;
                 m_log.ErrorFormat("[PRIM INVENTORY]: Avatar {0} cannot be found to update its prim item asset", avatarId);
                 return new ArrayList { "Avatar session was not found" };
             }

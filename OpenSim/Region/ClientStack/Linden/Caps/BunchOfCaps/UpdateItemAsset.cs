@@ -268,11 +268,14 @@ namespace OpenSim.Region.ClientStack.Linden
         /// <param name="primID">Prim containing item to update</param>
         /// <param name="isScriptRunning">Signals whether the script to update is currently running</param>
         /// <param name="data">New asset data</param>
-        public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, ref ArrayList errors)
+        public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience,
+            byte[] data, ref UUID newAssetID, ref ArrayList errors)
         {
             if (TaskScriptUpdatedCall != null)
             {
-                ArrayList e = TaskScriptUpdatedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data);
+                ArrayList e = TaskScriptUpdatedCall(
+                    m_HostCapsObj.AgentID, itemID, primID, isScriptRunning,
+                    experience, data, out newAssetID);
                 foreach (Object item in e)
                     errors.Add(item);
             }
@@ -432,9 +435,12 @@ namespace OpenSim.Region.ClientStack.Linden
                     LLSDTaskScriptUploadComplete uploadComplete = new LLSDTaskScriptUploadComplete();
 
                     ArrayList errors = new ArrayList();
-                    OnUpLoad?.Invoke(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, ref errors);
+                    UUID newAssetID = m_inventoryItemID;
+                    OnUpLoad?.Invoke(
+                        m_inventoryItemID, m_primID, m_isScriptRunning,
+                        m_experienceKey, data, ref newAssetID, ref errors);
 
-                    uploadComplete.new_asset = m_inventoryItemID;
+                    uploadComplete.new_asset = newAssetID;
                     uploadComplete.compiled = errors.Count > 0 ? false : true;
                     uploadComplete.state = "complete";
                     uploadComplete.errors = new OpenSim.Framework.Capabilities.OSDArray();
