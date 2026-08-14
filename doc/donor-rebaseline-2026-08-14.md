@@ -66,8 +66,9 @@ carried forward by Tranquillity must not be ported a second time from Mobius.
    `81e5c2449d`, Gunthar script surface, Mobius archive evidence and WhiteCore
    viewer protocol. Findings are recorded in
    [`parity-experiences.md`](parity-experiences.md).
-3. Abuse Reports: Mobius `8687793883`, any carried-forward Tranquillity version,
-   WhiteCore moderation behavior and the Continuum Robust/database adaptations.
+3. Abuse Reports: Mobius `8687793883` and WhiteCore's moderation workflow.
+   Tranquillity current `develop` contains no carried implementation. See
+   [`parity-abuse-reports.md`](parity-abuse-reports.md).
 4. MoneyServer Compatibility and ContinuumEconomy: DTL/NSL, opensim-lickx,
    Gunthar RegionCurrency and WhiteCore economy behavior kept as distinct lines.
 5. Search, RegionWeb, Weather, Tide, Marketplace, Groups, aliases, mute list,

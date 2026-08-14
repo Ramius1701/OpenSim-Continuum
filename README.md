@@ -194,6 +194,7 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 - [2026-08-14 donor re-baseline and mandatory comparison sequence](doc/donor-rebaseline-2026-08-14.md)
 - [Display Names donor-lineage and parity audit](doc/parity-display-names.md)
 - [Experiences donor-lineage and 1.x parity audit](doc/parity-experiences.md)
+- [Abuse Reports donor-lineage and WhiteCore workflow parity audit](doc/parity-abuse-reports.md)
 - [WhiteCore-to-Continuum improvement audit](doc/whitecore-continuum-improvement-audit.md)
 - [Donor feature testing handoff](doc/donor-feature-test-handoff.md)
 - [Current integration progress and release gates](doc/integration-progress.md)
