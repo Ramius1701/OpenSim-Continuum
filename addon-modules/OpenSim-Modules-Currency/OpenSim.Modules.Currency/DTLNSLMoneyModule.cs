@@ -945,6 +945,9 @@ namespace OpenSim.Modules.Currency
         /// <param name="landBuyEvent">The land buy event.</param>
         private void ValidateLandBuy(Object sender, EventManager.LandBuyArgs landBuyEvent)
         {
+            if (landBuyEvent.parcelPrice < 0)
+                return;
+
             IClientAPI senderClient = GetLocateClient(landBuyEvent.agentId);
             if (senderClient != null)
             {
@@ -1605,6 +1608,9 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
         {
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+                return false;
+
             bool ret = false;
             IClientAPI senderClient = GetLocateClient(sender);
 
