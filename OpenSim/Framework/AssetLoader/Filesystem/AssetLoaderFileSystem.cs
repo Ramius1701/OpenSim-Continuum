@@ -145,16 +145,24 @@ namespace OpenSim.Framework.AssetLoader.Filesystem
 
                     for (int i = 0; i < source.Configs.Count; i++)
                     {
-                        string assetIdStr = source.Configs[i].GetString("assetID", UUID.Random().ToString());
+                        string assetIdStr = source.Configs[i].GetString("assetID", String.Empty).Trim();
+                        if (!UUID.TryParse(assetIdStr, out UUID assetID) || assetID.IsZero())
+                        {
+                            m_log.ErrorFormat(
+                                "[ASSETS]: asset [{0}] in [{1}] has no valid non-zero assetID; entry was skipped.",
+                                source.Configs[i].Name, assetSetPath);
+                            continue;
+                        }
+
                         string name = source.Configs[i].GetString("name", String.Empty);
                         sbyte type = (sbyte)source.Configs[i].GetInt("assetType", 0);
 
                         string assetPath =  source.Configs[i].GetString("fileName", String.Empty);
                         AssetBase newAsset;
                         if (string.IsNullOrEmpty(assetPath))
-                            newAsset = CreateAsset(assetIdStr, name, null, type);
+                            newAsset = CreateAsset(assetID.ToString(), name, null, type);
                         else
-                            newAsset = CreateAsset(assetIdStr, name, Path.Combine(dir, assetPath), type);
+                            newAsset = CreateAsset(assetID.ToString(), name, Path.Combine(dir, assetPath), type);
 
                         if (newAsset != null)
                         {
