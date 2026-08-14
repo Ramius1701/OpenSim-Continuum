@@ -103,7 +103,8 @@ namespace OpenSim.Continuum.Economy
                     if (failure.Length==0 && Exceeds(c,t,request.AccountID,request.TransactionType,week,request.WeeklyCreditLimit,request.Amount)) failure="Weekly credit limit exceeded";
                     if (failure.Length==0 && Exceeds(c,t,request.AccountID,request.TransactionType,month,request.MonthlyCreditLimit,request.Amount)) failure="Monthly credit limit exceeded";
                 }
-                if (failure.Length != 0) status=2;
+                if (failure.Length != 0)
+                    status = request.Kind == LedgerAdjustmentKind.Debit ? 2 : 3;
                 else
                 {
                     try { checked { balance += request.Kind==LedgerAdjustmentKind.Credit ? request.Amount : -request.Amount; } }
@@ -116,7 +117,9 @@ namespace OpenSim.Continuum.Economy
                     SetBalance(c,t,request.AccountID,balance);
                 }
                 InsertAdjustment(c,t,request,hash,status,balance,failure); t.Commit();
-                return Adjustment(request.OperationID,status==1?LedgerResultCode.Committed:LedgerResultCode.InsufficientFunds,balance,status==1?"Adjustment committed":failure);
+                LedgerResultCode code = status == 1 ? LedgerResultCode.Committed :
+                    status == 2 ? LedgerResultCode.InsufficientFunds : LedgerResultCode.InvalidRequest;
+                return Adjustment(request.OperationID,code,balance,status==1?"Adjustment committed":failure);
             }
         }
         public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit)
@@ -248,6 +251,6 @@ namespace OpenSim.Continuum.Economy
             Convert.ToDateTime(reader.GetValue(ordinal),CultureInfo.InvariantCulture),DateTimeKind.Utc);
         private static bool Exceeds(SQLiteConnection c,SQLiteTransaction t,Guid id,int type,DateTime since,long limit,long amount){if(limit<=0)return false;using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="SELECT COALESCE(SUM(amount),0) FROM continuum_economy_adjustments WHERE account_id=@id AND transaction_type=@type AND adjustment_kind=1 AND status=1 AND created_utc>=@since";SQLiteEconomyStore.Add(q,"@id",id.ToString());SQLiteEconomyStore.Add(q,"@type",type);SQLiteEconomyStore.Add(q,"@since",Utc(since));return Convert.ToInt64(q.ExecuteScalar(),CultureInfo.InvariantCulture)+amount>limit;}
         private static void InsertAdjustment(SQLiteConnection c,SQLiteTransaction t,LedgerAdjustmentRequest r,string hash,int status,long balance,string failure){using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="INSERT INTO continuum_economy_operations(operation_id,request_hash,operation_kind) VALUES(@id,@hash,2); INSERT INTO continuum_economy_adjustments(operation_id,request_hash,account_id,actor_id,amount,adjustment_kind,transaction_type,reason,status,resulting_balance,failure_reason) VALUES(@id,@hash,@account,@actor,@amount,@kind,@type,@reason,@status,@balance,@failure)";object[]v={r.OperationID.ToString(),hash,r.AccountID.ToString(),r.ActorID.ToString(),r.Amount,(int)r.Kind,r.TransactionType,r.Reason,status,balance,failure};string[]n={"@id","@hash","@account","@actor","@amount","@kind","@type","@reason","@status","@balance","@failure"};for(int i=0;i<n.Length;i++)SQLiteEconomyStore.Add(q,n[i],v[i]);q.ExecuteNonQuery();}
-        private static LedgerAdjustmentResult PriorAdjustment(SQLiteConnection c,SQLiteTransaction t,Guid id,string hash){using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="SELECT request_hash,status,resulting_balance,failure_reason FROM continuum_economy_adjustments WHERE operation_id=@id";SQLiteEconomyStore.Add(q,"@id",id.ToString());using SQLiteDataReader r=q.ExecuteReader();if(!r.Read())return null;if(!String.Equals(r.GetString(0),hash,StringComparison.Ordinal))return Adjustment(id,LedgerResultCode.TransactionConflict,0,"Operation ID conflict");int s=r.GetInt32(1);return Adjustment(id,s==1?LedgerResultCode.Replayed:LedgerResultCode.InsufficientFunds,r.GetInt64(2),s==1?"Adjustment already committed":r.GetString(3));}
+        private static LedgerAdjustmentResult PriorAdjustment(SQLiteConnection c,SQLiteTransaction t,Guid id,string hash){using SQLiteCommand q=c.CreateCommand();q.Transaction=t;q.CommandText="SELECT request_hash,status,resulting_balance,failure_reason FROM continuum_economy_adjustments WHERE operation_id=@id";SQLiteEconomyStore.Add(q,"@id",id.ToString());using SQLiteDataReader r=q.ExecuteReader();if(!r.Read())return null;if(!String.Equals(r.GetString(0),hash,StringComparison.Ordinal))return Adjustment(id,LedgerResultCode.TransactionConflict,0,"Operation ID conflict");int s=r.GetInt32(1);LedgerResultCode code=s==1?LedgerResultCode.Replayed:s==2?LedgerResultCode.InsufficientFunds:LedgerResultCode.InvalidRequest;return Adjustment(id,code,r.GetInt64(2),s==1?"Adjustment already committed":r.GetString(3));}
     }
 }
