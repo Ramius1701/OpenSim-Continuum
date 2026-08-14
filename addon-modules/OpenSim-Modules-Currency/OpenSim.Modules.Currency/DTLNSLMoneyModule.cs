@@ -836,10 +836,30 @@ namespace OpenSim.Modules.Currency
         {
             if (m_enable_server && client != null)
             {
-                LogoffMoneyServer(client);
+                if (!HasOtherRootClient(client))
+                    LogoffMoneyServer(client);
 
                 m_log.InfoFormat("[MONEY MODULE] ClientClosed: {0}", client.AgentId);
             }
+
+            UnsubscribeClient(client);
+        }
+
+        private bool HasOtherRootClient(IClientAPI closingClient)
+        {
+            lock (m_sceneList)
+            {
+                foreach (Scene scene in m_sceneList.Values)
+                {
+                    ScenePresence presence = scene.GetScenePresence(closingClient.AgentId);
+                    if (presence != null && !presence.IsChildAgent &&
+                        presence.ControllingClient != null &&
+                        !ReferenceEquals(presence.ControllingClient, closingClient))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
 

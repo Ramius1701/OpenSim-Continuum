@@ -1953,8 +1953,14 @@ namespace OpenSim.Grid.MoneyServer
             GetSSLCommonName(request);
 
             string clientUUID = string.Empty;
+            string sessionID = string.Empty;
+            string secureSessionID = string.Empty;
             if (!TryReadString(requestData, "clientUUID", ref clientUUID) ||
-                !UUID.TryParse(clientUUID, out UUID parsedClientUUID) || parsedClientUUID == UUID.Zero)
+                !UUID.TryParse(clientUUID, out UUID parsedClientUUID) || parsedClientUUID == UUID.Zero ||
+                !TryReadString(requestData, "clientSessionID", ref sessionID) ||
+                !UUID.TryParse(sessionID, out UUID parsedSessionID) || parsedSessionID == UUID.Zero ||
+                !TryReadString(requestData, "clientSecureSessionID", ref secureSessionID) ||
+                !UUID.TryParse(secureSessionID, out UUID parsedSecureSessionID) || parsedSecureSessionID == UUID.Zero)
                 return response;
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleClientLogout: User {0} is logging off.", clientUUID);
@@ -1962,6 +1968,15 @@ namespace OpenSim.Grid.MoneyServer
             {
                 lock (m_sessionDic)
                 {
+                    if (!m_sessionDic.TryGetValue(clientUUID, out string activeSessionID) ||
+                        !m_secureSessionDic.TryGetValue(clientUUID, out string activeSecureSessionID) ||
+                        !String.Equals(activeSessionID, sessionID, StringComparison.OrdinalIgnoreCase) ||
+                        !String.Equals(activeSecureSessionID, secureSessionID, StringComparison.OrdinalIgnoreCase))
+                    {
+                        responseData["description"] = "Session changed or is no longer active";
+                        return response;
+                    }
+
                     m_sessionDic.Remove(clientUUID);
                     m_secureSessionDic.Remove(clientUUID);
                 }

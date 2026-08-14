@@ -130,9 +130,20 @@ namespace ContinuumEconomy.Service
 
         private XmlRpcResponse Logout(XmlRpcRequest request, IPEndPoint remote)
         {
-            Hashtable p=Parameters(request);
-            if(!Authenticated(p,"clientUUID","clientSessionID","clientSecureSessionID",out Guid agent))return Failure("Invalid session");
-            m_sessions.TryRemove(agent,out _);return Reply(new Hashtable{{"success",true}});
+            Hashtable p = Parameters(request);
+            if (!Secret(p) || !Guid.TryParse(Text(p, "clientUUID"), out Guid agent) || agent == Guid.Empty ||
+                !Guid.TryParse(Text(p, "clientSessionID"), out Guid session) ||
+                !Guid.TryParse(Text(p, "clientSecureSessionID"), out Guid secure) ||
+                !m_sessions.TryGetValue(agent, out Session known) ||
+                known.SessionID != session || known.SecureSessionID != secure)
+                return Failure("Invalid session");
+
+            // Remove only the session that was authenticated above. A destination
+            // region may replace it between the lookup and removal during a crossing.
+            bool removed = ((System.Collections.Generic.ICollection<
+                System.Collections.Generic.KeyValuePair<Guid, Session>>)m_sessions).Remove(
+                    new System.Collections.Generic.KeyValuePair<Guid, Session>(agent, known));
+            return removed ? Reply(new Hashtable { { "success", true } }) : Failure("Session changed");
         }
 
         private XmlRpcResponse Balance(XmlRpcRequest request,IPEndPoint remote)

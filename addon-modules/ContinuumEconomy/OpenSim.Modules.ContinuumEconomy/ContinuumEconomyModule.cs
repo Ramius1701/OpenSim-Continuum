@@ -839,10 +839,33 @@ namespace OpenSim.Modules.ContinuumEconomy
         {
             if (m_enable_server && client != null)
             {
-                LogoffMoneyServer(client);
+                // During a region crossing the source circuit can close after the
+                // destination has become root. Do not invalidate the grid-wide
+                // service session that the destination is actively using.
+                if (!HasOtherRootClient(client))
+                    LogoffMoneyServer(client);
 
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] ClientClosed: {0}", client.AgentId);
             }
+
+            UnsubscribeClient(client);
+        }
+
+        private bool HasOtherRootClient(IClientAPI closingClient)
+        {
+            lock (m_sceneList)
+            {
+                foreach (Scene scene in m_sceneList.Values)
+                {
+                    ScenePresence presence = scene.GetScenePresence(closingClient.AgentId);
+                    if (presence != null && !presence.IsChildAgent &&
+                        presence.ControllingClient != null &&
+                        !ReferenceEquals(presence.ControllingClient, closingClient))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
 
