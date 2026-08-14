@@ -23,6 +23,7 @@ namespace OpenSim.Services.ExperienceService
 
         // Second Life exposes a 128 MiB key-value quota per Experience.
         private const int MAX_QUOTA = 1024 * 1024 * 128;
+        private const int MAX_KEY_BYTES = 1011;
         private const int MAX_NAME_LENGTH = 42;
         private const int MAX_DESCRIPTION_LENGTH = 128;
         private const int MAX_SLURL_LENGTH = 256;
@@ -312,14 +313,15 @@ namespace OpenSim.Services.ExperienceService
 
         public string GetKeyValue(UUID experience, string key)
         {
-            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key))
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || Utf8Size(key) > MAX_KEY_BYTES)
                 return null;
             return m_Database.GetKeyValue(experience, key);
         }
 
         public string CreateKeyValue(UUID experience, string key, string value)
         {
-            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || value == null)
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) ||
+                Utf8Size(key) > MAX_KEY_BYTES || value == null)
                 return "error";
 
             lock (m_KeyValueLock)
@@ -337,7 +339,8 @@ namespace OpenSim.Services.ExperienceService
 
         public string UpdateKeyValue(UUID experience, string key, string val, bool check, string original)
         {
-            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || val == null || (check && original == null))
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) ||
+                Utf8Size(key) > MAX_KEY_BYTES || val == null || (check && original == null))
                 return "error";
 
             lock (m_KeyValueLock)
@@ -359,7 +362,7 @@ namespace OpenSim.Services.ExperienceService
 
         public string DeleteKey(UUID experience, string key)
         {
-            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key))
+            if (!CanUseKeyValueStore(experience) || string.IsNullOrEmpty(key) || Utf8Size(key) > MAX_KEY_BYTES)
                 return "failed";
 
             lock (m_KeyValueLock)

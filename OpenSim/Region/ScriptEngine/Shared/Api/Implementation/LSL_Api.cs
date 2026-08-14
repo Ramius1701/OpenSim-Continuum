@@ -20876,13 +20876,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             else return new LSL_Integer(ScriptBaseClass.SIT_INVALID_AGENT);
         }
 
+        private const int MAX_EXPERIENCE_KEY_BYTES = 1011;
+
         public LSL_Key llCreateKeyValue(string key, string value)
         {
             Action<string> act = eventID =>
             {
                 string response;
 
-                if (m_item.ExperienceID != UUID.Zero)
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES || value == null)
+                {
+                    response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
+                }
+                else if (m_item.ExperienceID != UUID.Zero)
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {
@@ -20919,7 +20925,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (m_item.ExperienceID != UUID.Zero)
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES)
+                {
+                    response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
+                }
+                else if (m_item.ExperienceID != UUID.Zero)
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {
@@ -20927,7 +20937,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         if (delete == "success")
                             response = "1,delete";
                         else if (delete == "missing")
-                            response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_STORAGE_EXCEPTION);
+                            response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_KEY_NOT_FOUND);
                         else
                             response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_UNKNOWN_ERROR);
                     }
@@ -20954,7 +20964,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (m_item.ExperienceID != UUID.Zero)
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES)
+                {
+                    response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
+                }
+                else if (m_item.ExperienceID != UUID.Zero)
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {
@@ -20987,7 +21001,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (m_item.ExperienceID != UUID.Zero)
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES || value == null ||
+                    (check != 0 && original == null))
+                {
+                    response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
+                }
+                else if (m_item.ExperienceID != UUID.Zero)
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {

@@ -2277,6 +2277,7 @@ namespace OpenSim.Region.ClientStack.Linden
             string[] ids = query.GetValues("ids") ?? Array.Empty<string>();
             string username = query.Get("username");
             string badUsername = null;
+            List<UUID> badIDs = new();
 
             if (ids.Length > 100)
             {
@@ -2314,6 +2315,17 @@ namespace OpenSim.Region.ClientStack.Linden
                 }
 
                 List<UserData> names = m_UserManager.GetKnownUsers(ids, m_scopeID);
+                HashSet<UUID> resolvedIDs = new(names.Count);
+                foreach (UserData name in names)
+                    resolvedIDs.Add(name.Id);
+
+                foreach (string id in ids)
+                {
+                    if (UUID.TryParse(id, out UUID requestedID) && !requestedID.IsZero()
+                        && !resolvedIDs.Contains(requestedID) && !badIDs.Contains(requestedID))
+                        badIDs.Add(requestedID);
+                }
+
                 lsl = LLSDxmlEncode2.Start(names.Count * 256 + 256);
 
                 LLSDxmlEncode2.AddMap(lsl);
@@ -2344,7 +2356,15 @@ namespace OpenSim.Region.ClientStack.Linden
                 }
             }
 
-            LLSDxmlEncode2.AddEmptyArray("bad_ids", lsl);
+            if (badIDs.Count == 0)
+                LLSDxmlEncode2.AddEmptyArray("bad_ids", lsl);
+            else
+            {
+                LLSDxmlEncode2.AddArray("bad_ids", lsl);
+                foreach (UUID badID in badIDs)
+                    LLSDxmlEncode2.AddElem(badID, lsl);
+                LLSDxmlEncode2.AddEndArray(lsl);
+            }
             if (badUsername is null)
                 LLSDxmlEncode2.AddEmptyArray("bad_usernames", lsl);
             else
