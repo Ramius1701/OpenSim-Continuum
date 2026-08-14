@@ -741,8 +741,10 @@ namespace OpenSimSearch.Modules.OpenSearch
                 ArrayList dataArray = (ArrayList)result["data"];
 
                 List<mapItemReply> mapitems = new();
-                string ParcelRegionUUID;
-                string[] landingpoint;
+                Scene[] scenes;
+                lock (m_Scenes)
+                    scenes = m_Scenes.ToArray();
+                Scene searchScene = scenes.Length == 0 ? null : scenes[0];
 
                 foreach (Object o in dataArray)
                 {
@@ -752,26 +754,8 @@ namespace OpenSimSearch.Modules.OpenSearch
                         continue;
 
                     mapItemReply mapitem = new();
-
-                    ParcelRegionUUID = d["region_UUID"].ToString();
-
-                    Scene[] scenes;
-                    lock (m_Scenes)
-                        scenes = m_Scenes.ToArray();
-
-                    foreach (Scene scene in scenes)
-                    {
-                        if (scene.RegionInfo.RegionID.ToString() == ParcelRegionUUID)
-                        {
-                            landingpoint = d["landing_point"].ToString().Split('/');
-
-                            mapitem.x = (uint)((scene.RegionInfo.RegionLocX * 256) +
-                                                Convert.ToDecimal(landingpoint[0]));
-                            mapitem.y = (uint)((scene.RegionInfo.RegionLocY * 256) +
-                                                Convert.ToDecimal(landingpoint[1]));
-                            break;
-                        }
-                    }
+                    if (!TryResolveLandMapPosition(d, scenes, searchScene, out mapitem.x, out mapitem.y))
+                        continue;
 
                     mapitem.id = new UUID(d["parcel_id"].ToString());
                     mapitem.Extra = Convert.ToInt32(d["area"]);
@@ -859,6 +843,63 @@ namespace OpenSimSearch.Modules.OpenSearch
                 remoteClient.SendMapItemReply(mapitems.ToArray(), itemtype, flags);
                 mapitems.Clear();
             }
+        }
+
+        private static bool TryResolveLandMapPosition(Hashtable data, Scene[] scenes,
+            Scene searchScene, out uint globalX, out uint globalY)
+        {
+            globalX = 0;
+            globalY = 0;
+            if (data["region_UUID"] == null || data["landing_point"] == null ||
+                !UUID.TryParse(data["region_UUID"].ToString(), out UUID regionID) || regionID == UUID.Zero)
+                return false;
+
+            string[] landing = data["landing_point"].ToString().Split('/');
+            if (landing.Length < 2 ||
+                !Decimal.TryParse(landing[0], NumberStyles.Float, CultureInfo.InvariantCulture, out decimal localX) ||
+                !Decimal.TryParse(landing[1], NumberStyles.Float, CultureInfo.InvariantCulture, out decimal localY) ||
+                localX < 0 || localY < 0)
+                return false;
+
+            decimal baseX = -1;
+            decimal baseY = -1;
+            foreach (Scene scene in scenes)
+            {
+                if (scene.RegionInfo.RegionID == regionID)
+                {
+                    baseX = scene.RegionInfo.WorldLocX;
+                    baseY = scene.RegionInfo.WorldLocY;
+                    break;
+                }
+            }
+
+            if (baseX < 0 && searchScene?.GridService != null)
+            {
+                try
+                {
+                    OpenSim.Services.Interfaces.GridRegion region = searchScene.GridService.GetRegionByUUID(
+                        searchScene.RegionInfo.ScopeID, regionID);
+                    if (region != null)
+                    {
+                        baseX = region.RegionLocX;
+                        baseY = region.RegionLocY;
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[SEARCH]: Unable to resolve region {0} for a land map result: {1}",
+                        regionID, e.Message);
+                }
+            }
+
+            decimal x = baseX + localX;
+            decimal y = baseY + localY;
+            if (baseX < 0 || baseY < 0 || x < 0 || y < 0 || x > UInt32.MaxValue || y > UInt32.MaxValue)
+                return false;
+
+            globalX = Decimal.ToUInt32(x);
+            globalY = Decimal.ToUInt32(y);
+            return true;
         }
 
         public void Refresh()
