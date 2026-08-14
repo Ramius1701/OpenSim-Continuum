@@ -197,20 +197,23 @@ namespace OpenSim.Region.ClientStack.Linden
                     return;
                 }
 
-                TaskInventoryItem taskItem = sop.Inventory.GetInventoryItem(itemID);
-                if (taskItem == null)
-                {
-                    LLSDAssetUploadError error = new LLSDAssetUploadError();
-                    error.message = "script inventory item not found";
-                    error.identifier = itemID;
-                    httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(error));
-                    return;
-                }
-
                 // Older viewers omit the Experience field when saving a script.
-                // Absence means "unchanged"; an explicit zero UUID means detach.
+                // Only those requests need an early inventory read to preserve
+                // the association. Current viewers provide the field, so avoid
+                // racing a newly rezzed script's inventory synchronization.
                 if (!experience_provided)
+                {
+                    TaskInventoryItem taskItem = sop.Inventory.GetInventoryItem(itemID);
+                    if (taskItem == null)
+                    {
+                        LLSDAssetUploadError error = new LLSDAssetUploadError();
+                        error.message = "script inventory item not found";
+                        error.identifier = itemID;
+                        httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(error));
+                        return;
+                    }
                     experience_key = taskItem.ExperienceID;
+                }
 
                 if (!m_Scene.Permissions.CanEditObjectInventory(objectID, m_AgentID))
                 {
