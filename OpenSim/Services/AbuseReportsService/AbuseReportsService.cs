@@ -85,7 +85,16 @@ namespace OpenSim.Services.AbuseReportsService
 
             try
             {
-                return m_Database.Store(report);
+                if (!m_Database.Store(report))
+                    return false;
+
+                if (report.ReportID > 0)
+                    return true;
+
+                m_log.ErrorFormat(
+                    "[ABUSE REPORTS SERVICE]: Storage provider accepted report from {0} but assigned no valid report ID.",
+                    report.SenderID);
+                return false;
             }
             catch (Exception e)
             {

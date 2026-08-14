@@ -62,7 +62,7 @@ namespace OpenSim.Data.MySQL
             if (cmd.LastInsertedId > 0 && cmd.LastInsertedId <= int.MaxValue)
                 row.ReportID = (int)cmd.LastInsertedId;
 
-            return true;
+            return row.ReportID > 0;
         }
 
         public AbuseReportData Get(int reportID, bool includeImage)
