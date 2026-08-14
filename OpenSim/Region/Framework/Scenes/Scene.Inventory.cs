@@ -372,13 +372,13 @@ namespace OpenSim.Region.Framework.Scenes
             if (!Permissions.CanEditScript(itemId, primId, remoteClient.AgentId))
             {
                 remoteClient.SendAgentAlertMessage("Insufficient permissions to edit script", false);
-                return new ArrayList();
+                return new ArrayList { "Insufficient permissions to edit script" };
             }
 
             // Retrieve group
             SceneObjectPart part = GetSceneObjectPart(primId);
             if (part is null)
-                return new ArrayList();
+                return new ArrayList { "Object containing the script was not found" };
 
             SceneObjectGroup group = part.ParentGroup;
 
@@ -391,7 +391,7 @@ namespace OpenSim.Region.Framework.Scenes
                         + " but the item does not exist in this inventory",
                     itemId, part.Name, part.UUID);
 
-                return new ArrayList();
+                return new ArrayList { "Script inventory item was not found" };
             }
 
             item.ScriptRunning = isScriptRunning;
@@ -416,11 +416,20 @@ namespace OpenSim.Region.Framework.Scenes
 
                 if (!allowed_to_contribute)
                 {
-                    experience = UUID.Zero;
                     errors = new ArrayList(1);
-                    errors.Add(experienceModule == null
-                        ? "Experience service is unavailable; the script was saved without an experience and was not started."
-                        : "Access denied to experience!");
+                    if (experienceModule == null)
+                    {
+                        // A temporary service outage must not destroy the
+                        // script's persisted Experience association or accept
+                        // an unvalidated replacement supplied by a client.
+                        experience = item.ExperienceID;
+                        errors.Add("Experience service is unavailable; the script was saved with its existing experience and was not started.");
+                    }
+                    else
+                    {
+                        experience = UUID.Zero;
+                        errors.Add("Access denied to experience!");
+                    }
                 }
             }
 
@@ -460,7 +469,7 @@ namespace OpenSim.Region.Framework.Scenes
             else
             {
                 m_log.ErrorFormat("[PRIM INVENTORY]: Avatar {0} cannot be found to update its prim item asset", avatarId);
-                return new ArrayList();
+                return new ArrayList { "Avatar session was not found" };
             }
         }
 

@@ -160,6 +160,7 @@ namespace OpenSim.Region.ClientStack.Linden
                 UUID objectID = UUID.Zero;
                 bool is_script_running = false;
                 UUID experience_key = UUID.Zero;
+                bool experience_provided = false;
                 OSD tmp;
                 try
                 {
@@ -170,7 +171,10 @@ namespace OpenSim.Region.ClientStack.Linden
                     if (map.TryGetValue("is_script_running", out tmp))
                         is_script_running = tmp;
                     if (map.TryGetValue("experience", out tmp))
+                    {
                         experience_key = tmp;
+                        experience_provided = true;
+                    }
                 }
                 catch { }
 
@@ -193,10 +197,25 @@ namespace OpenSim.Region.ClientStack.Linden
                     return;
                 }
 
+                TaskInventoryItem taskItem = sop.Inventory.GetInventoryItem(itemID);
+                if (taskItem == null)
+                {
+                    LLSDAssetUploadError error = new LLSDAssetUploadError();
+                    error.message = "script inventory item not found";
+                    error.identifier = itemID;
+                    httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(error));
+                    return;
+                }
+
+                // Older viewers omit the Experience field when saving a script.
+                // Absence means "unchanged"; an explicit zero UUID means detach.
+                if (!experience_provided)
+                    experience_key = taskItem.ExperienceID;
+
                 if (!m_Scene.Permissions.CanEditObjectInventory(objectID, m_AgentID))
                 {
                     LLSDAssetUploadError error = new LLSDAssetUploadError();
-                    error.message = "No permissions to edit objec";
+                    error.message = "No permissions to edit object";
                     error.identifier = UUID.Zero;
                     httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(error));
                     return;
