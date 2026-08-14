@@ -1059,8 +1059,16 @@ namespace OpenSim.Modules.ContinuumEconomy
                         //
                         if (salePrice == 0)
                         {
-                            mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
-                            ret = true;
+                            try
+                            {
+                                mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                                ret = true;
+                            }
+                            catch (Exception e)
+                            {
+                                m_log.ErrorFormat(
+                                    "[CONTINUUM ECONOMY MODULE]: Free object delivery failed: {0}", e);
+                            }
                         }
                         else if (salePrice > 0)
                         {
@@ -1076,10 +1084,13 @@ namespace OpenSim.Modules.ContinuumEconomy
                                         mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
                                         ret = CompletePurchase(purchaseID, remoteClient.AgentId, true);
                                     }
-                                    catch
+                                    catch (Exception e)
                                     {
                                         CompletePurchase(purchaseID, remoteClient.AgentId, false);
-                                        throw;
+                                        ret = false;
+                                        m_log.ErrorFormat(
+                                            "[CONTINUUM ECONOMY MODULE]: Object delivery failed for purchase {0}: {1}",
+                                            purchaseID, e);
                                     }
                                 }
                             }

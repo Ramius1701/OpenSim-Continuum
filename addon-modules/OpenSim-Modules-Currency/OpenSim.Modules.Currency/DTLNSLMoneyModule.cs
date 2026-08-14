@@ -1066,9 +1066,20 @@ namespace OpenSim.Modules.Currency
                         }
                         if (ret)
                         {
-                            mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                            try
+                            {
+                                mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                            }
+                            catch (Exception e)
+                            {
+                                ret = false;
+                                m_log.ErrorFormat(
+                                    "[MONEY MODULE]: Object delivery failed after MoneyServer payment: {0}",
+                                    e);
+                            }
                         }
-                        else
+
+                        if (!ret)
                         {
                             remoteClient.SendAgentAlertMessage("Unable to complete the object purchase", false);
                         }
