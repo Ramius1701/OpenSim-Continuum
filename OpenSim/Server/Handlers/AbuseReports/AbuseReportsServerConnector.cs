@@ -37,8 +37,22 @@ namespace OpenSim.Server.Handlers.AbuseReports
                 throw new Exception("Could not load IAbuseReportsService from " + service);
 
             IServiceAuth auth = ServiceAuth.Create(config, sectionName);
+            int maxScreenshotBytes = Math.Clamp(
+                serverConfig.GetInt("MaxScreenshotBytes", 5 * 1024 * 1024),
+                0,
+                20 * 1024 * 1024);
+            // The form-encoded base64 screenshot is larger than its binary
+            // source. Scale from the established 8 MiB transport allowance
+            // for a 5 MiB screenshot and keep the handler strictly bounded.
+            int maxRequestBodyBytes = Math.Max(
+                8 * 1024 * 1024,
+                (int)Math.Min(32L * 1024 * 1024,
+                    ((long)maxScreenshotBytes * 8 + 4) / 5));
             server.AddStreamHandler(
-                new AbuseReportsServerPostHandler(abuseReportsService, auth));
+                new AbuseReportsServerPostHandler(
+                    abuseReportsService,
+                    auth,
+                    maxRequestBodyBytes));
         }
     }
 }

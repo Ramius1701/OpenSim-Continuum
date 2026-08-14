@@ -89,6 +89,7 @@ namespace OpenSim.Region.ClientStack.Linden
             }
 
             scene.EventManager.OnRegisterCaps += RegisterCaps;
+            scene.EventManager.OnClientClosed += OnClientClosed;
             m_CapsEventRegistered = true;
 
             m_log.InfoFormat(
@@ -101,6 +102,7 @@ namespace OpenSim.Region.ClientStack.Linden
             if (m_CapsEventRegistered)
             {
                 scene.EventManager.OnRegisterCaps -= RegisterCaps;
+                scene.EventManager.OnClientClosed -= OnClientClosed;
                 m_CapsEventRegistered = false;
             }
 
@@ -156,6 +158,20 @@ namespace OpenSim.Region.ClientStack.Linden
             caps.RegisterHandler(
                 "SendUserReportWithScreenshot",
                 sendUserReportWithScreenshotHandler);
+        }
+
+        private void OnClientClosed(UUID agentID, Scene scene)
+        {
+            string uploaderPath = null;
+            IHttpServer uploaderServer = null;
+            lock (m_UploadersLock)
+            {
+                if (m_AgentUploaders.Remove(agentID, out uploaderPath))
+                    m_PendingUploaders.Remove(uploaderPath, out uploaderServer);
+            }
+
+            if (uploaderServer != null)
+                uploaderServer.RemoveStreamHandler("POST", uploaderPath);
         }
 
         private AbuseReportData AbuseReportDataFromOSD(OSDMap map)

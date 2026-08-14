@@ -18,18 +18,24 @@ namespace OpenSim.Server.Handlers.AbuseReports
     {
         // A 5 MiB screenshot expands to roughly 6.7 MiB as base64. Leave
         // bounded room for report fields while rejecting unbounded/chunked data.
-        private const int MaxRequestBodyBytes = 8 * 1024 * 1024;
+        private const int DefaultMaxRequestBodyBytes = 8 * 1024 * 1024;
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly IAbuseReportsService m_Service;
+        private readonly int m_MaxRequestBodyBytes;
 
         public AbuseReportsServerPostHandler(
             IAbuseReportsService service,
-            IServiceAuth auth)
+            IServiceAuth auth,
+            int maxRequestBodyBytes = DefaultMaxRequestBodyBytes)
             : base("POST", "/abuse", auth)
         {
             m_Service = service ?? throw new ArgumentNullException(nameof(service));
+            m_MaxRequestBodyBytes = Math.Clamp(
+                maxRequestBodyBytes,
+                1024 * 1024,
+                32 * 1024 * 1024);
         }
 
         protected override byte[] ProcessRequest(
@@ -281,11 +287,11 @@ namespace OpenSim.Server.Handlers.AbuseReports
             return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
         }
 
-        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        private string ReadBoundedBody(Stream input, IOSHttpRequest request)
         {
             if (input == null)
                 throw new InvalidDataException("Request body is unavailable.");
-            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+            if (request != null && request.ContentLength64 > m_MaxRequestBodyBytes)
                 throw new InvalidDataException("Request body exceeds the service limit.");
 
             using (MemoryStream body = new MemoryStream())
@@ -296,7 +302,7 @@ namespace OpenSim.Server.Handlers.AbuseReports
                 while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
                 {
                     total += read;
-                    if (total > MaxRequestBodyBytes)
+                    if (total > m_MaxRequestBodyBytes)
                         throw new InvalidDataException("Request body exceeds the service limit.");
                     body.Write(buffer, 0, read);
                 }
