@@ -119,10 +119,18 @@ namespace OpenSim.Services.Connectors
                 return Array.Empty<AbuseReportData>();
 
             reportCount = Math.Clamp(reportCount, 0, 200);
-            AbuseReportData[] reports = new AbuseReportData[reportCount];
+            List<AbuseReportData> reports = new List<AbuseReportData>(reportCount);
             for (int i = 0; i < reportCount; i++)
-                reports[i] = ParseReport(reply, $"report-{i}-");
-            return reports;
+            {
+                AbuseReportData report = ParseReport(reply, $"report-{i}-");
+                if (report != null)
+                    reports.Add(report);
+                else
+                    m_log.WarnFormat(
+                        "[ABUSE REPORTS CONNECTOR]: Ignored malformed report entry {0} in list reply.",
+                        i);
+            }
+            return reports.ToArray();
         }
 
         public bool UpdateReport(int reportID, string status, string notes,
@@ -213,15 +221,26 @@ namespace OpenSim.Services.Connectors
 
         private AbuseReportData ParseReport(Dictionary<string, object> data, string prefix)
         {
-            AbuseReportData report = new AbuseReportData();
-            TryGetInt(data, prefix + "id", out report.ReportID);
+            if (!TryGetInt(data, prefix + "id", out int reportID) || reportID < 1 ||
+                !UUID.TryParse(GetString(data, prefix + "reporter"), out UUID senderID) ||
+                senderID == UUID.Zero ||
+                !UUID.TryParse(GetString(data, prefix + "region-id"), out UUID regionID) ||
+                regionID == UUID.Zero)
+            {
+                return null;
+            }
+
+            AbuseReportData report = new AbuseReportData
+            {
+                ReportID = reportID,
+                SenderID = senderID,
+                AbuseRegionID = regionID
+            };
             TryGetInt(data, prefix + "time", out report.Time);
             TryGetInt(data, prefix + "check-flags", out report.CheckFlags);
             TryGetInt(data, prefix + "report-type", out report.ReportType);
             TryGetInt(data, prefix + "last-updated", out report.LastUpdated);
-            UUID.TryParse(GetString(data, prefix + "reporter"), out report.SenderID);
             UUID.TryParse(GetString(data, prefix + "abuser"), out report.AbuserID);
-            UUID.TryParse(GetString(data, prefix + "region-id"), out report.AbuseRegionID);
             UUID.TryParse(GetString(data, prefix + "object-id"), out report.ObjectID);
             UUID.TryParse(GetString(data, prefix + "moderator-id"), out report.ModeratorID);
             report.SenderName = GetString(data, prefix + "reporter-name");
