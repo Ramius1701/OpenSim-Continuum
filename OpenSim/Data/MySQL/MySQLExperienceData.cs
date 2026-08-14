@@ -206,7 +206,7 @@ namespace OpenSim.Data.MySQL
             {
                 dbcon.Open();
 
-                using (MySqlCommand cmd = new MySqlCommand("SELECT * FROM `experiences` WHERE name LIKE ?search", dbcon))
+                using (MySqlCommand cmd = new MySqlCommand("SELECT * FROM `experiences` WHERE name LIKE ?search LIMIT 1000", dbcon))
                 {
                     cmd.Parameters.AddWithValue("?search", string.Format("%{0}%", search ?? string.Empty));
 

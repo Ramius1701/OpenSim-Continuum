@@ -58,7 +58,7 @@ namespace OpenSim.Data
         }
 
         public ExperienceInfoData[] FindExperiences(string search) =>
-            QueryExperienceInfos("name LIKE @search", new[] { ("@search", (object)("%" + (search ?? string.Empty) + "%")) });
+            QueryExperienceInfos("name LIKE @search LIMIT 1000", new[] { ("@search", (object)("%" + (search ?? string.Empty) + "%")) });
 
         public UUID[] GetAgentExperiences(UUID agentID) =>
             QueryIDs("SELECT public_id FROM experiences WHERE owner_id=@id", ("@id", agentID.ToString()));
