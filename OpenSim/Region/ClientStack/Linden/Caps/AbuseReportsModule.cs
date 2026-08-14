@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Text;
 using System.Collections.Generic;
+using System.Threading;
 using log4net;
 using Mono.Addins;
 using Nini.Config;
@@ -29,9 +30,11 @@ namespace OpenSim.Region.ClientStack.Linden
         private IUserManagement m_UserManager;
         private int m_MaxScreenshotBytes = 5 * 1024 * 1024;
         private int m_MaxReportRequestBytes = 128 * 1024;
+        private int m_UploadTimeoutSeconds = 120;
         private readonly object m_UploadersLock = new object();
         private readonly Dictionary<string, IHttpServer> m_PendingUploaders = new Dictionary<string, IHttpServer>();
         private readonly Dictionary<UUID, string> m_AgentUploaders = new Dictionary<UUID, string>();
+        private readonly Dictionary<string, Timer> m_UploaderTimers = new Dictionary<string, Timer>();
 
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
@@ -50,6 +53,10 @@ namespace OpenSim.Region.ClientStack.Linden
                     config.GetInt("MaxReportRequestBytes", m_MaxReportRequestBytes),
                     1024,
                     1024 * 1024);
+                m_UploadTimeoutSeconds = Math.Clamp(
+                    config.GetInt("ScreenshotUploadTimeoutSeconds", m_UploadTimeoutSeconds),
+                    30,
+                    600);
             }
 
             if (m_Enabled)
@@ -114,6 +121,7 @@ namespace OpenSim.Region.ClientStack.Linden
             }
 
             KeyValuePair<string, IHttpServer>[] uploaders;
+            Timer[] timers;
             lock (m_UploadersLock)
             {
                 uploaders = new KeyValuePair<string, IHttpServer>[m_PendingUploaders.Count];
@@ -122,8 +130,13 @@ namespace OpenSim.Region.ClientStack.Linden
                     uploaders[index++] = uploader;
                 m_PendingUploaders.Clear();
                 m_AgentUploaders.Clear();
+                timers = new Timer[m_UploaderTimers.Count];
+                m_UploaderTimers.Values.CopyTo(timers, 0);
+                m_UploaderTimers.Clear();
             }
 
+            foreach (Timer timer in timers)
+                timer.Dispose();
             foreach (KeyValuePair<string, IHttpServer> uploader in uploaders)
                 uploader.Value.RemoveStreamHandler("POST", uploader.Key);
         }
@@ -164,12 +177,17 @@ namespace OpenSim.Region.ClientStack.Linden
         {
             string uploaderPath = null;
             IHttpServer uploaderServer = null;
+            Timer uploaderTimer = null;
             lock (m_UploadersLock)
             {
                 if (m_AgentUploaders.Remove(agentID, out uploaderPath))
+                {
                     m_PendingUploaders.Remove(uploaderPath, out uploaderServer);
+                    m_UploaderTimers.Remove(uploaderPath, out uploaderTimer);
+                }
             }
 
+            uploaderTimer?.Dispose();
             if (uploaderServer != null)
                 uploaderServer.RemoveStreamHandler("POST", uploaderPath);
         }
@@ -280,13 +298,16 @@ namespace OpenSim.Region.ClientStack.Linden
                     (data, uploadPath, uploadParam) =>
                     {
                         caps.HttpListener.RemoveStreamHandler("POST", uploadPath);
+                        Timer completedTimer = null;
                         lock (m_UploadersLock)
                         {
                             m_PendingUploaders.Remove(uploadPath);
+                            m_UploaderTimers.Remove(uploadPath, out completedTimer);
                             if (m_AgentUploaders.TryGetValue(caps.AgentID, out string agentPath) &&
                                 string.Equals(agentPath, uploadPath, StringComparison.Ordinal))
                                 m_AgentUploaders.Remove(caps.AgentID);
                         }
+                        completedTimer?.Dispose();
 
                         OSDMap uploadResponse = new OSDMap();
                         try
@@ -340,11 +361,20 @@ namespace OpenSim.Region.ClientStack.Linden
                 {
                     if (m_AgentUploaders.TryGetValue(caps.AgentID, out string previousPath) &&
                         m_PendingUploaders.Remove(previousPath, out IHttpServer previousServer))
+                    {
+                        if (m_UploaderTimers.Remove(previousPath, out Timer previousTimer))
+                            previousTimer.Dispose();
                         previousServer.RemoveStreamHandler("POST", previousPath);
+                    }
 
                     caps.HttpListener.AddStreamHandler(uploader);
                     m_PendingUploaders[uploader.Path] = caps.HttpListener;
                     m_AgentUploaders[caps.AgentID] = uploader.Path;
+                    m_UploaderTimers[uploader.Path] = new Timer(
+                        _ => ExpireUploader(caps.AgentID, uploader.Path),
+                        null,
+                        TimeSpan.FromSeconds(m_UploadTimeoutSeconds),
+                        Timeout.InfiniteTimeSpan);
                 }
 
                 OSDMap response = new OSDMap
@@ -363,6 +393,26 @@ namespace OpenSim.Region.ClientStack.Linden
                     e);
                 return SerializeState("failed");
             }
+        }
+
+        private void ExpireUploader(UUID agentID, string uploaderPath)
+        {
+            IHttpServer server = null;
+            Timer timer = null;
+            lock (m_UploadersLock)
+            {
+                if (!m_PendingUploaders.Remove(uploaderPath, out server))
+                    return;
+
+                m_UploaderTimers.Remove(uploaderPath, out timer);
+                if (m_AgentUploaders.TryGetValue(agentID, out string activePath) &&
+                    string.Equals(activePath, uploaderPath, StringComparison.Ordinal))
+                    m_AgentUploaders.Remove(agentID);
+            }
+
+            timer?.Dispose();
+            server.RemoveStreamHandler("POST", uploaderPath);
+            m_log.DebugFormat("[ABUSE REPORTS]: Expired abandoned screenshot uploader for {0}", agentID);
         }
 
         private void PopulateRegionContext(AbuseReportData report, UUID senderID)
