@@ -355,7 +355,8 @@ namespace OpenSim.Region.ClientStack.Linden
                         return OSDParser.SerializeLLSDXmlString(uploadResponse);
                     },
                     "AbuseReportScreenshotUploader",
-                    null);
+                    null,
+                    m_MaxScreenshotBytes);
 
                 lock (m_UploadersLock)
                 {

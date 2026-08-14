@@ -25,7 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using System.IO;
+using System.Net;
 using System.Text;
 
 namespace OpenSim.Framework.Servers.HttpServer
@@ -35,31 +37,57 @@ namespace OpenSim.Framework.Servers.HttpServer
     public class BinaryStreamHandler : BaseStreamHandler
     {
         private BinaryMethod m_method;
+        private readonly int m_maximumRequestBytes;
 
         public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod)
             : this(httpMethod, path, binaryMethod, null, null) {}
 
         public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod, string name, string description)
+            : this(httpMethod, path, binaryMethod, name, description, -1)
+        {
+        }
+
+        public BinaryStreamHandler(string httpMethod, string path, BinaryMethod binaryMethod,
+            string name, string description, int maximumRequestBytes)
             : base(httpMethod, path, name, description)
         {
             m_method = binaryMethod;
+            m_maximumRequestBytes = maximumRequestBytes;
         }
 
         protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
-            byte[] data;
-            if (request is MemoryStream)
-                data = ((MemoryStream)request).ToArray();
-            else
+            if (request == null ||
+                (m_maximumRequestBytes >= 0 && httpRequest != null &&
+                 httpRequest.ContentLength64 > m_maximumRequestBytes))
             {
-                request.Seek(0, SeekOrigin.Begin);
-                using (MemoryStream ms = new MemoryStream((int)request.Length))
-                {
-                    request.CopyTo(ms);
-                    data = ms.ToArray();
-                }
+                request?.Dispose();
+                httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                return Array.Empty<byte>();
             }
-            request.Dispose();
+
+            byte[] data;
+            using (request)
+            using (MemoryStream ms = new MemoryStream())
+            {
+                if (request.CanSeek)
+                    request.Seek(0, SeekOrigin.Begin);
+
+                byte[] buffer = new byte[8192];
+                int total = 0;
+                int read;
+                while ((read = request.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    total += read;
+                    if (m_maximumRequestBytes >= 0 && total > m_maximumRequestBytes)
+                    {
+                        httpResponse.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
+                        return Array.Empty<byte>();
+                    }
+                    ms.Write(buffer, 0, read);
+                }
+                data = ms.ToArray();
+            }
 
             string param = GetParam(path);
             string responseString = m_method(data, path, param);
