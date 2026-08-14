@@ -150,22 +150,23 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             // A different simulator may have accepted a rename while this
             // process retained an older account cache. Crossing/relogin is the
-            // point at which every observer must receive the authoritative grid
-            // value, otherwise nameplates can remain stale while Nearby/search
-            // already show the new name.
+            // point at which the arriving viewer must receive the authoritative
+            // grid value. Other residents are refreshed by normal name lookups
+            // and actual rename broadcasts; rebroadcasting here would create a
+            // false rename notification on every crossing.
             m_Scene.UserManagementModule.RemoveUser(presence.UUID);
             UserData userData = m_Scene.UserManagementModule.GetUserData(presence.UUID);
             if (userData == null)
                 return;
 
             DateTime nextUpdate = userData.NameChanged.AddDays(7);
-            // A root-agent transition is also a viewer cache resynchronization.
-            // Reporting the authoritative value as both old and new allows the
-            // viewer to discard the event as a no-op after a restart. Use the
-            // scene presence's legacy name as the prior value so the persisted
-            // display name is actively restored to the nameplate cache.
-            OSD update = FormatDisplayNameUpdate(presence.Name, userData, nextUpdate);
-            m_Scene.ForEachClient(client => m_EventQueue.Enqueue(update, client.AgentId));
+            // This is an authoritative cache resynchronization, not a rename.
+            // Firestorm and Cool VL both insert the supplied agent record and
+            // invalidate the name tag even when old/new names match. Reporting
+            // the legacy name here creates a false rename notification on each
+            // login or crossing.
+            OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
+            m_EventQueue.Enqueue(update, presence.UUID);
         }
 
         private void RefreshConnectedDisplayNames(object state)
@@ -354,7 +355,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             agentData["is_display_name_default"] = OSD.FromBoolean(userData.IsNameDefault);
             agentData["legacy_first_name"] = OSD.FromString(userData.FirstName);
             agentData["legacy_last_name"] = OSD.FromString(userData.LastName);
-            agentData["username"] = OSD.FromString(userData.Username);
+            agentData["username"] = OSD.FromString(userData.LowerUsername);
             agentData["display_name_next_update"] = OSD.FromDate(nextUpdate);
 
             var body = new OSDMap();
