@@ -72,6 +72,9 @@ namespace OpenSim.Data.Tests
 
         public static UUID GROUP_ID_1 = new UUID("250d214e-1c7e-4f9b-a488-87c5e53feed5");
         public static UUID GROUP_ID_2 = new UUID("250d214e-1c7e-4f9b-a488-87c5e53feed6");
+        public static UUID EXPERIENCE_ID_1 = new UUID("350d214e-1c7e-4f9b-a488-87c5e53feed1");
+        public static UUID EXPERIENCE_ID_2 = new UUID("350d214e-1c7e-4f9b-a488-87c5e53feed2");
+        public static UUID EXPERIENCE_ID_3 = new UUID("350d214e-1c7e-4f9b-a488-87c5e53feed3");
 
         protected override void InitService(object service)
         {
@@ -274,9 +277,27 @@ namespace OpenSim.Data.Tests
             // Loading settings to another instance variable.
             EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
 
-            Assert.AreEqual(2, loadedSettings.EstateAccess.Length);
+            Assert.AreEqual(2, loadedSettings.EstateGroups.Length);
             Assert.AreEqual(GROUP_ID_1, loadedSettings.EstateGroups[0]);
             Assert.AreEqual(GROUP_ID_2, loadedSettings.EstateGroups[1]);
+        }
+
+        [Test]
+        public void T023_EstateSettingsExperienceLists()
+        {
+            TestHelpers.InMethod();
+
+            EstateSettings originalSettings = db.LoadEstateSettings(REGION_ID, true);
+            originalSettings.AllowedExperiences = new UUID[] { EXPERIENCE_ID_1 };
+            originalSettings.KeyExperiences = new UUID[] { EXPERIENCE_ID_2 };
+            originalSettings.BlockedExperiences = new UUID[] { EXPERIENCE_ID_3 };
+
+            db.StoreEstateSettings(originalSettings);
+
+            EstateSettings loadedSettings = db.LoadEstateSettings(REGION_ID, true);
+            CollectionAssert.AreEqual(originalSettings.AllowedExperiences, loadedSettings.AllowedExperiences);
+            CollectionAssert.AreEqual(originalSettings.KeyExperiences, loadedSettings.KeyExperiences);
+            CollectionAssert.AreEqual(originalSettings.BlockedExperiences, loadedSettings.BlockedExperiences);
         }
 
         [Test]

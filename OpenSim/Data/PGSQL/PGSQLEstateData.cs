@@ -171,6 +171,9 @@ namespace OpenSim.Data.PGSQL
             es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
             es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
             es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+            es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+            es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+            es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
             //Set event
             es.OnSave += StoreEstateSettings;
@@ -191,6 +194,9 @@ namespace OpenSim.Data.PGSQL
             es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
             es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
             es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+            es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+            es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+            es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
             return es;
         }
@@ -274,6 +280,9 @@ namespace OpenSim.Data.PGSQL
             SaveUUIDList(es.EstateID, "estate_managers", es.EstateManagers);
             SaveUUIDList(es.EstateID, "estate_users", es.EstateAccess);
             SaveUUIDList(es.EstateID, "estate_groups", es.EstateGroups);
+            SaveUUIDList(es.EstateID, "estate_allowed_experiences", es.AllowedExperiences);
+            SaveUUIDList(es.EstateID, "estate_key_experiences", es.KeyExperiences);
+            SaveUUIDList(es.EstateID, "estate_blocked_experiences", es.BlockedExperiences);
         }
 
         #endregion
@@ -355,10 +364,10 @@ namespace OpenSim.Data.PGSQL
                     foreach (EstateBan b in es.EstateBans)
                     {
                         cmd.Parameters.Clear();
-                        cmd.Parameters["EstateID"].Value = b.EstateID;
-                        cmd.Parameters["bannedUUID"].Value = _Database.CreateParameter("bannedUUID", b.BannedUserID).Value;
-                        cmd.Parameters["banningUUID"].Value = _Database.CreateParameter("banningUUID", b.BanningUserID).Value;
-                        cmd.Parameters["banTime"].Value = b.BanTime;
+                        cmd.Parameters.AddWithValue("EstateID", (int)es.EstateID);
+                        cmd.Parameters.Add(_Database.CreateParameter("bannedUUID", b.BannedUserID));
+                        cmd.Parameters.Add(_Database.CreateParameter("banningUUID", b.BanningUserID));
+                        cmd.Parameters.AddWithValue("banTime", b.BanTime);
 
                         cmd.ExecuteNonQuery();
                     }
@@ -381,6 +390,7 @@ namespace OpenSim.Data.PGSQL
                     foreach (UUID uuid in data)
                     {
                         cmd.Parameters.Clear();
+                        cmd.Parameters.AddWithValue("EstateID", (int)estateID);
                         cmd.Parameters.Add(_Database.CreateParameter("uuid", uuid));
                         cmd.ExecuteNonQuery();
                     }
@@ -439,6 +449,9 @@ namespace OpenSim.Data.PGSQL
             es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
             es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
             es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+            es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+            es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+            es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
             //Set event
             es.OnSave += StoreEstateSettings;
