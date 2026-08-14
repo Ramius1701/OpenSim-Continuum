@@ -327,6 +327,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 settings.BlockedExperiences = blockedSet.ToArray();
                 settings.KeyExperiences = trusted;
                 m_scene.EstateDataService.StoreEstateSettings(settings);
+
+                // Estate Experience policy is shared by every region in the
+                // estate.  Notify the estate connector so other simulators
+                // reload the persisted lists instead of retaining stale
+                // in-memory policy until their next restart.
+                m_scene.RequestModuleInterface<IEstateModule>()?.TriggerEstateInfoChange();
                 m_scene.ForEachRootScenePresence(
                     presence => UpdateScriptExperiencePerms(presence, false));
             }
