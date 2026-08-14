@@ -75,8 +75,9 @@ namespace ContinuumEconomy.Service
             m_monthlyPurchaseLimit = Math.Max(0, config.GetLong("MonthlyPurchaseLimit", 0));
             m_maximumBalance = Math.Max(0, config.GetLong("MaximumBalance", 0));
             m_estimatedCostPerUnit = Math.Max(0, config.GetDouble("EstimatedCostPerUnit", 0.01));
-            if (m_sharedSecret.Length < 32)
-                throw new InvalidOperationException("RegionSharedSecret must contain at least 32 characters");
+            if (m_sharedSecret.Length < 32 ||
+                m_sharedSecret.StartsWith("CHANGE-THIS", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("RegionSharedSecret must be a unique secret containing at least 32 characters");
             if (!Guid.TryParse(config.GetString("SystemActorID", String.Empty), out m_systemActor) || m_systemActor == Guid.Empty)
                 throw new InvalidOperationException("SystemActorID must be a non-zero UUID");
         }

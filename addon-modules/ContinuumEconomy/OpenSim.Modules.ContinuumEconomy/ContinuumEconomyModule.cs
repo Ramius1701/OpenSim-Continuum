@@ -229,8 +229,11 @@ namespace OpenSim.Modules.ContinuumEconomy
 
                 m_moneyServURL = economyConfig.GetString("ContinuumEconomyServer", economyConfig.GetString("CurrencyServer", m_moneyServURL));
                 m_continuumSecret = economyConfig.GetString("ContinuumEconomySharedSecret", string.Empty);
-                if (m_continuumSecret.Length < 32)
-                    throw new InvalidOperationException("ContinuumEconomySharedSecret must contain at least 32 characters");
+                if (!Uri.TryCreate(m_moneyServURL, UriKind.Absolute, out Uri currencyServer) ||
+                    (currencyServer.Scheme != Uri.UriSchemeHttp && currencyServer.Scheme != Uri.UriSchemeHttps))
+                    throw new InvalidOperationException("ContinuumEconomyServer must be an absolute HTTP or HTTPS URL");
+                if (m_continuumSecret.Length < 32 || IsExampleSecret(m_continuumSecret))
+                    throw new InvalidOperationException("ContinuumEconomySharedSecret must be a unique secret containing at least 32 characters");
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: CurrencyServer set to {0}", m_moneyServURL);
 
                 // Konfiguration fÃ¼r Client-Zertifizierung
@@ -313,6 +316,9 @@ namespace OpenSim.Modules.ContinuumEconomy
                 m_log.ErrorFormat("[CONTINUUM ECONOMY MODULE]: Initialise - Failed to load configuration. Error: {0}", ex);
             }
         }
+
+        private static bool IsExampleSecret(string secret) =>
+            secret.StartsWith("CHANGE-THIS", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// This is called whenever a <see cref="T:OpenSim.Region.Framework.Scenes.Scene" /> is added. For shared modules, this can happen several times.
