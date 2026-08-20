@@ -12,18 +12,20 @@ service = xmlrpc.client.ServerProxy(url, allow_none=True)
 buyer, seller = uuid.uuid4(), uuid.uuid4()
 buyer_session, buyer_secure = uuid.uuid4(), uuid.uuid4()
 seller_session, seller_secure = uuid.uuid4(), uuid.uuid4()
+buyer_region, seller_region = uuid.uuid4(), uuid.uuid4()
 
-def login(agent, session, secure):
+def login(agent, session, secure, region):
     return service.ClientLogin({"continuumSecret": secret, "clientUUID": str(agent),
-        "clientSessionID": str(session), "clientSecureSessionID": str(secure)})
+        "clientSessionID": str(session), "clientSecureSessionID": str(secure),
+        "regionUUID": str(region)})
 
 def balance(agent, session, secure):
     return service.GetBalance({"continuumSecret": secret, "clientUUID": str(agent),
         "clientSessionID": str(session), "clientSecureSessionID": str(secure)})
 
 assert service.ContinuumHealth({})["service"] == "ContinuumEconomy.Service"
-buyer_start = login(buyer, buyer_session, buyer_secure)["clientBalance"]
-seller_start = login(seller, seller_session, seller_secure)["clientBalance"]
+buyer_start = login(buyer, buyer_session, buyer_secure, buyer_region)["clientBalance"]
+seller_start = login(seller, seller_session, seller_secure, seller_region)["clientBalance"]
 assert buyer_start >= 25 and seller_start >= 0
 transaction = uuid.uuid4()
 transfer = {"continuumSecret": secret, "transactionID": str(transaction),
@@ -137,6 +139,7 @@ unauthorized["continuumSecret"] = "not-the-region-secret"
 assert service.ForceTransferMoney(unauthorized)["success"] is False
 assert service.ClientLogout({"continuumSecret": secret, "clientUUID": str(buyer),
     "clientSessionID": str(buyer_session),
-    "clientSecureSessionID": str(buyer_secure)})["success"] is True
+    "clientSecureSessionID": str(buyer_secure),
+    "regionUUID": str(buyer_region)})["success"] is True
 assert balance(buyer, buyer_session, buyer_secure)["success"] is False
 print("ContinuumEconomy XML-RPC smoke test passed against", url)
