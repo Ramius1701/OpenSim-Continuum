@@ -1058,6 +1058,35 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 ["experience_keys"] = experiences
             });
         }
+
+        public static byte[] SerializeExperienceLookup(
+            IEnumerable<ExperienceInfo> infos, IEnumerable<UUID> requestedIDs)
+        {
+            OSDArray experiences = new();
+            HashSet<UUID> found = new();
+            foreach (ExperienceInfo info in infos ?? Array.Empty<ExperienceInfo>())
+            {
+                if (info == null || info.public_id == UUID.Zero)
+                    continue;
+                experiences.Add(ToExperienceMap(info));
+                found.Add(info.public_id);
+            }
+
+            OSDArray errors = new();
+            foreach (UUID id in requestedIDs ?? Array.Empty<UUID>())
+            {
+                if (id != UUID.Zero && !found.Contains(id))
+                    errors.Add(id);
+            }
+
+            return OSDParser.SerializeLLSDXmlBytes(new OSDMap
+            {
+                ["experience_keys"] = experiences,
+                // Firestorm removes missing IDs from its pending queue only
+                // when the lookup response identifies them explicitly.
+                ["error_ids"] = errors
+            });
+        }
     }
 
     public class FindExperienceByNameGetHandler : BaseStreamHandler
@@ -1669,8 +1698,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                     experienceIDs.Add(experienceID);
             }
 
-            ExperienceInfo[] infos = m_ExperienceModule.GetExperienceInfos(experienceIDs.ToArray());
-            return ExperienceCapsResponse.SerializeExperiences(infos);
+            UUID[] requestedIDs = experienceIDs.ToArray();
+            ExperienceInfo[] infos = m_ExperienceModule.GetExperienceInfos(requestedIDs);
+            return ExperienceCapsResponse.SerializeExperienceLookup(infos, requestedIDs);
         }
     }
 
