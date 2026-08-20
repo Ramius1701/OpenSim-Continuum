@@ -78,6 +78,7 @@ namespace OpenSim.Framework.Servers.HttpServer
         void AddStreamHandler(IRequestHandler handler);
         void AddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
         bool TryAddSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
+        bool TryRemoveSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false);
         List<string> GetSimpleStreamHandlerKeys();
 
         bool AddXmlRPCHandler(string method, XmlRpcMethod handler);

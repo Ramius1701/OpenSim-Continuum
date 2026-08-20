@@ -2913,6 +2913,9 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
         private bool m_enabled;
         private bool m_fixedHandlerRegistered;
         private bool m_variableHandlerRegistered;
+        private IHttpServer m_handlerServer;
+        private ISimpleStreamHandler m_fixedHandler;
+        private ISimpleStreamHandler m_variableHandler;
         private string m_basePath = "/currency";
         private string m_defaultEstateTitle = "My OpenSim Estate";
 
@@ -3003,10 +3006,12 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
-                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"));
-                m_variableHandlerRegistered = m_fixedHandlerRegistered && server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency"), true);
+                m_handlerServer = server;
+                m_fixedHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency");
+                m_variableHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionCurrency");
+                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(m_fixedHandler);
+                m_variableHandlerRegistered = m_fixedHandlerRegistered &&
+                    server.TryAddSimpleStreamHandler(m_variableHandler, true);
                 if (!m_variableHandlerRegistered)
                     throw new InvalidOperationException("HTTP path " + m_basePath + " is already owned by another module");
 
@@ -3095,16 +3100,19 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
 
         private void RemoveHttpHandlers()
         {
-            if (!m_fixedHandlerRegistered && !m_variableHandlerRegistered)
+            IHttpServer server = m_handlerServer;
+            if (server == null)
                 return;
 
-            IHttpServer server = MainServer.GetHttpServer(0);
             if (m_fixedHandlerRegistered)
-                server.RemoveSimpleStreamHandler(m_basePath);
+                server.TryRemoveSimpleStreamHandler(m_fixedHandler);
             if (m_variableHandlerRegistered)
-                server.RemoveSimpleStreamHandler(m_basePath);
+                server.TryRemoveSimpleStreamHandler(m_variableHandler, true);
             m_fixedHandlerRegistered = false;
             m_variableHandlerRegistered = false;
+            m_fixedHandler = null;
+            m_variableHandler = null;
+            m_handlerServer = null;
         }
 
         private void AddOrUpdateScene(Scene scene)

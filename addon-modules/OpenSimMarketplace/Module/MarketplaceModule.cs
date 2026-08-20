@@ -49,6 +49,11 @@ public sealed class MarketplaceModule : ISharedRegionModule
     private bool m_inspectRegistered;
     private bool m_snapshotRegistered;
     private bool m_deliveryRegistered;
+    private IHttpServer? m_handlerServer;
+    private ISimpleStreamHandler? m_inventoryHandler;
+    private ISimpleStreamHandler? m_inspectHandler;
+    private ISimpleStreamHandler? m_snapshotHandler;
+    private ISimpleStreamHandler? m_deliveryHandler;
     private bool m_requireHttps;
     private bool m_notifyLocalUser = true;
     private int m_maxRequestBodyBytes = 32768;
@@ -147,14 +152,22 @@ public sealed class MarketplaceModule : ISharedRegionModule
 
             try
             {
-                m_inventoryRegistered = MainServer.Instance.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_inventoryPath, m_auth, HandleInventoryRequest, Name + ".inventory"));
-                m_inspectRegistered = m_inventoryRegistered && MainServer.Instance.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_inspectPath, m_auth, HandleInspectRequest, Name + ".inspect"));
-                m_snapshotRegistered = m_inspectRegistered && MainServer.Instance.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_snapshotPath, m_auth, HandleSnapshotRequest, Name + ".snapshot"));
-                m_deliveryRegistered = m_snapshotRegistered && MainServer.Instance.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_deliveryPath, m_auth, HandleDeliveryRequest, Name + ".deliver"));
+                m_handlerServer = MainServer.Instance;
+                m_inventoryHandler = new SimpleStreamHandler(
+                    m_inventoryPath, m_auth, HandleInventoryRequest, Name + ".inventory");
+                m_inspectHandler = new SimpleStreamHandler(
+                    m_inspectPath, m_auth, HandleInspectRequest, Name + ".inspect");
+                m_snapshotHandler = new SimpleStreamHandler(
+                    m_snapshotPath, m_auth, HandleSnapshotRequest, Name + ".snapshot");
+                m_deliveryHandler = new SimpleStreamHandler(
+                    m_deliveryPath, m_auth, HandleDeliveryRequest, Name + ".deliver");
+                m_inventoryRegistered = m_handlerServer.TryAddSimpleStreamHandler(m_inventoryHandler);
+                m_inspectRegistered = m_inventoryRegistered &&
+                    m_handlerServer.TryAddSimpleStreamHandler(m_inspectHandler);
+                m_snapshotRegistered = m_inspectRegistered &&
+                    m_handlerServer.TryAddSimpleStreamHandler(m_snapshotHandler);
+                m_deliveryRegistered = m_snapshotRegistered &&
+                    m_handlerServer.TryAddSimpleStreamHandler(m_deliveryHandler);
 
                 if (!m_deliveryRegistered)
                     throw new InvalidOperationException("One or more Marketplace endpoint paths are already owned by another handler.");
@@ -198,20 +211,26 @@ public sealed class MarketplaceModule : ISharedRegionModule
 
     private void UnregisterHandlers()
     {
+        IHttpServer? server = m_handlerServer;
         if (m_inventoryRegistered)
-            MainServer.Instance.RemoveSimpleStreamHandler(m_inventoryPath);
+            server?.TryRemoveSimpleStreamHandler(m_inventoryHandler!);
         if (m_inspectRegistered)
-            MainServer.Instance.RemoveSimpleStreamHandler(m_inspectPath);
+            server?.TryRemoveSimpleStreamHandler(m_inspectHandler!);
         if (m_snapshotRegistered)
-            MainServer.Instance.RemoveSimpleStreamHandler(m_snapshotPath);
+            server?.TryRemoveSimpleStreamHandler(m_snapshotHandler!);
         if (m_deliveryRegistered)
-            MainServer.Instance.RemoveSimpleStreamHandler(m_deliveryPath);
+            server?.TryRemoveSimpleStreamHandler(m_deliveryHandler!);
 
         m_inventoryRegistered = false;
         m_inspectRegistered = false;
         m_snapshotRegistered = false;
         m_deliveryRegistered = false;
         m_registered = false;
+        m_inventoryHandler = null;
+        m_inspectHandler = null;
+        m_snapshotHandler = null;
+        m_deliveryHandler = null;
+        m_handlerServer = null;
     }
 
     private void HandleInventoryRequest(IOSHttpRequest request, IOSHttpResponse response)

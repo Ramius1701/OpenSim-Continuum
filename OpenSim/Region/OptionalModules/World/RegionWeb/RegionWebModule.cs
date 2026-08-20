@@ -107,6 +107,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private bool m_fixedHandlerRegistered;
         private bool m_variableHandlerRegistered;
         private IHttpServer m_handlerServer;
+        private ISimpleStreamHandler m_fixedHandler;
+        private ISimpleStreamHandler m_variableHandler;
         private bool m_autoCreateContent;
         private bool m_showMap;
         private bool m_showStats;
@@ -242,10 +244,11 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
                 IHttpServer server = MainServer.GetHttpServer(0);
                 m_handlerServer = server;
-                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"));
-                m_variableHandlerRegistered = m_fixedHandlerRegistered && server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true);
+                m_fixedHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb");
+                m_variableHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb");
+                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(m_fixedHandler);
+                m_variableHandlerRegistered = m_fixedHandlerRegistered &&
+                    server.TryAddSimpleStreamHandler(m_variableHandler, true);
                 if (!m_variableHandlerRegistered)
                     throw new InvalidOperationException("HTTP path " + m_basePath + " is already owned by another module");
 
@@ -367,11 +370,13 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 return;
 
             if (m_fixedHandlerRegistered)
-                server.RemoveSimpleStreamHandler(m_basePath);
+                server.TryRemoveSimpleStreamHandler(m_fixedHandler);
             if (m_variableHandlerRegistered)
-                server.RemoveSimpleStreamHandler(m_basePath);
+                server.TryRemoveSimpleStreamHandler(m_variableHandler, true);
             m_fixedHandlerRegistered = false;
             m_variableHandlerRegistered = false;
+            m_fixedHandler = null;
+            m_variableHandler = null;
             m_handlerServer = null;
         }
 

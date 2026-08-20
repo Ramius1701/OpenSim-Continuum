@@ -370,6 +370,20 @@ namespace OpenSim.Framework.Servers.HttpServer
             return m_simpleStreamHandlers.TryAdd(handler.Path, handler);
         }
 
+        public bool TryRemoveSimpleStreamHandler(ISimpleStreamHandler handler, bool varPath = false)
+        {
+            if (handler == null)
+                return false;
+
+            ConcurrentDictionary<string, ISimpleStreamHandler> handlers =
+                varPath ? m_simpleStreamVarPath : m_simpleStreamHandlers;
+            // ICollection.Remove(KeyValuePair) is an atomic conditional remove
+            // for ConcurrentDictionary. A stale module can no longer remove a
+            // replacement that claimed the same path after it shut down.
+            return ((ICollection<KeyValuePair<string, ISimpleStreamHandler>>)handlers)
+                .Remove(new KeyValuePair<string, ISimpleStreamHandler>(handler.Path, handler));
+        }
+
         public void AddWebSocketHandler(string servicepath, WebSocketRequestDelegate handler)
         {
             m_WebSocketHandlers.TryAdd(servicepath, handler);

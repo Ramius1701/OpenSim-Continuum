@@ -109,8 +109,11 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private readonly Dictionary<UUID, InventoryCarouselAssetCacheEntry> m_inventoryCarouselAssetCache = new Dictionary<UUID, InventoryCarouselAssetCacheEntry>();
 
         private bool m_enabled;
-        private bool m_handlerRegistered;
+        private bool m_fixedHandlerRegistered;
+        private bool m_variableHandlerRegistered;
         private IHttpServer m_handlerServer;
+        private ISimpleStreamHandler m_fixedHandler;
+        private ISimpleStreamHandler m_variableHandler;
         private bool m_autoCreateContent;
         private bool m_showMap;
         private bool m_showStats;
@@ -227,23 +230,22 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
-                if (!server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb")))
+                m_handlerServer = server;
+                m_fixedHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb");
+                m_variableHandler = new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb");
+                m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(m_fixedHandler);
+                if (!m_fixedHandlerRegistered)
                 {
                     throw new InvalidOperationException(
                         "The RegionWeb route is already owned by another HTTP handler.");
                 }
 
-                if (!server.TryAddSimpleStreamHandler(
-                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true))
+                m_variableHandlerRegistered = server.TryAddSimpleStreamHandler(m_variableHandler, true);
+                if (!m_variableHandlerRegistered)
                 {
-                    server.RemoveSimpleStreamHandler(m_basePath);
                     throw new InvalidOperationException(
                         "The RegionWeb variable route is already owned by another HTTP handler.");
                 }
-
-                m_handlerServer = server;
-                m_handlerRegistered = true;
 
                 MainConsole.Instance.Commands.AddCommand(
                     "RegionWeb", false, "regionweb show",
@@ -351,12 +353,18 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         private void RemoveHandlers()
         {
-            if (!m_handlerRegistered || m_handlerServer == null)
+            IHttpServer server = m_handlerServer;
+            if (server == null)
                 return;
 
-            m_handlerServer.RemoveSimpleStreamHandler(m_basePath);
-            m_handlerServer.RemoveSimpleStreamHandler(m_basePath);
-            m_handlerRegistered = false;
+            if (m_fixedHandlerRegistered)
+                server.TryRemoveSimpleStreamHandler(m_fixedHandler);
+            if (m_variableHandlerRegistered)
+                server.TryRemoveSimpleStreamHandler(m_variableHandler, true);
+            m_fixedHandlerRegistered = false;
+            m_variableHandlerRegistered = false;
+            m_fixedHandler = null;
+            m_variableHandler = null;
             m_handlerServer = null;
         }
 
