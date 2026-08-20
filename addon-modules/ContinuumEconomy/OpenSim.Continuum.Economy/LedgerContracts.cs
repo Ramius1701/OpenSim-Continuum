@@ -163,6 +163,8 @@ namespace OpenSim.Continuum.Economy
         void ValidateSchema();
         void EnsureAccount(Guid accountID);
         bool AccountExists(Guid accountID);
+        IReadOnlyList<Guid> GetAccounts(LedgerAccountType accountType, Guid afterAccountID,
+            DateTime? createdAfterUtc, int limit);
         long GetBalance(Guid accountID);
         long GetAvailableBalance(Guid accountID);
         LedgerTransferResult Transfer(LedgerTransferRequest request);

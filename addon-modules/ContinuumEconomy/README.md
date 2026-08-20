@@ -183,3 +183,21 @@ avatar classifications. `register-group` requires explicit operation, group and
 actor UUIDs, a name and literal confirmation. Registration reserves the global
 operation ID and writes an immutable provenance row; an existing UUID with a
 different account class is rejected.
+
+When ContinuumEconomy is selected, successful group creation automatically
+registers that typed account through the authenticated service. Existing groups
+can be reconciled with `register-group`. Viewer group-account Summary, Details
+and Transactions requests require the `Accountable` group power and return the
+group's bounded ledger history; the simulator never reads economy tables.
+
+WhiteCore-style periodic stipends are optional and disabled by default. Set a
+positive `StipendAmount`, `StipendsEvery`, a `day`, `week`, or `month` period,
+and an explicit UTC anchor before enabling them. Every account/period payment
+has a deterministic operation ID, so repeated scheduler passes and service
+restarts replay instead of minting twice. `StipendsLoadOldUsers` controls
+whether pre-existing resident ledger accounts are eligible, while
+`GiveStipendsOnlyWhenLoggedIn` restricts each pass to authenticated sessions.
+Premium-only mode deliberately fails startup until a real premium-account
+authority is integrated; premium status is never guessed from balances or
+login activity. Run `tests/stipend_smoke.py` only with the disposable stipend
+test configuration to verify repeated-pass and restart idempotency.

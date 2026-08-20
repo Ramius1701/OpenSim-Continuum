@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace OpenSim.Continuum.Economy
@@ -124,6 +125,12 @@ namespace OpenSim.Continuum.Economy
             Require(groupHistory.Count > 0 && groupHistory[0].IsCredit &&
                 groupHistory[0].CounterpartyID == buyer && groupHistory[0].Amount == 1,
                 "group account bounded history", report);
+            IReadOnlyList<Guid> residents = ledger.GetAccounts(
+                LedgerAccountType.Resident, Guid.Empty, DateTime.UtcNow.AddDays(-1), 500);
+            Require(residents.Contains(buyer), "resident stipend account enumeration", report);
+            IReadOnlyList<Guid> groups = ledger.GetAccounts(
+                LedgerAccountType.Group, Guid.Empty, DateTime.UtcNow.AddDays(-1), 500);
+            Require(groups.Contains(registration.AccountID), "typed group account enumeration", report);
         }
 
         private static void Require(bool condition, string test, Action<string> report)

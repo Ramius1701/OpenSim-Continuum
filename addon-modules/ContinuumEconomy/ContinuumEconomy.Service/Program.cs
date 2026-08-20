@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net;
 using Nini.Config;
@@ -29,7 +30,7 @@ namespace ContinuumEconomy.Service
                     database.GetString("ConnectionString", String.Empty));
                 backend.Ledger.ValidateSchema();
                 MainConsole.Instance = new LocalConsole("ContinuumEconomy ");
-                ContinuumEconomyRpc rpc = new(backend, service);
+                using ContinuumEconomyRpc rpc = new(backend, service);
                 BaseHttpServer server = new(checked((uint)service.GetInt("Port", 8009)));
                 rpc.Register(server);
                 server.Start();
@@ -48,7 +49,7 @@ namespace ContinuumEconomy.Service
         }
     }
 
-    internal sealed class ContinuumEconomyRpc
+    internal sealed class ContinuumEconomyRpc : IDisposable
     {
         private readonly EconomyBackend m_backend;
         private readonly ConcurrentDictionary<(Guid AgentID, Guid RegionID), Session> m_sessions = new();
@@ -62,6 +63,7 @@ namespace ContinuumEconomy.Service
         private readonly long m_monthlyPurchaseLimit;
         private readonly long m_maximumBalance;
         private readonly double m_estimatedCostPerUnit;
+        private readonly ScheduledStipends m_stipends;
 
         internal ContinuumEconomyRpc(EconomyBackend backend, IConfig config)
         {
@@ -80,6 +82,7 @@ namespace ContinuumEconomy.Service
                 throw new InvalidOperationException("RegionSharedSecret must be a unique secret containing at least 32 characters");
             if (!Guid.TryParse(config.GetString("SystemActorID", String.Empty), out m_systemActor) || m_systemActor == Guid.Empty)
                 throw new InvalidOperationException("SystemActorID must be a non-zero UUID");
+            m_stipends = ScheduledStipends.Start(m_backend, config, m_systemActor, OnlineAccounts);
         }
 
         internal void Register(BaseHttpServer server)
@@ -472,6 +475,13 @@ namespace ContinuumEconomy.Service
                     return true;
             return false;
         }
+        private IReadOnlyCollection<Guid> OnlineAccounts()
+        {
+            HashSet<Guid> accounts = new();
+            foreach (var session in m_sessions)
+                accounts.Add(session.Key.AgentID);
+            return accounts;
+        }
         private bool Secret(Hashtable p)=>CryptographicEquals(Text(p,"continuumSecret"),m_sharedSecret);
         private static bool CryptographicEquals(string a,string b)
         {
@@ -498,5 +508,6 @@ namespace ContinuumEconomy.Service
         private static XmlRpcResponse Failure(string message)=>Reply(new Hashtable{{"success",false},{"errorMessage",message},{"errorURI",String.Empty},{"message",message}});
         private static XmlRpcResponse Reply(Hashtable value)=>new(){Value=value};
         private readonly record struct Session(Guid SessionID,Guid SecureSessionID);
+        public void Dispose() => m_stipends?.Dispose();
     }
 }

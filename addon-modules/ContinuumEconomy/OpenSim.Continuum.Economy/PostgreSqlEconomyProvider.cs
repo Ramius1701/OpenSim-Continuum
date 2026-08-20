@@ -34,6 +34,14 @@ namespace OpenSim.Continuum.Economy
         public void EnsureSchema() => s.EnsureSchema(); public void ValidateSchema() => s.ValidateSchema();
         public void EnsureAccount(Guid id) { Valid(id); using NpgsqlConnection c = s.Open(); using NpgsqlCommand q = c.CreateCommand(); q.CommandText = "INSERT INTO continuum_economy_accounts(account_id,balance)VALUES(@id,0)ON CONFLICT(account_id)DO NOTHING"; Add(q, "id", id); q.ExecuteNonQuery(); }
         public bool AccountExists(Guid id) => Scalar(id, "SELECT COUNT(*) FROM continuum_economy_accounts WHERE account_id=@id") != 0;
+        public IReadOnlyList<Guid> GetAccounts(LedgerAccountType type, Guid after, DateTime? createdAfter, int limit)
+        {
+            if(limit<1||limit>500)throw new ArgumentOutOfRangeException(nameof(limit)); List<Guid> result=new(limit);
+            using NpgsqlConnection c=s.Open();using NpgsqlCommand q=c.CreateCommand();
+            q.CommandText="SELECT account_id FROM continuum_economy_accounts WHERE account_type=@type AND account_id>@after AND(CAST(@created AS timestamptz) IS NULL OR created_utc>=@created)ORDER BY account_id LIMIT @limit";
+            Add(q,"type",(short)type);Add(q,"after",after);Add(q,"created",createdAfter.HasValue?createdAfter.Value.ToUniversalTime():DBNull.Value);Add(q,"limit",limit);
+            using NpgsqlDataReader r=q.ExecuteReader();while(r.Read())result.Add(r.GetGuid(0));return result;
+        }
         public long GetBalance(Guid id) => Scalar(id, "SELECT COALESCE((SELECT balance FROM continuum_economy_accounts WHERE account_id=@id),0)");
         public long GetAvailableBalance(Guid id) => Scalar(id, "SELECT COALESCE((SELECT balance FROM continuum_economy_accounts WHERE account_id=@id),0)-COALESCE((SELECT SUM(amount)FROM continuum_economy_purchases WHERE buyer_id=@id AND state=1),0)");
         public LedgerTransferResult Transfer(LedgerTransferRequest r)

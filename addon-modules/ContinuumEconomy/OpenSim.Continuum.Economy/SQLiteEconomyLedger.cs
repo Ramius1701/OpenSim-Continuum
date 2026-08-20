@@ -30,6 +30,28 @@ namespace OpenSim.Continuum.Economy
 
         public bool AccountExists(Guid accountID) => Scalar(accountID,
             "SELECT COUNT(*) FROM continuum_economy_accounts WHERE account_id=@id") != 0;
+        public IReadOnlyList<Guid> GetAccounts(LedgerAccountType accountType, Guid afterAccountID,
+            DateTime? createdAfterUtc, int limit)
+        {
+            if (limit < 1 || limit > 500) throw new ArgumentOutOfRangeException(nameof(limit));
+            List<Guid> accounts = new(limit);
+            lock (m_store.SyncRoot)
+            {
+                using SQLiteConnection c = m_store.Open();
+                using SQLiteCommand q = c.CreateCommand();
+                q.CommandText = @"SELECT account_id FROM continuum_economy_accounts
+                    WHERE account_type=@type AND account_id>@after
+                      AND (@created IS NULL OR created_utc>=@created)
+                    ORDER BY account_id LIMIT @limit";
+                SQLiteEconomyStore.Add(q,"@type",(int)accountType);
+                SQLiteEconomyStore.Add(q,"@after",afterAccountID == Guid.Empty ? String.Empty : afterAccountID.ToString());
+                SQLiteEconomyStore.Add(q,"@created",createdAfterUtc.HasValue ? Utc(createdAfterUtc.Value) : DBNull.Value);
+                SQLiteEconomyStore.Add(q,"@limit",limit);
+                using SQLiteDataReader r=q.ExecuteReader();
+                while(r.Read()) if(Guid.TryParse(r.GetString(0),out Guid id)&&id!=Guid.Empty)accounts.Add(id);
+            }
+            return accounts;
+        }
         public long GetBalance(Guid accountID) => Scalar(accountID,
             "SELECT COALESCE((SELECT balance FROM continuum_economy_accounts WHERE account_id=@id),0)");
         public long GetAvailableBalance(Guid accountID) => Scalar(accountID,

@@ -13,6 +13,19 @@
     ; Viewer XML-RPC quotes use this major-currency-unit price per token. Keep
     ; zero unless an external payment workflow actually collects that amount.
     EstimatedCostPerUnit = 0
+    ; Optional WhiteCore-style scheduled stipends. Disabled by default. Every
+    ; payment uses a deterministic operation ID, so restarts cannot pay twice.
+    StipendsEnabled = false
+    StipendAmount = 0
+    StipendsEveryType = week
+    StipendsEvery = 1
+    StipendAnchorUtc = 2026-01-05T00:00:00Z
+    StipendsLoadOldUsers = true
+    GiveStipendsOnlyWhenLoggedIn = false
+    ; Premium-only stipends require a separately configured premium-account
+    ; authority; the economy service refuses to guess this status.
+    StipendsPremiumOnly = false
+    StipendPollSeconds = 60
     SystemActorID = 11111111-1111-1111-1111-111111111111
     ; Generate a unique random value of at least 32 characters and use the same
     ; value in the simulator [Economy] section. Do not publish the real secret.

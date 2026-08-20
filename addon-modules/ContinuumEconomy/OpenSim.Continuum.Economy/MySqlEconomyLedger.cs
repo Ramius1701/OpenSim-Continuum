@@ -90,6 +90,30 @@ namespace OpenSim.Continuum.Economy
             return command.ExecuteScalar() != null;
         }
 
+        public IReadOnlyList<Guid> GetAccounts(LedgerAccountType accountType, Guid afterAccountID,
+            DateTime? createdAfterUtc, int limit)
+        {
+            if (limit < 1 || limit > 500)
+                throw new ArgumentOutOfRangeException(nameof(limit), "Account query limit must be between 1 and 500");
+            List<Guid> accounts = new(limit);
+            using MySqlConnection connection = new(m_connectionString);
+            connection.Open();
+            using MySqlCommand command = connection.CreateCommand();
+            command.CommandText = @"SELECT account_id FROM continuum_economy_accounts
+                WHERE account_type=?type AND account_id>?after
+                  AND (?created IS NULL OR created_utc>=?created)
+                ORDER BY account_id LIMIT ?limit";
+            command.Parameters.AddWithValue("?type", (int)accountType);
+            command.Parameters.AddWithValue("?after", afterAccountID == Guid.Empty ? String.Empty : afterAccountID.ToString());
+            command.Parameters.AddWithValue("?created", createdAfterUtc.HasValue ? createdAfterUtc.Value.ToUniversalTime() : DBNull.Value);
+            command.Parameters.AddWithValue("?limit", limit);
+            using MySqlDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+                if (Guid.TryParse(reader.GetString(0), out Guid account) && account != Guid.Empty)
+                    accounts.Add(account);
+            return accounts;
+        }
+
         public void EnsureAccount(Guid accountID)
         {
             if (accountID == Guid.Empty)
