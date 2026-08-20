@@ -106,6 +106,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
         private bool m_enabled;
         private bool m_fixedHandlerRegistered;
         private bool m_variableHandlerRegistered;
+        private IHttpServer m_handlerServer;
         private bool m_autoCreateContent;
         private bool m_showMap;
         private bool m_showStats;
@@ -240,6 +241,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
+                m_handlerServer = server;
                 m_fixedHandlerRegistered = server.TryAddSimpleStreamHandler(
                     new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"));
                 m_variableHandlerRegistered = m_fixedHandlerRegistered && server.TryAddSimpleStreamHandler(
@@ -360,16 +362,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         private void RemoveHttpHandlers()
         {
-            if (!m_fixedHandlerRegistered && !m_variableHandlerRegistered)
+            IHttpServer server = m_handlerServer;
+            if (server == null)
                 return;
 
-            IHttpServer server = MainServer.GetHttpServer(0);
             if (m_fixedHandlerRegistered)
                 server.RemoveSimpleStreamHandler(m_basePath);
             if (m_variableHandlerRegistered)
                 server.RemoveSimpleStreamHandler(m_basePath);
             m_fixedHandlerRegistered = false;
             m_variableHandlerRegistered = false;
+            m_handlerServer = null;
         }
 
         private bool AddOrUpdateScene(Scene scene)
