@@ -1026,12 +1026,26 @@ namespace OpenSim.Modules.Currency
                 SceneObjectPart sceneObj = scene.GetSceneObjectPart(localID);
                 if (sceneObj != null)
                 {
+                    SceneObjectGroup saleGroup = sceneObj.ParentGroup;
+                    SceneObjectPart saleRoot = saleGroup?.RootPart;
+                    if (saleRoot == null || saleGroup.IsDeleted || saleGroup.inTransit ||
+                        saleRoot.LocalId != localID || saleRoot.ObjectSaleType == (byte)SaleType.Not ||
+                        saleRoot.ObjectSaleType != saleType || saleRoot.SalePrice != salePrice)
+                    {
+                        remoteClient.SendAgentAlertMessage(
+                            "Unable to buy now. The object's sale details have changed.", false);
+                        m_log.WarnFormat(
+                            "[MONEY MODULE]: Rejected stale or invalid sale details for local object {0}",
+                            localID);
+                        return;
+                    }
+
                     IBuySellModule mod = scene.RequestModuleInterface<IBuySellModule>();
                     if (mod != null)
                     {
-                        UUID receiverId = sceneObj.OwnerID;
-                        ulong regionHandle = sceneObj.RegionHandle;
-                        UUID regionUUID = sceneObj.RegionID;
+                        UUID receiverId = saleRoot.OwnerID;
+                        ulong regionHandle = saleRoot.RegionHandle;
+                        UUID regionUUID = saleRoot.RegionID;
                         bool ret = false;
                         //
                         if (salePrice == 0)
@@ -1045,14 +1059,14 @@ namespace OpenSim.Modules.Currency
                             if (!string.IsNullOrEmpty(m_moneyServURL))
                             {
                                 ret = TransferMoney(remoteClient.AgentId, receiverId, salePrice,
-                                                (int)TransactionType.PayObject, sceneObj.UUID, regionHandle, regionUUID, "Object Buy");
+                                                (int)TransactionType.PayObject, saleRoot.UUID, regionHandle, regionUUID, "Object Buy");
                             }
                         }
                         if (ret)
                         {
                             try
                             {
-                                mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
+                                ret = mod.BuyObject(remoteClient, categoryID, localID, saleType, salePrice);
                             }
                             catch (Exception e)
                             {
