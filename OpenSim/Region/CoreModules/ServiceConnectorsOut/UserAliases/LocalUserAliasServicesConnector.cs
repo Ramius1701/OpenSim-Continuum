@@ -50,6 +50,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
         public IUserAliasService UserAliasService { get; private set; }
 
         private bool m_Enabled = false;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         #region ISharedRegionModule
 
@@ -111,22 +113,45 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
         public void Close()
         {
-            if (!m_Enabled)
-                return;
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                scene.UnregisterModuleInterface<IUserAliasService>(UserAliasService);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
 
-            scene.RegisterModuleInterface<IUserAliasService>(UserAliasService);
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
+
+                scene.RegisterModuleInterface<IUserAliasService>(UserAliasService);
+            }
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+
+                scene.UnregisterModuleInterface<IUserAliasService>(UserAliasService);
+            }
         }
 
         public void RegionLoaded(Scene scene)

@@ -51,6 +51,8 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
                 MethodBase.GetCurrentMethod().DeclaringType);
 
         private bool m_Enabled = false;
+        private readonly object m_RegionsLock = new object();
+        private readonly HashSet<Scene> m_Regions = new HashSet<Scene>();
 
         public Type ReplaceableInterface
         {
@@ -94,24 +96,45 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
 
         public void Close()
         {
-            if (!m_Enabled)
-                return;
+            Scene[] regions;
+            lock (m_RegionsLock)
+            {
+                regions = new Scene[m_Regions.Count];
+                m_Regions.CopyTo(regions);
+                m_Regions.Clear();
+                m_Enabled = false;
+            }
+
+            foreach (Scene scene in regions)
+                scene.UnregisterModuleInterface<IUserAliasService>(this);
         }
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
 
-            scene.RegisterModuleInterface<IUserAliasService>(this);
+            lock (m_RegionsLock)
+            {
+                if (!m_Enabled || !m_Regions.Add(scene))
+                    return;
 
-            scene.EventManager.OnNewClient += OnNewClient;
+                scene.RegisterModuleInterface<IUserAliasService>(this);
+            }
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_RegionsLock)
+            {
+                if (!m_Regions.Remove(scene))
+                    return;
+
+                scene.UnregisterModuleInterface<IUserAliasService>(this);
+            }
         }
 
         public void RegionLoaded(Scene scene)
@@ -120,11 +143,5 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases
                 return;
         }
 
-        // When a user actually enters the sim, clear them from
-        // cache so the sim will have the current values for
-        // flags, title, etc. And country, don't forget country!
-        private void OnNewClient(IClientAPI client)
-        {
-        }
     }
 }

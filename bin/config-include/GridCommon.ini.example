@@ -85,6 +85,9 @@
     ;; Register the grid-wide Experience service before ExperienceModule loads.
     ExperienceService = "RemoteExperienceServicesConnector"
 
+    ;; Resolve imported identity aliases through the grid-wide ROBUST service.
+    UserAliasServices = "RemoteUserAliasServicesConnector"
+
 [AbuseReportsService]
     ;; Private ROBUST endpoint used by RemoteAbuseReportsServicesConnector.
     AbuseReportsServerURI = "${Const|PrivURL}:${Const|PrivatePort}"

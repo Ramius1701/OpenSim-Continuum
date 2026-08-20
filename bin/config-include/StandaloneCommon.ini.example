@@ -84,6 +84,9 @@
     ;; Register the standalone Experience service before ExperienceModule loads.
     ExperienceService = "LocalExperienceServicesConnector"
 
+    ;; Resolve imported identity aliases through the standalone service.
+    UserAliasServices = "LocalUserAliasServicesConnector"
+
 [AbuseReportsService]
     ;; Used when [Modules] selects LocalAbuseReportsServicesConnector.
     LocalServiceModule = "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService"
@@ -98,6 +101,10 @@
     Enabled = true
     ;; StorageProvider and ConnectionString inherit from [DatabaseService].
     UserAccountService = "OpenSim.Services.UserAccountService.dll:UserAccountService"
+
+[UserAliasService]
+    LocalServiceModule = "OpenSim.Services.UserAccountService.dll:UserAliasService"
+    ;; StorageProvider and ConnectionString inherit from [DatabaseService].
 
 [AssetService]
     DefaultAssetLoader = "OpenSim.Framework.AssetLoader.Filesystem.dll"

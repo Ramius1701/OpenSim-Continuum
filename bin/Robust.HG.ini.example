@@ -123,6 +123,7 @@
     LLLoginServiceInConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:LLLoginServiceInConnector"
     PresenceServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:PresenceServiceConnector"
     UserAccountServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:UserAccountServiceConnector"
+    UserAliasServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:UserAliasServiceConnector"
     GridUserServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:GridUserServiceConnector"
     AgentPreferencesServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AgentPreferencesServiceConnector"
     FriendsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:FriendsServiceConnector"
@@ -491,6 +492,9 @@
     ;; Default is false.
     ; AllowSetAccount = false
 
+[UserAliasService]
+    LocalServiceModule = "OpenSim.Services.UserAccountService.dll:UserAliasService"
+    ;; StorageProvider and ConnectionString inherit from [DatabaseService].
 
 [GridUserService]
     ; for the server connector
