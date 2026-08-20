@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace OpenSim.Continuum.Economy
@@ -109,6 +110,20 @@ namespace OpenSim.Continuum.Economy
             registration.DisplayName = "Conflicting acceptance group";
             Require(accounts.Register(registration, out _) == LedgerResultCode.TransactionConflict,
                 "account registration fingerprint conflict", report);
+
+            LedgerTransferResult groupPayment = ledger.Transfer(new LedgerTransferRequest
+            {
+                TransactionID = Guid.NewGuid(), SenderID = buyer, ReceiverID = registration.AccountID,
+                Amount = 1, TransactionType = 6004, Description = "group account history self-test"
+            });
+            Require(groupPayment.Code == LedgerResultCode.Committed &&
+                ledger.GetBalance(registration.AccountID) == 1,
+                "group account transfer", report);
+            IReadOnlyList<LedgerHistoryEntry> groupHistory =
+                ledger.GetHistory(registration.AccountID, DateTime.UtcNow.AddMinutes(1), 500);
+            Require(groupHistory.Count > 0 && groupHistory[0].IsCredit &&
+                groupHistory[0].CounterpartyID == buyer && groupHistory[0].Amount == 1,
+                "group account bounded history", report);
         }
 
         private static void Require(bool condition, string test, Action<string> report)

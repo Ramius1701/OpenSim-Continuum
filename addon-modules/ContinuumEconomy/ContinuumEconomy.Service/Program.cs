@@ -142,7 +142,8 @@ namespace ContinuumEconomy.Service
             int intervalDays = Math.Clamp(ParseInt(p, "intervalDays"), 1, 90);
             DateTime end = DateTime.UtcNow.Date.AddDays(-(long)currentInterval * intervalDays + 1);
             DateTime start = end.AddDays(-intervalDays);
-            var rows = m_backend.Ledger.GetHistory(group, end, 1000);
+            // All ledger providers enforce the same 500-row query bound.
+            var rows = m_backend.Ledger.GetHistory(group, end, 500);
             ArrayList history = new();
             long credits = 0;
             long debits = 0;
