@@ -24165,6 +24165,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
 #endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -24200,6 +24201,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, String.Empty);
         }
 
+#endif
 #if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llDeleteKeyValue(string key)
         {
@@ -24248,6 +24250,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
 #endif
+#if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llKeysKeyValue(int first, int count)
         {
             if (!CanUseExperienceKeyValueStore(out int error))
@@ -24283,6 +24286,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return PostKeyValueResult(true, result.ToString());
         }
 
+#endif
 #if false // Superseded by the authoritative Tranquillity Experience service implementation above.
         public LSL_Key llDataSizeKeyValue()
         {
