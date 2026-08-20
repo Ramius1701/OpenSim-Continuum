@@ -2033,13 +2033,16 @@ namespace OpenSim.Modules.Currency
                         string tmp;
                         Util.ParseUniversalUserIdentifier(universalID, out uuid, out serverURL, out firstName, out lastName, out tmp);
                     }
-                    // if serverURL is empty, avatar is a NPC
-                    if (isNpc || String.IsNullOrEmpty(serverURL))
+                    // A local user may legitimately have a UUID-only UUI with
+                    // no HomeURI. NPC status comes from the scene presence,
+                    // not from absence of a Hypergrid home address.
+                    if (isNpc)
                     {
                         avatarType = (int)AvatarType.NPC_AVATAR;
                     }
                     //
-                    if ((agent.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0 || String.IsNullOrEmpty(userName))
+                    if ((agent.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0 ||
+                        (String.IsNullOrEmpty(userName) && !String.IsNullOrEmpty(serverURL)))
                     {
                         avatarType = (int)AvatarType.HG_AVATAR;
                     }
@@ -2058,8 +2061,10 @@ namespace OpenSim.Modules.Currency
                 //
                 // Login the Money Server.
                 Hashtable paramTable = new Hashtable();
-                paramTable["openSimServIP"] = scene.RegionInfo.ServerURI.Replace(scene.RegionInfo.InternalEndPoint.Port.ToString(),
-                                                                                         scene.RegionInfo.HttpPort.ToString());
+                // ServerURI is already OpenSim's canonical externally reachable
+                // simulator HTTP endpoint. String-replacing an internal port can
+                // also corrupt matching digits elsewhere in the URI.
+                paramTable["openSimServIP"] = scene.RegionInfo.ServerURI;
                 paramTable["avatarType"] = avatarType.ToString();
                 paramTable["avatarClass"] = avatarClass.ToString();
                 paramTable["userName"] = userName;

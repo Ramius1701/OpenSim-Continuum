@@ -1830,7 +1830,9 @@ namespace OpenSim.Grid.MoneyServer
             }
 
             if (avatarType == (int)AvatarType.UNKNOWN_AVATAR) avatarType = avatarClass;
-            if (String.IsNullOrEmpty(serverURL)) avatarClass = (int)AvatarType.NPC_AVATAR;
+            // A UUID-only universal identifier is normal for local residents.
+            // Preserve the validated class supplied by the region; absence of
+            // a Hypergrid HomeURI is not evidence that the user is an NPC.
 
             m_log.InfoFormat("[MONEY XMLRPC]: handleClientLogon: Avatar {0} ({1}) is logged on.", userName, clientUUID);
             m_log.InfoFormat("[MONEY XMLRPC]: handleClientLogon: Avatar Type is {0} and Avatar Class is {1}", avatarType, avatarClass);

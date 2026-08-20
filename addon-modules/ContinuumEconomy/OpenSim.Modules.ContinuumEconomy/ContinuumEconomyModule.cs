@@ -2179,13 +2179,15 @@ namespace OpenSim.Modules.ContinuumEconomy
                         string tmp;
                         Util.ParseUniversalUserIdentifier(universalID, out uuid, out serverURL, out firstName, out lastName, out tmp);
                     }
-                    // if serverURL is empty, avatar is a NPC
-                    if (isNpc || String.IsNullOrEmpty(serverURL))
+                    // UUID-only local UUIs do not contain a HomeURI. Treat
+                    // only an actual NPC scene presence as an NPC account.
+                    if (isNpc)
                     {
                         avatarType = (int)AvatarType.NPC_AVATAR;
                     }
                     //
-                    if ((agent.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0 || String.IsNullOrEmpty(userName))
+                    if ((agent.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0 ||
+                        (String.IsNullOrEmpty(userName) && !String.IsNullOrEmpty(serverURL)))
                     {
                         avatarType = (int)AvatarType.HG_AVATAR;
                     }
@@ -2204,8 +2206,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 //
                 // Login the Money Server.
                 Hashtable paramTable = new Hashtable();
-                paramTable["openSimServIP"] = scene.RegionInfo.ServerURI.Replace(scene.RegionInfo.InternalEndPoint.Port.ToString(),
-                                                                                         scene.RegionInfo.HttpPort.ToString());
+                paramTable["openSimServIP"] = scene.RegionInfo.ServerURI;
                 paramTable["avatarType"] = avatarType.ToString();
                 paramTable["avatarClass"] = avatarClass.ToString();
                 paramTable["userName"] = userName;
