@@ -14,3 +14,27 @@ CREATE TABLE MuteList (
 );
 
 COMMIT;
+
+:VERSION 2
+
+BEGIN TRANSACTION;
+
+CREATE TABLE MuteList_v2 (
+  AgentID char(36) NOT NULL,
+  MuteID char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+  MuteName varchar(64) NOT NULL DEFAULT '',
+  MuteType int(11) NOT NULL DEFAULT '1',
+  MuteFlags int(11) NOT NULL DEFAULT '0',
+  Stamp int(11) NOT NULL,
+  UNIQUE (AgentID, MuteID, MuteName)
+);
+
+INSERT OR IGNORE INTO MuteList_v2
+  (AgentID, MuteID, MuteName, MuteType, MuteFlags, Stamp)
+  SELECT AgentID, MuteID, MuteName, MuteType, MuteFlags, Stamp FROM MuteList;
+
+DROP TABLE MuteList;
+ALTER TABLE MuteList_v2 RENAME TO MuteList;
+CREATE INDEX MuteListAgentID ON MuteList(AgentID);
+
+COMMIT;
