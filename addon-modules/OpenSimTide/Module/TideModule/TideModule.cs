@@ -56,6 +56,7 @@ namespace TideModule
         private double m_originalWaterHeight;
         private bool m_hasOriginalWaterHeight;
         private readonly object m_lifecycleSync = new object();
+        private readonly object m_operationSync = new object();
 
         public Scene m_scene;
         public IConfigSource m_config;
@@ -210,18 +211,21 @@ namespace TideModule
         // Place your methods here
         public void TideUpdate ()
         {
-            try
+            lock (m_operationSync)
             {
-                UpdateTideState();
-            }
-            catch (Exception e)
-            {
-                Scene scene = m_scene;
-                m_log.WarnFormat(
-                    "[{0}]: Tide update failed in {1}: {2}",
-                    m_name,
-                    scene == null ? "unknown region" : scene.RegionInfo.RegionName,
-                    e.Message);
+                try
+                {
+                    UpdateTideState();
+                }
+                catch (Exception e)
+                {
+                    Scene scene = m_scene;
+                    m_log.WarnFormat(
+                        "[{0}]: Tide update failed in {1}: {2}",
+                        m_name,
+                        scene == null ? "unknown region" : scene.RegionInfo.RegionName,
+                        e.Message);
+                }
             }
         }
 
@@ -320,17 +324,24 @@ namespace TideModule
                 m_ready = false;
                 scene.EventManager.OnFrame -= TideUpdate;
 
-                if (m_restoreWaterOnStop && m_hasOriginalWaterHeight)
+                // Wait for an OnFrame callback that already entered the update
+                // path before restoring the original height. This makes region
+                // removal a real mutation barrier instead of allowing a late
+                // callback to overwrite the restored water level.
+                lock (m_operationSync)
                 {
-                    float original = (float)m_originalWaterHeight;
-                    scene.RegionInfo.RegionSettings.WaterHeight = original;
-                    scene.EventManager.TriggerRequestChangeWaterHeight(original);
-                    scene.EventManager.TriggerTerrainTick();
-                    m_log.InfoFormat(
-                        "[{0}]: Restored water height to {1:0.###}m in Region: {2}",
-                        m_name,
-                        original,
-                        scene.RegionInfo.RegionName);
+                    if (m_restoreWaterOnStop && m_hasOriginalWaterHeight)
+                    {
+                        float original = (float)m_originalWaterHeight;
+                        scene.RegionInfo.RegionSettings.WaterHeight = original;
+                        scene.EventManager.TriggerRequestChangeWaterHeight(original);
+                        scene.EventManager.TriggerTerrainTick();
+                        m_log.InfoFormat(
+                            "[{0}]: Restored water height to {1:0.###}m in Region: {2}",
+                            m_name,
+                            original,
+                            scene.RegionInfo.RegionName);
+                    }
                 }
 
                 m_hasOriginalWaterHeight = false;

@@ -118,6 +118,7 @@ test-results/
 doc/html
 doc/doxygen.error.log
 bin/OpenSim.ini
+bin/*.runtimeconfig.json
 addon-modules/ContinuumEconomy/tests/*.sqlite
 
 *.patch
