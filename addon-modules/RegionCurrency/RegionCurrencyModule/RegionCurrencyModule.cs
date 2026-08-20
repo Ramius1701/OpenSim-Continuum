@@ -3116,7 +3116,19 @@ namespace OpenSim.Region.OptionalModules.World.RegionCurrency
             {
                 if (!m_enabled)
                     return;
-                m_scenesByID[scene.RegionInfo.RegionID] = scene;
+
+                if (m_scenesByID.TryGetValue(scene.RegionInfo.RegionID, out Scene activeScene))
+                {
+                    if (ReferenceEquals(activeScene, scene))
+                        return;
+
+                    m_log.ErrorFormat(
+                        "[REGION CURRENCY]: Region {0} already has an active scene instance; replacement attachment ignored",
+                        scene.RegionInfo.RegionID);
+                    return;
+                }
+
+                m_scenesByID.Add(scene.RegionInfo.RegionID, scene);
             }
         }
 
