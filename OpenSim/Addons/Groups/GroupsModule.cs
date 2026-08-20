@@ -970,6 +970,12 @@ namespace OpenSim.Groups
                 else if (money != null && money.GroupCreationCharge > 0)
                     money.ApplyCharge(remoteClient.AgentId, money.GroupCreationCharge, MoneyTransactionType.GroupCreate, name);
 
+                if (money is IGroupEconomyAccountModule groupEconomy &&
+                    !groupEconomy.RegisterGroupAccount(groupID, remoteClient.AgentId, name))
+                {
+                    m_log.ErrorFormat("[Groups]: Group {0} was created but its economy account requires reconciliation", groupID);
+                }
+
                 remoteClient.SendCreateGroupReply(groupID, true, "Group created successfully");
 
                 // Update the founder with new group information.

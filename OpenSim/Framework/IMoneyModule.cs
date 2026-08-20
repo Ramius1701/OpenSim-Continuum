@@ -61,4 +61,14 @@ namespace OpenSim.Framework
         bool CaptureCharge(UUID reservationID, UUID agentID);
         bool CancelCharge(UUID reservationID, UUID agentID);
     }
+
+    /// <summary>
+    /// Optional grid-economy contract for registering non-resident accounts.
+    /// Group creation remains owned by the groups service; this hook only
+    /// establishes the corresponding typed ledger account after creation.
+    /// </summary>
+    public interface IGroupEconomyAccountModule
+    {
+        bool RegisterGroupAccount(UUID groupID, UUID founderID, string groupName);
+    }
 }

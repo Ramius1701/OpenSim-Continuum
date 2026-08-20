@@ -101,8 +101,34 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("AuthorizeCharge", AuthorizeCharge);
             server.AddXmlRPCHandler("CapturePurchase", CapturePurchase);
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
+            server.AddXmlRPCHandler("RegisterEconomyAccount", RegisterEconomyAccount);
             server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
             server.AddXmlRPCHandler("buyLandPrep", BuyLandPrep);
+        }
+
+        private XmlRpcResponse RegisterEconomyAccount(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!Secret(p) || !Guid.TryParse(Text(p, "operationID"), out Guid operation) || operation == Guid.Empty ||
+                !Guid.TryParse(Text(p, "accountID"), out Guid account) || account == Guid.Empty ||
+                !Guid.TryParse(Text(p, "actorID"), out Guid actor) || actor == Guid.Empty ||
+                !Int32.TryParse(Text(p, "accountType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int accountType))
+                return Failure("Invalid economy account registration request");
+
+            LedgerResultCode result = m_backend.Accounts.Register(new LedgerAccountRegistrationRequest
+            {
+                OperationID = operation,
+                AccountID = account,
+                ActorID = actor,
+                AccountType = (LedgerAccountType)accountType,
+                DisplayName = Text(p, "displayName")
+            }, out string message);
+            return Reply(new Hashtable
+            {
+                { "success", result == LedgerResultCode.Committed || result == LedgerResultCode.Replayed },
+                { "result", result.ToString() },
+                { "message", message }
+            });
         }
 
         private XmlRpcResponse Health(XmlRpcRequest request, IPEndPoint remote) => Reply(new Hashtable

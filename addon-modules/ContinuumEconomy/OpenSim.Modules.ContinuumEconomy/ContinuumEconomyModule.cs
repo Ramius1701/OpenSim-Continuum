@@ -97,7 +97,8 @@ namespace OpenSim.Modules.ContinuumEconomy
     }
 
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ContinuumEconomyModule")]
-    public class ContinuumEconomyModule : IMoneyModule, IReservedMoneyModule, ISharedRegionModule
+    public class ContinuumEconomyModule : IMoneyModule, IReservedMoneyModule,
+        IGroupEconomyAccountModule, ISharedRegionModule
     {
         // Constant memebers
         private const int MONEYMODULE_REQUEST_TIMEOUT = 10000;
@@ -715,6 +716,31 @@ namespace OpenSim.Modules.ContinuumEconomy
 
         public bool CancelCharge(UUID reservationID, UUID agentID) =>
             reservationID == UUID.Zero || CompletePurchase(reservationID, agentID, false);
+
+        public bool RegisterGroupAccount(UUID groupID, UUID founderID, string groupName)
+        {
+            if (groupID == UUID.Zero || founderID == UUID.Zero || String.IsNullOrWhiteSpace(groupName))
+                return false;
+
+            Hashtable result = genericCurrencyXMLRPCRequest(new Hashtable
+            {
+                ["operationID"] = DeterministicGroupRegistrationID(groupID).ToString(),
+                ["accountID"] = groupID.ToString(),
+                ["actorID"] = founderID.ToString(),
+                ["accountType"] = 100,
+                ["displayName"] = groupName.Trim()
+            }, "RegisterEconomyAccount");
+            return result != null && result.ContainsKey("success") && result["success"] is bool success && success;
+        }
+
+        private static UUID DeterministicGroupRegistrationID(UUID groupID)
+        {
+            byte[] source = Encoding.UTF8.GetBytes(groupID + "|ContinuumGroupAccount");
+            byte[] hash = System.Security.Cryptography.SHA256.HashData(source);
+            byte[] value = new byte[16];
+            Buffer.BlockCopy(hash, 0, value, 0, value.Length);
+            return new UUID(new Guid(value));
+        }
 
 
         /// <summary>Transfers the specified from identifier.</summary>
