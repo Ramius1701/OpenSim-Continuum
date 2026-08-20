@@ -33,7 +33,7 @@ patches:
 | Acquire/Create Experience workflow | Present | `AgentExperiences` GET/POST and the configurable `ExperienceCreators` policy are implemented. |
 | Experience group reassignment | Present | The Experience owner may change the group; administrative edits do not acquire that owner-only authority. |
 | Admin/contributor null/zero guards | Present in portions | Complete exact comparison before change; retain current stricter validation where equivalent. |
-| KVP quota | Divergent | Continuum service enforces 16 MiB; Tranquillity 1.x raises it to 128 MiB. Do not change the constant alone: reconcile byte accounting for SQLite, MySQL and PostgreSQL and the script-reported quota first. |
+| KVP quota | Reconciled | Continuum enforces the Tranquillity 1.x 128 MiB quota and all three providers account for UTF-8 bytes; SQLite Unicode accounting has a direct runtime contract, while MySQL/MariaDB and PostgreSQL still require deployment-version certification. |
 | Script error table and details layout | Present from current reconciled work | Verify against the 1.x slice and Gunthar rather than rewriting. |
 | Explicit block versus prompt | Corrected in candidate | The original Tranquillity condition tested `Allowed` twice; Continuum now uses `Blocked`. Retain as a donor defect correction. |
 | Consent dialog | Present | YEngine correlates the pending task/item request, resolves it once, detaches on connection close and enforces the donor's 300-second timeout without importing Phlox. |
@@ -55,10 +55,10 @@ The following **narrow donor ports** from Tranquillity 1.x
    resolution and timeout error 18.
 6. Consistent marketplace/quota response fields after the quota decision.
 
-The 128 MiB quota remains a separate compatibility decision because the donor itself
-documents SQLite character-count divergence. It cannot advance until all three
-Continuum providers use the same UTF-8 byte accounting and migration/runtime
-tests pass.
+The 128 MiB quota is retained with provider-specific UTF-8 byte expressions.
+SQLite has passed a direct Unicode accounting contract; repeat the migration,
+quota and concurrency matrix on the production MySQL/MariaDB and PostgreSQL
+versions before release approval.
 
 ## Behavior retained from Continuum only with proof
 
