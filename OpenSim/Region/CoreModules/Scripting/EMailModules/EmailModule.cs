@@ -239,6 +239,17 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
         public void RemoveRegion(Scene scene)
         {
+            if (scene == null)
+                return;
+            lock (m_Scenes)
+            {
+                if (!m_Scenes.TryGetValue(scene.RegionInfo.RegionHandle, out Scene registered) ||
+                    !ReferenceEquals(registered, scene))
+                    return;
+                m_Scenes.Remove(scene.RegionInfo.RegionHandle);
+            }
+            scene.UnregisterModuleInterface<IEmailModule>(this);
+            scene.UnregisterModuleInterface<ISystemEmailModule>(this);
         }
 
         public void PostInitialise()
@@ -247,6 +258,17 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
         public void Close()
         {
+            m_Enabled = false;
+            Scene[] scenes;
+            lock (m_Scenes)
+                scenes = new List<Scene>(m_Scenes.Values).ToArray();
+            foreach (Scene scene in scenes)
+                RemoveRegion(scene);
+            lock (m_queuesLock)
+            {
+                m_MailQueues.Clear();
+                m_LastGetEmailCall.Clear();
+            }
         }
 
         public string Name
