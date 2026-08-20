@@ -338,7 +338,10 @@ namespace OpenSim.Data.MySQL
             {
                 dbcon.Open();
 
-                using (MySqlCommand cmd = new MySqlCommand("REPLACE INTO `experience_kv` (`experience`, `key`, `value`) VALUES (?experience, ?key, ?value)", dbcon))
+                using (MySqlCommand cmd = new MySqlCommand(@"
+INSERT INTO `experience_kv` (`experience`, `key_hash`, `key`, `value`)
+VALUES (?experience, UNHEX(SHA2(?key, 256)), ?key, ?value)
+ON DUPLICATE KEY UPDATE `key` = ?key, `value` = ?value", dbcon))
                 {
                     cmd.Parameters.AddWithValue("?experience", experience.ToString());
                     cmd.Parameters.AddWithValue("?key", key);

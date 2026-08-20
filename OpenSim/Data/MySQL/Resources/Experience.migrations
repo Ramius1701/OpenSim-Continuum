@@ -57,3 +57,24 @@ ALTER TABLE `experiences`
     CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 COMMIT;
+
+:VERSION 7 # -----------------
+
+BEGIN;
+
+ALTER TABLE `experience_kv`
+    ADD COLUMN `key_hash` BINARY(32) NULL AFTER `experience`,
+    DROP PRIMARY KEY;
+
+ALTER TABLE `experience_kv`
+    MODIFY COLUMN `key` VARCHAR(1011)
+        CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL;
+
+UPDATE `experience_kv`
+    SET `key_hash` = UNHEX(SHA2(`key`, 256));
+
+ALTER TABLE `experience_kv`
+    MODIFY COLUMN `key_hash` BINARY(32) NOT NULL,
+    ADD PRIMARY KEY (`experience`, `key_hash`);
+
+COMMIT;
