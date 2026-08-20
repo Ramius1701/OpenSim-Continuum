@@ -154,12 +154,15 @@ credentials, service URIs, database providers, and optional-module settings.
 
 ## Branches used for testing
 
-- `agent/complete-runtime-readiness`: active production-hardening and runtime-test candidate
-- `codex/complete-opensim-feature-set`: complete OpenSim-side feature candidate
-- `codex/production-feature-integration`: earlier conservative integration checkpoint
-- `codex/testing-ubode-tuning`: experimental ubODE series on the integration candidate
-- `audit/donor-feature-inventory`: donor audit and provenance checkpoint
-- `fix/continuum-runtime-stabilization`: preserved unfinished historical stabilization work; not a deployment recommendation
+- `development`: the single active integration and production-hardening branch;
+  all current work is verified here before promotion.
+- `main`: the public stable checkpoint; it intentionally advances only after a
+  development checkpoint passes the controlled runtime gate.
+
+Historical preservation uses tags instead of extra working branches. The clean
+OpenSim Dev baseline is retained by `opensim-dev-baseline-2026-08-01` and
+`opensim-dev-baseline-2026-08-01-build-clean`; the unfinished earlier runtime
+work is retained by `archive/runtime-stabilization-065769b`.
 
 ## Donors and provenance
 

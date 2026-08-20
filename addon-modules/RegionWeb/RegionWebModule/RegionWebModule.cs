@@ -110,6 +110,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         private bool m_enabled;
         private bool m_handlerRegistered;
+        private IHttpServer m_handlerServer;
         private bool m_autoCreateContent;
         private bool m_showMap;
         private bool m_showStats;
@@ -226,8 +227,22 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
                 LoadCurrencyPayPalOrders();
 
                 IHttpServer server = MainServer.GetHttpServer(0);
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"));
-                server.AddSimpleStreamHandler(new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true);
+                if (!server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb")))
+                {
+                    throw new InvalidOperationException(
+                        "The RegionWeb route is already owned by another HTTP handler.");
+                }
+
+                if (!server.TryAddSimpleStreamHandler(
+                    new SimpleStreamHandler(m_basePath, HandleRequest, "RegionWeb"), true))
+                {
+                    server.RemoveSimpleStreamHandler(m_basePath);
+                    throw new InvalidOperationException(
+                        "The RegionWeb variable route is already owned by another HTTP handler.");
+                }
+
+                m_handlerServer = server;
                 m_handlerRegistered = true;
 
                 MainConsole.Instance.Commands.AddCommand(
@@ -258,6 +273,7 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
             }
             catch (Exception e)
             {
+                RemoveHandlers();
                 m_enabled = false;
                 m_log.WarnFormat("[REGION WEB]: Could not enable module: {0}", e.Message);
             }
@@ -307,12 +323,8 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
         public void Close()
         {
-            if (m_handlerRegistered)
-            {
-                MainServer.GetHttpServer(0).RemoveSimpleStreamHandler(m_basePath);
-                MainServer.GetHttpServer(0).RemoveSimpleStreamHandler(m_basePath);
-                m_handlerRegistered = false;
-            }
+            m_enabled = false;
+            RemoveHandlers();
 
             lock (m_sync)
             {
@@ -335,6 +347,17 @@ namespace OpenSim.Region.OptionalModules.World.RegionWeb
 
             lock (m_inventoryCarouselCacheLock)
                 m_inventoryCarouselAssetCache.Clear();
+        }
+
+        private void RemoveHandlers()
+        {
+            if (!m_handlerRegistered || m_handlerServer == null)
+                return;
+
+            m_handlerServer.RemoveSimpleStreamHandler(m_basePath);
+            m_handlerServer.RemoveSimpleStreamHandler(m_basePath);
+            m_handlerRegistered = false;
+            m_handlerServer = null;
         }
 
         private void AddOrUpdateScene(Scene scene)
