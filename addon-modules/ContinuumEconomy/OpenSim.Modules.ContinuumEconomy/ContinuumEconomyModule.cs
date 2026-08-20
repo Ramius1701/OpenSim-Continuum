@@ -2215,6 +2215,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 paramTable["clientUUID"] = client.AgentId.ToString();
                 paramTable["clientSessionID"] = client.SessionId.ToString();
                 paramTable["clientSecureSessionID"] = client.SecureSessionId.ToString();
+                paramTable["regionUUID"] = scene.RegionInfo.RegionID.ToString();
 
                 // Generate the request for transfer.
                 Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "ClientLogin");
@@ -2264,6 +2265,8 @@ namespace OpenSim.Modules.ContinuumEconomy
                 paramTable["clientUUID"] = client.AgentId.ToString();
                 paramTable["clientSessionID"] = client.SessionId.ToString();
                 paramTable["clientSecureSessionID"] = client.SecureSessionId.ToString();
+                if (client.Scene is Scene scene)
+                    paramTable["regionUUID"] = scene.RegionInfo.RegionID.ToString();
 
                 // Generate the request for transfer.
                 Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "ClientLogout");

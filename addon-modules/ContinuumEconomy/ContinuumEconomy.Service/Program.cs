@@ -51,7 +51,7 @@ namespace ContinuumEconomy.Service
     internal sealed class ContinuumEconomyRpc
     {
         private readonly EconomyBackend m_backend;
-        private readonly ConcurrentDictionary<Guid, Session> m_sessions = new();
+        private readonly ConcurrentDictionary<(Guid AgentID, Guid RegionID), Session> m_sessions = new();
         private readonly Guid m_systemActor;
         private readonly long m_defaultBalance;
         private readonly string m_sharedSecret;
@@ -115,7 +115,9 @@ namespace ContinuumEconomy.Service
         {
             Hashtable p = Parameters(request);
             if (!Secret(p) || !IDs(p, "clientUUID", "clientSessionID", "clientSecureSessionID",
-                out Guid agent, out Guid session, out Guid secure)) return Failure("Invalid login credentials");
+                out Guid agent, out Guid session, out Guid secure) ||
+                !Guid.TryParse(Text(p, "regionUUID"), out Guid region) || region == Guid.Empty)
+                return Failure("Invalid login credentials");
             m_backend.Ledger.EnsureAccount(agent);
             if (m_defaultBalance > 0 && m_backend.Ledger.GetBalance(agent) == 0 &&
                 m_backend.Ledger.CountHistory(agent, null, null) == 0)
@@ -124,7 +126,7 @@ namespace ContinuumEconomy.Service
                     AccountID=agent,ActorID=m_systemActor,Amount=m_defaultBalance,Kind=LedgerAdjustmentKind.Credit,
                     TransactionType=900,Reason="Continuum initial account balance" });
             }
-            m_sessions[agent] = new Session(session, secure);
+            m_sessions[(agent, region)] = new Session(session, secure);
             return SuccessBalance(agent);
         }
 
@@ -134,15 +136,16 @@ namespace ContinuumEconomy.Service
             if (!Secret(p) || !Guid.TryParse(Text(p, "clientUUID"), out Guid agent) || agent == Guid.Empty ||
                 !Guid.TryParse(Text(p, "clientSessionID"), out Guid session) ||
                 !Guid.TryParse(Text(p, "clientSecureSessionID"), out Guid secure) ||
-                !m_sessions.TryGetValue(agent, out Session known) ||
+                !Guid.TryParse(Text(p, "regionUUID"), out Guid region) || region == Guid.Empty ||
+                !m_sessions.TryGetValue((agent, region), out Session known) ||
                 known.SessionID != session || known.SecureSessionID != secure)
                 return Failure("Invalid session");
 
-            // Remove only the session that was authenticated above. A destination
-            // region may replace it between the lookup and removal during a crossing.
+            // Remove only this region's authenticated presence. The destination
+            // region remains registered when the source closes after a crossing.
             bool removed = ((System.Collections.Generic.ICollection<
-                System.Collections.Generic.KeyValuePair<Guid, Session>>)m_sessions).Remove(
-                    new System.Collections.Generic.KeyValuePair<Guid, Session>(agent, known));
+                System.Collections.Generic.KeyValuePair<(Guid AgentID, Guid RegionID), Session>>)m_sessions).Remove(
+                    new System.Collections.Generic.KeyValuePair<(Guid AgentID, Guid RegionID), Session>((agent, region), known));
             return removed ? Reply(new Hashtable { { "success", true } }) : Failure("Session changed");
         }
 
@@ -227,8 +230,8 @@ namespace ContinuumEconomy.Service
             if (secureText.Length == 0) secureText = Text(p, "clientSecureSessionID");
             string amountText = Text(p, "currencyBuy");
             if (!Guid.TryParse(agentText, out agent) || agent == Guid.Empty ||
-                !Guid.TryParse(secureText, out Guid secure) || !m_sessions.TryGetValue(agent, out Session known) ||
-                known.SecureSessionID != secure || !Int64.TryParse(amountText, NumberStyles.Integer,
+                !Guid.TryParse(secureText, out Guid secure) || !HasSecureSession(agent, secure) ||
+                !Int64.TryParse(amountText, NumberStyles.Integer,
                     CultureInfo.InvariantCulture, out amount) || amount <= 0)
             { error = "The currency request could not be authenticated or has an invalid amount"; return false; }
             error = String.Empty;
@@ -245,7 +248,7 @@ namespace ContinuumEconomy.Service
                 !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty ||
                 !Int64.TryParse(Text(p, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount) || amount <= 0)
                 return Failure("Invalid purchase authorization request");
-            if (!m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure)
+            if (!HasSession(buyer, session, secure))
                 return Failure("Invalid session");
             Int32.TryParse(Text(p, "transactionType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int type);
             Guid.TryParse(Text(p, "regionUUID"), out Guid region);
@@ -267,7 +270,7 @@ namespace ContinuumEconomy.Service
                 !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty ||
                 !Int64.TryParse(Text(p, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount) || amount <= 0)
                 return Failure("Invalid charge authorization request");
-            if (!m_sessions.TryGetValue(buyer, out Session known) || known.SessionID != session || known.SecureSessionID != secure)
+            if (!HasSession(buyer, session, secure))
                 return Failure("Invalid session");
 
             Int32.TryParse(Text(p, "transactionType"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int type);
@@ -318,7 +321,7 @@ namespace ContinuumEconomy.Service
             currencyBuy = 0;
             if (!Guid.TryParse(Text(p, "agentId"), out agent) || agent == Guid.Empty ||
                 !Guid.TryParse(Text(p, "secureSessionId"), out Guid secure) ||
-                !m_sessions.TryGetValue(agent, out Session session) || session.SecureSessionID != secure ||
+                !HasSecureSession(agent, secure) ||
                 !Int64.TryParse(Text(p, "currencyBuy"), NumberStyles.Integer,
                     CultureInfo.InvariantCulture, out currencyBuy) || currencyBuy < 0 || ParseInt(p, "billableArea") < 0)
             { error = "The land purchase request could not be authenticated or has invalid values"; return false; }
@@ -338,7 +341,7 @@ namespace ContinuumEconomy.Service
             if(!Secret(p)||!Guid.TryParse(Text(p,"senderID"),out Guid sender)||sender==Guid.Empty||
                 !Guid.TryParse(Text(p,"senderSessionID"),out Guid session)||
                 !Guid.TryParse(Text(p,"senderSecureSessionID"),out Guid secure)||
-                !m_sessions.TryGetValue(sender,out Session known)||known.SessionID!=session||known.SecureSessionID!=secure)
+                !HasSession(sender,session,secure))
                 return Failure("Invalid sender session");
             Guid receiver=m_systemActor;
             if(!charge&&(!Guid.TryParse(Text(p,"receiverID"),out receiver)||receiver==Guid.Empty))return Failure("Invalid receiver");
@@ -376,7 +379,21 @@ namespace ContinuumEconomy.Service
         {
             agent=Guid.Empty;return Secret(p)&&Guid.TryParse(Text(p,agentKey),out agent)&&
                 Guid.TryParse(Text(p,sessionKey),out Guid session)&&Guid.TryParse(Text(p,secureKey),out Guid secure)&&
-                m_sessions.TryGetValue(agent,out Session known)&&known.SessionID==session&&known.SecureSessionID==secure;
+                HasSession(agent,session,secure);
+        }
+        private bool HasSession(Guid agent, Guid session, Guid secure)
+        {
+            foreach (System.Collections.Generic.KeyValuePair<(Guid AgentID, Guid RegionID), Session> entry in m_sessions)
+                if (entry.Key.AgentID == agent && entry.Value.SessionID == session && entry.Value.SecureSessionID == secure)
+                    return true;
+            return false;
+        }
+        private bool HasSecureSession(Guid agent, Guid secure)
+        {
+            foreach (System.Collections.Generic.KeyValuePair<(Guid AgentID, Guid RegionID), Session> entry in m_sessions)
+                if (entry.Key.AgentID == agent && entry.Value.SecureSessionID == secure)
+                    return true;
+            return false;
         }
         private bool Secret(Hashtable p)=>CryptographicEquals(Text(p,"continuumSecret"),m_sharedSecret);
         private static bool CryptographicEquals(string a,string b)
