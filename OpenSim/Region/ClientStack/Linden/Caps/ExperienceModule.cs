@@ -603,6 +603,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                     if (m_ExperiencePermissions.TryGetValue(avatar_id, out Dictionary<UUID, bool> permissions))
                         permissions.Remove(experience_id);
                 }
+
+                if (m_scene.TryGetScenePresence(avatar_id, out ScenePresence scenePresence))
+                    UpdateScriptExperiencePerms(scenePresence, true);
             }
             return updated;
         }
