@@ -209,3 +209,16 @@ ALTER TABLE IF EXISTS os_groups_notices
 ;
 
 COMMIT;
+
+:VERSION 5
+
+BEGIN;
+
+CREATE TABLE os_groups_bans (
+  "GroupID" uuid NOT NULL,
+  "PrincipalID" varchar(255) NOT NULL DEFAULT '',
+  "BanTime" bigint NOT NULL DEFAULT 0,
+  CONSTRAINT os_groupbanspk PRIMARY KEY ("GroupID", "PrincipalID")
+);
+
+COMMIT;

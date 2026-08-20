@@ -338,6 +338,15 @@ namespace OpenSim.Groups
             return m_GroupsService.GetGroupNotices(RequestingAgentID, GroupID);
         }
 
+        public List<GroupBanInfo> GetGroupBans(string requestingAgentID, UUID groupID) =>
+            m_GroupsService.GetGroupBans(requestingAgentID, groupID);
+
+        public bool AddGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs) =>
+            m_GroupsService.AddGroupBans(requestingAgentID, groupID, agentIDs);
+
+        public bool RemoveGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs) =>
+            m_GroupsService.RemoveGroupBans(requestingAgentID, groupID, agentIDs);
+
         #endregion
     }
 }

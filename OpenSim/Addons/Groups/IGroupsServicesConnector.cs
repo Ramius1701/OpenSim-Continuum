@@ -92,6 +92,16 @@ namespace OpenSim.Groups
         GroupNoticeInfo GetGroupNotice(string RequestingAgentID, UUID noticeID);
         List<ExtendedGroupNoticeData> GetGroupNotices(string RequestingAgentID, UUID GroupID);
 
+        List<GroupBanInfo> GetGroupBans(string requestingAgentID, UUID groupID);
+        bool AddGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs);
+        bool RemoveGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs);
+
+    }
+
+    public class GroupBanInfo
+    {
+        public UUID AgentID;
+        public uint BanTime;
     }
 
     public class GroupInviteInfo

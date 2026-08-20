@@ -661,6 +661,50 @@ namespace OpenSim.Groups
             return notices;
         }
 
+        public List<GroupBanInfo> GetGroupBans(string requestingAgentID, UUID groupID)
+        {
+            List<GroupBanInfo> result = new List<GroupBanInfo>();
+            Dictionary<string, object> reply = MakeRequest("GETGROUPBANS", new Dictionary<string, object>
+            {
+                ["RequestingAgentID"] = requestingAgentID,
+                ["GroupID"] = groupID.ToString()
+            });
+            if (reply == null || !reply.TryGetValue("Count", out object countValue) ||
+                !Int32.TryParse(Convert.ToString(countValue), out int count))
+                return result;
+            count = Math.Clamp(count, 0, 500);
+            for (int i = 0; i < count; ++i)
+                if (reply.TryGetValue("BanID" + i, out object idValue) &&
+                    UUID.TryParse(Convert.ToString(idValue), out UUID id) && !id.IsZero())
+                {
+                    UInt32.TryParse(reply.TryGetValue("BanTime" + i, out object timeValue)
+                        ? Convert.ToString(timeValue) : "0", out uint time);
+                    result.Add(new GroupBanInfo { AgentID = id, BanTime = time });
+                }
+            return result;
+        }
+
+        public bool AddGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs) =>
+            ChangeGroupBans("ADDGROUPBANS", requestingAgentID, groupID, agentIDs);
+
+        public bool RemoveGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs) =>
+            ChangeGroupBans("REMOVEGROUPBANS", requestingAgentID, groupID, agentIDs);
+
+        private bool ChangeGroupBans(string method, string requestingAgentID, UUID groupID, List<UUID> agentIDs)
+        {
+            if (agentIDs == null || agentIDs.Count == 0 || agentIDs.Count > 100)
+                return false;
+            List<string> ids = agentIDs.ConvertAll(id => id.ToString());
+            Dictionary<string, object> reply = MakeRequest(method, new Dictionary<string, object>
+            {
+                ["RequestingAgentID"] = requestingAgentID,
+                ["GroupID"] = groupID.ToString(),
+                ["AgentIDs"] = ids
+            });
+            return reply != null && reply.TryGetValue("RESULT", out object value) &&
+                String.Equals(Convert.ToString(value), "true", StringComparison.OrdinalIgnoreCase);
+        }
+
         #region Make Request
 
         private Dictionary<string, object> MakeRequest(string method, Dictionary<string, object> sendData)

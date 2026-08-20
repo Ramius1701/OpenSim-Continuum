@@ -149,6 +149,12 @@ namespace OpenSim.Groups
                         return HandleGetNotices(request);
                     case "FINDGROUPS":
                         return HandleFindGroups(request);
+                    case "GETGROUPBANS":
+                        return HandleGetGroupBans(request);
+                    case "ADDGROUPBANS":
+                        return HandleChangeGroupBans(request, true);
+                    case "REMOVEGROUPBANS":
+                        return HandleChangeGroupBans(request, false);
                 }
                 m_log.DebugFormat("[GROUPS HANDLER]: unknown method request: {0}", method);
             }
@@ -786,6 +792,43 @@ namespace OpenSim.Groups
 
             string xmlString = ServerUtils.BuildXmlResponse(result);
             return Util.UTF8NoBomEncoding.GetBytes(xmlString);
+        }
+
+        byte[] HandleGetGroupBans(Dictionary<string, object> request)
+        {
+            if (!request.TryGetValue("RequestingAgentID", out object requester) ||
+                !request.TryGetValue("GroupID", out object groupValue) ||
+                !UUID.TryParse(Convert.ToString(groupValue), out UUID groupID) || groupID.IsZero())
+                return FailureResult("Bad group ban request");
+            List<GroupBanInfo> bans = m_GroupsService.GetGroupBans(Convert.ToString(requester), groupID);
+            Dictionary<string, object> result = new Dictionary<string, object>
+                { ["Count"] = Math.Min(bans.Count, 500).ToString() };
+            for (int i = 0; i < bans.Count && i < 500; ++i)
+            {
+                result["BanID" + i] = bans[i].AgentID.ToString();
+                result["BanTime" + i] = bans[i].BanTime.ToString();
+            }
+            return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+        }
+
+        byte[] HandleChangeGroupBans(Dictionary<string, object> request, bool add)
+        {
+            if (!request.TryGetValue("RequestingAgentID", out object requester) ||
+                !request.TryGetValue("GroupID", out object groupValue) ||
+                !UUID.TryParse(Convert.ToString(groupValue), out UUID groupID) || groupID.IsZero() ||
+                !request.TryGetValue("AgentIDs", out object values) || values is not List<string> raw ||
+                raw.Count == 0 || raw.Count > 100)
+                return FailureResult("Bad group ban request");
+            List<UUID> ids = new List<UUID>(raw.Count);
+            HashSet<UUID> distinct = new HashSet<UUID>();
+            foreach (string value in raw)
+                if (UUID.TryParse(value, out UUID id) && !id.IsZero() && distinct.Add(id)) ids.Add(id);
+            bool success = ids.Count > 0 && (add
+                ? m_GroupsService.AddGroupBans(Convert.ToString(requester), groupID, ids)
+                : m_GroupsService.RemoveGroupBans(Convert.ToString(requester), groupID, ids));
+            Dictionary<string, object> result = new Dictionary<string, object>
+                { ["RESULT"] = success.ToString() };
+            return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
         }
 
 

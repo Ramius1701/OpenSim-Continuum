@@ -45,6 +45,7 @@ namespace OpenSim.Data.PGSQL
         private PGSqlGroupsInvitesHandler m_Invites;
         private PGSqlGroupsNoticesHandler m_Notices;
         private PGSqlGroupsPrincipalsHandler m_Principals;
+        private PGSqlGroupsBansHandler m_Bans;
 
         public PGSQLGroupsData(string connectionString, string realm)
         {
@@ -55,6 +56,7 @@ namespace OpenSim.Data.PGSQL
             m_Invites = new PGSqlGroupsInvitesHandler(connectionString, realm + "_invites");
             m_Notices = new PGSqlGroupsNoticesHandler(connectionString, realm + "_notices");
             m_Principals = new PGSqlGroupsPrincipalsHandler(connectionString, realm + "_principals");
+            m_Bans = new PGSqlGroupsBansHandler(connectionString, realm + "_bans");
         }
 
         #region groups table
@@ -340,6 +342,17 @@ namespace OpenSim.Data.PGSQL
             m_Notices.DeleteOld();
         }
 
+        public bool StoreBan(GroupBanData data) => m_Bans.Store(data);
+        public GroupBanData RetrieveBan(UUID groupID, string principalID)
+        {
+            GroupBanData[] rows = m_Bans.Get(new[] { "GroupID", "PrincipalID" },
+                new[] { groupID.ToString(), principalID });
+            return rows != null && rows.Length > 0 ? rows[0] : null;
+        }
+        public GroupBanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+        public bool DeleteBan(UUID groupID, string principalID) =>
+            m_Bans.Delete(new[] { "GroupID", "PrincipalID" }, new[] { groupID.ToString(), principalID });
+
         #endregion
 
         #region combinations
@@ -481,5 +494,11 @@ namespace OpenSim.Data.PGSQL
             : base(connectionString, realm, string.Empty)
         {
         }
+    }
+
+    public class PGSqlGroupsBansHandler : PGSQLGenericTableHandler<GroupBanData>
+    {
+        public PGSqlGroupsBansHandler(string connectionString, string realm) :
+            base(connectionString, realm, "GroupBans") { }
     }
 }

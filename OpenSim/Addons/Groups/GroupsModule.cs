@@ -27,6 +27,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Timers;
 using log4net;
@@ -35,10 +36,12 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
+using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using PermissionMask = OpenSim.Framework.PermissionMask;
+using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Groups
 {
@@ -49,6 +52,8 @@ namespace OpenSim.Groups
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private List<Scene> m_sceneList = new List<Scene>();
+        private readonly Dictionary<Scene, EventManager.RegisterCapsEvent> m_capsRegistrations =
+            new Dictionary<Scene, EventManager.RegisterCapsEvent>();
 
         private IMessageTransferModule m_msgTransferModule = null;
 
@@ -180,6 +185,11 @@ namespace OpenSim.Groups
             scene.EventManager.OnMakeChildAgent += OnMakeChild;
             scene.EventManager.OnIncomingInstantMessage += OnGridInstantMessage;
             scene.EventManager.OnClientClosed += OnClientClosed;
+            EventManager.RegisterCapsEvent registerCaps = (agentID, caps) =>
+                RegisterGroupApiCaps(scene, agentID, caps);
+            lock (m_sceneList)
+                m_capsRegistrations[scene] = registerCaps;
+            scene.EventManager.OnRegisterCaps += registerCaps;
 
         }
 
@@ -192,6 +202,11 @@ namespace OpenSim.Groups
             scene.EventManager.OnMakeChildAgent -= OnMakeChild;
             scene.EventManager.OnIncomingInstantMessage -= OnGridInstantMessage;
             scene.EventManager.OnClientClosed -= OnClientClosed;
+            lock (m_sceneList)
+            {
+                if (m_capsRegistrations.Remove(scene, out EventManager.RegisterCapsEvent registerCaps))
+                    scene.EventManager.OnRegisterCaps -= registerCaps;
+            }
             scene.UnregisterModuleInterface<IGroupsModule>(this);
 
             scene.ForEachClient(client =>
@@ -232,6 +247,111 @@ namespace OpenSim.Groups
         public void PostInitialise()
         {
             // NoOp
+        }
+
+        private void RegisterGroupApiCaps(Scene scene, UUID agentID, Caps caps)
+        {
+            caps.RegisterSimpleHandler("GroupAPIv1", new SimpleStreamHandler(
+                "/" + UUID.Random(), (request, response) => GroupApiRequest(
+                    scene, agentID, request, response)));
+        }
+
+        private void GroupApiRequest(Scene scene, UUID agentID,
+            IOSHttpRequest request, IOSHttpResponse response)
+        {
+            response.ContentType = "application/llsd+xml";
+            if (scene == null || m_groupData == null ||
+                !UUID.TryParse(request.QueryString["group_id"], out UUID groupID) || groupID.IsZero())
+            {
+                response.StatusCode = 400;
+                return;
+            }
+
+            if (request.HttpMethod == "GET")
+            {
+                WriteGroupBanResponse(response, groupID,
+                    m_groupData.GetGroupBans(agentID.ToString(), groupID));
+                return;
+            }
+            if (request.HttpMethod != "POST" || request.ContentLength64 > 32 * 1024)
+            {
+                response.StatusCode = request.HttpMethod == "POST" ? 413 : 405;
+                return;
+            }
+
+            OSDMap body;
+            try
+            {
+                using MemoryStream bounded = new MemoryStream();
+                byte[] buffer = new byte[4096];
+                int total = 0;
+                for (int read; (read = request.InputStream.Read(buffer, 0, buffer.Length)) > 0; )
+                {
+                    total += read;
+                    if (total > 32 * 1024)
+                    {
+                        response.StatusCode = 413;
+                        return;
+                    }
+                    bounded.Write(buffer, 0, read);
+                }
+                bounded.Position = 0;
+                body = OSDParser.DeserializeLLSDXml(bounded) as OSDMap;
+            }
+            catch
+            {
+                response.StatusCode = 400;
+                return;
+            }
+            if (body == null || !body.TryGetValue("ban_ids", out OSD idsValue) ||
+                idsValue is not OSDArray ids || ids.Count == 0 || ids.Count > 100)
+            {
+                response.StatusCode = 400;
+                return;
+            }
+            List<UUID> agents = new List<UUID>(ids.Count);
+            HashSet<UUID> distinct = new HashSet<UUID>();
+            foreach (OSD value in ids)
+            {
+                UUID id = value.AsUUID();
+                if (!id.IsZero() && distinct.Add(id)) agents.Add(id);
+            }
+            if (agents.Count == 0)
+            {
+                response.StatusCode = 400;
+                return;
+            }
+
+            int action = body.TryGetValue("ban_action", out OSD actionValue)
+                ? actionValue.AsInteger() : 0;
+            bool success = action switch
+            {
+                1 => m_groupData.AddGroupBans(agentID.ToString(), groupID, agents),
+                2 => m_groupData.RemoveGroupBans(agentID.ToString(), groupID, agents),
+                _ => false
+            };
+            if (!success)
+            {
+                response.StatusCode = action == 1 || action == 2 ? 403 : 400;
+                return;
+            }
+            WriteGroupBanResponse(response, groupID,
+                m_groupData.GetGroupBans(agentID.ToString(), groupID));
+        }
+
+        private static void WriteGroupBanResponse(IOSHttpResponse response, UUID groupID,
+            List<GroupBanInfo> bans)
+        {
+            OSDMap list = new OSDMap();
+            if (bans != null)
+                foreach (GroupBanInfo ban in bans)
+                    list[ban.AgentID.ToString()] = new OSDMap
+                    {
+                        ["ban_date"] = OSD.FromDate(Utils.UnixTimeToDateTime(ban.BanTime))
+                    };
+            OSDMap result = new OSDMap { ["group_id"] = groupID, ["ban_list"] = list };
+            response.RawBuffer = OSDParser.SerializeLLSDXmlBytes(result);
+            response.StatusCode = 200;
         }
 
         #endregion

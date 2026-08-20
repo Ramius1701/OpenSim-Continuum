@@ -47,6 +47,7 @@ namespace OpenSim.Data.MySQL
         private MySqlGroupsInvitesHandler m_Invites;
         private MySqlGroupsNoticesHandler m_Notices;
         private MySqlGroupsPrincipalsHandler m_Principals;
+        private MySqlGroupsBansHandler m_Bans;
 
         public MySQLGroupsData(string connectionString, string realm)
         {
@@ -57,6 +58,7 @@ namespace OpenSim.Data.MySQL
             m_Invites = new MySqlGroupsInvitesHandler(connectionString, realm + "_invites");
             m_Notices = new MySqlGroupsNoticesHandler(connectionString, realm + "_notices");
             m_Principals = new MySqlGroupsPrincipalsHandler(connectionString, realm + "_principals");
+            m_Bans = new MySqlGroupsBansHandler(connectionString, realm + "_bans");
         }
 
         #region groups table
@@ -335,6 +337,17 @@ namespace OpenSim.Data.MySQL
             m_Notices.DeleteOld();
         }
 
+        public bool StoreBan(GroupBanData data) => m_Bans.Store(data);
+        public GroupBanData RetrieveBan(UUID groupID, string principalID)
+        {
+            GroupBanData[] rows = m_Bans.Get(new[] { "GroupID", "PrincipalID" },
+                new[] { groupID.ToString(), principalID });
+            return rows != null && rows.Length > 0 ? rows[0] : null;
+        }
+        public GroupBanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+        public bool DeleteBan(UUID groupID, string principalID) =>
+            m_Bans.Delete(new[] { "GroupID", "PrincipalID" }, new[] { groupID.ToString(), principalID });
+
         #endregion
 
         #region combinations
@@ -479,5 +492,11 @@ namespace OpenSim.Data.MySQL
             : base(connectionString, realm, string.Empty)
         {
         }
+    }
+
+    public class MySqlGroupsBansHandler : MySQLGenericTableHandler<GroupBanData>
+    {
+        public MySqlGroupsBansHandler(string connectionString, string realm) :
+            base(connectionString, realm, "GroupBans") { }
     }
 }

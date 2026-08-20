@@ -107,7 +107,7 @@ service/database architecture is not a drop-in donor.
 | Gunthar invite-message overload | Narrow core compatibility patch | Retain if viewer/script tests prove the overload is required. |
 | Continuum lifecycle/cache failure hardening | Upstream-quality bug fix | Retain with focused concurrency and teardown tests. |
 | Success-only/reserved group fees | Narrow core compatibility patch | Retain; test separately with both economy products and no economy. |
-| WhiteCore `GroupAPIv1` bans and `GroupMemberData` CAPS | Narrow viewer compatibility candidate | Compare current Firestorm requests and official OpenSim behavior before porting. |
+| WhiteCore `GroupAPIv1` bans and `GroupMemberData` CAPS | Narrow viewer compatibility patch | Firestorm source confirms both capabilities. Official Dev already supplies `GroupMemberData`; Continuum now adds permission-checked, bounded `GroupAPIv1` ban persistence for SQLite, MySQL/MariaDB and PostgreSQL. Foreign-group mutation remains fail-closed. |
 | WhiteCore group land/profile pages | Optional integrated WebUI module | Port faithfully during the WebUI phase using the selected Groups service. |
 | WhiteCore group currency/accounting | Robust service extension | Covered by the separate economy design; never embed ledger ownership in Groups. |
 | Recovered XML-RPC/PHP group services | Obsolete or unsuitable | Do not add when current authenticated services cover the behavior. |
@@ -129,8 +129,10 @@ service/database architecture is not a drop-in donor.
   success under MoneyServer Compatibility and ContinuumEconomy.
 - Verify automatic invites, expired/duplicate invites, role power enforcement,
   owner transfer and last-owner protection.
-- Compare WhiteCore group-ban/member CAPS against actual viewer traffic before
-  selecting a port; do not infer necessity from file presence alone.
+- Test `GroupAPIv1` list/add/remove, the 100-entry request and 500-entry group
+  limits, owner protection, permission denial, restart persistence and banned
+  join refusal on current Firestorm. `GroupMemberData` remains the official
+  implementation.
 
 ## Licensing and provenance
 

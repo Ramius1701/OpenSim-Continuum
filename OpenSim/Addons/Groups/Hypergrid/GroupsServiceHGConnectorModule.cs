@@ -638,6 +638,25 @@ namespace OpenSim.Groups
             return m_LocalGroupsConnector.GetGroupNotices(AgentUUI(RequestingAgentID), GroupID);
         }
 
+        public List<GroupBanInfo> GetGroupBans(string requestingAgentID, UUID groupID)
+        {
+            return IsLocal(groupID, out string _, out string _)
+                ? m_LocalGroupsConnector.GetGroupBans(AgentUUI(requestingAgentID), groupID)
+                : new List<GroupBanInfo>();
+        }
+
+        public bool AddGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs)
+        {
+            return IsLocal(groupID, out string _, out string _) &&
+                m_LocalGroupsConnector.AddGroupBans(AgentUUI(requestingAgentID), groupID, agentIDs);
+        }
+
+        public bool RemoveGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs)
+        {
+            return IsLocal(groupID, out string _, out string _) &&
+                m_LocalGroupsConnector.RemoveGroupBans(AgentUUI(requestingAgentID), groupID, agentIDs);
+        }
+
         #endregion
 
         #region hypergrid groups

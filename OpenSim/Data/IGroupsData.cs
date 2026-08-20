@@ -80,6 +80,13 @@ namespace OpenSim.Data
         public Dictionary<string, string> Data;
     }
 
+    public class GroupBanData
+    {
+        public UUID GroupID;
+        public string PrincipalID;
+        public long BanTime;
+    }
+
 
     public interface IGroupsData
     {
@@ -134,6 +141,12 @@ namespace OpenSim.Data
         NoticeData[] RetrieveNotices(UUID groupID);
         bool DeleteNotice(UUID noticeID);
         void DeleteOldNotices();
+
+        // group bans table
+        bool StoreBan(GroupBanData data);
+        GroupBanData RetrieveBan(UUID groupID, string principalID);
+        GroupBanData[] RetrieveBans(UUID groupID);
+        bool DeleteBan(UUID groupID, string principalID);
 
         // combinations
         MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID);

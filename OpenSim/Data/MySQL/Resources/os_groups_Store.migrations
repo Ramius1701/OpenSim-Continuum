@@ -121,3 +121,16 @@ ALTER TABLE `os_groups_invites`
 MODIFY `TMStamp` timestamp NOT NULL default CURRENT_TIMESTAMP;
 
 COMMIT;
+
+:VERSION 4
+
+BEGIN;
+
+CREATE TABLE `os_groups_bans` (
+  `GroupID` char(36) NOT NULL default '',
+  `PrincipalID` varchar(255) NOT NULL default '',
+  `BanTime` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY (`GroupID`,`PrincipalID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+COMMIT;

@@ -427,6 +427,14 @@ namespace OpenSim.Groups
         {
             reason = string.Empty;
 
+            Util.ParseUniversalUserIdentifier(AgentID, out UUID agentID, out string _,
+                out string _, out string _, out string _);
+            if (!agentID.IsZero() && m_Database.RetrieveBan(GroupID, agentID.ToString()) != null)
+            {
+                reason = "You are banned from this group";
+                return false;
+            }
+
             _AddAgentToGroup(RequestingAgentID, AgentID, GroupID, RoleID, token);
 
             return true;
@@ -771,6 +779,65 @@ namespace OpenSim.Groups
             }
 
             return infos;
+        }
+
+        public List<GroupBanInfo> GetGroupBans(string requestingAgentID, UUID groupID)
+        {
+            List<GroupBanInfo> result = new List<GroupBanInfo>();
+            if (!HasPower(requestingAgentID, groupID, GroupPowers.GroupBanAccess))
+                return result;
+            GroupBanData[] bans = m_Database.RetrieveBans(groupID);
+            if (bans == null)
+                return result;
+            foreach (GroupBanData ban in bans)
+                if (ban != null && UUID.TryParse(ban.PrincipalID, out UUID agentID) && !agentID.IsZero())
+                    result.Add(new GroupBanInfo
+                    {
+                        AgentID = agentID,
+                        BanTime = ban.BanTime > 0 && ban.BanTime <= UInt32.MaxValue
+                            ? (uint)ban.BanTime : 0
+                    });
+            return result;
+        }
+
+        public bool AddGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs)
+        {
+            if (!HasPower(requestingAgentID, groupID, GroupPowers.GroupBanAccess) ||
+                agentIDs == null || agentIDs.Count == 0 || agentIDs.Count > 100)
+                return false;
+            GroupBanData[] existing = m_Database.RetrieveBans(groupID) ?? Array.Empty<GroupBanData>();
+            HashSet<UUID> known = new HashSet<UUID>();
+            foreach (GroupBanData ban in existing)
+                if (ban != null && UUID.TryParse(ban.PrincipalID, out UUID id)) known.Add(id);
+            HashSet<UUID> additions = new HashSet<UUID>();
+            foreach (UUID agentID in agentIDs)
+            {
+                if (agentID.IsZero() || IsOwner(agentID.ToString(), groupID))
+                    return false;
+                if (!known.Contains(agentID)) additions.Add(agentID);
+            }
+            if (known.Count + additions.Count > 500)
+                return false;
+            uint now = unchecked((uint)Util.UnixTimeSinceEpoch());
+            foreach (UUID agentID in additions)
+            {
+                if (!m_Database.StoreBan(new GroupBanData
+                    { GroupID = groupID, PrincipalID = agentID.ToString(), BanTime = now }))
+                    return false;
+            }
+            return true;
+        }
+
+        public bool RemoveGroupBans(string requestingAgentID, UUID groupID, List<UUID> agentIDs)
+        {
+            if (!HasPower(requestingAgentID, groupID, GroupPowers.GroupBanAccess) ||
+                agentIDs == null || agentIDs.Count == 0 || agentIDs.Count > 100)
+                return false;
+            bool success = true;
+            foreach (UUID agentID in agentIDs)
+                if (!agentID.IsZero() && m_Database.RetrieveBan(groupID, agentID.ToString()) != null)
+                    success &= m_Database.DeleteBan(groupID, agentID.ToString());
+            return success;
         }
 
         public void ResetAgentGroupChatSessions(string agentID)
