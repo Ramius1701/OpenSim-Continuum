@@ -1510,6 +1510,20 @@
     ;# {PostsPerPage} {Enabled} {Number of blog posts on the region page} {} 5
     ; PostsPerPage = 5
 
+    ;; Currency and PayPal surfaces are independent, explicit opt-ins. Merely
+    ;; enabling the public RegionWeb site never enables wallet operations.
+    ; CurrencyPortalEnabled = false
+    ; CurrencyBuyEnabled = false
+    ; CurrencyTransferEnabled = false
+
+    ;; Values: disabled, request (staff approval), grant, paypal.
+    ;; Never use grant on a production grid. PayPal remains sandbox-only until
+    ;; payment capture and currency credit reconciliation have been certified.
+    ; CurrencyBuyMode = "disabled"
+    ; CurrencyBuyLimit = 100000
+    ; PayPalEnabled = false
+    ; PayPalEnvironment = "sandbox"
+
 
 [Terrain]
     ;# {InitialTerrain} {} {Initial terrain type} {pinhead-island flat} pinhead-island

@@ -4,25 +4,24 @@
 
 ### Lineage and behavior
 
-Gunthar revision `6c7021cc36fd6890db27200cd65fd4bb37bd60fd` is the
-authoritative donor. Its RegionWeb history includes the per-region/estate site,
+Gunthar revision `b3511ea070501c32612e24949ded5612c437e8dc` is the
+packaged authoritative donor checkpoint (source blob
+`db48bab8ff7e115dcb97cd3e4eb54b44d1bd3468`). Its RegionWeb history includes the per-region/estate site,
 inventory carousels, protected estate administration, wallet presentation and
 optional PayPal checkout. This is not WhiteCore WebUI and is not a grid-wide
 public administration interface.
 
-Continuum's `RegionWebModule.cs` differs from that donor by 154 additions and
-37 removals. The reviewed delta is primarily current OpenSim API adaptation,
-route ownership, scene lifecycle and failure-closed hardening. It remains a
-candidate until the public and authenticated HTTP surfaces pass live tests.
+Continuum packages that source as a separately built addon. The source delta is
+limited to Mono.Addins assembly metadata and Continuum-facing branding; donor
+behavior remains intact. It remains a candidate until the public and
+authenticated HTTP surfaces pass live tests.
 
 ### Classification and decision
 
-- **Classification:** optional addon behavior currently located in OpenSim's
-  optional core-module tree.
+- **Classification:** optional addon module.
 - **Current Dev equivalent:** none.
-- **Addon versus core:** retain its current location for this stabilization
-  cycle to avoid another architectural move. Re-evaluate packaging after
-  runtime certification; it must remain disabled by default.
+- **Addon versus core:** packaged under `addon-modules/RegionWeb`; it remains
+  disabled by default and does not alter the official optional-module assembly.
 - **RegionCurrency:** the earlier split portal is deprecated compatibility
   material, never a ledger, and must disable itself whenever RegionWeb is on.
 - **Economy:** RegionWeb is a client of exactly one selected `IMoneyModule`.

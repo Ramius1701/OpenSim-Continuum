@@ -188,9 +188,9 @@ Priority reflects expected value and auditability, not authorization to implemen
 ### 8. Gunthar RegionWeb
 
 - **Feature and intended behaviour:** optional per-region public pages, map/carousel content, and protected estate administration. It is not a grid-wide WebUI.
-- **Donor and commit:** Gunthar RegionWeb series; representative admin commit `b05cd2bb4bc0d325aa1a7c6771d8a933ec6d1405` and inventory carousel `2f9abda3877b406b2ca49b9fda55f85dc77e2bbf`.
+- **Donor and commit:** Gunthar RegionWeb series through packaged checkpoint `b3511ea070501c32612e24949ded5612c437e8dc` (source blob `db48bab8ff7e115dcb97cd3e4eb54b44d1bd3468`); representative admin commit `b05cd2bb4bc0d325aa1a7c6771d8a933ec6d1405` and inventory carousel `2f9abda3877b406b2ca49b9fda55f85dc77e2bbf`.
 - **Current Dev equivalent / missing behaviour:** no `RegionWeb` module in Dev. Existing HTTP/caps and map services do not provide this site.
-- **Affected files and services:** `OpenSim/Region/OptionalModules/World/RegionWeb/RegionWebModule.cs`, static/template assets, region HTTP server, inventory/map and estate controls.
+- **Affected files and services:** `addon-modules/RegionWeb/RegionWebModule/RegionWebModule.cs`, region HTTP server, inventory/map and estate controls.
 - **Addon versus core:** optional addon module; only narrowly justified host APIs should touch core.
 - **Compatibility:** should run without Robust/database dependencies where possible; any account/admin data path needs MySQL and Robust tests; Windows path/case handling; HG content must be escaped and identity-aware.
 - **Viewer requirements:** ordinary web browser; optionally used as viewer login splash.
