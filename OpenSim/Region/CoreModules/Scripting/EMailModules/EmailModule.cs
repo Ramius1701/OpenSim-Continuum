@@ -44,7 +44,7 @@ using Mono.Addins;
 namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "EmailModule")]
-    public class EmailModule : ISharedRegionModule, IEmailModule
+    public class EmailModule : ISharedRegionModule, IEmailModule, ISystemEmailModule
     {
         public class throttleControlInfo
         {
@@ -90,6 +90,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         private double m_SMTP_MailsRate = 100.0 / 86400.0;
         private double m_SMTPLastTime;
         private double m_SMTPCount;
+        private readonly object m_SMTPThrottleLock = new object();
 
         private int m_MailsToPrimAddressPerHour = 50;
         private double m_MailsToPrimAddressRate = 50.0 / 3600.0;
@@ -227,6 +228,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
             {
                 // Claim the interface slot
                 scene.RegisterModuleInterface<IEmailModule>(this);
+                scene.RegisterModuleInterface<ISystemEmailModule>(this);
 
                 // Add to scene list
                 m_Scenes[scene.RegionInfo.RegionHandle] = scene;
@@ -435,13 +437,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 if(!m_enableEmailToSMTP)
                     return; //smtp disabled
 
-                m_SMTPCount += (m_SMTPLastTime - now) * m_SMTP_MailsRate;
-                m_SMTPLastTime = now;
-                if (m_SMTPCount > m_SMTP_MailsPerDay)
-                    m_SMTPCount = m_SMTP_MailsPerDay;
-                else if (m_SMTPCount <= 0)
+                if (!TryConsumeSmtpQuota(now))
                     return;
-                --m_SMTPCount;
 
                 lock (m_SMPTAddressThrottles)
                 {
@@ -569,6 +566,127 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     // object on another region
                     // TODO FIX
                 }
+            }
+        }
+
+        public void SendSystemEmail(UUID ownerID, string address, string subject,
+            string body, string sourceName, string regionName)
+        {
+            if (!m_enableEmailToSMTP || string.IsNullOrWhiteSpace(address))
+                return;
+            address = address.Trim();
+            if (address.Length > 320 || !MailboxAddress.TryParse(address, out MailboxAddress mailTo))
+            {
+                m_log.ErrorFormat("[EMAIL]: invalid system TO email address {0}", address);
+                return;
+            }
+            subject ??= string.Empty;
+            body ??= string.Empty;
+            if (subject.Length + body.Length > m_MaxEmailSize)
+            {
+                m_log.Error("[EMAIL]: system subject + body larger than limit of " + m_MaxEmailSize + " bytes");
+                return;
+            }
+
+            double now = Util.GetTimeStamp();
+            throttleControlInfo tci;
+            lock (m_ownerThrottles)
+            {
+                if (m_ownerThrottles.TryGetValue(ownerID, out tci))
+                {
+                    tci.count += (now - tci.lastTime) * m_MailsFromOwnerRate;
+                    tci.lastTime = now;
+                    if (tci.count > m_MailsFromOwnerPerHour)
+                        tci.count = m_MailsFromOwnerPerHour;
+                    else if (tci.count <= 0)
+                        return;
+                    --tci.count;
+                }
+                else
+                {
+                    m_ownerThrottles[ownerID] = new throttleControlInfo
+                    {
+                        lastTime = now,
+                        count = m_MailsFromOwnerPerHour - 1
+                    };
+                }
+            }
+
+            if (!TryConsumeSmtpQuota(now))
+                return;
+
+            string addressLower = address.ToLowerInvariant();
+            lock (m_SMPTAddressThrottles)
+            {
+                if (m_SMPTAddressThrottles.TryGetValue(addressLower, out tci))
+                {
+                    tci.count += (now - tci.lastTime) * m_MailsToSMTPAddressRate;
+                    tci.lastTime = now;
+                    if (tci.count > m_MailsToSMTPAddressPerHour)
+                        tci.count = m_MailsToSMTPAddressPerHour;
+                    else if (tci.count <= 0)
+                        return;
+                    --tci.count;
+                }
+                else
+                {
+                    m_SMPTAddressThrottles[addressLower] = new throttleControlInfo
+                    {
+                        lastTime = now,
+                        count = m_MailsToSMTPAddressPerHour - 1
+                    };
+                }
+            }
+
+            try
+            {
+                MimeMessage message = new MimeMessage();
+                if (SMTP_MAIL_FROM != null)
+                    message.From.Add(SMTP_MAIL_FROM);
+                else
+                    message.From.Add(MailboxAddress.Parse("system@" + m_HostName));
+                message.To.Add(mailTo);
+                message.Subject = subject;
+                message.Headers["X-Owner-ID"] = ownerID.ToString();
+                message.Headers["X-Task-ID"] = UUID.Zero.ToString();
+                message.Body = new TextPart("plain")
+                {
+                    Text = "Source: " + (sourceName ?? "OpenSimulator") +
+                        "\nRegion: " + (regionName ?? string.Empty) + "\n\n" + body
+                };
+                using SmtpClient client = new SmtpClient();
+                if (SMTP_SERVER_TLS)
+                {
+                    client.ServerCertificateValidationCallback = smptValidateServerCertificate;
+                    client.Connect(SMTP_SERVER_HOSTNAME, SMTP_SERVER_PORT,
+                        MailKit.Security.SecureSocketOptions.StartTls);
+                }
+                else
+                    client.Connect(SMTP_SERVER_HOSTNAME, SMTP_SERVER_PORT);
+                if (!string.IsNullOrEmpty(SMTP_SERVER_LOGIN) && !string.IsNullOrEmpty(SMTP_SERVER_PASSWORD))
+                    client.Authenticate(SMTP_SERVER_LOGIN, SMTP_SERVER_PASSWORD);
+                client.Send(message);
+                client.Disconnect(true);
+                m_log.InfoFormat("[EMAIL]: System email sent to {0} from {1}", address, sourceName);
+            }
+            catch (Exception e)
+            {
+                m_log.Error("[EMAIL]: System email exception: " + e.Message);
+            }
+        }
+
+        private bool TryConsumeSmtpQuota(double now)
+        {
+            lock (m_SMTPThrottleLock)
+            {
+                m_SMTPCount += (now - m_SMTPLastTime) * m_SMTP_MailsRate;
+                m_SMTPLastTime = now;
+                if (m_SMTPCount > m_SMTP_MailsPerDay)
+                    m_SMTPCount = m_SMTP_MailsPerDay;
+                if (m_SMTPCount < 1)
+                    return false;
+                --m_SMTPCount;
+                return true;
             }
         }
 

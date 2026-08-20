@@ -283,6 +283,7 @@ namespace OpenSim.Region.ClientStack.Linden
                         report.SenderName,
                         report.AbuserName,
                         report.AbuseRegionName);
+                    NotifyEstateOwner(report);
                     return SerializeState("complete");
                 }
 
@@ -366,6 +367,8 @@ namespace OpenSim.Region.ClientStack.Linden
                                     report.SenderName,
                                     report.AbuserName,
                                     report.AbuseRegionName);
+
+                                NotifyEstateOwner(report);
 
                                 uploadResponse["state"] = "complete";
                                 uploadResponse["new_asset"] = screenshotID;
@@ -458,6 +461,45 @@ namespace OpenSim.Region.ClientStack.Linden
             report.AbuseRegionID = scene.RegionInfo.RegionID;
             report.AbuseRegionName = scene.RegionInfo.RegionName ?? string.Empty;
             report.AbuserName = m_UserManager.GetUserName(report.AbuserID) ?? string.Empty;
+        }
+
+        private void NotifyEstateOwner(AbuseReportData report)
+        {
+            Scene scene = m_Scene;
+            if (scene == null || report == null)
+                return;
+            EstateSettings estate = scene.RegionInfo.EstateSettings;
+            if (!estate.AbuseEmailToEstateOwner || string.IsNullOrWhiteSpace(estate.AbuseEmail))
+                return;
+            ISystemEmailModule email = scene.RequestModuleInterface<ISystemEmailModule>();
+            if (email == null)
+                return;
+
+            string address = estate.AbuseEmail;
+            UUID ownerID = estate.EstateOwner;
+            string regionName = report.AbuseRegionName;
+            string body = "Reporter: " + report.SenderName +
+                "\nReported resident: " + report.AbuserName +
+                "\nLocation: " + report.Position +
+                "\nCategory: " + report.Category +
+                "\nSummary: " + report.Summary +
+                "\nDetails: " + report.Details;
+            // The stock email module defaults to a 4096-character message cap.
+            if (body.Length > 3500)
+                body = body.Substring(0, 3500) + "\n[truncated]";
+
+            Util.FireAndForget(_ =>
+            {
+                try
+                {
+                    email.SendSystemEmail(ownerID, address, "Abuse report: " + regionName,
+                        body, "Abuse Reports", regionName);
+                }
+                catch (Exception e)
+                {
+                    m_log.WarnFormat("[ABUSE REPORTS]: Estate notification failed after report storage: {0}", e.Message);
+                }
+            }, null, "AbuseReports.NotifyEstateOwner");
         }
 
         private static OSDMap DeserializeMap(string request)

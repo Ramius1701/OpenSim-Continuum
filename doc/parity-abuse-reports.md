@@ -27,7 +27,7 @@
 | SQLite and PostgreSQL | Continuum adaptations | Required support; retain only after provider-parity and migration tests. |
 | Moderation list/get/update | Continuum extension informed by WhiteCore | Direction is correct. Confirm pagination, image exclusion from lists, status transitions, assignment identity and notes persistence against WhiteCore behavior. |
 | Console moderation | Present | Useful administrative surface, but it does not replace the integrated WebUI workflow. |
-| Estate-owner email | Missing relative to WhiteCore | Port later as an optional notification adapter using the existing estate flags and configured email service; report storage must never depend on mail delivery. |
+| Estate-owner email | Implemented from WhiteCore behavior | After successful grid-wide storage, Continuum asynchronously uses the estate's `AbuseEmailToEstateOwner`/`AbuseEmail` settings and the configured SMTP module. Missing SMTP, throttling or delivery failure cannot fail or roll back the report. |
 | Integrated WebUI manager/detail pages | Deferred | Faithfully port WhiteCore's `abuse_manager` and `abuse_report` page/controller/template behavior during the WebUI phase. Do not build a separate replacement site. |
 | Public/admin WebAPI | Partial equivalent through Continuum Robust handler | Reconcile authorization and response contracts with the WhiteCore WebAPI before exposing it to the integrated UI. Do not copy WhiteCore's password-in-method contract unchanged. |
 | Hypergrid reporting | Local-grid authority only | A visitor may submit a report about conduct in the visited region, but the report and moderation authority remain with that grid. Do not forward moderator credentials or private evidence to a foreign home grid. |

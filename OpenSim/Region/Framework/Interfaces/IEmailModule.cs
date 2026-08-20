@@ -45,4 +45,15 @@ namespace OpenSim.Region.Framework.Interfaces
         void AddPartMailBox(UUID objectID);
         void RemovePartMailBox(UUID objectID);
     }
+
+    /// <summary>
+    /// Optional SMTP-only path for trusted simulator services which do not
+    /// have an in-world object identity. Kept separate from IEmailModule so
+    /// existing third-party script email modules remain binary compatible.
+    /// </summary>
+    public interface ISystemEmailModule
+    {
+        void SendSystemEmail(UUID ownerID, string address, string subject,
+            string body, string sourceName, string regionName);
+    }
 }
