@@ -2263,7 +2263,7 @@ namespace OpenSim.Grid.MoneyServer
                             else if (transaction.Type == (int)TransactionType.LandSale)
                             {
                                 snd_message = m_BalanceMessageLandSale;
-                                snd_message = m_BalanceMessageRcvLandSale;
+                                rcv_message = m_BalanceMessageRcvLandSale;
                             }
                             else if (transaction.Type == (int)TransactionType.PayObject)
                             {
