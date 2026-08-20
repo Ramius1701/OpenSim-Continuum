@@ -772,14 +772,26 @@ namespace OpenSim.Modules.Currency
         /// <param name="client">The client.</param>
         private void OnNewClient(IClientAPI client)
         {
-            client.OnEconomyDataRequest += OnEconomyDataRequest;
-            client.OnLogout += ClientClosed;
+            if (client == null || client.Scene is not Scene scene)
+                return;
 
-            client.OnMoneyBalanceRequest += OnMoneyBalanceRequest;
-            client.OnRequestPayPrice += OnRequestPayPrice;
-            client.OnObjectBuy += OnObjectBuy;
+            lock (m_sceneList)
+            {
+                if (!m_enabled
+                    || !m_sceneList.TryGetValue(scene.RegionInfo.RegionHandle, out Scene activeScene)
+                    || !ReferenceEquals(activeScene, scene))
+                {
+                    return;
+                }
 
-            m_log.InfoFormat("[MONEY MODULE] OnNewClient: {0}", client.AgentId);
+                client.OnEconomyDataRequest += OnEconomyDataRequest;
+                client.OnLogout += ClientClosed;
+                client.OnMoneyBalanceRequest += OnMoneyBalanceRequest;
+                client.OnRequestPayPrice += OnRequestPayPrice;
+                client.OnObjectBuy += OnObjectBuy;
+
+                m_log.InfoFormat("[MONEY MODULE] OnNewClient: {0}", client.AgentId);
+            }
         }
 
         private void UnsubscribeClient(IClientAPI client)
