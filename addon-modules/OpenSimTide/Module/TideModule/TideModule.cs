@@ -57,6 +57,7 @@ namespace TideModule
         private bool m_hasOriginalWaterHeight;
         private readonly object m_lifecycleSync = new object();
         private readonly object m_operationSync = new object();
+        private bool m_closed;
 
         public Scene m_scene;
         public IConfigSource m_config;
@@ -76,7 +77,12 @@ namespace TideModule
 
         public void Close ()
         {
-            Scene scene = m_scene;
+            Scene scene;
+            lock (m_lifecycleSync)
+            {
+                m_closed = true;
+                scene = m_scene;
+            }
             if (scene != null)
                 StopTide(scene);
         }
@@ -89,6 +95,9 @@ namespace TideModule
 
             lock (m_lifecycleSync)
             {
+                if (m_closed)
+                    return;
+
                 if (ReferenceEquals(m_scene, scene))
                     return;
                 if (m_scene != null)
@@ -195,6 +204,9 @@ namespace TideModule
 
         public void RemoveRegion (Scene scene)
         {
+            if (scene == null)
+                return;
+
             m_log.InfoFormat("[{0}]: Removing region '{1}' from this module", m_name, scene.RegionInfo.RegionName);
             StopTide(scene);
         }

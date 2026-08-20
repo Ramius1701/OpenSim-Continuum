@@ -507,46 +507,48 @@ namespace OpenSim.Region.OptionalModules.World.Weather
             {
                 if (!ReferenceEquals(m_scene, scene))
                     return;
-            }
 
-            m_environmentModule = scene.RequestModuleInterface<IEnvironmentModule>();
-            if (m_adjustClouds && m_environmentModule == null)
-            {
-                m_log.WarnFormat("[WEATHER]: Cloud changes disabled in {0}; EnvironmentModule is not available.", scene.RegionInfo.RegionName);
-            }
-            else if (m_adjustClouds)
-            {
-                m_log.WarnFormat(
-                    "[WEATHER]: Cloud adjustment is enabled in {0}. OpenSim persists these region environment changes; "
-                    + "a process crash can prevent automatic restoration.",
-                    scene.RegionInfo.RegionName);
-            }
+                m_environmentModule = scene.RequestModuleInterface<IEnvironmentModule>();
+                if (m_adjustClouds && m_environmentModule == null)
+                {
+                    m_log.WarnFormat("[WEATHER]: Cloud changes disabled in {0}; EnvironmentModule is not available.", scene.RegionInfo.RegionName);
+                }
+                else if (m_adjustClouds)
+                {
+                    m_log.WarnFormat(
+                        "[WEATHER]: Cloud adjustment is enabled in {0}. OpenSim persists these region environment changes; "
+                        + "a process crash can prevent automatic restoration.",
+                        scene.RegionInfo.RegionName);
+                }
 
-            m_windModule = scene.RequestModuleInterface<IWindModule>();
-            if (m_adjustWind && m_windModule == null)
-            {
-                m_log.WarnFormat("[WEATHER]: Region wind changes disabled in {0}; WindModule is not available.", scene.RegionInfo.RegionName);
-            }
-            else if (m_adjustWind
-                && m_windModule.WindActiveModelPluginName != "SimpleRandomWind"
-                && m_windModule.WindActiveModelPluginName != "ConfigurableWind")
-            {
-                m_log.WarnFormat(
-                    "[WEATHER]: Wind plugin '{0}' in {1} is not supported; weather will not alter region wind.",
-                    m_windModule.WindActiveModelPluginName,
-                    scene.RegionInfo.RegionName);
-            }
+                m_windModule = scene.RequestModuleInterface<IWindModule>();
+                if (m_adjustWind && m_windModule == null)
+                {
+                    m_log.WarnFormat("[WEATHER]: Region wind changes disabled in {0}; WindModule is not available.", scene.RegionInfo.RegionName);
+                }
+                else if (m_adjustWind
+                    && m_windModule.WindActiveModelPluginName != "SimpleRandomWind"
+                    && m_windModule.WindActiveModelPluginName != "ConfigurableWind")
+                {
+                    m_log.WarnFormat(
+                        "[WEATHER]: Wind plugin '{0}' in {1} is not supported; weather will not alter region wind.",
+                        m_windModule.WindActiveModelPluginName,
+                        scene.RegionInfo.RegionName);
+                }
 
-            if (m_cleanupGeneratedObjectsOnStartup)
-                CleanupGeneratedObjects();
+                if (m_cleanupGeneratedObjectsOnStartup)
+                    CleanupGeneratedObjects();
 
-            RefreshExclusionVolumes(true);
-            StartAutoCycle();
-            StartSurfaceTimer();
+                RefreshExclusionVolumes(true);
+                StartAutoCycle();
+                StartSurfaceTimer();
+            }
         }
 
         public void Close()
         {
+            lock (m_lifecycleSync)
+                m_enabled = false;
             TeardownRegion(null);
         }
 
