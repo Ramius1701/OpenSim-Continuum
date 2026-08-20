@@ -12,7 +12,7 @@ service = xmlrpc.client.ServerProxy(url, allow_none=True)
 buyer, seller = uuid.uuid4(), uuid.uuid4()
 buyer_session, buyer_secure = uuid.uuid4(), uuid.uuid4()
 seller_session, seller_secure = uuid.uuid4(), uuid.uuid4()
-buyer_region, seller_region = uuid.uuid4(), uuid.uuid4()
+buyer_region, buyer_destination_region, seller_region = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
 
 def login(agent, session, secure, region):
     return service.ClientLogin({"continuumSecret": secret, "clientUUID": str(agent),
@@ -27,6 +27,9 @@ assert service.ContinuumHealth({})["service"] == "ContinuumEconomy.Service"
 buyer_start = login(buyer, buyer_session, buyer_secure, buyer_region)["clientBalance"]
 seller_start = login(seller, seller_session, seller_secure, seller_region)["clientBalance"]
 assert buyer_start >= 25 and seller_start >= 0
+# A crossing registers the destination before the source logs out. Both region
+# sessions must coexist so the source logout cannot invalidate the destination.
+assert login(buyer, buyer_session, buyer_secure, buyer_destination_region)["success"] is True
 transaction = uuid.uuid4()
 transfer = {"continuumSecret": secret, "transactionID": str(transaction),
     "senderID": str(buyer), "receiverID": str(seller),
@@ -141,5 +144,10 @@ assert service.ClientLogout({"continuumSecret": secret, "clientUUID": str(buyer)
     "clientSessionID": str(buyer_session),
     "clientSecureSessionID": str(buyer_secure),
     "regionUUID": str(buyer_region)})["success"] is True
+assert balance(buyer, buyer_session, buyer_secure)["success"] is True
+assert service.ClientLogout({"continuumSecret": secret, "clientUUID": str(buyer),
+    "clientSessionID": str(buyer_session),
+    "clientSecureSessionID": str(buyer_secure),
+    "regionUUID": str(buyer_destination_region)})["success"] is True
 assert balance(buyer, buyer_session, buyer_secure)["success"] is False
 print("ContinuumEconomy XML-RPC smoke test passed against", url)
