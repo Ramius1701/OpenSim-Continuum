@@ -178,6 +178,7 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private Dictionary<string, float> m_savedWindParams;
         private WeatherKind m_currentWeather = WeatherKind.Clear;
         private int m_stormEffectGeneration;
+        private CancellationTokenSource m_stormCancellation;
         private bool m_adjustWind;
         private bool m_restoreWindOnClear;
         private float m_windDirectionDegrees;
@@ -1551,8 +1552,12 @@ namespace OpenSim.Region.OptionalModules.World.Weather
                 return;
 
             int generation = Interlocked.Increment(ref m_stormEffectGeneration);
+            CancellationTokenSource cancellation = new CancellationTokenSource();
+            CancellationTokenSource previous = Interlocked.Exchange(
+                ref m_stormCancellation, cancellation);
+            previous?.Cancel();
             Util.FireAndForget(
-                o => StormEffectLoop(generation, ownerId),
+                o => StormEffectLoop(generation, ownerId, cancellation),
                 null,
                 "WeatherModule.StormEffects",
                 false);
@@ -1561,18 +1566,34 @@ namespace OpenSim.Region.OptionalModules.World.Weather
         private void StopStormEffects()
         {
             Interlocked.Increment(ref m_stormEffectGeneration);
+            Interlocked.Exchange(ref m_stormCancellation, null)?.Cancel();
         }
 
-        private void StormEffectLoop(int generation, UUID ownerId)
+        private void StormEffectLoop(
+            int generation, UUID ownerId, CancellationTokenSource cancellation)
         {
-            while (generation == m_stormEffectGeneration && IsCurrentWeather(WeatherKind.Storm))
+            try
             {
-                Thread.Sleep(RandomRange(m_lightningMinDelayMS, m_lightningMaxDelayMS + 1));
+                CancellationToken token = cancellation.Token;
+                while (!token.IsCancellationRequested &&
+                    generation == m_stormEffectGeneration &&
+                    IsCurrentWeather(WeatherKind.Storm))
+                {
+                    int delay = RandomRange(m_lightningMinDelayMS, m_lightningMaxDelayMS + 1);
+                    if (token.WaitHandle.WaitOne(delay))
+                        return;
 
-                if (m_scene == null || generation != m_stormEffectGeneration || !IsCurrentWeather(WeatherKind.Storm))
-                    return;
+                    if (m_scene == null || token.IsCancellationRequested ||
+                        generation != m_stormEffectGeneration ||
+                        !IsCurrentWeather(WeatherKind.Storm))
+                        return;
 
-                TriggerLightning(ownerId, generation);
+                    TriggerLightning(ownerId, generation);
+                }
+            }
+            finally
+            {
+                cancellation.Dispose();
             }
         }
 
