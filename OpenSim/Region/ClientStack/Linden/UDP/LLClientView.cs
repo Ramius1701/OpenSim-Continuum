@@ -12169,12 +12169,18 @@ namespace OpenSim.Region.ClientStack.LindenUDP
         private static void HandleEventNotificationAddRequest(LLClientView c, Packet Pack)
         {
             EventNotificationAddRequestPacket eventNotificationAdd = (EventNotificationAddRequestPacket)Pack;
+            if (eventNotificationAdd.AgentData.SessionID.NotEqual(c.m_sessionId) ||
+                eventNotificationAdd.AgentData.AgentID.NotEqual(c.m_agentId))
+                return;
             c.OnEventNotificationAddRequest?.Invoke(eventNotificationAdd.EventData.EventID, c);
         }
 
         private static void HandleEventNotificationRemoveRequest(LLClientView c, Packet Pack)
         {
             EventNotificationRemoveRequestPacket eventNotificationRemove = (EventNotificationRemoveRequestPacket)Pack;
+            if (eventNotificationRemove.AgentData.SessionID.NotEqual(c.m_sessionId) ||
+                eventNotificationRemove.AgentData.AgentID.NotEqual(c.m_agentId))
+                return;
             c.OnEventNotificationRemoveRequest?.Invoke(eventNotificationRemove.EventData.EventID, c);
         }
 
