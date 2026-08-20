@@ -203,7 +203,13 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
                     DateTime nextUpdate = current.NameChanged.AddDays(7);
                     OSD update = FormatDisplayNameUpdate(oldDisplayName, current, nextUpdate);
-                    scene.ForEachClient(client => eventQueue.Enqueue(update, client.AgentId));
+                    // Child-agent circuits connect one viewer to several
+                    // neighboring simulators.  Sending on every circuit makes
+                    // a single grid rename appear as one notification per
+                    // region.  Only the simulator hosting each root agent
+                    // should deliver the viewer-visible update.
+                    scene.ForEachRootScenePresence(
+                        resident => eventQueue.Enqueue(update, resident.UUID));
                     m_log.InfoFormat(
                         "[DISPLAY NAMES]: Refreshed grid display name for {0} in region {1}",
                         presence.UUID,
@@ -334,7 +340,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             DateTime next_update = DateTime.UtcNow.AddDays(7);
             OSD update = FormatDisplayNameUpdate(oldName, userData, next_update);
-            m_Scene.ForEachClient(x => m_EventQueue.Enqueue(update, x.AgentId));
+            m_Scene.ForEachRootScenePresence(
+                resident => m_EventQueue.Enqueue(update, resident.UUID));
             SendSetDisplayNameReply(newName, oldName, userData, next_update);
 
             WriteSetDisplayNameAccepted(httpResponse);
