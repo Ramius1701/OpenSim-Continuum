@@ -873,13 +873,7 @@ namespace OpenSim.Data.PGSQL
 
         public bool GetUserPreferences(ref UserPreferences pref, ref string result)
         {
-            string query = string.Empty;
-
-            query += "SELECT imviaemail::VARCHAR,visible::VARCHAR,email FROM ";
-            query += "usersettings WHERE ";
-            query += "useruuid = :Id";
-
-            OSDArray data = new OSDArray();
+            const string query = "SELECT imviaemail,visible,email FROM usersettings WHERE useruuid = :Id";
 
             try
             {
@@ -895,29 +889,27 @@ namespace OpenSim.Data.PGSQL
                             if (reader.HasRows)
                             {
                                 reader.Read();
-                                bool.TryParse((string)reader["imviaemail"], out pref.IMViaEmail);
-                                bool.TryParse((string)reader["visible"], out pref.Visible);
+                                pref.IMViaEmail = reader.GetBoolean(0);
+                                pref.Visible = reader.GetBoolean(1);
                                 pref.EMail = (string)reader["email"];
-                            }
-                            else
-                            {
-                                using (NpgsqlCommand put = new NpgsqlCommand(query, dbcon))
-                                {
-                                    put.Parameters.Add(m_database.CreateParameter("Id", pref.UserId));
-                                    query = "INSERT INTO usersettings VALUES ";
-                                    query += "(:Id,'false','false', '')";
-
-                                    put.ExecuteNonQuery();
-                                }
+                                return true;
                             }
                         }
                     }
+
+                    const string insert = "INSERT INTO usersettings (useruuid,imviaemail,visible,email) " +
+                        "VALUES (:Id,false,false,:Email) ON CONFLICT (useruuid) DO NOTHING";
+                    using NpgsqlCommand put = new NpgsqlCommand(insert, dbcon);
+                    put.Parameters.Add(m_database.CreateParameter("Id", pref.UserId));
+                    put.Parameters.Add(m_database.CreateParameter("Email", pref.EMail ?? string.Empty));
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
             {
                 m_log.Error("[PROFILES_DATA]: GetUserPreferences exception ", e);
                 result = e.Message;
+                return false;
             }
 
             return true;
@@ -925,13 +917,9 @@ namespace OpenSim.Data.PGSQL
 
         public bool UpdateUserPreferences(ref UserPreferences pref, ref string result)
         {
-            string query = string.Empty;
-
-            query += "UPDATE usersettings SET ";
-            query += "imviaemail=:ImViaEmail, ";
-            query += "visible=:Visible, ";
-            query += "email=:Email ";
-            query += "WHERE useruuid=:uuid";
+            const string query = "INSERT INTO usersettings (useruuid,imviaemail,visible,email) " +
+                "VALUES (:uuid,:ImViaEmail,:Visible,:Email) ON CONFLICT (useruuid) DO UPDATE SET " +
+                "imviaemail=EXCLUDED.imviaemail,visible=EXCLUDED.visible,email=EXCLUDED.email";
 
             try
             {
@@ -942,7 +930,7 @@ namespace OpenSim.Data.PGSQL
                     {
                         cmd.Parameters.Add(m_database.CreateParameter("ImViaEmail", pref.IMViaEmail));
                         cmd.Parameters.Add(m_database.CreateParameter("Visible", pref.Visible));
-                        cmd.Parameters.Add(m_database.CreateParameter("EMail", pref.EMail.ToString().ToLower()));
+                        cmd.Parameters.Add(m_database.CreateParameter("Email", (pref.EMail ?? string.Empty).ToLowerInvariant()));
                         cmd.Parameters.Add(m_database.CreateParameter("uuid", pref.UserId));
 
                         cmd.ExecuteNonQuery();
@@ -965,11 +953,14 @@ namespace OpenSim.Data.PGSQL
 
         public bool GetUserAppData(ref UserAppData props, ref string result)
         {
-            string query = string.Empty;
+            if (!UUID.TryParse(props.UserId, out UUID userID) || userID == UUID.Zero)
+            {
+                result = "UserId must be a non-zero UUID";
+                return false;
+            }
 
-            query += "SELECT * FROM userdata WHERE ";
-            query += "\"UserId\" = :Id AND ";
-            query += "\"TagId\" = :TagId";
+            const string query = "SELECT \"DataKey\",\"DataVal\" FROM userdata WHERE " +
+                "\"UserId\" = :Id AND \"TagId\" = :TagId";
 
             try
             {
@@ -978,7 +969,7 @@ namespace OpenSim.Data.PGSQL
                     dbcon.Open();
                     using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
                     {
-                        cmd.Parameters.Add(m_database.CreateParameter("Id", props.UserId));
+                        cmd.Parameters.Add(m_database.CreateParameter("Id", userID));
                         cmd.Parameters.Add(m_database.CreateParameter("TagId", props.TagId));
 
                         using (NpgsqlDataReader reader = cmd.ExecuteReader(CommandBehavior.SingleRow))
@@ -986,29 +977,21 @@ namespace OpenSim.Data.PGSQL
                             if (reader.HasRows)
                             {
                                 reader.Read();
-                                props.DataKey = (string)reader["DataKey"];
-                                props.DataVal = (string)reader["DataVal"];
-                            }
-                            else
-                            {
-                                query += "INSERT INTO userdata VALUES ( ";
-                                query += ":UserId,";
-                                query += ":TagId,";
-                                query += ":DataKey,";
-                                query += ":DataVal) ";
-
-                                using (NpgsqlCommand put = new NpgsqlCommand(query, dbcon))
-                                {
-                                    put.Parameters.Add(m_database.CreateParameter("UserId", props.UserId));
-                                    put.Parameters.Add(m_database.CreateParameter("TagId", props.TagId));
-                                    put.Parameters.Add(m_database.CreateParameter("DataKey", props.DataKey.ToString()));
-                                    put.Parameters.Add(m_database.CreateParameter("DataVal", props.DataVal.ToString()));
-
-                                    put.ExecuteNonQuery();
-                                }
+                                props.DataKey = Convert.ToString(reader["DataKey"]);
+                                props.DataVal = Convert.ToString(reader["DataVal"]);
+                                return true;
                             }
                         }
                     }
+
+                    const string insert = "INSERT INTO userdata (\"UserId\",\"TagId\",\"DataKey\",\"DataVal\") " +
+                        "VALUES (:UserId,:TagId,:DataKey,:DataVal) ON CONFLICT (\"UserId\",\"TagId\") DO NOTHING";
+                    using NpgsqlCommand put = new NpgsqlCommand(insert, dbcon);
+                    put.Parameters.Add(m_database.CreateParameter("UserId", userID));
+                    put.Parameters.Add(m_database.CreateParameter("TagId", props.TagId));
+                    put.Parameters.Add(m_database.CreateParameter("DataKey", props.DataKey ?? string.Empty));
+                    put.Parameters.Add(m_database.CreateParameter("DataVal", props.DataVal ?? string.Empty));
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -1023,14 +1006,15 @@ namespace OpenSim.Data.PGSQL
 
         public bool SetUserAppData(UserAppData props, ref string result)
         {
-            string query = string.Empty;
+            if (!UUID.TryParse(props.UserId, out UUID userID) || userID == UUID.Zero)
+            {
+                result = "UserId must be a non-zero UUID";
+                return false;
+            }
 
-            query += "UPDATE userdata SET ";
-            query += "\"TagId\" = :TagId, ";
-            query += "\"DataKey\" = :DataKey, ";
-            query += "\"DataVal\" = :DataVal WHERE ";
-            query += "\"UserId\" = :UserId AND ";
-            query += "\"TagId\" = :TagId";
+            const string query = "INSERT INTO userdata (\"UserId\",\"TagId\",\"DataKey\",\"DataVal\") " +
+                "VALUES (:UserId,:TagId,:DataKey,:DataVal) ON CONFLICT (\"UserId\",\"TagId\") DO UPDATE SET " +
+                "\"DataKey\"=EXCLUDED.\"DataKey\",\"DataVal\"=EXCLUDED.\"DataVal\"";
 
             try
             {
@@ -1039,10 +1023,10 @@ namespace OpenSim.Data.PGSQL
                     dbcon.Open();
                     using (NpgsqlCommand cmd = new NpgsqlCommand(query, dbcon))
                     {
-                        cmd.Parameters.Add(m_database.CreateParameter("UserId", props.UserId.ToString()));
+                        cmd.Parameters.Add(m_database.CreateParameter("UserId", userID));
                         cmd.Parameters.Add(m_database.CreateParameter("TagId", props.TagId.ToString()));
-                        cmd.Parameters.Add(m_database.CreateParameter("DataKey", props.DataKey.ToString()));
-                        cmd.Parameters.Add(m_database.CreateParameter("DataVal", props.DataVal.ToString()));
+                        cmd.Parameters.Add(m_database.CreateParameter("DataKey", props.DataKey ?? string.Empty));
+                        cmd.Parameters.Add(m_database.CreateParameter("DataVal", props.DataVal ?? string.Empty));
 
                         cmd.ExecuteNonQuery();
                     }

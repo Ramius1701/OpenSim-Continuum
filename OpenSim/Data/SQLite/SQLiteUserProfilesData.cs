@@ -738,13 +738,9 @@ namespace OpenSim.Data.SQLite
 
         public bool UpdateUserPreferences(ref UserPreferences pref, ref string result)
         {
-            string query = string.Empty;
-
-            query += "UPDATE usersettings SET ";
-            query += "imviaemail=:ImViaEmail, ";
-            query += "visible=:Visible, ";
-            query += "email=:EMail ";
-            query += "WHERE useruuid=:uuid";
+            const string query = "INSERT INTO usersettings (useruuid,imviaemail,visible,email) " +
+                "VALUES (:uuid,:ImViaEmail,:Visible,:EMail) ON CONFLICT(useruuid) DO UPDATE SET " +
+                "imviaemail=excluded.imviaemail,visible=excluded.visible,email=excluded.email";
 
             try
             {
@@ -771,44 +767,32 @@ namespace OpenSim.Data.SQLite
 
         public bool GetUserPreferences(ref UserPreferences pref, ref string result)
         {
-            IDataReader reader = null;
-            string query = string.Empty;
-
-            query += "SELECT imviaemail,visible,email FROM ";
-            query += "usersettings WHERE ";
-            query += "useruuid = :Id";
-
-            OSDArray data = new OSDArray();
+            const string query = "SELECT imviaemail,visible,email FROM usersettings WHERE useruuid = :Id";
 
             try
             {
                 using (SQLiteCommand cmd = (SQLiteCommand)m_connection.CreateCommand())
                 {
                     cmd.CommandText = query;
-                    cmd.Parameters.AddWithValue("?Id", pref.UserId.ToString());
+                    cmd.Parameters.AddWithValue(":Id", pref.UserId.ToString());
 
-                    using (reader = cmd.ExecuteReader(CommandBehavior.SingleRow))
+                    using (IDataReader reader = cmd.ExecuteReader(CommandBehavior.SingleRow))
                     {
                         if(reader.Read())
                         {
-                            bool.TryParse((string)reader["imviaemail"], out pref.IMViaEmail);
-                            bool.TryParse((string)reader["visible"], out pref.Visible);
-                            pref.EMail = (string)reader["email"];
-                         }
-                         else
-                         {
-                            query = "INSERT INTO usersettings VALUES ";
-                            query += "(:Id,'false','false', :Email)";
-
-                            using (SQLiteCommand put = (SQLiteCommand)m_connection.CreateCommand())
-                            {
-                                put.Parameters.AddWithValue(":Id", pref.UserId.ToString());
-                                put.Parameters.AddWithValue(":Email", pref.EMail);
-                                put.ExecuteNonQuery();
-
-                            }
+                            pref.IMViaEmail = ReadBoolean(reader["imviaemail"]);
+                            pref.Visible = ReadBoolean(reader["visible"]);
+                            pref.EMail = Convert.ToString(reader["email"]);
+                            return true;
                         }
                     }
+
+                    using SQLiteCommand put = (SQLiteCommand)m_connection.CreateCommand();
+                    put.CommandText = "INSERT OR IGNORE INTO usersettings " +
+                        "(useruuid,imviaemail,visible,email) VALUES (:Id,0,0,:Email)";
+                    put.Parameters.AddWithValue(":Id", pref.UserId.ToString());
+                    put.Parameters.AddWithValue(":Email", pref.EMail ?? string.Empty);
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -821,14 +805,36 @@ namespace OpenSim.Data.SQLite
             return true;
         }
 
+        private static bool ReadBoolean(object value)
+        {
+            if (value == null || value == DBNull.Value)
+                return false;
+            if (value is bool boolean)
+                return boolean;
+            if (value is byte[] bytes)
+            {
+                if (bytes.Length == 0)
+                    return false;
+                if (bytes.Length == 1)
+                    return bytes[0] != 0 && bytes[0] != (byte)'0';
+                return bool.TryParse(System.Text.Encoding.UTF8.GetString(bytes), out bool parsedBytes)
+                    && parsedBytes;
+            }
+            if (bool.TryParse(Convert.ToString(value), out bool parsed))
+                return parsed;
+            try
+            {
+                return Convert.ToInt64(value) != 0;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         public bool GetUserAppData(ref UserAppData props, ref string result)
         {
-            IDataReader reader = null;
-            string query = string.Empty;
-
-            query += "SELECT * FROM `userdata` WHERE ";
-            query += "UserId = :Id AND ";
-            query += "TagId = :TagId";
+            const string query = "SELECT DataKey,DataVal FROM userdata WHERE UserId=:Id AND TagId=:TagId";
 
             try
             {
@@ -838,33 +844,24 @@ namespace OpenSim.Data.SQLite
                     cmd.Parameters.AddWithValue(":Id", props.UserId.ToString());
                     cmd.Parameters.AddWithValue (":TagId", props.TagId.ToString());
 
-                    using (reader = cmd.ExecuteReader(CommandBehavior.SingleRow))
+                    using (IDataReader reader = cmd.ExecuteReader(CommandBehavior.SingleRow))
                     {
                         if(reader.Read())
                         {
-                            props.DataKey = (string)reader["DataKey"];
-                            props.DataVal = (string)reader["DataVal"];
-                        }
-                        else
-                        {
-                            query += "INSERT INTO userdata VALUES ( ";
-                            query += ":UserId,";
-                            query += ":TagId,";
-                            query += ":DataKey,";
-                            query += ":DataVal) ";
-
-                            using (SQLiteCommand put = (SQLiteCommand)m_connection.CreateCommand())
-                            {
-                                cmd.CommandText = query;
-                                put.Parameters.AddWithValue(":UserId", props.UserId.ToString());
-                                put.Parameters.AddWithValue(":TagId", props.TagId.ToString());
-                                put.Parameters.AddWithValue(":DataKey", props.DataKey.ToString());
-                                put.Parameters.AddWithValue(":DataVal", props.DataVal.ToString());
-
-                                put.ExecuteNonQuery();
-                            }
+                            props.DataKey = Convert.ToString(reader["DataKey"]);
+                            props.DataVal = Convert.ToString(reader["DataVal"]);
+                            return true;
                         }
                     }
+
+                    using SQLiteCommand put = (SQLiteCommand)m_connection.CreateCommand();
+                    put.CommandText = "INSERT OR IGNORE INTO userdata (UserId,TagId,DataKey,DataVal) " +
+                        "VALUES (:UserId,:TagId,:DataKey,:DataVal)";
+                    put.Parameters.AddWithValue(":UserId", props.UserId);
+                    put.Parameters.AddWithValue(":TagId", props.TagId);
+                    put.Parameters.AddWithValue(":DataKey", props.DataKey ?? string.Empty);
+                    put.Parameters.AddWithValue(":DataVal", props.DataVal ?? string.Empty);
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -878,24 +875,19 @@ namespace OpenSim.Data.SQLite
         }
         public bool SetUserAppData(UserAppData props, ref string result)
         {
-            string query = string.Empty;
-
-            query += "UPDATE userdata SET ";
-            query += "TagId = :TagId, ";
-            query += "DataKey = :DataKey, ";
-            query += "DataVal = :DataVal WHERE ";
-            query += "UserId = :UserId AND ";
-            query += "TagId = :TagId";
+            const string query = "INSERT INTO userdata (UserId,TagId,DataKey,DataVal) " +
+                "VALUES (:UserId,:TagId,:DataKey,:DataVal) ON CONFLICT(UserId,TagId) DO UPDATE SET " +
+                "DataKey=excluded.DataKey,DataVal=excluded.DataVal";
 
             try
             {
                 using (SQLiteCommand cmd = (SQLiteCommand)m_connection.CreateCommand())
                 {
                     cmd.CommandText = query;
-                    cmd.Parameters.AddWithValue(":UserId", props.UserId.ToString());
-                    cmd.Parameters.AddWithValue(":TagId", props.TagId.ToString ());
-                    cmd.Parameters.AddWithValue(":DataKey", props.DataKey.ToString ());
-                    cmd.Parameters.AddWithValue(":DataVal", props.DataKey.ToString ());
+                    cmd.Parameters.AddWithValue(":UserId", props.UserId);
+                    cmd.Parameters.AddWithValue(":TagId", props.TagId);
+                    cmd.Parameters.AddWithValue(":DataKey", props.DataKey ?? string.Empty);
+                    cmd.Parameters.AddWithValue(":DataVal", props.DataVal ?? string.Empty);
 
                     cmd.ExecuteNonQuery();
                 }
@@ -974,4 +966,3 @@ namespace OpenSim.Data.SQLite
         #endregion
     }
 }
-

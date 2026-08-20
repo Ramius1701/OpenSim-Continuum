@@ -122,9 +122,12 @@ ALTER TABLE userpicks ADD PRIMARY KEY (pickuuid);
 ALTER TABLE userprofile DROP CONSTRAINT userprofile_pkey;
 ALTER TABLE userprofile ALTER COLUMN useruuid SET DATA TYPE uuid USING useruuid::uuid;
 ALTER TABLE userprofile ALTER COLUMN "profilePartner" SET DATA TYPE uuid USING "profilePartner"::uuid;
--- Force column conversions
-ALTER TABLE userprofile ALTER COLUMN "profileAllowPublish" SET DATA TYPE boolean USING CASE WHEN false THEN false ELSE true END;
-ALTER TABLE userprofile ALTER COLUMN "profileMaturePublish" SET DATA TYPE boolean USING CASE WHEN false THEN false ELSE true END;
+-- Preserve the one-byte boolean values used by the legacy bytea schema.
+-- The former constant CASE expression converted every existing row to true.
+ALTER TABLE userprofile ALTER COLUMN "profileAllowPublish" SET DATA TYPE boolean
+  USING (octet_length("profileAllowPublish") > 0 AND get_byte("profileAllowPublish", 0) <> 0);
+ALTER TABLE userprofile ALTER COLUMN "profileMaturePublish" SET DATA TYPE boolean
+  USING (octet_length("profileMaturePublish") > 0 AND get_byte("profileMaturePublish", 0) <> 0);
 ALTER TABLE userprofile ALTER COLUMN "profileImage" SET DATA TYPE uuid USING "profileImage"::uuid;
 ALTER TABLE userprofile ALTER COLUMN "profileFirstImage" SET DATA TYPE uuid USING "profileFirstImage"::uuid;
 ALTER TABLE userprofile ADD PRIMARY KEY (useruuid);
@@ -139,8 +142,12 @@ ALTER TABLE userdata ADD PRIMARY KEY ("UserId","TagId");
 -- Usersettings
 ALTER TABLE usersettings DROP CONSTRAINT usersettings_pkey;
 ALTER TABLE usersettings ALTER COLUMN useruuid SET DATA TYPE uuid USING useruuid::uuid;
-ALTER TABLE usersettings ALTER COLUMN visible SET DATA TYPE boolean USING CASE WHEN false THEN false ELSE true END;
-ALTER TABLE usersettings ADD COLUMN email varchar(254) NOT NULL;
+ALTER TABLE usersettings ALTER COLUMN visible SET DATA TYPE boolean
+  USING (octet_length(visible) > 0 AND get_byte(visible, 0) <> 0);
+-- A default is required while upgrading a populated v3 table. Drop it after
+-- backfilling so the final schema retains the original explicit-write contract.
+ALTER TABLE usersettings ADD COLUMN email varchar(254) NOT NULL DEFAULT '';
+ALTER TABLE usersettings ALTER COLUMN email DROP DEFAULT;
 ALTER TABLE usersettings ADD PRIMARY KEY (useruuid);
 
 COMMIT;
@@ -150,7 +157,8 @@ COMMIT;
 
 BEGIN;
 
-ALTER TABLE usersettings ALTER COLUMN imviaemail SET DATA TYPE boolean USING CASE WHEN false THEN false ELSE true END;
+ALTER TABLE usersettings ALTER COLUMN imviaemail SET DATA TYPE boolean
+  USING (octet_length(imviaemail) > 0 AND get_byte(imviaemail, 0) <> 0);
 
 COMMIT;
 

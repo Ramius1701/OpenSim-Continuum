@@ -876,29 +876,20 @@ namespace OpenSim.Data.MySQL
                             if (reader.HasRows)
                             {
                                 reader.Read();
-                                bool.TryParse((string)reader["imviaemail"], out pref.IMViaEmail);
-                                bool.TryParse((string)reader["visible"], out pref.Visible);
-                                pref.EMail = (string)reader["email"];
-                            }
-                            else
-                            {
-                                dbcon.Close();
-                                dbcon.Open();
-
-                                const string queryB = "INSERT INTO usersettings VALUES (?uuid,'false','false', ?Email)";
-
-                                using (MySqlCommand put = new MySqlCommand(queryB, dbcon))
-                                {
-
-                                    put.Parameters.AddWithValue("?Email", pref.EMail);
-                                    put.Parameters.AddWithValue("?uuid", pref.UserId.ToString());
-
-                                    put.ExecuteNonQuery();
-                                }
+                                pref.IMViaEmail = Convert.ToBoolean(reader["imviaemail"]);
+                                pref.Visible = Convert.ToBoolean(reader["visible"]);
+                                pref.EMail = Convert.ToString(reader["email"]);
+                                return true;
                             }
                         }
                     }
-                    dbcon.Close();
+
+                    const string insert = "INSERT IGNORE INTO usersettings " +
+                        "(useruuid,imviaemail,visible,email) VALUES (?uuid,'false','false',?Email)";
+                    using MySqlCommand put = new MySqlCommand(insert, dbcon);
+                    put.Parameters.AddWithValue("?Email", pref.EMail ?? string.Empty);
+                    put.Parameters.AddWithValue("?uuid", pref.UserId.ToString());
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -912,9 +903,9 @@ namespace OpenSim.Data.MySQL
 
         public bool UpdateUserPreferences(ref UserPreferences pref, ref string result)
         {
-            const string query = "UPDATE usersettings SET imviaemail=?ImViaEmail," 
-                + "visible=?Visible, email=?EMail "
-                + "WHERE useruuid=?uuid";
+            const string query = "INSERT INTO usersettings (useruuid,imviaemail,visible,email) " +
+                "VALUES (?uuid,?ImViaEmail,?Visible,?EMail) ON DUPLICATE KEY UPDATE " +
+                "imviaemail=VALUES(imviaemail),visible=VALUES(visible),email=VALUES(email)";
 
             try
             {
@@ -926,7 +917,7 @@ namespace OpenSim.Data.MySQL
                         cmd.Parameters.AddWithValue("?ImViaEmail", pref.IMViaEmail.ToString().ToLower());
                         cmd.Parameters.AddWithValue("?Visible", pref.Visible.ToString().ToLower());
                         cmd.Parameters.AddWithValue("?uuid", pref.UserId.ToString());
-                        cmd.Parameters.AddWithValue("?EMail", pref.EMail.ToString().ToLower());
+                        cmd.Parameters.AddWithValue("?EMail", (pref.EMail ?? string.Empty).ToLowerInvariant());
 
                         cmd.ExecuteNonQuery();
                     }
@@ -946,7 +937,7 @@ namespace OpenSim.Data.MySQL
         #region Integration
         public bool GetUserAppData(ref UserAppData props, ref string result)
         {
-            const string query = "SELECT * FROM `userdata` WHERE UserId = ?Id AND TagId = ?TagId";
+            const string query = "SELECT DataKey,DataVal FROM userdata WHERE UserId=?Id AND TagId=?TagId";
 
             try
             {
@@ -963,25 +954,21 @@ namespace OpenSim.Data.MySQL
                             if(reader.HasRows)
                             {
                                 reader.Read();
-                                props.DataKey = (string)reader["DataKey"];
-                                props.DataVal = (string)reader["DataVal"];
-                            }
-                            else
-                            {
-                                const string queryB = "INSERT INTO userdata VALUES (?UserId, ?TagId, ?DataKey, ?DataVal)";
-                                using (MySqlCommand put = new MySqlCommand(queryB, dbcon))
-                                {
-                                    put.Parameters.AddWithValue("?UserId", props.UserId.ToString());
-                                    put.Parameters.AddWithValue("?TagId", props.TagId.ToString());
-                                    put.Parameters.AddWithValue("?DataKey", props.DataKey.ToString());
-                                    put.Parameters.AddWithValue("?DataVal", props.DataVal.ToString());
-
-                                    put.ExecuteNonQuery();
-                                }
+                                props.DataKey = Convert.ToString(reader["DataKey"]);
+                                props.DataVal = Convert.ToString(reader["DataVal"]);
+                                return true;
                             }
                         }
                     }
-                    dbcon.Close();
+
+                    const string insert = "INSERT IGNORE INTO userdata (UserId,TagId,DataKey,DataVal) " +
+                        "VALUES (?UserId,?TagId,?DataKey,?DataVal)";
+                    using MySqlCommand put = new MySqlCommand(insert, dbcon);
+                    put.Parameters.AddWithValue("?UserId", props.UserId);
+                    put.Parameters.AddWithValue("?TagId", props.TagId);
+                    put.Parameters.AddWithValue("?DataKey", props.DataKey ?? string.Empty);
+                    put.Parameters.AddWithValue("?DataVal", props.DataVal ?? string.Empty);
+                    put.ExecuteNonQuery();
                 }
             }
             catch (Exception e)
@@ -995,7 +982,9 @@ namespace OpenSim.Data.MySQL
 
         public bool SetUserAppData(UserAppData props, ref string result)
         {
-            const string query = "UPDATE userdata SET TagId = ?TagId, DataKey = ?DataKey, DataVal = ?DataVal WHERE UserId = ?UserId AND TagId = ?TagId";
+            const string query = "INSERT INTO userdata (UserId,TagId,DataKey,DataVal) " +
+                "VALUES (?UserId,?TagId,?DataKey,?DataVal) ON DUPLICATE KEY UPDATE " +
+                "DataKey=VALUES(DataKey),DataVal=VALUES(DataVal)";
 
             try
             {
@@ -1004,10 +993,10 @@ namespace OpenSim.Data.MySQL
                     dbcon.Open();
                     using (MySqlCommand cmd = new MySqlCommand(query, dbcon))
                     {
-                        cmd.Parameters.AddWithValue("?UserId", props.UserId.ToString());
-                        cmd.Parameters.AddWithValue("?TagId", props.TagId.ToString());
-                        cmd.Parameters.AddWithValue("?DataKey", props.DataKey.ToString());
-                        cmd.Parameters.AddWithValue("?DataVal", props.DataVal.ToString());
+                        cmd.Parameters.AddWithValue("?UserId", props.UserId);
+                        cmd.Parameters.AddWithValue("?TagId", props.TagId);
+                        cmd.Parameters.AddWithValue("?DataKey", props.DataKey ?? string.Empty);
+                        cmd.Parameters.AddWithValue("?DataVal", props.DataVal ?? string.Empty);
 
                         cmd.ExecuteNonQuery();
                     }
