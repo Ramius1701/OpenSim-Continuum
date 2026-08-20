@@ -61,7 +61,11 @@ namespace OpenSim.Data
         }
 
         public ExperienceInfoData[] FindExperiences(string search) =>
-            QueryExperienceInfos("name LIKE @search LIMIT 1000", new[] { ("@search", (object)("%" + (search ?? string.Empty) + "%")) });
+            // PostgreSQL LIKE is case-sensitive while the MySQL and SQLite
+            // donor paths normally are not.  Keep viewer search behavior
+            // consistent across supported grid databases.
+            QueryExperienceInfos("LOWER(name) LIKE LOWER(@search) LIMIT 1000",
+                new[] { ("@search", (object)("%" + (search ?? string.Empty) + "%")) });
 
         public UUID[] GetAgentExperiences(UUID agentID) =>
             QueryIDs("SELECT public_id FROM experiences WHERE owner_id=@id", ("@id", agentID.ToString()));

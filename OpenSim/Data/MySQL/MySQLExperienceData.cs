@@ -99,7 +99,9 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?experience", experience_id.ToString());
                     cmd.Parameters.AddWithValue("?allow", allow);
 
-                    return (cmd.ExecuteNonQuery() > 0);
+                    // Permission writes are idempotent; the requested state
+                    // already existing is still success.
+                    return (cmd.ExecuteNonQuery() >= 0);
                 }
             }
         }
@@ -195,7 +197,10 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?maturity", data.maturity);
                     cmd.Parameters.AddWithValue("?properties", data.properties);
 
-                    return (cmd.ExecuteNonQuery() > 0);
+                    // An unchanged profile produces zero affected rows with
+                    // default MySQL client semantics, but the requested state
+                    // is already durable.
+                    return (cmd.ExecuteNonQuery() >= 0);
                 }
             }
         }
@@ -349,7 +354,10 @@ ON DUPLICATE KEY UPDATE `key` = ?key, `value` = ?value", dbcon))
                     cmd.Parameters.AddWithValue("?key", key);
                     cmd.Parameters.AddWithValue("?value", val);
 
-                    return (cmd.ExecuteNonQuery() > 0);
+                    // An unchanged value produces zero affected rows with
+                    // default MySQL client semantics, but the requested KVP
+                    // state is already durable.
+                    return (cmd.ExecuteNonQuery() >= 0);
                 }
             }
         }
