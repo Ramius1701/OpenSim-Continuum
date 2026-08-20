@@ -20881,6 +20881,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
         private const int MAX_EXPERIENCE_KEY_BYTES = 1011;
+        private const int MAX_EXPERIENCE_VALUE_BYTES = 4095;
 
         public LSL_Key llCreateKeyValue(string key, string value)
         {
@@ -20888,7 +20889,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES || value == null)
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES ||
+                    value == null || Utf8ByteCount(value) > MAX_EXPERIENCE_VALUE_BYTES)
                 {
                     response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
                 }
@@ -21005,8 +21007,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES || value == null ||
-                    (check != 0 && original == null))
+                if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES ||
+                    value == null || Utf8ByteCount(value) > MAX_EXPERIENCE_VALUE_BYTES ||
+                    (check != 0 && check != 1) || (check == 1 && original == null))
                 {
                     response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
                 }
@@ -21080,7 +21083,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             {
                 string response;
 
-                if (m_item.ExperienceID != UUID.Zero)
+                if (first < 0 || count < 1 || count > 1000)
+                {
+                    response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
+                }
+                else if (m_item.ExperienceID != UUID.Zero)
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {
@@ -21120,8 +21127,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         int used = World.ExperienceModule.GetSize(m_item.ExperienceID);
                         var info = World.ExperienceModule.GetExperienceInfo(m_item.ExperienceID);
 
-                        int max = 1024 * 1024 * info.quota;
-                        response = string.Format("1,{0},{1}", used, max);
+                        if (info == null)
+                        {
+                            response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_EXPERIENCE);
+                        }
+                        else
+                        {
+                            int max = 1024 * 1024 * info.quota;
+                            response = string.Format("1,{0},{1}", used, max);
+                        }
                     }
                     else
                     {
