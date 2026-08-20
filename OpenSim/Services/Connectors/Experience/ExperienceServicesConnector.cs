@@ -234,6 +234,9 @@ namespace OpenSim.Services.Connectors
 
         public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
         {
+            if (info == null || info.public_id == UUID.Zero || info.owner_id == UUID.Zero)
+                return null;
+
             // let's just pray they never add a parameter named "method"
             Dictionary<string, object> sendData = info.ToDictionary();
             sendData["METHOD"] = "updateexperienceinfo";
@@ -251,7 +254,16 @@ namespace OpenSim.Services.Connectors
                 {
                     try
                     {
-                        return new ExperienceInfo(replyData);
+                        ExperienceInfo updated = new ExperienceInfo(replyData);
+                        if (updated.public_id == UUID.Zero || updated.owner_id == UUID.Zero ||
+                            updated.public_id != info.public_id)
+                        {
+                            m_log.WarnFormat(
+                                "[EXPERIENCE CONNECTOR]: Update reply did not contain the requested valid Experience {0}.",
+                                info.public_id);
+                            return null;
+                        }
+                        return updated;
                     }
                     catch (Exception e)
                     {
