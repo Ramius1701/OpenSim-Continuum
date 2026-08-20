@@ -148,13 +148,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (presence == null || presence.IsDeleted || presence.IsChildAgent || m_EventQueue == null)
                 return;
 
-            // DisplayNameUpdate is also a user-visible rename notification in
-            // current OpenSimulator viewers, even when old and new names match.
-            // Seed the viewer cache on a real login, but do not emit a false
-            // rename every time the same session crosses or teleports to a sim.
-            if ((presence.TeleportFlags & Constants.TeleportFlags.ViaLogin) == 0)
-                return;
-
             // A different simulator may have accepted a rename while this
             // process retained an older account cache. Crossing/relogin is the
             // point at which the arriving viewer must receive the authoritative
