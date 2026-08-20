@@ -223,11 +223,14 @@ namespace HoloNeon.RegionModules
 
         public void AddRegion(Scene scene)
         {
-            if (!m_enabled)
+            if (!m_enabled || scene == null)
                 return;
 
             lock (m_scenes)
             {
+                if (!m_enabled)
+                    return;
+
                 UUID regionID = scene.RegionInfo.RegionID;
                 if (m_scenes.TryGetValue(regionID, out Scene activeScene))
                 {
