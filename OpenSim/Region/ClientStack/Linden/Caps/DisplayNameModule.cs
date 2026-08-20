@@ -30,6 +30,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private int m_RefreshIntervalSeconds = 60;
         private Timer m_RefreshTimer;
         private int m_RefreshRunning;
+        private readonly object m_RefreshOperationLock = new object();
         private readonly object m_LifecycleLock = new object();
         private bool m_CapsRegistered;
 
@@ -95,6 +96,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             Timer refreshTimer = Interlocked.Exchange(ref m_RefreshTimer, null);
             refreshTimer?.Dispose();
+            // Timer disposal prevents future scheduling but does not wait for
+            // an already-running callback. Region removal must be a mutation
+            // barrier before interfaces and event subscriptions are detached.
+            lock (m_RefreshOperationLock)
+            {
+            }
 
             scene.EventManager.OnRegisterCaps -= OnRegisterCaps;
             scene.EventManager.OnNewClient -= OnNewClient;
@@ -221,39 +228,45 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             try
             {
-                // Neighboring avatars are represented as child agents. Their
-                // display names must be refreshed too or viewers near a region
-                // border retain stale nameplates after a rename on another sim.
-                scene.ForEachScenePresence(presence =>
+                lock (m_RefreshOperationLock)
                 {
-                    if (presence == null || presence.IsDeleted)
+                    if (!ReferenceEquals(m_Scene, scene) || m_EventQueue == null)
                         return;
 
-                    UserData cached = scene.UserManagementModule.GetUserData(presence.UUID);
-                    string oldDisplayName = cached?.ViewerDisplayName ?? presence.Name;
-                    DateTime oldChanged = cached?.NameChanged ?? DateTime.MinValue;
+                    // Neighboring avatars are represented as child agents. Their
+                    // display names must be refreshed too or viewers near a region
+                    // border retain stale nameplates after a rename on another sim.
+                    scene.ForEachScenePresence(presence =>
+                    {
+                        if (presence == null || presence.IsDeleted)
+                            return;
 
-                    scene.UserManagementModule.RemoveUser(presence.UUID);
-                    UserData current = scene.UserManagementModule.GetUserData(presence.UUID);
-                    if (current == null ||
-                        (string.Equals(oldDisplayName, current.ViewerDisplayName, StringComparison.Ordinal) &&
-                         oldChanged == current.NameChanged))
-                        return;
+                        UserData cached = scene.UserManagementModule.GetUserData(presence.UUID);
+                        string oldDisplayName = cached?.ViewerDisplayName ?? presence.Name;
+                        DateTime oldChanged = cached?.NameChanged ?? DateTime.MinValue;
 
-                    DateTime nextUpdate = current.NameChanged.AddDays(7);
-                    OSD update = FormatDisplayNameUpdate(oldDisplayName, current, nextUpdate);
-                    // Child-agent circuits connect one viewer to several
-                    // neighboring simulators.  Sending on every circuit makes
-                    // a single grid rename appear as one notification per
-                    // region.  Only the simulator hosting each root agent
-                    // should deliver the viewer-visible update.
-                    scene.ForEachRootScenePresence(
-                        resident => eventQueue.Enqueue(update, resident.UUID));
-                    m_log.InfoFormat(
-                        "[DISPLAY NAMES]: Refreshed grid display name for {0} in region {1}",
-                        presence.UUID,
-                        scene.RegionInfo.RegionName);
-                });
+                        scene.UserManagementModule.RemoveUser(presence.UUID);
+                        UserData current = scene.UserManagementModule.GetUserData(presence.UUID);
+                        if (current == null ||
+                            (string.Equals(oldDisplayName, current.ViewerDisplayName, StringComparison.Ordinal) &&
+                             oldChanged == current.NameChanged))
+                            return;
+
+                        DateTime nextUpdate = current.NameChanged.AddDays(7);
+                        OSD update = FormatDisplayNameUpdate(oldDisplayName, current, nextUpdate);
+                        // Child-agent circuits connect one viewer to several
+                        // neighboring simulators.  Sending on every circuit makes
+                        // a single grid rename appear as one notification per
+                        // region.  Only the simulator hosting each root agent
+                        // should deliver the viewer-visible update.
+                        scene.ForEachRootScenePresence(
+                            resident => eventQueue.Enqueue(update, resident.UUID));
+                        m_log.InfoFormat(
+                            "[DISPLAY NAMES]: Refreshed grid display name for {0} in region {1}",
+                            presence.UUID,
+                            scene.RegionInfo.RegionName);
+                    });
+                }
             }
             catch (Exception e)
             {

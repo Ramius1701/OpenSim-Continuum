@@ -616,6 +616,8 @@ namespace OpenSim.Data.MySQL
                                 props.SkillsMask = (int)reader["profileSkillsMask"];
                                 props.SkillsText = (string)reader["profileSkillsText"];
                                 props.Language = (string)reader["profileLanguages"];
+                                props.PublishProfile = Convert.ToBoolean(reader["profileAllowPublish"]);
+                                props.PublishMature = Convert.ToBoolean(reader["profileMaturePublish"]);
                             }
                             else
                             {
@@ -709,6 +711,7 @@ namespace OpenSim.Data.MySQL
             const string query = "UPDATE userprofile SET profileURL=?profileURL,"
                 + "profileImage=?image, profileAboutText=?abouttext,"
                 + "profileFirstImage=?firstlifeimage, profileFirstText=?firstlifetext "
+                + ",profileAllowPublish=?allowpublish,profileMaturePublish=?maturepublish "
                 + "WHERE useruuid=?uuid";
 
             try
@@ -723,6 +726,8 @@ namespace OpenSim.Data.MySQL
                         cmd.Parameters.AddWithValue("?abouttext", props.AboutText);
                         cmd.Parameters.AddWithValue("?firstlifeimage", props.FirstLifeImageId.ToString());
                         cmd.Parameters.AddWithValue("?firstlifetext", props.FirstLifeText);
+                        cmd.Parameters.AddWithValue("?allowpublish", props.PublishProfile);
+                        cmd.Parameters.AddWithValue("?maturepublish", props.PublishMature);
                         cmd.Parameters.AddWithValue("?uuid", props.UserId.ToString());
 
                         cmd.ExecuteNonQuery();

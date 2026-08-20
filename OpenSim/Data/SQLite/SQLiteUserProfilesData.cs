@@ -589,6 +589,8 @@ namespace OpenSim.Data.SQLite
                             props.SkillsMask = (int)reader["profileSkillsMask"];
                             props.SkillsText = (string)reader["profileSkillsText"];
                             props.Language = (string)reader["profileLanguages"];
+                            props.PublishProfile = ReadBoolean(reader["profileAllowPublish"]);
+                            props.PublishMature = ReadBoolean(reader["profileMaturePublish"]);
                         }
                         else
                         {
@@ -670,7 +672,9 @@ namespace OpenSim.Data.SQLite
             query += "profileImage=:image, ";
             query += "profileAboutText=:abouttext,";
             query += "profileFirstImage=:firstlifeimage,";
-            query += "profileFirstText=:firstlifetext ";
+            query += "profileFirstText=:firstlifetext,";
+            query += "profileAllowPublish=:allowpublish,";
+            query += "profileMaturePublish=:maturepublish ";
             query += "WHERE useruuid=:uuid";
 
             try
@@ -683,6 +687,8 @@ namespace OpenSim.Data.SQLite
                     cmd.Parameters.AddWithValue(":abouttext", props.AboutText);
                     cmd.Parameters.AddWithValue(":firstlifeimage", props.FirstLifeImageId.ToString());
                     cmd.Parameters.AddWithValue(":firstlifetext", props.FirstLifeText);
+                    cmd.Parameters.AddWithValue(":allowpublish", props.PublishProfile);
+                    cmd.Parameters.AddWithValue(":maturepublish", props.PublishMature);
                     cmd.Parameters.AddWithValue(":uuid", props.UserId.ToString());
 
                     cmd.ExecuteNonQuery();

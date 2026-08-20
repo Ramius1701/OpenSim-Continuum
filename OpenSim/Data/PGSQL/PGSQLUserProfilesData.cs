@@ -617,6 +617,8 @@ namespace OpenSim.Data.PGSQL
                                 props.SkillsMask = (int)reader["profileSkillsMask"];
                                 props.SkillsText = (string)reader["profileSkillsText"];
                                 props.Language = (string)reader["profileLanguages"];
+                                props.PublishProfile = Convert.ToBoolean(reader["profileAllowPublish"]);
+                                props.PublishMature = Convert.ToBoolean(reader["profileMaturePublish"]);
                             }
                             else
                             {
@@ -716,7 +718,9 @@ namespace OpenSim.Data.PGSQL
             query += "\"profileImage\"=:image, ";
             query += "\"profileAboutText\"=:abouttext,";
             query += "\"profileFirstImage\"=:firstlifeimage,";
-            query += "\"profileFirstText\"=:firstlifetext ";
+            query += "\"profileFirstText\"=:firstlifetext,";
+            query += "\"profileAllowPublish\"=:allowpublish,";
+            query += "\"profileMaturePublish\"=:maturepublish ";
             query += "WHERE \"useruuid\"=:uuid";
 
             try
@@ -731,6 +735,8 @@ namespace OpenSim.Data.PGSQL
                         cmd.Parameters.Add(m_database.CreateParameter("abouttext", props.AboutText));
                         cmd.Parameters.Add(m_database.CreateParameter("firstlifeimage", props.FirstLifeImageId));
                         cmd.Parameters.Add(m_database.CreateParameter("firstlifetext", props.FirstLifeText));
+                        cmd.Parameters.Add(m_database.CreateParameter("allowpublish", props.PublishProfile));
+                        cmd.Parameters.Add(m_database.CreateParameter("maturepublish", props.PublishMature));
                         cmd.Parameters.Add(m_database.CreateParameter("uuid", props.UserId));
 
                         cmd.ExecuteNonQuery();
