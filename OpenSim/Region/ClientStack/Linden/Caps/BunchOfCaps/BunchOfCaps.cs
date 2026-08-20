@@ -2312,7 +2312,14 @@ namespace OpenSim.Region.ClientStack.Linden
                 foreach (string id in ids)
                 {
                     if (UUID.TryParse(id, out UUID userID) && !userID.IsZero())
-                        m_UserManager.RemoveUser(userID);
+                    {
+                        UserData cached = m_UserManager.GetUserData(userID);
+                        // Local mutable account data must be refreshed from the
+                        // grid service. Foreign display names have their own
+                        // short home-grid cache and must retain the trusted UUI.
+                        if (cached != null && cached.IsLocal)
+                            m_UserManager.RemoveUser(userID);
+                    }
                 }
 
                 List<UserData> names = m_UserManager.GetKnownUsers(ids, m_scopeID);

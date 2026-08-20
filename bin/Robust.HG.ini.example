@@ -155,6 +155,9 @@
     UserAgentServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:UserAgentServerConnector"
     HeloServiceInConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:HeloServiceInConnector"
     HGFriendsServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:HGFriendsServerConnector"
+    ;; Mobius-lineage home-grid display-name lookup. Enable the matching
+    ;; [HGDisplayNames] section before uncommenting.
+    ; HGDisplayNamesServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:HGDisplayNamesServerConnector"
     InstantMessageServerConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:InstantMessageServerConnector"
     HGInventoryServiceConnector = "HGInventoryService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:XInventoryInConnector"
     HGAssetServiceConnector = "HGAssetService@${Const|PublicPort}/OpenSim.Server.Handlers.dll:AssetServiceConnector"
@@ -215,6 +218,15 @@
     ;ConsolePass = secret
     ;ConsolePort = 0
 
+
+[HGDisplayNames]
+    Enabled = false
+    AuthType = "BasicHttpAuthentication"
+    HttpAuthUsername = "CHANGE-ME"
+    HttpAuthPassword = "CHANGE-ME-TO-A-LONG-RANDOM-FEDERATION-SECRET"
+    CacheHours = 1
+    TimeoutSeconds = 5
+    AllowInsecureHttp = false
 
 [Hypergrid]
     ;# {HomeURI} {Hypergrid} {The Home URL of this grid} {}

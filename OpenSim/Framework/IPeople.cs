@@ -44,6 +44,9 @@ namespace OpenSim.Framework
         public double LastWebFail = -1;
         public string DisplayName;
         public DateTime NameChanged;
+        // Set only after a bounded home-grid display-name lookup. This keeps
+        // mutable HG names separate from the durable legacy UUI identity.
+        public DateTime DisplayNameFetched;
 
         public bool IsNameDefault
         {

@@ -71,6 +71,9 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
         protected ExpiringCacheOS<UUID, UserData> m_userCacheByID = new ExpiringCacheOS<UUID, UserData>(120000);
 
         protected bool m_DisplayChangingHomeURI = false;
+        private bool m_HGDisplayNamesEnabled;
+        private int m_HGDisplayNameCacheMilliseconds = 3600000;
+        private IConfigSource m_Config;
 
         UUID m_scopeID = UUID.Zero;
 
@@ -681,6 +684,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
 
             List<string> missing = new List<string>(ids.Length);
             var untried = new Dictionary<UUID, UserData>();
+            Dictionary<string, List<UserData>> foreign = new(StringComparer.OrdinalIgnoreCase);
             foreach (string id in ids)
             {
                 if (!UUID.TryParse(id, out UUID uuid) || uuid.IsZero())
@@ -690,7 +694,12 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                 {
                     if (userdata.HasGridUserTried)
                     {
-                        if (!userdata.IsUnknownUser)
+                        if (!userdata.IsUnknownUser && !userdata.IsLocal && m_HGDisplayNamesEnabled &&
+                            (userdata.DisplayNameFetched == DateTime.MinValue ||
+                             DateTime.UtcNow - userdata.DisplayNameFetched >=
+                                TimeSpan.FromMilliseconds(m_HGDisplayNameCacheMilliseconds)))
+                            AddForeignDisplayNameRequest(foreign, userdata);
+                        else if (!userdata.IsUnknownUser)
                             ret.Add(userdata);
                         continue;
                     }
@@ -701,7 +710,10 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
             }
 
             if (missing.Count == 0)
+            {
+                RefreshForeignDisplayNames(foreign, ret);
                 return ret;
+            }
 
             ids = null;
 
@@ -734,7 +746,10 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
             }
 
             if (missing.Count == 0 || m_gridUserService == null)
+            {
+                RefreshForeignDisplayNames(foreign, ret);
                 return ret;
+            }
 
             GridUserInfo[] pinfos = m_gridUserService.GetGridUserInfo(missing.ToArray());
             missing = null;
@@ -764,6 +779,8 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                                     userdata.HomeURL = host.URI;
                                     userdata.LastName = "@" + host.HostAndPort;
                                     userdata.IsLocal = false;
+                                    if (m_HGDisplayNamesEnabled)
+                                        AddForeignDisplayNameRequest(foreign, userdata);
                                 }
 
                                 userdata.IsUnknownUser = false;
@@ -771,7 +788,8 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                                 m_userCacheByID.Add(uuid, userdata, 1800000);
 
                                 untried.Remove(uuid);
-                                ret.Add(userdata);
+                                if (userdata.IsLocal || !m_HGDisplayNamesEnabled)
+                                    ret.Add(userdata);
                             }
                         }
                         else
@@ -787,7 +805,54 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
                 if (!ud.IsUnknownUser)
                     ret.Add(ud);
             }
+            RefreshForeignDisplayNames(foreign, ret);
             return ret;
+        }
+
+        private static void AddForeignDisplayNameRequest(
+            Dictionary<string, List<UserData>> requests, UserData user)
+        {
+            if (user == null || String.IsNullOrWhiteSpace(user.HomeURL))
+                return;
+            if (!requests.TryGetValue(user.HomeURL, out List<UserData> users))
+            {
+                users = new List<UserData>();
+                requests[user.HomeURL] = users;
+            }
+            users.Add(user);
+        }
+
+        private void RefreshForeignDisplayNames(
+            Dictionary<string, List<UserData>> requests, List<UserData> result)
+        {
+            foreach (KeyValuePair<string, List<UserData>> home in requests)
+            {
+                Dictionary<UUID, RemoteDisplayNameData> names = null;
+                try
+                {
+                    names = new DisplayNameServiceConnector(home.Key, m_Config)
+                        .GetDisplayNames(home.Value.ConvertAll(user => user.Id));
+                }
+                catch (Exception e)
+                {
+                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: HG display-name lookup at {0} failed: {1}",
+                        home.Key, e.Message);
+                }
+                foreach (UserData user in home.Value)
+                {
+                    RemoteDisplayNameData name = null;
+                    bool found = names != null && names.TryGetValue(user.Id, out name);
+                    if (found)
+                    {
+                        user.DisplayName = name.DisplayName;
+                        user.NameChanged = name.NameChanged;
+                    }
+                    user.DisplayNameFetched = DateTime.UtcNow;
+                    m_userCacheByID.Add(user.Id, user,
+                        found ? m_HGDisplayNameCacheMilliseconds : BADHGEXPIRE);
+                    result.Add(user);
+                }
+            }
         }
 
         public virtual string GetUserHomeURL(UUID userID)
@@ -1345,6 +1410,7 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
 
         protected virtual void Init(IConfigSource config)
         {
+            m_Config = config;
             AddSystemUser(UUID.Zero, "Unknown", "User");
             AddSystemUser(Constants.m_MrOpenSimID, "Mr", "Opensim");
             RegisterConsoleCmds();
@@ -1352,6 +1418,22 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
             IConfig userManagementConfig = config.Configs["UserManagement"];
             if (userManagementConfig != null)
                 m_DisplayChangingHomeURI = userManagementConfig.GetBoolean("DisplayChangingHomeURI", false);
+
+            IConfig hgDisplayNames = config.Configs["HGDisplayNames"];
+            if (hgDisplayNames != null && hgDisplayNames.GetBoolean("Enabled", false))
+            {
+                if (!String.Equals(hgDisplayNames.GetString("AuthType", String.Empty),
+                    "BasicHttpAuthentication", StringComparison.Ordinal) ||
+                    String.IsNullOrWhiteSpace(hgDisplayNames.GetString("HttpAuthUsername", String.Empty)) ||
+                    hgDisplayNames.GetString("HttpAuthUsername", String.Empty).Contains("CHANGE-ME", StringComparison.OrdinalIgnoreCase) ||
+                    hgDisplayNames.GetString("HttpAuthPassword", String.Empty).Length < 24 ||
+                    hgDisplayNames.GetString("HttpAuthPassword", String.Empty).Contains("CHANGE-ME", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException(
+                        "Enabled HG display names require BasicHttpAuthentication credentials");
+                m_HGDisplayNamesEnabled = true;
+                double hours = Math.Clamp(hgDisplayNames.GetDouble("CacheHours", 1), 0.05, 24);
+                m_HGDisplayNameCacheMilliseconds = checked((int)(hours * 3600000));
+            }
 
         }
 

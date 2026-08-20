@@ -1249,6 +1249,18 @@
     ;; Money Unit fee to create groups.  Default is 0.
     ; PriceGroupCreate = 0
 
+[HGDisplayNames]
+    ;; Optional Mobius-lineage lookup of mutable names from a foreign avatar's
+    ;; trusted UUI home grid. Credentials must match the participating home
+    ;; grids' public HGDisplayNames endpoint; arbitrary viewer URLs are ignored.
+    Enabled = false
+    AuthType = "BasicHttpAuthentication"
+    HttpAuthUsername = "CHANGE-ME"
+    HttpAuthPassword = "CHANGE-ME-TO-A-LONG-RANDOM-FEDERATION-SECRET"
+    CacheHours = 1
+    TimeoutSeconds = 5
+    AllowInsecureHttp = false
+
 [YEngine]
     ;; implements non preemptive microthreading, so fixing problems like llSleep or long events handlers
     ;; but those will suffer from timeslicing, so will be slower.

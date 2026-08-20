@@ -22,7 +22,7 @@ applied as independent patches.
 | Login, nearby/search and script lookup | Retain reconciled implementation | These surfaces consume the same account/UserManagement fields. |
 | Same-simulator update event | Retain donor behavior | Tranquillity and WhiteCore both broadcast `DisplayNameUpdate` to connected viewers after a successful change. |
 | Cross-simulator local-grid propagation | Continuum adaptation pending runtime proof | Tranquillity has no inter-simulator invalidation. WhiteCore's central CAPS architecture broadcasts more widely but is not directly portable. Continuum currently refreshes authoritative account data on root entry and a bounded interval; this is not donor code and must be explicitly tested or replaced by a service event mechanism. |
-| Hypergrid display-name lookup | **Missing donor behavior** | Continuum does not contain Mobius `924deef165`'s remote home-grid lookup. Current UserManagement can reconstruct foreign legacy identity but cannot fetch the foreign mutable display name. |
+| Hypergrid display-name lookup | Implemented; runtime federation proof pending | Continuum now preserves Mobius `924deef165` semantics through an authenticated `/get_display_names` Robust endpoint and trusted-UUI home-grid lookup. Requests and replies are bounded, mutable names have a short cache, and failure retains the foreign legacy identity. |
 
 ## Hypergrid port decision
 
@@ -30,8 +30,8 @@ Mobius proves the intended behavior, but its original endpoint is not suitable f
 a blind port: it is unauthenticated, performs DNS/IP rewriting, accepts an
 unbounded ID collection and uses older synchronous request infrastructure.
 
-The required narrow compatibility port must preserve Mobius semantics while
-adapting to current OpenSim service contracts:
+The narrow compatibility port preserves Mobius semantics while adapting to
+current OpenSim service contracts:
 
 - resolve foreign users through their trusted home URI, never a viewer-supplied
   arbitrary endpoint;
@@ -40,26 +40,28 @@ adapting to current OpenSim service contracts:
 - cache remote display names with a short expiry without overwriting legacy UUI;
 - fail back to the foreign legacy name when the home grid is unavailable;
 - avoid exposing local account search or mutation through the HG endpoint;
-- test HTTPS, DNS change, timeout, malformed/oversized replies and hostile grids.
+- require an explicit `[HGDisplayNames]` opt-in, matching federation credentials,
+  HTTPS by default, and a non-example password of at least 24 characters.
 
 This is a **narrow core compatibility patch**, sourced from Mobius
 `924deef165`, not a newly invented Display Names feature.
 
 ## Compatibility and tests
 
-- **Robust:** local persistence remains authoritative; HG lookup must use a
-  separately authenticated handler.
+- **Robust:** local persistence remains authoritative; HG lookup uses a
+  separately authenticated handler that is disabled by default.
 - **Databases:** DisplayName/NameChanged migrations and reads require SQLite,
   MySQL/MariaDB and PostgreSQL clean-install and upgrade coverage.
 - **Windows:** verify timers/shutdown only for the current propagation adaptation;
   HG connector must use current portable HTTP infrastructure.
-- **Hypergrid:** two-grid test for lookup, rename, cache expiry, home-grid outage,
-  untrusted endpoint rejection and legacy-name fallback.
+- **Hypergrid:** two-grid test remains required for lookup, rename, cache expiry,
+  home-grid outage, HTTP rejection and legacy-name fallback.
 - **Viewer:** clean cache, rename/reset, weekly throttle, relog, full grid restart,
   two simulators with existing observers, search/nearby/nameplate consistency.
 
 ## Gate
 
-Display Names are not donor-parity complete until the Mobius HG behavior is
-ported safely and the current cross-simulator local-grid propagation path passes
-live testing. No other Display Names rewrite is justified by the donor evidence.
+Display Names are not donor-parity complete until the new Mobius-derived HG path
+and the current cross-simulator local-grid propagation path pass live testing.
+The complete Release solution compiles with zero warnings and zero errors; no
+other Display Names rewrite is justified by the donor evidence.
