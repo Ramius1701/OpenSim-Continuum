@@ -44,6 +44,7 @@ namespace OpenSimSearch.Modules.OpenSearch
         private int m_RequestTimeoutMs = 5000;
         private int m_MaxConcurrentRequests = 8;
         private int m_ActiveRequests;
+        private bool m_Closing;
 
         #region IRegionModuleBase implementation
         public void Initialise(IConfigSource config)
@@ -102,37 +103,34 @@ namespace OpenSimSearch.Modules.OpenSearch
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene is null)
                 return;
 
-            bool added;
             lock(m_Scenes)
             {
-                added = !m_Scenes.Contains(scene);
-                if (added)
-                    m_Scenes.Add(scene);
-            }
-            if (!added)
-                return;
+                if (m_Closing || m_Scenes.Contains(scene))
+                    return;
 
-            scene.EventManager.OnNewClient += OnNewClient;
-            scene.RegisterModuleInterface<ISearchModule>(this);
+                m_Scenes.Add(scene);
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.RegisterModuleInterface<ISearchModule>(this);
+            }
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene is null)
                 return;
-
-            scene.UnregisterModuleInterface<ISearchModule>(this);
-
-            scene.EventManager.OnNewClient -= OnNewClient;
-            scene.ForEachClient(UnsubscribeClient);
 
             lock(m_Scenes)
             {
-                m_Scenes.Remove(scene);
+                if (!m_Scenes.Remove(scene))
+                    return;
             }
+
+            scene.EventManager.OnNewClient -= OnNewClient;
+            scene.ForEachClient(UnsubscribeClient);
+            scene.UnregisterModuleInterface<ISearchModule>(this);
         }
 
         public void RegionLoaded(Scene scene)
@@ -152,7 +150,10 @@ namespace OpenSimSearch.Modules.OpenSearch
         {
             Scene[] scenes;
             lock (m_Scenes)
+            {
+                m_Closing = true;
                 scenes = m_Scenes.ToArray();
+            }
             foreach (Scene scene in scenes)
                 RemoveRegion(scene);
         }
@@ -171,14 +172,23 @@ namespace OpenSimSearch.Modules.OpenSearch
         /// New Client Event Handler
         private void OnNewClient(IClientAPI client)
         {
-            client.OnDirPlacesQuery += OnDirPlacesQuery;
-            client.OnDirFindQuery += OnDirFindQuery;
-            client.OnDirPopularQuery += OnDirPopularQuery;
-            client.OnDirLandQuery += OnDirLandQuery;
-            client.OnDirClassifiedQuery += OnDirClassifiedQuery;
-            client.OnEventInfoRequest += OnEventInfoRequest;
-            client.OnClassifiedInfoRequest += OnClassifiedInfoRequest;
-            client.OnMapItemRequest += OnMapItemRequest;
+            if (client is null)
+                return;
+
+            lock (m_Scenes)
+            {
+                if (m_Closing || client.Scene is not Scene scene || !m_Scenes.Contains(scene))
+                    return;
+
+                client.OnDirPlacesQuery += OnDirPlacesQuery;
+                client.OnDirFindQuery += OnDirFindQuery;
+                client.OnDirPopularQuery += OnDirPopularQuery;
+                client.OnDirLandQuery += OnDirLandQuery;
+                client.OnDirClassifiedQuery += OnDirClassifiedQuery;
+                client.OnEventInfoRequest += OnEventInfoRequest;
+                client.OnClassifiedInfoRequest += OnClassifiedInfoRequest;
+                client.OnMapItemRequest += OnMapItemRequest;
+            }
         }
 
         private void UnsubscribeClient(IClientAPI client)
