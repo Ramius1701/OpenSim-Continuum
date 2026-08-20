@@ -30,7 +30,6 @@ using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
-using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -113,8 +112,6 @@ namespace OpenSim.Modules.Currency
         private IConfigSource m_config;
 
         private string m_moneyServURL = string.Empty;
-        public BaseHttpServer HttpServer;
-
         private string m_certFilename = "";
         private string m_certPassword = "";
         private bool m_checkServerCert = false;
@@ -348,13 +345,6 @@ namespace OpenSim.Modules.Currency
                 {
                     if (m_enable_server)
                     {
-                        HttpServer = new BaseHttpServer(9000);
-                        HttpServer.AddStreamHandler(new Region.Framework.Scenes.RegionStatsHandler(scene.RegionInfo));
-
-                        HttpServer.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-                        HttpServer.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-                        HttpServer.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-
                         MainServer.Instance.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
                         MainServer.Instance.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
                         MainServer.Instance.AddXmlRPCHandler("UserAlert", UserAlertHandler);
@@ -513,12 +503,6 @@ namespace OpenSim.Modules.Currency
                 MainServer.Instance.RemoveXmlRPCHandler("UpdateBalance");
                 MainServer.Instance.RemoveXmlRPCHandler("UserAlert");
                 m_rpcHandlersRegistered = false;
-            }
-
-            if (HttpServer != null)
-            {
-                HttpServer.Stop();
-                HttpServer = null;
             }
         }
 

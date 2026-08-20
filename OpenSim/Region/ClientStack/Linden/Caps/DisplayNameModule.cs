@@ -148,6 +148,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             if (presence == null || presence.IsDeleted || presence.IsChildAgent || m_EventQueue == null)
                 return;
 
+            // DisplayNameUpdate is a user-visible rename notification in both
+            // Firestorm and Cool VL. Seed a fresh login, but never emit a fake
+            // rename notification for an ordinary teleport or region crossing.
+            if ((presence.TeleportFlags & Constants.TeleportFlags.ViaLogin) == 0)
+                return;
+
             // A different simulator may have accepted a rename while this
             // process retained an older account cache. Crossing/relogin is the
             // point at which the arriving viewer must receive the authoritative
@@ -160,11 +166,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
 
             DateTime nextUpdate = userData.NameChanged.AddDays(7);
-            // This is an authoritative cache resynchronization, not a rename.
-            // Firestorm and Cool VL both insert the supplied agent record and
-            // invalidate the name tag even when old/new names match. Reporting
-            // the legacy name here creates a false rename notification on each
-            // login or crossing.
+            // Supplying the current value as old_display_name avoids claiming
+            // that a rename happened during this login cache seed.
             OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
             m_EventQueue.Enqueue(update, presence.UUID);
         }

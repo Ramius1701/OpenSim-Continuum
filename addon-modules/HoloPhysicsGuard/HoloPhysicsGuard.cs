@@ -4,7 +4,7 @@
 //
 // Region safety module for OpenSimulator.
 // Sleeps selected physical root objects when a region is empty, records the
-// reversible sleep state in a module-owned MySQL table, and wakes the objects
+// reversible sleep state in a module-owned database table, and wakes the objects
 // when a root agent enters.
 //
 // Continuum reconciliation 0.5.0:
@@ -16,9 +16,11 @@
 //   - wakes only on an occupied transition instead of querying every timer tick
 //   - supports inheriting ConnectionString from [DatabaseService]
 //   - avoids deprecated VALUES(column) upsert syntax
+//   - supports MySQL/MariaDB, PostgreSQL, and SQLite persistence
 
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Reflection;
 using System.Threading;
 using System.Timers;
@@ -26,8 +28,10 @@ using System.Timers;
 using log4net;
 using Mono.Addins;
 using MySql.Data.MySqlClient;
+using Npgsql;
 using Nini.Config;
 using OpenMetaverse;
+using System.Data.SQLite;
 
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -73,6 +77,7 @@ namespace HoloNeon.RegionModules
         private string m_connectionString = String.Empty;
         private string m_connectionSource = "none";
         private string m_storageProvider = String.Empty;
+        private DatabaseKind m_databaseKind;
 
         private string[] m_alwaysSleepNameContains = Array.Empty<string>();
         private string[] m_neverSleepNameContains = Array.Empty<string>();
@@ -169,10 +174,10 @@ namespace HoloNeon.RegionModules
                     return;
                 }
 
-                if (!IsMySqlProvider(m_storageProvider))
+                if (!TryResolveDatabaseKind(m_storageProvider, out m_databaseKind))
                 {
                     m_log.ErrorFormat(
-                        "[HOLO PHYSICS GUARD]: PersistSleep supports only MySQL/MariaDB, but StorageProvider is '{0}'; module disabled",
+                        "[HOLO PHYSICS GUARD]: Unsupported StorageProvider '{0}'. Use MySQL, PostgreSQL, or SQLite; module disabled",
                         String.IsNullOrWhiteSpace(m_storageProvider) ? "unspecified" : m_storageProvider
                     );
                     m_enabled = false;
@@ -352,11 +357,35 @@ namespace HoloNeon.RegionModules
                 m_connectionSource = "DatabaseService";
         }
 
-        private static bool IsMySqlProvider(string provider)
+        private static bool TryResolveDatabaseKind(string provider, out DatabaseKind kind)
         {
-            return provider.Equals("OpenSim.Data.MySQL.dll", StringComparison.OrdinalIgnoreCase)
+            if (provider.Equals("OpenSim.Data.MySQL.dll", StringComparison.OrdinalIgnoreCase)
                 || provider.Equals("MySQL", StringComparison.OrdinalIgnoreCase)
-                || provider.Equals("MariaDB", StringComparison.OrdinalIgnoreCase);
+                || provider.Equals("MariaDB", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = DatabaseKind.MySql;
+                return true;
+            }
+
+            if (provider.Equals("OpenSim.Data.PGSQL.dll", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("PGSQL", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = DatabaseKind.PostgreSql;
+                return true;
+            }
+
+            if (provider.Equals("OpenSim.Data.SQLite.dll", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("SQLite", StringComparison.OrdinalIgnoreCase)
+                || provider.Equals("System.Data.SQLite", StringComparison.OrdinalIgnoreCase))
+            {
+                kind = DatabaseKind.Sqlite;
+                return true;
+            }
+
+            kind = DatabaseKind.Unknown;
+            return false;
         }
 
         private void OnTimer(object sender, ElapsedEventArgs e)
@@ -803,16 +832,22 @@ namespace HoloNeon.RegionModules
             return String.Equals(m_mode, "PersistSleep", StringComparison.OrdinalIgnoreCase);
         }
 
-        private MySqlConnection OpenDb()
+        private DbConnection OpenDb()
         {
-            MySqlConnection connection = new MySqlConnection(m_connectionString);
+            DbConnection connection = m_databaseKind switch
+            {
+                DatabaseKind.MySql => new MySqlConnection(m_connectionString),
+                DatabaseKind.PostgreSql => new NpgsqlConnection(m_connectionString),
+                DatabaseKind.Sqlite => new SQLiteConnection(m_connectionString),
+                _ => throw new InvalidOperationException("Unsupported HoloPhysicsGuard database provider")
+            };
             connection.Open();
             return connection;
         }
 
         private void EnsureTable()
         {
-            const string sql = @"
+            string sql = m_databaseKind == DatabaseKind.MySql ? @"
 CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
     region_uuid CHAR(36) NOT NULL,
     object_uuid CHAR(36) NOT NULL,
@@ -826,10 +861,23 @@ CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
     KEY idx_region_uuid (region_uuid),
     KEY idx_scene_group_id (scene_group_id),
     KEY idx_slept_at (slept_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;" : @"
+CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
+    region_uuid VARCHAR(36) NOT NULL,
+    object_uuid VARCHAR(36) NOT NULL,
+    scene_group_id VARCHAR(36) NOT NULL,
+    object_name VARCHAR(255) NOT NULL DEFAULT '',
+    original_object_flags BIGINT NOT NULL DEFAULT 0,
+    slept_at BIGINT NOT NULL,
+    slept_by VARCHAR(64) NOT NULL DEFAULT 'HoloPhysicsGuard',
+    PRIMARY KEY (region_uuid, object_uuid)
+);
+CREATE INDEX IF NOT EXISTS hpg_sleep_region_idx ON holo_physics_guard_sleep(region_uuid);
+CREATE INDEX IF NOT EXISTS hpg_sleep_group_idx ON holo_physics_guard_sleep(scene_group_id);
+CREATE INDEX IF NOT EXISTS hpg_sleep_time_idx ON holo_physics_guard_sleep(slept_at);";
 
-            using (MySqlConnection connection = OpenDb())
-            using (MySqlCommand command = new MySqlCommand(sql, connection))
+            using (DbConnection connection = OpenDb())
+            using (DbCommand command = CreateCommand(connection, sql))
                 command.ExecuteNonQuery();
 
             m_log.Info("[HOLO PHYSICS GUARD]: Table holo_physics_guard_sleep ready");
@@ -839,8 +887,8 @@ CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
         {
             const string sql = "SELECT 1 FROM holo_physics_guard_sleep LIMIT 1;";
 
-            using (MySqlConnection connection = OpenDb())
-            using (MySqlCommand command = new MySqlCommand(sql, connection))
+            using (DbConnection connection = OpenDb())
+            using (DbCommand command = CreateCommand(connection, sql))
                 command.ExecuteScalar();
 
             m_log.Info("[HOLO PHYSICS GUARD]: Existing table holo_physics_guard_sleep verified");
@@ -848,7 +896,7 @@ CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
 
         private void RecordSleepInDb(Scene scene, SceneObjectGroup sog, SceneObjectPart root)
         {
-            const string sql = @"
+            string sql = m_databaseKind == DatabaseKind.MySql ? @"
 INSERT INTO holo_physics_guard_sleep
     (region_uuid, object_uuid, scene_group_id, object_name, original_object_flags, slept_at, slept_by)
 VALUES
@@ -857,17 +905,26 @@ ON DUPLICATE KEY UPDATE
     scene_group_id = @scene_group_id,
     object_name = @object_name,
     slept_at = @slept_at,
+    slept_by = 'HoloPhysicsGuard';" : @"
+INSERT INTO holo_physics_guard_sleep
+    (region_uuid, object_uuid, scene_group_id, object_name, original_object_flags, slept_at, slept_by)
+VALUES
+    (@region_uuid, @object_uuid, @scene_group_id, @object_name, @original_object_flags, @slept_at, 'HoloPhysicsGuard')
+ON CONFLICT (region_uuid, object_uuid) DO UPDATE SET
+    scene_group_id = excluded.scene_group_id,
+    object_name = excluded.object_name,
+    slept_at = excluded.slept_at,
     slept_by = 'HoloPhysicsGuard';";
 
-            using (MySqlConnection connection = OpenDb())
-            using (MySqlCommand command = new MySqlCommand(sql, connection))
+            using (DbConnection connection = OpenDb())
+            using (DbCommand command = CreateCommand(connection, sql))
             {
-                command.Parameters.AddWithValue("@region_uuid", scene.RegionInfo.RegionID.ToString());
-                command.Parameters.AddWithValue("@object_uuid", root.UUID.ToString());
-                command.Parameters.AddWithValue("@scene_group_id", sog.UUID.ToString());
-                command.Parameters.AddWithValue("@object_name", Truncate(root.Name ?? String.Empty, 255));
-                command.Parameters.AddWithValue("@original_object_flags", Convert.ToUInt64(root.Flags));
-                command.Parameters.AddWithValue("@slept_at", UnixTimeNow());
+                AddParameter(command, "@region_uuid", scene.RegionInfo.RegionID.ToString());
+                AddParameter(command, "@object_uuid", root.UUID.ToString());
+                AddParameter(command, "@scene_group_id", sog.UUID.ToString());
+                AddParameter(command, "@object_name", Truncate(root.Name ?? String.Empty, 255));
+                AddParameter(command, "@original_object_flags", Convert.ToInt64(root.Flags));
+                AddParameter(command, "@slept_at", Convert.ToInt64(UnixTimeNow()));
                 command.ExecuteNonQuery();
             }
         }
@@ -882,20 +939,20 @@ ORDER BY slept_at ASC;";
 
             List<SleepRow> rows = new List<SleepRow>();
 
-            using (MySqlConnection connection = OpenDb())
-            using (MySqlCommand command = new MySqlCommand(sql, connection))
+            using (DbConnection connection = OpenDb())
+            using (DbCommand command = CreateCommand(connection, sql))
             {
-                command.Parameters.AddWithValue("@region_uuid", regionID.ToString());
+                AddParameter(command, "@region_uuid", regionID.ToString());
 
-                using (MySqlDataReader reader = command.ExecuteReader())
+                using (DbDataReader reader = command.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         SleepRow row = new SleepRow();
-                        row.RegionUUID = UUID.Parse(reader.GetString("region_uuid"));
-                        row.ObjectUUID = UUID.Parse(reader.GetString("object_uuid"));
-                        row.SceneGroupID = UUID.Parse(reader.GetString("scene_group_id"));
-                        row.ObjectName = reader.GetString("object_name");
+                        row.RegionUUID = UUID.Parse(reader.GetString(reader.GetOrdinal("region_uuid")));
+                        row.ObjectUUID = UUID.Parse(reader.GetString(reader.GetOrdinal("object_uuid")));
+                        row.SceneGroupID = UUID.Parse(reader.GetString(reader.GetOrdinal("scene_group_id")));
+                        row.ObjectName = reader.GetString(reader.GetOrdinal("object_name"));
                         row.OriginalObjectFlags = Convert.ToUInt64(reader["original_object_flags"]);
                         rows.Add(row);
                     }
@@ -912,13 +969,28 @@ DELETE FROM holo_physics_guard_sleep
 WHERE region_uuid = @region_uuid
   AND object_uuid = @object_uuid;";
 
-            using (MySqlConnection connection = OpenDb())
-            using (MySqlCommand command = new MySqlCommand(sql, connection))
+            using (DbConnection connection = OpenDb())
+            using (DbCommand command = CreateCommand(connection, sql))
             {
-                command.Parameters.AddWithValue("@region_uuid", regionUUID.ToString());
-                command.Parameters.AddWithValue("@object_uuid", objectUUID.ToString());
+                AddParameter(command, "@region_uuid", regionUUID.ToString());
+                AddParameter(command, "@object_uuid", objectUUID.ToString());
                 command.ExecuteNonQuery();
             }
+        }
+
+        private static DbCommand CreateCommand(DbConnection connection, string sql)
+        {
+            DbCommand command = connection.CreateCommand();
+            command.CommandText = sql;
+            return command;
+        }
+
+        private static void AddParameter(DbCommand command, string name, object value)
+        {
+            DbParameter parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value;
+            command.Parameters.Add(parameter);
         }
 
         private static uint UnixTimeNow()
@@ -965,6 +1037,14 @@ WHERE region_uuid = @region_uuid
             public UUID SceneGroupID;
             public string ObjectName;
             public ulong OriginalObjectFlags;
+        }
+
+        private enum DatabaseKind
+        {
+            Unknown,
+            MySql,
+            PostgreSql,
+            Sqlite
         }
     }
 }

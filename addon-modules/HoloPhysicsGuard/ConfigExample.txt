@@ -16,13 +16,13 @@ Mode = ReportOnly
 DryRun = true
 
 ; Leave blank to inherit [DatabaseService] ConnectionString.
-; Set an explicit MySQL connection string only when the guard table must use
-; a different database. Never commit live credentials.
+; Set an explicit connection string only when the guard table must use a
+; different database. Never commit live credentials.
 ConnectionString =
 
-; PersistSleep is MySQL/MariaDB-only. When ConnectionString is inherited this
-; is inherited from [DatabaseService] too. Set it explicitly with a module-
-; specific connection string; unsupported providers disable PersistSleep.
+; PersistSleep supports MySQL/MariaDB, PostgreSQL, and SQLite. When inherited,
+; this comes from [DatabaseService]. For a module-specific connection use
+; OpenSim.Data.MySQL.dll, OpenSim.Data.PGSQL.dll, or OpenSim.Data.SQLite.dll.
 StorageProvider = OpenSim.Data.MySQL.dll
 
 AutoCreateTable = true

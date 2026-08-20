@@ -29,6 +29,8 @@
   <Reference name="Nini" />
   <Reference name="Mono.Addins" />
   <Reference name="MySql.Data" />
+  <Reference name="Npgsql" />
+  <Reference name="System.Data.SQLite" />
 
   <Files>
     <Match pattern="*.cs" recurse="false" />

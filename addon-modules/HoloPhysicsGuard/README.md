@@ -25,7 +25,7 @@ Version 0.5.0 preserves the upstream design while correcting integration risks:
 - queries wake state only when occupancy changes from empty to occupied
 - retries wake operations when a database or row-deletion failure occurs
 - spaces repeated empty-region scans by `EmptyDelaySeconds`
-- inherits the MySQL connection from `[DatabaseService]` when the module-specific connection is blank
+- inherits the database provider and connection from `[DatabaseService]` when module-specific values are blank
 - validates the selected storage provider before starting `PersistSleep`
 - validates an existing sleep table at startup when automatic creation is disabled
 - uses only the module-owned `holo_physics_guard_sleep` table
@@ -63,25 +63,25 @@ OpenSim does not automatically load an arbitrary file merely because it is place
 
 The module runs in the region simulator process. It does not run inside Robust.
 
-When `ConnectionString` is blank, the module reads the region process's `[DatabaseService] ConnectionString`. This supports normal MySQL-backed Standalone and Grid/Robust region configurations without hard-coded credentials.
+When `ConnectionString` is blank, the module reads the region process's `[DatabaseService] ConnectionString`. This supports normal Standalone and Grid/Robust region configurations without hard-coded credentials.
 
 Only the module-owned sleep table is accessed directly. OpenSim remains responsible for persisting object flag changes made through `UpdatePrimFlags()`.
 
-`PersistSleep` is currently MySQL/MariaDB-only because the recovered module uses
-its own MySQL ledger. SQLite and PostgreSQL deployments may use `ReportOnly`, but
-must not select `PersistSleep`. This optional module is therefore not considered
-database-portable until dedicated SQLite and PostgreSQL providers and migrations
-are implemented and certified.
+`PersistSleep` supports MySQL/MariaDB, PostgreSQL, and SQLite. The module owns a
+small provider-neutral sleep ledger and creates its table and indexes when
+`AutoCreateTable = true`.
 
 When the connection is inherited, `StorageProvider` is inherited from
-`[DatabaseService]`; unsupported providers now disable the module immediately.
-For a module-specific MySQL/MariaDB connection, set
-`StorageProvider = OpenSim.Data.MySQL.dll`. Omitting it with an explicit
-connection retains backward-compatible MySQL selection.
+`[DatabaseService]`; unsupported providers disable the module immediately. For
+a module-specific connection, set `StorageProvider` to
+`OpenSim.Data.MySQL.dll`, `OpenSim.Data.PGSQL.dll`, or
+`OpenSim.Data.SQLite.dll`. Omitting it with an explicit connection retains
+backward-compatible MySQL selection.
 
 ## Database table
 
-With `AutoCreateTable = true`, the module creates:
+With `AutoCreateTable = true`, the module creates the equivalent portable table
+and indexes. The MySQL form is:
 
 ```sql
 CREATE TABLE IF NOT EXISTS holo_physics_guard_sleep (
