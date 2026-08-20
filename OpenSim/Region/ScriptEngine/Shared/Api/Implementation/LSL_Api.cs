@@ -20994,7 +20994,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return rq.ToString();
         }
 
-        public LSL_Key llUpdateKeyValue(string key, string value, LSL_Integer check, string original)
+        public LSL_Key llUpdateKeyValue(string key, string value, int checkedUpdate, string originalValue)
         {
             Action<string> act = eventID =>
             {
@@ -21002,7 +21002,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                 if (String.IsNullOrEmpty(key) || Utf8ByteCount(key) > MAX_EXPERIENCE_KEY_BYTES ||
                     value == null || Utf8ByteCount(value) > MAX_EXPERIENCE_VALUE_BYTES ||
-                    (check != 0 && check != 1) || (check == 1 && original == null))
+                    (checkedUpdate != 0 && checkedUpdate != 1) ||
+                    (checkedUpdate == 1 && originalValue == null))
                 {
                     response = string.Format("0,{0}", ScriptBaseClass.XP_ERROR_INVALID_PARAMETERS);
                 }
@@ -21010,8 +21011,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 {
                     if (CheckExperienceAccessAtPos(m_host.AbsolutePosition, m_item.ExperienceID))
                     {
-                        bool do_check = check == 1;
-                        string update = World.ExperienceModule.UpdateKeyValue(m_item.ExperienceID, key, value, do_check, original);
+                        bool do_check = checkedUpdate == 1;
+                        string update = World.ExperienceModule.UpdateKeyValue(
+                            m_item.ExperienceID, key, value, do_check, originalValue);
                         if (update == "success")
                             response = "1," + value;
                         else if (update == "mismatch")
@@ -21070,7 +21072,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             return rq.ToString();
         }
 
-        public LSL_Key llKeysKeyValue(LSL_Integer first, LSL_Integer count)
+        public LSL_Key llKeysKeyValue(int first, int count)
         {
             Action<string> act = eventID =>
             {
