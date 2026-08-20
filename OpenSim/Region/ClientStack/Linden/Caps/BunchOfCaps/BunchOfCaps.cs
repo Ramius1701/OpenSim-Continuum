@@ -2567,9 +2567,12 @@ namespace OpenSim.Region.ClientStack.Linden
 
             public virtual void Stop()
             {
+                Timer timeoutTimer = Interlocked.Exchange(ref m_timeoutTimer, null);
+                if (timeoutTimer == null)
+                    return;
+
                 m_httpListener.RemoveSimpleStreamHandler(m_mypath);
-                m_timeoutTimer.Dispose();
-                m_timeoutTimer = null;
+                timeoutTimer.Dispose();
             }
 
             public virtual void Timedout(object state)
