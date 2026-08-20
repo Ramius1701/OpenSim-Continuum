@@ -667,10 +667,11 @@ namespace OpenSim.Data.PGSQL
                                 query += ":profileImage, ";
                                 query += ":profileAboutText, ";
                                 query += ":profileFirstImage, ";
-                                query += ":profileFirstText)";
+                                query += ":profileFirstText) ON CONFLICT (useruuid) DO NOTHING";
 
-                                dbcon.Close();
-                                dbcon.Open();
+                                // Finish the initial lookup before issuing the
+                                // idempotent create on the same connection.
+                                reader.Close();
 
                                 using (NpgsqlCommand put = new NpgsqlCommand(query, dbcon))
                                 {

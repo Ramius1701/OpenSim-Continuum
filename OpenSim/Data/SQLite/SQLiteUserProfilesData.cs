@@ -608,7 +608,7 @@ namespace OpenSim.Data.SQLite
                             props.PublishProfile = false;
                             props.PublishMature = false;
 
-                            query = "INSERT INTO userprofile (";
+                            query = "INSERT OR IGNORE INTO userprofile (";
                             query += "useruuid, ";
                             query += "profilePartner, ";
                             query += "profileAllowPublish, ";
@@ -638,6 +638,9 @@ namespace OpenSim.Data.SQLite
                             query += ":profileFirstImage, ";
                             query += ":profileFirstText)";
 
+                            // Finish the initial lookup before issuing the
+                            // idempotent create on the same connection.
+                            reader?.Close();
                             using (SQLiteCommand put = (SQLiteCommand)m_connection.CreateCommand())
                             {
                                 put.CommandText = query;
@@ -659,6 +662,7 @@ namespace OpenSim.Data.SQLite
                                 put.ExecuteNonQuery();
                             }
                         }
+                    reader?.Close();
                 }
             return true;
         }

@@ -638,7 +638,7 @@ namespace OpenSim.Data.MySQL
                                 props.PublishProfile = false;
                                 props.PublishMature = false;
 
-                                query = "INSERT INTO userprofile ("
+                                query = "INSERT IGNORE INTO userprofile ("
                                     + "useruuid, "
                                     + "profilePartner, "
                                     + "profileAllowPublish, "
@@ -669,8 +669,9 @@ namespace OpenSim.Data.MySQL
                                     + "?profileFirstText)"
                                     ;
 
-                                dbcon.Close();
-                                dbcon.Open();
+                                // Finish the initial lookup before issuing the
+                                // idempotent create on the same connection.
+                                reader.Close();
 
                                 using (MySqlCommand put = new MySqlCommand(query, dbcon))
                                 {
