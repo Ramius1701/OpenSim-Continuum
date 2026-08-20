@@ -38,11 +38,15 @@ namespace OpenSim.Server.Handlers.UserAlias
     public class UserAliasServiceConnector : ServiceConnector
     {
         private IUserAliasService m_UserAliasService;
-        private string m_ConfigName = "UserAliasService";
+        private readonly string m_ConfigName;
 
         public UserAliasServiceConnector(IConfigSource config, IHttpServer server, string configName) :
                 base(config, server, configName)
         {
+            m_ConfigName = string.IsNullOrWhiteSpace(configName)
+                ? "UserAliasService"
+                : configName;
+
             IConfig serverConfig = config.Configs[m_ConfigName];
             if (serverConfig == null)
                 throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
@@ -55,6 +59,8 @@ namespace OpenSim.Server.Handlers.UserAlias
 
             Object[] args = new Object[] { config };
             m_UserAliasService = ServerUtils.LoadPlugin<IUserAliasService>(service, args);
+            if (m_UserAliasService == null)
+                throw new Exception("Could not load IUserAliasService from " + service);
 
             IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
             server.AddStreamHandler(new UserAliasServerPostHandler(m_UserAliasService, serverConfig, auth));

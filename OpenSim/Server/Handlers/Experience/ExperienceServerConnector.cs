@@ -11,11 +11,15 @@ namespace OpenSim.Server.Handlers.Experience
     public class ExperienceServiceConnector : ServiceConnector
     {
         private IExperienceService m_ExperienceService;
-        private string m_ConfigName = "ExperienceService";
+        private readonly string m_ConfigName;
 
         public ExperienceServiceConnector(IConfigSource config, IHttpServer server, string configName) :
                 base(config, server, configName)
         {
+            m_ConfigName = string.IsNullOrWhiteSpace(configName)
+                ? "ExperienceService"
+                : configName;
+
             IConfig serverConfig = config.Configs[m_ConfigName];
             if (serverConfig == null)
                 throw new Exception(String.Format("No section {0} in config file", m_ConfigName));
@@ -27,6 +31,8 @@ namespace OpenSim.Server.Handlers.Experience
 
             Object[] args = new Object[] { config };
             m_ExperienceService = ServerUtils.LoadPlugin<IExperienceService>(service, args);
+            if (m_ExperienceService == null)
+                throw new Exception("Could not load IExperienceService from " + service);
 
             IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
 

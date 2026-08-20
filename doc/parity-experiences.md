@@ -28,23 +28,23 @@ patches:
 | Allowed, trusted and blocked estate policy | Present, including blocked persistence and CAPS | Matches the later Tranquillity 1.x direction; verify all three databases and viewer mutation. |
 | Resident Allowed/Blocked preferences | Present | Retain Tranquillity single-table allow-bit model and verify restart/cross-simulator behavior. |
 | Viewer panels and profile metadata | Mostly present | Current serializer carries marketplace and quota fields, but remaining 1.x CAP gaps below are real. |
-| Find-by-name pagination | Partial | Continuum pages results but omits donor `next_page_url` and `previous_page_url`, which viewers use for navigation. |
-| `ExperienceQuery` capability | Missing | Port Tranquillity 1.x's documented no-op response so viewers do not treat experiences as invalid merely because the CAP is absent. |
-| Acquire/Create Experience workflow | Missing | Port the `AgentExperiences` GET/POST and `ExperienceCreators` policy slice; keep policy explicit and default-compatible. |
-| Experience group reassignment | Over-restricted | Continuum rejects every group change. Tranquillity 1.x permits the Experience owner, but not a group administrator, to change it. Restore that donor rule. |
+| Find-by-name pagination | Present | Continuum returns bounded results with donor-compatible `next_page_url` and `previous_page_url` navigation. |
+| `ExperienceQuery` capability | Present | The viewer-facing capability is registered and returns the donor-compatible lookup response. |
+| Acquire/Create Experience workflow | Present | `AgentExperiences` GET/POST and the configurable `ExperienceCreators` policy are implemented. |
+| Experience group reassignment | Present | The Experience owner may change the group; administrative edits do not acquire that owner-only authority. |
 | Admin/contributor null/zero guards | Present in portions | Complete exact comparison before change; retain current stricter validation where equivalent. |
 | KVP quota | Divergent | Continuum service enforces 16 MiB; Tranquillity 1.x raises it to 128 MiB. Do not change the constant alone: reconcile byte accounting for SQLite, MySQL and PostgreSQL and the script-reported quota first. |
 | Script error table and details layout | Present from current reconciled work | Verify against the 1.x slice and Gunthar rather than rewriting. |
 | Explicit block versus prompt | Corrected in candidate | The original Tranquillity condition tested `Allowed` twice; Continuum now uses `Blocked`. Retain as a donor defect correction. |
-| Consent dialog | Incomplete relative to 1.x | Continuum has one per-script boolean subscription and no 300-second timeout/connection-close resolver. Port the 1.x correlation/timeout semantics into YEngine APIs without importing Phlox. |
+| Consent dialog | Present | YEngine correlates the pending task/item request, resolves it once, detaches on connection close and enforces the donor's 300-second timeout without importing Phlox. |
 | Grant/deny persistence | Present with recent corrections | Retain only where it matches Tranquillity 1.x's block-before-grant and cache-coherency ordering. |
 | Land admission | Present with estate and parcel allow/block | Continuum is ahead of the 1.x estate-only slice in parcel data integration; verify against Gunthar and existing parcel storage before retaining. |
 | KVP async script responses | Present through YEngine dataserver | Compare numeric error mappings and validation with both Gunthar and 1.x; do not port Phlox adapters wholesale. |
 
-## Proven implementation slices to port
+## Proven implementation slices reconciled
 
-The following are **narrow donor ports** from Tranquillity 1.x
-`81e5c2449d`, adapted to current OpenSim/YEngine:
+The following **narrow donor ports** from Tranquillity 1.x
+`81e5c2449d` are present, adapted to current OpenSim/YEngine:
 
 1. `ExperienceQuery` CAPS response.
 2. Experience acquisition policy and `AgentExperiences` POST.
@@ -55,7 +55,7 @@ The following are **narrow donor ports** from Tranquillity 1.x
    resolution and timeout error 18.
 6. Consistent marketplace/quota response fields after the quota decision.
 
-The 128 MiB quota is a separate compatibility decision because the donor itself
+The 128 MiB quota remains a separate compatibility decision because the donor itself
 documents SQLite character-count divergence. It cannot advance until all three
 Continuum providers use the same UTF-8 byte accounting and migration/runtime
 tests pass.
