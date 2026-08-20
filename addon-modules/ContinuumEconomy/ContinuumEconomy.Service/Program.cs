@@ -102,6 +102,7 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("CapturePurchase", CapturePurchase);
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
             server.AddXmlRPCHandler("RegisterEconomyAccount", RegisterEconomyAccount);
+            server.AddXmlRPCHandler("GetGroupAccount", GetGroupAccount);
             server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
             server.AddXmlRPCHandler("buyLandPrep", BuyLandPrep);
         }
@@ -128,6 +129,43 @@ namespace ContinuumEconomy.Service
                 { "success", result == LedgerResultCode.Committed || result == LedgerResultCode.Replayed },
                 { "result", result.ToString() },
                 { "message", message }
+            });
+        }
+
+        private XmlRpcResponse GetGroupAccount(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!Secret(p) || !Guid.TryParse(Text(p, "groupID"), out Guid group) || group == Guid.Empty)
+                return Failure("Invalid group account request");
+
+            int currentInterval = Math.Max(0, ParseInt(p, "currentInterval"));
+            int intervalDays = Math.Clamp(ParseInt(p, "intervalDays"), 1, 90);
+            DateTime end = DateTime.UtcNow.Date.AddDays(-(long)currentInterval * intervalDays + 1);
+            DateTime start = end.AddDays(-intervalDays);
+            var rows = m_backend.Ledger.GetHistory(group, end, 1000);
+            ArrayList history = new();
+            long credits = 0;
+            long debits = 0;
+            foreach (LedgerHistoryEntry row in rows)
+            {
+                if (!row.Succeeded || row.CreatedUtc < start || row.CreatedUtc >= end)
+                    continue;
+                if (row.IsCredit) credits += row.Amount; else debits += row.Amount;
+                history.Add(new Hashtable
+                {
+                    { "amount", SignedViewerAmount(row.IsCredit ? row.Amount : -row.Amount) },
+                    { "description", row.Description ?? String.Empty },
+                    { "time", row.CreatedUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) },
+                    { "actor", row.CounterpartyID.ToString() },
+                    { "payment", !row.IsAdjustment }
+                });
+            }
+            return Reply(new Hashtable
+            {
+                { "success", true }, { "balance", ViewerBalance(m_backend.Ledger.GetBalance(group)) },
+                { "totalCredits", ViewerBalance(credits) }, { "totalDebits", ViewerBalance(debits) },
+                { "startDate", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                { "history", history }
             });
         }
 
@@ -450,6 +488,7 @@ namespace ContinuumEconomy.Service
         }
         private XmlRpcResponse SuccessBalance(Guid id)=>Reply(new Hashtable{{"success",true},{"clientBalance",ViewerBalance(m_backend.Ledger.GetBalance(id))}});
         private static int ViewerBalance(long value)=>checked((int)Math.Clamp(value,0,Int32.MaxValue));
+        private static int SignedViewerAmount(long value)=>checked((int)Math.Clamp(value,Int32.MinValue,Int32.MaxValue));
         private static int ParseInt(Hashtable p, string key) => Int32.TryParse(Text(p, key),
             NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : -1;
         private static Guid InitialCreditID(Guid account){byte[] ns=account.ToByteArray(),tag=System.Text.Encoding.ASCII.GetBytes("ContinuumInitialBalance");byte[] all=new byte[ns.Length+tag.Length];Buffer.BlockCopy(ns,0,all,0,ns.Length);Buffer.BlockCopy(tag,0,all,ns.Length,tag.Length);byte[] hash=System.Security.Cryptography.SHA256.HashData(all);byte[] id=new byte[16];Buffer.BlockCopy(hash,0,id,0,16);return new Guid(id);}

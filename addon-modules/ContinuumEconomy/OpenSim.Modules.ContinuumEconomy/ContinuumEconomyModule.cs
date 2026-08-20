@@ -835,6 +835,9 @@ namespace OpenSim.Modules.ContinuumEconomy
                 client.OnMoneyBalanceRequest += OnMoneyBalanceRequest;
                 client.OnRequestPayPrice += OnRequestPayPrice;
                 client.OnObjectBuy += OnObjectBuy;
+                client.OnGroupAccountSummaryRequest += OnGroupAccountSummaryRequest;
+                client.OnGroupAccountDetailsRequest += OnGroupAccountDetailsRequest;
+                client.OnGroupAccountTransactionsRequest += OnGroupAccountTransactionsRequest;
 
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] OnNewClient: {0}", client.AgentId);
             }
@@ -850,6 +853,101 @@ namespace OpenSim.Modules.ContinuumEconomy
             client.OnMoneyBalanceRequest -= OnMoneyBalanceRequest;
             client.OnRequestPayPrice -= OnRequestPayPrice;
             client.OnObjectBuy -= OnObjectBuy;
+            client.OnGroupAccountSummaryRequest -= OnGroupAccountSummaryRequest;
+            client.OnGroupAccountDetailsRequest -= OnGroupAccountDetailsRequest;
+            client.OnGroupAccountTransactionsRequest -= OnGroupAccountTransactionsRequest;
+        }
+
+        private bool CanViewGroupAccount(IClientAPI client, UUID agentID, UUID groupID)
+        {
+            if (client == null || client.AgentId != agentID || client.Scene == null || groupID == UUID.Zero)
+                return false;
+            IGroupsModule groups = client.Scene.RequestModuleInterface<IGroupsModule>();
+            return groups != null &&
+                (groups.GetFullGroupPowers(agentID, groupID) & (ulong)GroupPowers.Accountable) != 0;
+        }
+
+        private Hashtable GetGroupAccount(UUID groupID, int currentInterval, int intervalDays)
+        {
+            return genericCurrencyXMLRPCRequest(new Hashtable
+            {
+                ["groupID"] = groupID.ToString(),
+                ["currentInterval"] = Math.Max(0, currentInterval),
+                ["intervalDays"] = Math.Clamp(intervalDays, 1, 90)
+            }, "GetGroupAccount");
+        }
+
+        private static int GroupAccountInt(Hashtable values, string key)
+        {
+            if (values == null || !values.ContainsKey(key))
+                return 0;
+            return Int64.TryParse(Convert.ToString(values[key]), out long value)
+                ? checked((int)Math.Clamp(value, Int32.MinValue, Int32.MaxValue)) : 0;
+        }
+
+        private static GroupAccountHistory[] GroupHistory(Hashtable values, bool payments)
+        {
+            if (values == null || values["history"] is not ArrayList rows)
+                return Array.Empty<GroupAccountHistory>();
+            List<GroupAccountHistory> result = new();
+            foreach (object item in rows)
+            {
+                if (item is not Hashtable row)
+                    continue;
+                bool payment = !row.ContainsKey("payment") || Convert.ToBoolean(row["payment"]);
+                if (payment != payments)
+                    continue;
+                result.Add(new GroupAccountHistory
+                {
+                    Amount = GroupAccountInt(row, "amount"),
+                    Description = Convert.ToString(row["description"]) ?? String.Empty,
+                    TimeString = Convert.ToString(row["time"]) ?? String.Empty,
+                    UserCausingCharge = Convert.ToString(row["actor"]) ?? String.Empty,
+                    Payment = payment
+                });
+            }
+            return result.ToArray();
+        }
+
+        private void OnGroupAccountSummaryRequest(IClientAPI client, UUID agentID, UUID groupID,
+            UUID requestID, int currentInterval, int intervalDays)
+        {
+            if (!CanViewGroupAccount(client, agentID, groupID))
+                return;
+            Hashtable account = GetGroupAccount(groupID, currentInterval, intervalDays);
+            if (account == null || !account.ContainsKey("success") || !(bool)account["success"])
+                return;
+            client.SendGroupAccountingSummary(client, groupID, requestID,
+                GroupAccountInt(account, "balance"), GroupAccountInt(account, "totalDebits"),
+                GroupAccountInt(account, "totalCredits"), Convert.ToString(account["startDate"]) ?? "Never",
+                Math.Max(0, currentInterval), Math.Clamp(intervalDays, 1, 90));
+        }
+
+        private void OnGroupAccountDetailsRequest(IClientAPI client, UUID agentID, UUID groupID,
+            UUID requestID, UUID sessionID, int currentInterval, int intervalDays)
+        {
+            if (!CanViewGroupAccount(client, agentID, groupID) || client.SessionId != sessionID)
+                return;
+            Hashtable account = GetGroupAccount(groupID, currentInterval, intervalDays);
+            if (account == null || !account.ContainsKey("success") || !(bool)account["success"])
+                return;
+            client.SendGroupAccountingDetails(client, groupID, requestID, sessionID,
+                GroupAccountInt(account, "balance"), Math.Max(0, currentInterval),
+                Math.Clamp(intervalDays, 1, 90), Convert.ToString(account["startDate"]) ?? "Never",
+                GroupHistory(account, false));
+        }
+
+        private void OnGroupAccountTransactionsRequest(IClientAPI client, UUID agentID, UUID groupID,
+            UUID requestID, UUID sessionID, int currentInterval, int intervalDays)
+        {
+            if (!CanViewGroupAccount(client, agentID, groupID) || client.SessionId != sessionID)
+                return;
+            Hashtable account = GetGroupAccount(groupID, currentInterval, intervalDays);
+            if (account == null || !account.ContainsKey("success") || !(bool)account["success"])
+                return;
+            client.SendGroupTransactionsSummaryDetails(client, groupID, requestID, sessionID,
+                Math.Max(0, currentInterval), Math.Clamp(intervalDays, 1, 90),
+                Convert.ToString(account["startDate"]) ?? "Never", GroupHistory(account, true));
         }
 
 

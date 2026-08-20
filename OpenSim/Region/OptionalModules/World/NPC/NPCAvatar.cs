@@ -1348,15 +1348,15 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         {
         }
 
-        public void SendGroupAccountingDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID, int amt)
+        public void SendGroupAccountingDetails(IClientAPI sender, UUID groupID, UUID transactionID, UUID sessionID, int amount, int currentInterval, int intervalDays, string startDate, GroupAccountHistory[] history)
         {
         }
 
-        public void SendGroupAccountingSummary(IClientAPI sender,UUID groupID, uint moneyAmt, int totalTier, int usedTier)
+        public void SendGroupAccountingSummary(IClientAPI sender, UUID groupID, UUID requestID, int balance, int totalDebits, int totalCredits, string startDate, int currentInterval, int intervalDays)
         {
         }
 
-        public void SendGroupTransactionsSummaryDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID,int amt)
+        public void SendGroupTransactionsSummaryDetails(IClientAPI sender, UUID groupID, UUID transactionID, UUID sessionID, int currentInterval, int intervalDays, string startDate, GroupAccountHistory[] history)
         {
         }
 

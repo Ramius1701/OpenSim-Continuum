@@ -495,11 +495,23 @@ namespace OpenSim.Framework
 
     public delegate void SaveStateHandler(IClientAPI client,UUID agentID);
 
-    public delegate void GroupAccountSummaryRequest(IClientAPI client,UUID agentID, UUID groupID);
+    public delegate void GroupAccountSummaryRequest(IClientAPI client, UUID agentID, UUID groupID,
+        UUID requestID, int currentInterval, int intervalDays);
 
-    public delegate void GroupAccountDetailsRequest(IClientAPI client,UUID agentID, UUID groupID, UUID transactionID, UUID sessionID);
+    public delegate void GroupAccountDetailsRequest(IClientAPI client, UUID agentID, UUID groupID,
+        UUID transactionID, UUID sessionID, int currentInterval, int intervalDays);
 
-    public delegate void GroupAccountTransactionsRequest(IClientAPI client,UUID agentID, UUID groupID, UUID transactionID, UUID sessionID);
+    public delegate void GroupAccountTransactionsRequest(IClientAPI client, UUID agentID, UUID groupID,
+        UUID transactionID, UUID sessionID, int currentInterval, int intervalDays);
+
+    public sealed class GroupAccountHistory
+    {
+        public int Amount;
+        public string Description = String.Empty;
+        public string TimeString = String.Empty;
+        public string UserCausingCharge = String.Empty;
+        public bool Payment = true;
+    }
 
     public delegate void ParcelBuyPass(IClientAPI client, UUID agentID, int ParcelLocalID);
 
@@ -1458,11 +1470,14 @@ namespace OpenSim.Framework
 
         void SendAvatarInterestsReply(UUID avatarID, uint wantMask, string wantText, uint skillsMask, string skillsText, string languages);
 
-        void SendGroupAccountingDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID, int amt);
+        void SendGroupAccountingDetails(IClientAPI sender, UUID groupID, UUID transactionID, UUID sessionID,
+            int amount, int currentInterval, int intervalDays, string startDate, GroupAccountHistory[] history);
 
-        void SendGroupAccountingSummary(IClientAPI sender,UUID groupID, uint moneyAmt, int totalTier, int usedTier);
+        void SendGroupAccountingSummary(IClientAPI sender, UUID groupID, UUID requestID, int balance,
+            int totalDebits, int totalCredits, string startDate, int currentInterval, int intervalDays);
 
-        void SendGroupTransactionsSummaryDetails(IClientAPI sender,UUID groupID, UUID transactionID, UUID sessionID,int amt);
+        void SendGroupTransactionsSummaryDetails(IClientAPI sender, UUID groupID, UUID transactionID,
+            UUID sessionID, int currentInterval, int intervalDays, string startDate, GroupAccountHistory[] history);
 
         void SendChangeUserRights(UUID agentID, UUID friendID, int rights);
         void SendTextBoxRequest(string message, int chatChannel, string objectname, UUID ownerID, string ownerFirstName, string ownerLastName, UUID objectId);
