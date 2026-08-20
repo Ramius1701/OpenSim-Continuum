@@ -1394,8 +1394,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                         string secureid = (string)requestParam["clientSecureSessionID"];
                         if (client != null && secureid == client.SecureSessionId.ToString() && (sessionid == UUID.Zero.ToString() || sessionid == client.SessionId.ToString()))
                         {
-                            balance = QueryBalanceFromMoneyServer(client);
-                            ret = balance >= 0;
+                            balance = QueryBalanceFromMoneyServer(client, out ret);
                         }
                     }
                 }
