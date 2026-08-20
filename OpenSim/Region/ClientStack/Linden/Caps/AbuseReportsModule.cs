@@ -35,6 +35,7 @@ namespace OpenSim.Region.ClientStack.Linden
         private readonly Dictionary<string, IHttpServer> m_PendingUploaders = new Dictionary<string, IHttpServer>();
         private readonly Dictionary<UUID, string> m_AgentUploaders = new Dictionary<UUID, string>();
         private readonly Dictionary<string, Timer> m_UploaderTimers = new Dictionary<string, Timer>();
+        private readonly object m_LifecycleLock = new object();
 
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
@@ -65,39 +66,60 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public void AddRegion(Scene scene)
         {
-            if (m_Enabled)
+            if (!m_Enabled || scene == null)
+                return;
+
+            lock (m_LifecycleLock)
+            {
+                if (!m_Enabled || ReferenceEquals(m_Scene, scene))
+                    return;
+                if (m_Scene != null)
+                {
+                    m_log.ErrorFormat(
+                        "[ABUSE REPORTS]: Refusing second region {0}; module instance already owns {1}",
+                        scene.RegionInfo.RegionName,
+                        m_Scene.RegionInfo.RegionName);
+                    return;
+                }
+
                 m_Scene = scene;
+            }
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            m_Scene = scene;
-            m_UserManager = scene.RequestModuleInterface<IUserManagement>();
-            if (m_UserManager == null)
+            lock (m_LifecycleLock)
             {
-                m_log.ErrorFormat(
-                    "[ABUSE REPORTS]: IUserManagement is unavailable in region {0}; module disabled",
-                    scene.RegionInfo.RegionName);
-                m_Enabled = false;
-                return;
-            }
+                if (!m_Enabled || !ReferenceEquals(m_Scene, scene) || m_CapsEventRegistered)
+                    return;
 
-            m_Connector = scene.RequestModuleInterface<IAbuseReportsService>();
-            if (m_Connector == null)
-            {
-                m_log.ErrorFormat(
-                    "[ABUSE REPORTS]: IAbuseReportsService is unavailable in region {0}; module disabled",
-                    scene.RegionInfo.RegionName);
-                m_Enabled = false;
-                return;
-            }
+                m_UserManager = scene.RequestModuleInterface<IUserManagement>();
+                if (m_UserManager == null)
+                {
+                    m_log.ErrorFormat(
+                        "[ABUSE REPORTS]: IUserManagement is unavailable in region {0}; module disabled",
+                        scene.RegionInfo.RegionName);
+                    m_Enabled = false;
+                    return;
+                }
 
-            scene.EventManager.OnRegisterCaps += RegisterCaps;
-            scene.EventManager.OnClientClosed += OnClientClosed;
-            m_CapsEventRegistered = true;
+                m_Connector = scene.RequestModuleInterface<IAbuseReportsService>();
+                if (m_Connector == null)
+                {
+                    m_log.ErrorFormat(
+                        "[ABUSE REPORTS]: IAbuseReportsService is unavailable in region {0}; module disabled",
+                        scene.RegionInfo.RegionName);
+                    m_Enabled = false;
+                    return;
+                }
+
+                scene.EventManager.OnRegisterCaps += RegisterCaps;
+                scene.EventManager.OnClientClosed += OnClientClosed;
+                m_CapsEventRegistered = true;
+            }
 
             m_log.InfoFormat(
                 "[ABUSE REPORTS]: Enabled in region {0}",
@@ -106,18 +128,26 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public void RemoveRegion(Scene scene)
         {
-            if (m_CapsEventRegistered)
-            {
-                scene.EventManager.OnRegisterCaps -= RegisterCaps;
-                scene.EventManager.OnClientClosed -= OnClientClosed;
-                m_CapsEventRegistered = false;
-            }
+            if (scene == null)
+                return;
 
-            if (ReferenceEquals(m_Scene, scene))
+            bool capsEventRegistered;
+            lock (m_LifecycleLock)
             {
+                if (!ReferenceEquals(m_Scene, scene))
+                    return;
+
+                capsEventRegistered = m_CapsEventRegistered;
+                m_CapsEventRegistered = false;
                 m_Scene = null;
                 m_Connector = null;
                 m_UserManager = null;
+            }
+
+            if (capsEventRegistered)
+            {
+                scene.EventManager.OnRegisterCaps -= RegisterCaps;
+                scene.EventManager.OnClientClosed -= OnClientClosed;
             }
 
             KeyValuePair<string, IHttpServer>[] uploaders;
@@ -143,6 +173,7 @@ namespace OpenSim.Region.ClientStack.Linden
 
         public void Close()
         {
+            m_Enabled = false;
             Scene scene = m_Scene;
             if (scene != null)
                 RemoveRegion(scene);

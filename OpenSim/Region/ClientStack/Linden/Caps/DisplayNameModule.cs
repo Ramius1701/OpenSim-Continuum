@@ -30,6 +30,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private int m_RefreshIntervalSeconds = 60;
         private Timer m_RefreshTimer;
         private int m_RefreshRunning;
+        private readonly object m_LifecycleLock = new object();
+        private bool m_CapsRegistered;
 
         #region ISharedRegionModule
 
@@ -54,20 +56,42 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            m_Scene = scene;
+            lock (m_LifecycleLock)
+            {
+                if (!m_Enabled || ReferenceEquals(m_Scene, scene))
+                    return;
+                if (m_Scene != null)
+                {
+                    m_log.ErrorFormat(
+                        "[DISPLAY NAMES]: Refusing second region {0}; module instance already owns {1}",
+                        scene.RegionInfo.RegionName,
+                        m_Scene.RegionInfo.RegionName);
+                    return;
+                }
 
-            scene.RegisterModuleInterface<IDisplayNameModule>(this);
-            scene.EventManager.OnNewClient += OnNewClient;
-            scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+                m_Scene = scene;
+                scene.RegisterModuleInterface<IDisplayNameModule>(this);
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
+            }
         }
 
         public void RemoveRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (scene == null)
                 return;
+
+            lock (m_LifecycleLock)
+            {
+                if (!ReferenceEquals(m_Scene, scene))
+                    return;
+                m_Scene = null;
+                m_EventQueue = null;
+                m_CapsRegistered = false;
+            }
 
             Timer refreshTimer = Interlocked.Exchange(ref m_RefreshTimer, null);
             refreshTimer?.Dispose();
@@ -76,34 +100,40 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             scene.EventManager.OnNewClient -= OnNewClient;
             scene.EventManager.OnMakeRootAgent -= OnMakeRootAgent;
             scene.UnregisterModuleInterface<IDisplayNameModule>(this);
-            m_Scene = null;
-            m_EventQueue = null;
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            m_EventQueue = scene.RequestModuleInterface<IEventQueue>();
-            if (m_EventQueue is null)
+            lock (m_LifecycleLock)
             {
-                m_log.Info("[DISPLAY NAMES]: Module disabled becuase IEventQueue was not found!");
-                return;
-            }
+                if (!m_Enabled || !ReferenceEquals(m_Scene, scene) || m_CapsRegistered)
+                    return;
 
-            scene.EventManager.OnRegisterCaps += OnRegisterCaps;
-            m_RefreshTimer = new Timer(
-                RefreshConnectedDisplayNames,
-                scene,
-                TimeSpan.FromSeconds(m_RefreshIntervalSeconds),
-                TimeSpan.FromSeconds(m_RefreshIntervalSeconds));
+                m_EventQueue = scene.RequestModuleInterface<IEventQueue>();
+                if (m_EventQueue is null)
+                {
+                    m_log.Info("[DISPLAY NAMES]: Module disabled because IEventQueue was not found!");
+                    return;
+                }
+
+                scene.EventManager.OnRegisterCaps += OnRegisterCaps;
+                m_CapsRegistered = true;
+                m_RefreshTimer = new Timer(
+                    RefreshConnectedDisplayNames,
+                    scene,
+                    TimeSpan.FromSeconds(m_RefreshIntervalSeconds),
+                    TimeSpan.FromSeconds(m_RefreshIntervalSeconds));
+            }
         }
 
         public void PostInitialise() { }
 
         public void Close()
         {
+            m_Enabled = false;
             Scene scene = m_Scene;
             if (scene != null)
                 RemoveRegion(scene);
@@ -122,7 +152,11 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public string GetDisplayName(UUID avatar)
         {
-            var user = m_Scene.UserManagementModule.GetUserData(avatar);
+            Scene scene = m_Scene;
+            if (scene == null)
+                return string.Empty;
+
+            var user = scene.UserManagementModule.GetUserData(avatar);
 
             if (user is not null)
             {
@@ -140,12 +174,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             // still hold the account value cached before another simulator accepted
             // a rename, or from before the grid restarted. Refresh it before the
             // viewer starts resolving nearby avatar names and registering CAPS.
-            m_Scene.UserManagementModule.RemoveUser(client.AgentId);
+            Scene scene = m_Scene;
+            if (scene != null && client != null)
+                scene.UserManagementModule.RemoveUser(client.AgentId);
         }
 
         private void OnMakeRootAgent(ScenePresence presence)
         {
-            if (presence == null || presence.IsDeleted || presence.IsChildAgent || m_EventQueue == null)
+            Scene scene = m_Scene;
+            IEventQueue eventQueue = m_EventQueue;
+            if (scene == null || eventQueue == null || presence == null ||
+                presence.IsDeleted || presence.IsChildAgent)
                 return;
 
             // DisplayNameUpdate is a user-visible rename notification in both
@@ -160,8 +199,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             // grid value. Other residents are refreshed by normal name lookups
             // and actual rename broadcasts; rebroadcasting here would create a
             // false rename notification on every crossing.
-            m_Scene.UserManagementModule.RemoveUser(presence.UUID);
-            UserData userData = m_Scene.UserManagementModule.GetUserData(presence.UUID);
+            scene.UserManagementModule.RemoveUser(presence.UUID);
+            UserData userData = scene.UserManagementModule.GetUserData(presence.UUID);
             if (userData == null)
                 return;
 
@@ -169,7 +208,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             // Supplying the current value as old_display_name avoids claiming
             // that a rename happened during this login cache seed.
             OSD update = FormatDisplayNameUpdate(userData.ViewerDisplayName, userData, nextUpdate);
-            m_EventQueue.Enqueue(update, presence.UUID);
+            eventQueue.Enqueue(update, presence.UUID);
         }
 
         private void RefreshConnectedDisplayNames(object state)
@@ -231,7 +270,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         private void OnRegisterCaps(UUID agentID, Caps caps)
         {
-            if (m_Scene.UserManagementModule.IsLocalGridUser(agentID))
+            Scene scene = m_Scene;
+            if (scene != null && caps != null && scene.UserManagementModule.IsLocalGridUser(agentID))
             {
                 caps.RegisterSimpleHandler("SetDisplayName", new SimpleStreamHandler($"/{UUID.Random()}", (req, resp) => SetDisplayName(agentID, req, resp)));
             }
@@ -245,8 +285,16 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
             }
 
-            ScenePresence sp = m_Scene.GetScenePresence(agent_id);
-            if (sp == null || sp.IsDeleted)
+            Scene scene = m_Scene;
+            IEventQueue eventQueue = m_EventQueue;
+            if (scene == null || eventQueue == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
+                return;
+            }
+
+            ScenePresence sp = scene.GetScenePresence(agent_id);
+            if (sp == null || sp.IsDeleted || sp.IsChildAgent)
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.Gone;
                 return;
@@ -259,7 +307,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
             }
 
-            UserData userData = m_Scene.UserManagementModule.GetUserData(agent_id);
+            UserData userData = scene.UserManagementModule.GetUserData(agent_id);
             if (userData is null)
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
@@ -306,7 +354,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                     oldName, expectedOldName, userData,
                     userData.NameChanged.AddDays(7),
                     (int)HttpStatusCode.Conflict,
-                    "Display name changed; refresh and try again.");
+                    "Display name changed; refresh and try again.",
+                    eventQueue);
                 WriteSetDisplayNameAccepted(httpResponse);
                 return;
             }
@@ -323,7 +372,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 return;
             }
 
-            if (!m_Scene.UserManagementModule.SetDisplayName(agent_id, newName))
+            if (!scene.UserManagementModule.SetDisplayName(agent_id, newName))
             {
                 sp.ControllingClient.SendAlertMessage("Failed to update display name.");
                 httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -340,9 +389,9 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
             DateTime next_update = DateTime.UtcNow.AddDays(7);
             OSD update = FormatDisplayNameUpdate(oldName, userData, next_update);
-            m_Scene.ForEachRootScenePresence(
-                resident => m_EventQueue.Enqueue(update, resident.UUID));
-            SendSetDisplayNameReply(newName, oldName, userData, next_update);
+            scene.ForEachRootScenePresence(
+                resident => eventQueue.Enqueue(update, resident.UUID));
+            SendSetDisplayNameReply(newName, oldName, userData, next_update, eventQueue: eventQueue);
 
             WriteSetDisplayNameAccepted(httpResponse);
         }
@@ -402,7 +451,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public void SendSetDisplayNameReply(
             string newDisplayName, string oldDisplayName, UserData nameInfo,
             DateTime nextUpdate, int status = (int)HttpStatusCode.OK,
-            string reason = "OK")
+            string reason = "OK", IEventQueue eventQueue = null)
         {
             var content = new OSDMap();
             content["display_name"] = OSD.FromString(nameInfo.ViewerDisplayName);
@@ -422,7 +471,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             nameReply["body"] = body;
             nameReply["message"] = OSD.FromString("SetDisplayNameReply");
 
-            m_EventQueue.Enqueue((OSD)nameReply, nameInfo.Id);
+            (eventQueue ?? m_EventQueue)?.Enqueue((OSD)nameReply, nameInfo.Id);
         }
     }
 }

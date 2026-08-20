@@ -39,6 +39,8 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         private IScriptModule[] m_ScriptModules = null;
 
         protected Scene m_scene = null;
+        private readonly object m_LifecycleLock = new object();
+        private bool m_RegionRegistered = false;
 
         private bool m_Enabled = false;
 
@@ -65,11 +67,25 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void AddRegion(Scene scene)
         {
-            if (!m_Enabled)
+            if (!m_Enabled || scene == null)
                 return;
 
-            m_scene = scene;
+            lock (m_LifecycleLock)
+            {
+                if (m_scene == scene)
+                    return;
 
+                if (m_scene != null)
+                {
+                    m_log.ErrorFormat(
+                        "[EXPERIENCE]: Refusing to replace active region {0} with {1}",
+                        m_scene.RegionInfo.RegionName,
+                        scene.RegionInfo.RegionName);
+                    return;
+                }
+
+                m_scene = scene;
+            }
         }
 
         private void EventManager_OnAvatarEnteringNewParcel(ScenePresence avatar, int localLandID, UUID regionID)
@@ -79,42 +95,63 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void RemoveRegion(Scene scene)
         {
-            scene.EventManager.OnRegisterCaps -= RegisterCaps;
-            scene.EventManager.OnNewClient -= OnNewClient;
-            scene.EventManager.OnClientClosed -= OnClientClosed;
-            scene.EventManager.OnAvatarEnteringNewParcel -= EventManager_OnAvatarEnteringNewParcel;
-            scene.UnregisterModuleInterface<IExperienceModule>(this);
+            if (scene == null)
+                return;
+
+            bool wasRegistered;
+            lock (m_LifecycleLock)
+            {
+                if (m_scene != scene)
+                    return;
+
+                wasRegistered = m_RegionRegistered;
+                m_RegionRegistered = false;
+                m_ExperienceService = null;
+                m_ScriptModules = null;
+                m_scene = null;
+            }
+
+            if (wasRegistered)
+            {
+                scene.EventManager.OnRegisterCaps -= RegisterCaps;
+                scene.EventManager.OnNewClient -= OnNewClient;
+                scene.EventManager.OnClientClosed -= OnClientClosed;
+                scene.EventManager.OnAvatarEnteringNewParcel -= EventManager_OnAvatarEnteringNewParcel;
+                scene.UnregisterModuleInterface<IExperienceModule>(this);
+            }
+
             lock (m_ExperiencePermissionsLock)
                 m_ExperiencePermissions.Clear();
-            m_ExperienceService = null;
-            m_ScriptModules = null;
-            m_scene = null;
         }
 
         public void RegionLoaded(Scene scene)
         {
-            if (!m_Enabled)
-                return;
-
-            m_ExperienceService = scene.RequestModuleInterface<IExperienceService>();
-            if (m_ExperienceService == null)
+            lock (m_LifecycleLock)
             {
-                m_log.ErrorFormat(
-                    "[EXPERIENCE]: Enabled=true in region {0}, but IExperienceService was not registered. " +
-                    "Load the matching LocalExperienceServicesConnector or RemoteExperienceServicesConnector " +
-                    "and its [ExperienceService] configuration; viewer Experience CAPS and tabs are unavailable.",
-                    scene.RegionInfo.RegionName);
-                return;
+                if (!m_Enabled || scene == null || m_scene != scene || m_RegionRegistered)
+                    return;
+
+                m_ExperienceService = scene.RequestModuleInterface<IExperienceService>();
+                if (m_ExperienceService == null)
+                {
+                    m_log.ErrorFormat(
+                        "[EXPERIENCE]: Enabled=true in region {0}, but IExperienceService was not registered. " +
+                        "Load the matching LocalExperienceServicesConnector or RemoteExperienceServicesConnector " +
+                        "and its [ExperienceService] configuration; viewer Experience CAPS and tabs are unavailable.",
+                        scene.RegionInfo.RegionName);
+                    return;
+                }
+
+                m_ScriptModules = scene.RequestModuleInterfaces<IScriptModule>();
+
+                scene.RegisterModuleInterface<IExperienceModule>(this);
+
+                scene.EventManager.OnRegisterCaps += RegisterCaps;
+                scene.EventManager.OnNewClient += OnNewClient;
+                scene.EventManager.OnClientClosed += OnClientClosed;
+                scene.EventManager.OnAvatarEnteringNewParcel += EventManager_OnAvatarEnteringNewParcel;
+                m_RegionRegistered = true;
             }
-
-            m_ScriptModules = scene.RequestModuleInterfaces<IScriptModule>();
-
-            scene.RegisterModuleInterface<IExperienceModule>(this);
-
-            scene.EventManager.OnRegisterCaps += RegisterCaps;
-            scene.EventManager.OnNewClient += OnNewClient;
-            scene.EventManager.OnClientClosed += OnClientClosed;
-            scene.EventManager.OnAvatarEnteringNewParcel += EventManager_OnAvatarEnteringNewParcel;
         }
 
         private void OnNewClient(IClientAPI client)
@@ -152,7 +189,12 @@ namespace OpenSim.Region.ClientStack.LindenCaps
 
         public void Close()
         {
-            Scene scene = m_scene;
+            Scene scene;
+            lock (m_LifecycleLock)
+            {
+                m_Enabled = false;
+                scene = m_scene;
+            }
             if (scene != null)
                 RemoveRegion(scene);
         }
