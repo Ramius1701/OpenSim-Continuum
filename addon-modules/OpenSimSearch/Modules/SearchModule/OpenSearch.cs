@@ -55,7 +55,17 @@ namespace OpenSimSearch.Modules.OpenSearch
                 m_Enabled = false;
                 return;
             }
-            if (searchConfig.GetString("Module", "OpenSimSearch") != "OpenSimSearch")
+
+            // OpenSim chooses ISearchModule implementations in [Modules].
+            // Older OpenSimSearch deployments used [Search] Module instead,
+            // so retain that only as a fallback when no standard selection is
+            // present. This prevents BasicSearch and OpenSimSearch from both
+            // subscribing the same viewer directory requests.
+            IConfig modulesConfig = config.Configs["Modules"];
+            string selectedModule = modulesConfig?.GetString("SearchModule", string.Empty)?.Trim();
+            if (string.IsNullOrEmpty(selectedModule))
+                selectedModule = searchConfig.GetString("Module", "OpenSimSearch").Trim();
+            if (!string.Equals(selectedModule, "OpenSimSearch", StringComparison.OrdinalIgnoreCase))
             {
                 m_Enabled = false;
                 return;
