@@ -20539,14 +20539,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     lock (m_scriptExperienceAnswerLock)
                     {
                         if (m_waitingForScriptExperienceAnswer)
-                        {
-                            m_ScriptEngine.PostScriptEvent(m_item.ItemID, new EventParams(
-                                "experience_permissions_denied", new Object[] {
-                                new LSL_Key(agentID.ToString()),
-                                new LSL_Integer(ScriptBaseClass.XP_ERROR_THROTTLED)},
-                                Array.Empty<DetectParams>()));
-                            return;
-                        }
+                            ClearScriptExperienceAnswerWait();
 
                         presence.ControllingClient.OnScriptAnswer += handleScriptExperienceAnswer;
                         presence.ControllingClient.OnConnectionClosed += handleScriptExperienceConnectionClosed;
