@@ -1,10 +1,10 @@
 # OpenSim Continuum integration progress
 
-Last updated: 2026-08-09
+Last updated: 2026-08-20
 
-Branch: protected `master`; active hardening branch `agent/complete-runtime-readiness`
+Branch: protected `master`; active integration branch `development`
 
-OpenSim upstream synchronized through `a87969840ce2abde50309229347fe7257456e62e`
+OpenSim upstream synchronized through `58b7b39db676a166c68d47256f50588cdf330630`
 
 This ledger distinguishes code completion from runtime certification. A feature
 is not production-approved merely because it compiles or passes an isolated
@@ -14,7 +14,9 @@ grid gate here and in `donor-feature-test-handoff.md` passes.
 The four baseline CS9193 warnings were removed by passing local quaternion
 variables with the explicit `in` modifier to the `ref readonly` conjugation API
 without changing calculations.
-The complete Release build is now expected to be warning-free.
+The complete Release build passed on 2026-08-20 with zero warnings and zero
+errors after reconciling the Experience KVP implementation signatures with the
+generated OpenSim script API contract.
 
 ## Current checkpoint
 
