@@ -1603,7 +1603,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
         {
-            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1644,7 +1644,7 @@ namespace OpenSim.Modules.Currency
                 paramTable["description"] = description;
 
                 // Generate the request for transfer.
-                Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "TransferMoney");
+                Hashtable resultTable = SendAuthenticatedRequest(paramTable, "TransferMoney", senderClient);
 
                 // Handle the return values from Money Server.
                 if (resultTable != null && resultTable.Contains("success"))
@@ -1674,7 +1674,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID, ulong regionHandle, UUID regionUUID, string description)
         {
-            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1726,7 +1726,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool SendMoneyTo(UUID avatarID, int amount, int type, string secretCode)
         {
-            if (avatarID == UUID.Zero || amount < 0)
+            if (avatarID == UUID.Zero || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1772,7 +1772,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool MoveMoneyFromTo(UUID senderID, UUID receiverID, int amount, string secretCode)
         {
-            if (senderID == UUID.Zero || receiverID == UUID.Zero || senderID == receiverID || amount < 0)
+            if (senderID == UUID.Zero || receiverID == UUID.Zero || senderID == receiverID || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1818,7 +1818,7 @@ namespace OpenSim.Modules.Currency
         /// </returns>
         private bool AddBankerMoney(UUID bankerID, int amount, ulong regionHandle, UUID regionUUID)
         {
-            if (bankerID == UUID.Zero || amount < 0)
+            if (bankerID == UUID.Zero || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1875,6 +1875,8 @@ namespace OpenSim.Modules.Currency
         {
             if (sender == UUID.Zero || amount < 0)
                 return false;
+            if (amount == 0)
+                return true;
 
             bool ret = false;
             IClientAPI senderClient = GetLocateClient(sender);
@@ -1907,7 +1909,7 @@ namespace OpenSim.Modules.Currency
                 paramTable["description"] = description;
 
                 // Generate the request for transfer.
-                Hashtable resultTable = genericCurrencyXMLRPCRequest(paramTable, "PayMoneyCharge");
+                Hashtable resultTable = SendAuthenticatedRequest(paramTable, "PayMoneyCharge", senderClient);
 
                 // Handle the return values from Money Server.
                 if (resultTable != null && resultTable.Contains("success"))
@@ -1960,6 +1962,21 @@ namespace OpenSim.Modules.Currency
                             succeeded = true;
                             m_log.InfoFormat("[MONEY MODULE]: QueryBalanceFromMoneyServer: Balance {0}", balance);
                         }
+                        else if (IsInvalidSessionResponse(resultTable))
+                        {
+                            Scene scene = GetLocateScene(client.AgentId);
+                            ScenePresence presence = scene?.GetScenePresence(client.AgentId);
+                            if (presence != null && !presence.IsChildAgent &&
+                                presence.ControllingClient?.SessionId == client.SessionId &&
+                                LoginMoneyServer(presence, out int recoveredBalance))
+                            {
+                                balance = recoveredBalance;
+                                succeeded = true;
+                                m_log.InfoFormat(
+                                    "[MONEY MODULE]: Restored MoneyServer session for {0}",
+                                    client.AgentId);
+                            }
+                        }
                     }
                 }
                 else
@@ -1974,6 +1991,50 @@ namespace OpenSim.Modules.Currency
             }
 
             return balance;
+        }
+
+        private static bool IsInvalidSessionResponse(Hashtable response)
+        {
+            if (response == null)
+                return false;
+
+            string message = null;
+            foreach (string key in new[] { "message", "errorMessage", "description" })
+            {
+                if (response.ContainsKey(key) && response[key] != null)
+                {
+                    message = response[key].ToString();
+                    if (!String.IsNullOrEmpty(message))
+                        break;
+                }
+            }
+
+            return !String.IsNullOrEmpty(message) &&
+                message.IndexOf("session", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                (message.IndexOf("invalid", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 message.IndexOf("failure", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 message.IndexOf("re-login", StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        private Hashtable SendAuthenticatedRequest(
+            Hashtable parameters, string method, IClientAPI client)
+        {
+            Hashtable result = genericCurrencyXMLRPCRequest(parameters, method);
+            if (!IsInvalidSessionResponse(result) || client == null)
+                return result;
+
+            Scene scene = GetLocateScene(client.AgentId);
+            ScenePresence presence = scene?.GetScenePresence(client.AgentId);
+            if (presence == null || presence.IsChildAgent ||
+                presence.ControllingClient?.SessionId != client.SessionId ||
+                !LoginMoneyServer(presence, out _))
+                return result;
+
+            m_log.InfoFormat(
+                "[MONEY MODULE]: {0}: restored MoneyServer session for {1} and is retrying once",
+                method,
+                client.AgentId);
+            return genericCurrencyXMLRPCRequest(parameters, method);
         }
 
 

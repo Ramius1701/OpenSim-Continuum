@@ -1636,7 +1636,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         private bool TransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID,
             ulong regionHandle, UUID regionUUID, string description, UUID transactionID = default)
         {
-            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1750,7 +1750,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         private bool ForceTransferMoney(UUID sender, UUID receiver, int amount, int type, UUID objectID,
             ulong regionHandle, UUID regionUUID, string description, UUID transactionID = default)
         {
-            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount < 0)
+            if (sender == UUID.Zero || receiver == UUID.Zero || sender == receiver || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1806,7 +1806,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool SendMoneyTo(UUID avatarID, int amount, int type, string secretCode)
         {
-            if (avatarID == UUID.Zero || amount < 0)
+            if (avatarID == UUID.Zero || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1867,7 +1867,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool MoveMoneyFromTo(UUID senderID, UUID receiverID, int amount, string secretCode)
         {
-            if (senderID == UUID.Zero || receiverID == UUID.Zero || senderID == receiverID || amount < 0)
+            if (senderID == UUID.Zero || receiverID == UUID.Zero || senderID == receiverID || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1915,7 +1915,7 @@ namespace OpenSim.Modules.ContinuumEconomy
         /// </returns>
         private bool AddBankerMoney(UUID bankerID, int amount, ulong regionHandle, UUID regionUUID)
         {
-            if (bankerID == UUID.Zero || amount < 0)
+            if (bankerID == UUID.Zero || amount <= 0)
                 return false;
 
             bool ret = false;
@@ -1972,6 +1972,8 @@ namespace OpenSim.Modules.ContinuumEconomy
         {
             if (sender == UUID.Zero || amount < 0)
                 return false;
+            if (amount == 0)
+                return true;
 
             bool ret = false;
             IClientAPI senderClient = GetLocateClient(sender);
