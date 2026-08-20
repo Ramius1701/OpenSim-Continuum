@@ -18,6 +18,7 @@ namespace OpenSim.Services.AbuseReportsService
         private readonly int m_MaxScreenshotBytes;
         private readonly int m_MaxSummaryBytes;
         private readonly int m_MaxDetailsBytes;
+        private const int MaxModeratorNotesBytes = 16 * 1024;
 
         public AbuseReportsService(IConfigSource config)
             : base(config)
@@ -30,7 +31,7 @@ namespace OpenSim.Services.AbuseReportsService
             m_MaxSummaryBytes = Math.Clamp(
                 serviceConfig?.GetInt("MaxSummaryBytes", 4096) ?? 4096,
                 256,
-                64 * 1024);
+                65535);
             m_MaxDetailsBytes = Math.Clamp(
                 serviceConfig?.GetInt("MaxDetailsBytes", 65536) ?? 65536,
                 1024,
@@ -146,7 +147,7 @@ namespace OpenSim.Services.AbuseReportsService
                 return false;
 
             notes = (notes ?? string.Empty).Trim();
-            if (notes.Length > 16384)
+            if (Encoding.UTF8.GetByteCount(notes) > MaxModeratorNotesBytes)
                 return false;
             moderatorName = string.IsNullOrWhiteSpace(moderatorName)
                 ? "Console"
@@ -192,7 +193,7 @@ namespace OpenSim.Services.AbuseReportsService
             string candidate = (status ?? string.Empty).Trim().ToLowerInvariant().Replace('_', '-').Replace(' ', '-');
             switch (candidate)
             {
-                case "":
+                case "" when allowAll:
                 case "all" when allowAll:
                     return true;
                 case "open":
