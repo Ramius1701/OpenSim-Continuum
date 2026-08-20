@@ -80,7 +80,9 @@ namespace OpenSim.Data.MySQL
                     cmd.Parameters.AddWithValue("?avatar", agent_id.ToString());
                     cmd.Parameters.AddWithValue("?experience", experience_id.ToString());
 
-                    return (cmd.ExecuteNonQuery() > 0);
+                    // Removing a preference is idempotent.  A missing row is
+                    // already the state requested by the viewer.
+                    return (cmd.ExecuteNonQuery() >= 0);
                 }
             }
         }

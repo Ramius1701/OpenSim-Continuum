@@ -40,8 +40,11 @@ namespace OpenSim.Data
         }
 
         public bool ForgetExperiencePermissions(UUID agentID, UUID experienceID) =>
+            // DELETE is intentionally idempotent.  The viewer can discard a
+            // preference after another simulator or session already removed
+            // it; zero affected rows still means the requested state exists.
             Execute("DELETE FROM experience_permissions WHERE avatar=@avatar AND experience=@experience",
-                ("@avatar", agentID.ToString()), ("@experience", experienceID.ToString())) > 0;
+                ("@avatar", agentID.ToString()), ("@experience", experienceID.ToString())) >= 0;
 
         public bool SetExperiencePermissions(UUID agentID, UUID experienceID, bool allow) =>
             Execute("INSERT INTO experience_permissions (experience, avatar, allow) " +
