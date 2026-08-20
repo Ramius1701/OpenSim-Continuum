@@ -30,6 +30,7 @@ using Mono.Addins;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
+using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -154,7 +155,10 @@ namespace OpenSim.Modules.Currency
         private int PriceLand = 0;
         private int PriceCurrency = 0;
 
-        private bool m_rpcHandlersRegistered;
+        private IHttpServer m_rpcHandlerServer;
+        private XmlRpcMethod m_onMoneyTransferredHandler;
+        private XmlRpcMethod m_balanceUpdateHandler;
+        private XmlRpcMethod m_userAlertHandler;
 
         /// <summary>
         /// Initializes the specified scene.
@@ -339,19 +343,33 @@ namespace OpenSim.Modules.Currency
                     return;
                 }
 
-                scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
-
                 if (m_sceneList.Count == 0)
                 {
                     if (m_enable_server)
                     {
-                        MainServer.Instance.AddXmlRPCHandler("OnMoneyTransfered", OnMoneyTransferedHandler);
-                        MainServer.Instance.AddXmlRPCHandler("UpdateBalance", BalanceUpdateHandler);
-                        MainServer.Instance.AddXmlRPCHandler("UserAlert", UserAlertHandler);
-                        m_rpcHandlersRegistered = true;
+                        m_rpcHandlerServer = MainServer.Instance;
+                        m_onMoneyTransferredHandler = OnMoneyTransferedHandler;
+                        m_balanceUpdateHandler = BalanceUpdateHandler;
+                        m_userAlertHandler = UserAlertHandler;
+
+                        bool transferAdded = m_rpcHandlerServer.TryAddXmlRPCHandler(
+                            "OnMoneyTransfered", m_onMoneyTransferredHandler);
+                        bool balanceAdded = transferAdded && m_rpcHandlerServer.TryAddXmlRPCHandler(
+                            "UpdateBalance", m_balanceUpdateHandler);
+                        bool alertAdded = balanceAdded && m_rpcHandlerServer.TryAddXmlRPCHandler(
+                            "UserAlert", m_userAlertHandler);
+
+                        if (!alertAdded)
+                        {
+                            RemoveMoneyServerCallbacks();
+                            throw new InvalidOperationException(
+                                "One or more MoneyServer callback names are already owned by another module.");
+                        }
 
                     }
                 }
+
+                scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
 
                 m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
 
@@ -497,13 +515,21 @@ namespace OpenSim.Modules.Currency
 
         private void RemoveMoneyServerCallbacks()
         {
-            if (m_rpcHandlersRegistered)
+            IHttpServer server = m_rpcHandlerServer;
+            if (server != null)
             {
-                MainServer.Instance.RemoveXmlRPCHandler("OnMoneyTransfered");
-                MainServer.Instance.RemoveXmlRPCHandler("UpdateBalance");
-                MainServer.Instance.RemoveXmlRPCHandler("UserAlert");
-                m_rpcHandlersRegistered = false;
+                if (m_onMoneyTransferredHandler != null)
+                    server.TryRemoveXmlRPCHandler("OnMoneyTransfered", m_onMoneyTransferredHandler);
+                if (m_balanceUpdateHandler != null)
+                    server.TryRemoveXmlRPCHandler("UpdateBalance", m_balanceUpdateHandler);
+                if (m_userAlertHandler != null)
+                    server.TryRemoveXmlRPCHandler("UserAlert", m_userAlertHandler);
             }
+
+            m_onMoneyTransferredHandler = null;
+            m_balanceUpdateHandler = null;
+            m_userAlertHandler = null;
+            m_rpcHandlerServer = null;
         }
 
         /// <summary>Objects the give money.</summary>

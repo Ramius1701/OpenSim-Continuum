@@ -5,11 +5,14 @@
     ; Leave false unless simulator-side SendMoney/AddBankerMoney is required.
     AllowRegionCredits = false
     CurrencyPurchaseEnabled = true
-    DailyPurchaseLimit = 100
-    WeeklyPurchaseLimit = 250
-    MonthlyPurchaseLimit = 500
+    ; Zero disables a period limit. MaximumBalance remains the final cap.
+    DailyPurchaseLimit = 0
+    WeeklyPurchaseLimit = 0
+    MonthlyPurchaseLimit = 0
     MaximumBalance = 10000
-    EstimatedCostPerUnit = 0.01
+    ; Viewer XML-RPC quotes use this major-currency-unit price per token. Keep
+    ; zero unless an external payment workflow actually collects that amount.
+    EstimatedCostPerUnit = 0
     SystemActorID = 11111111-1111-1111-1111-111111111111
     ; Generate a unique random value of at least 32 characters and use the same
     ; value in the simulator [Economy] section. Do not publish the real secret.

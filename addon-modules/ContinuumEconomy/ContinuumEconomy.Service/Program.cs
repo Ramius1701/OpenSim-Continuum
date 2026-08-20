@@ -74,7 +74,7 @@ namespace ContinuumEconomy.Service
             m_weeklyPurchaseLimit = Math.Max(0, config.GetLong("WeeklyPurchaseLimit", 0));
             m_monthlyPurchaseLimit = Math.Max(0, config.GetLong("MonthlyPurchaseLimit", 0));
             m_maximumBalance = Math.Max(0, config.GetLong("MaximumBalance", 0));
-            m_estimatedCostPerUnit = Math.Max(0, config.GetDouble("EstimatedCostPerUnit", 0.01));
+            m_estimatedCostPerUnit = Math.Max(0, config.GetDouble("EstimatedCostPerUnit", 0));
             if (m_sharedSecret.Length < 32 ||
                 m_sharedSecret.StartsWith("CHANGE-THIS", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("RegionSharedSecret must be a unique secret containing at least 32 characters");
@@ -192,8 +192,14 @@ namespace ContinuumEconomy.Service
             Hashtable p = Parameters(request);
             if (!CurrencyRequest(p, out Guid agent, out long amount, out string error))
                 return Failure(error);
+            double rawEstimatedCost = amount * m_estimatedCostPerUnit * 100d;
+            int estimatedCost = rawEstimatedCost >= Int32.MaxValue
+                ? Int32.MaxValue
+                : (int)Math.Round(rawEstimatedCost, MidpointRounding.AwayFromZero);
             return Reply(new Hashtable { { "success", true }, { "currency", new Hashtable
-                { { "estimatedCost", amount * m_estimatedCostPerUnit }, { "currencyBuy", ViewerBalance(amount) } } },
+                // Firestorm requires an integer number of US cents here. The
+                // configuration value remains major currency units per token.
+                { { "estimatedCost", estimatedCost }, { "currencyBuy", ViewerBalance(amount) } } },
                 { "confirm", Guid.NewGuid().ToString() }, { "agentId", agent.ToString() } });
         }
 
@@ -214,9 +220,15 @@ namespace ContinuumEconomy.Service
                 DailyCreditLimit = m_dailyPurchaseLimit, WeeklyCreditLimit = m_weeklyPurchaseLimit,
                 MonthlyCreditLimit = m_monthlyPurchaseLimit
             });
-            return Reply(new Hashtable { { "success", result.Succeeded }, { "result", result.Code.ToString() },
+            Hashtable response = new Hashtable { { "success", result.Succeeded }, { "result", result.Code.ToString() },
                 { "message", result.Message }, { "transactionID", operation.ToString() },
-                { "clientBalance", ViewerBalance(result.Balance) } });
+                { "clientBalance", ViewerBalance(result.Balance) } };
+            if (!result.Succeeded)
+            {
+                response["errorMessage"] = result.Message;
+                response["errorURI"] = String.Empty;
+            }
+            return Reply(response);
         }
 
         private bool CurrencyRequest(Hashtable p, out Guid agent, out long amount, out string error)
@@ -232,7 +244,7 @@ namespace ContinuumEconomy.Service
             if (!Guid.TryParse(agentText, out agent) || agent == Guid.Empty ||
                 !Guid.TryParse(secureText, out Guid secure) || !HasSecureSession(agent, secure) ||
                 !Int64.TryParse(amountText, NumberStyles.Integer,
-                    CultureInfo.InvariantCulture, out amount) || amount <= 0)
+                    CultureInfo.InvariantCulture, out amount) || amount <= 0 || amount > Int32.MaxValue)
             { error = "The currency request could not be authenticated or has an invalid amount"; return false; }
             error = String.Empty;
             return true;

@@ -436,6 +436,40 @@ namespace OpenSim.Framework.Servers.HttpServer
             return true;
         }
 
+        public bool TryAddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive = true)
+        {
+            if (string.IsNullOrWhiteSpace(method) || handler == null)
+                return false;
+
+            lock (m_rpcHandlers)
+            {
+                if (!m_rpcHandlers.TryAdd(method, handler))
+                    return false;
+
+                m_rpcHandlersKeepAlive[method] = keepAlive;
+                return true;
+            }
+        }
+
+        public bool TryRemoveXmlRPCHandler(string method, XmlRpcMethod handler)
+        {
+            if (string.IsNullOrWhiteSpace(method) || handler == null)
+                return false;
+
+            lock (m_rpcHandlers)
+            {
+                if (!m_rpcHandlers.TryGetValue(method, out XmlRpcMethod registered) ||
+                    !registered.Equals(handler))
+                {
+                    return false;
+                }
+
+                m_rpcHandlers.Remove(method);
+                m_rpcHandlersKeepAlive.Remove(method);
+                return true;
+            }
+        }
+
         public XmlRpcMethod GetXmlRPCHandler(string method)
         {
             lock (m_rpcHandlers)
@@ -2173,7 +2207,10 @@ namespace OpenSim.Framework.Servers.HttpServer
         public void RemoveXmlRPCHandler(string method)
         {
             lock (m_rpcHandlers)
+            {
                 m_rpcHandlers.Remove(method);
+                m_rpcHandlersKeepAlive.Remove(method);
+            }
         }
 
         public void RemoveJsonRPCHandler(string method)

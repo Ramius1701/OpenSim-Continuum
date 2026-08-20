@@ -674,6 +674,9 @@ namespace OpenSim.Grid.MoneyServer
             if (httpRequest == null || httpResponse == null)
                 return;
 
+            httpResponse.StatusCode = 200;
+            httpResponse.ContentType = "text/xml";
+
             try
             {
                 string requestBody = ReadBoundedRequestBody(httpRequest);
@@ -986,13 +989,15 @@ namespace OpenSim.Grid.MoneyServer
                 "[PERFORM GET CURRENCY QUOTE]: Generating currency quote for AgentId: {0}",
                 agentId);
 
-            const double estimatedCostPerUnit = 0.01d;
             return new Hashtable
             {
                 { "success", true },
                 { "currency", new Hashtable
                     {
-                        { "estimatedCost", currencyBuy * estimatedCostPerUnit },
+                        // Firestorm interprets this as an integer number of US
+                        // cents. Compatibility MoneyServer takes no real-world
+                        // payment, matching the official OpenSim sample quote.
+                        { "estimatedCost", 0 },
                         { "currencyBuy", currencyBuy }
                     }
                 },
@@ -1034,7 +1039,9 @@ namespace OpenSim.Grid.MoneyServer
             Hashtable responseData = new Hashtable
             {
                 { "success", false },
-                { "message", "Currency quote failed." }
+                { "message", "Currency quote failed." },
+                { "errorMessage", "Currency quote failed." },
+                { "errorURI", string.Empty }
             };
 
             try
@@ -1042,7 +1049,7 @@ namespace OpenSim.Grid.MoneyServer
                 if (request == null || request.Params == null || request.Params.Count == 0 ||
                     request.Params[0] is not Hashtable requestData)
                 {
-                    responseData["message"] = "Invalid currency quote request.";
+                    SetCurrencyError(responseData, "Invalid currency quote request.");
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1055,7 +1062,7 @@ namespace OpenSim.Grid.MoneyServer
                 string accessMessage;
                 if (!ValidateCurrencyPurchaseAccess(agentId, amount, out accessMessage))
                 {
-                    responseData["message"] = accessMessage;
+                    SetCurrencyError(responseData, accessMessage);
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1064,7 +1071,7 @@ namespace OpenSim.Grid.MoneyServer
                 string sessionMessage;
                 if (!ValidateCurrencySession(agentId, secureSessionId, out sessionMessage))
                 {
-                    responseData["message"] = sessionMessage;
+                    SetCurrencyError(responseData, sessionMessage);
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1076,8 +1083,7 @@ namespace OpenSim.Grid.MoneyServer
             catch (Exception ex)
             {
                 m_log.ErrorFormat("[GET CURRENCY QUOTE]: Error processing currency quote: {0}", ex);
-                responseData["success"] = false;
-                responseData["message"] = "The currency quote could not be generated.";
+                SetCurrencyError(responseData, "The currency quote could not be generated.");
                 return new XmlRpcResponse { Value = responseData };
             }
         }
@@ -1086,21 +1092,23 @@ namespace OpenSim.Grid.MoneyServer
             Hashtable responseData = new Hashtable
             {
                 { "success", false },
-                { "message", "Currency purchase failed." }
+                { "message", "Currency purchase failed." },
+                { "errorMessage", "Currency purchase failed." },
+                { "errorURI", string.Empty }
             };
 
             try
             {
                 if (request == null || request.Params == null || request.Params.Count == 0)
                 {
-                    responseData["message"] = "Invalid currency purchase request.";
+                    SetCurrencyError(responseData, "Invalid currency purchase request.");
                     return new XmlRpcResponse { Value = responseData };
                 }
 
                 Hashtable requestData = request.Params[0] as Hashtable;
                 if (requestData == null)
                 {
-                    responseData["message"] = "Invalid currency purchase request.";
+                    SetCurrencyError(responseData, "Invalid currency purchase request.");
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1113,7 +1121,7 @@ namespace OpenSim.Grid.MoneyServer
                 string accessMessage;
                 if (!ValidateCurrencyPurchaseAccess(agentId, amount, out accessMessage))
                 {
-                    responseData["message"] = accessMessage;
+                    SetCurrencyError(responseData, accessMessage);
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1122,7 +1130,7 @@ namespace OpenSim.Grid.MoneyServer
                 string sessionMessage;
                 if (!ValidateCurrencySession(agentId, secureSessionId, out sessionMessage))
                 {
-                    responseData["message"] = sessionMessage;
+                    SetCurrencyError(responseData, sessionMessage);
                     return new XmlRpcResponse { Value = responseData };
                 }
 
@@ -1143,6 +1151,8 @@ namespace OpenSim.Grid.MoneyServer
 
                 responseData["success"] = purchaseSucceeded;
                 responseData["message"] = purchaseMessage;
+                responseData["errorMessage"] = purchaseSucceeded ? string.Empty : purchaseMessage;
+                responseData["errorURI"] = string.Empty;
                 responseData["transactionID"] = transactionID.ToString();
 
                 if (purchaseSucceeded)
@@ -1153,8 +1163,7 @@ namespace OpenSim.Grid.MoneyServer
             catch (Exception ex)
             {
                 m_log.ErrorFormat("[BUY CURRENCY]: Error processing currency purchase: {0}", ex);
-                responseData["success"] = false;
-                responseData["message"] = "The currency purchase could not be completed.";
+                SetCurrencyError(responseData, "The currency purchase could not be completed.");
             }
 
             return new XmlRpcResponse { Value = responseData };
@@ -1264,6 +1273,16 @@ namespace OpenSim.Grid.MoneyServer
             return values[key].ToString();
         }
 
+        private static void SetCurrencyError(Hashtable response, string message)
+        {
+            string safeMessage = message ?? string.Empty;
+            response["success"] = false;
+            response["message"] = safeMessage;
+            // Firestorm's LLCurrencyUIManager reads these legacy XML-RPC keys.
+            response["errorMessage"] = safeMessage;
+            response["errorURI"] = string.Empty;
+        }
+
         private static string ReadBoundedRequestBody(IOSHttpRequest request)
         {
             if (request == null || request.InputStream == null)
@@ -1325,7 +1344,9 @@ namespace OpenSim.Grid.MoneyServer
             Hashtable responseData = new Hashtable
             {
                 { "success", success },
-                { "message", message ?? string.Empty }
+                { "message", message ?? string.Empty },
+                { "errorMessage", success ? string.Empty : message ?? string.Empty },
+                { "errorURI", string.Empty }
             };
 
             if (!string.IsNullOrWhiteSpace(transactionID))
@@ -1333,6 +1354,7 @@ namespace OpenSim.Grid.MoneyServer
 
             XmlRpcResponse xmlResponse = new XmlRpcResponse { Value = responseData };
             httpResponse.StatusCode = 200;
+            httpResponse.ContentType = "text/xml";
             httpResponse.RawBuffer = Encoding.UTF8.GetBytes(xmlResponse.ToString());
         }
 

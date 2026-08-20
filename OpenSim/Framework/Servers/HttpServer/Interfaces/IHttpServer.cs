@@ -83,6 +83,8 @@ namespace OpenSim.Framework.Servers.HttpServer
 
         bool AddXmlRPCHandler(string method, XmlRpcMethod handler);
         bool AddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive);
+        bool TryAddXmlRPCHandler(string method, XmlRpcMethod handler, bool keepAlive = true);
+        bool TryRemoveXmlRPCHandler(string method, XmlRpcMethod handler);
 
         bool AddJsonRPCHandler(string method, JsonRPCMethod handler);
 
