@@ -53,20 +53,10 @@ namespace OpenSim.Groups
         public GroupsServiceRobustConnector(IConfigSource config, IHttpServer server, string configName) :
             base(config, server, configName)
         {
-            string key = string.Empty;
             if (configName != String.Empty)
                 m_ConfigName = configName;
 
             m_log.DebugFormat("[Groups.RobustConnector]: Starting with config name {0}", m_ConfigName);
-
-            IConfig groupsConfig = config.Configs[m_ConfigName];
-            if (groupsConfig != null)
-            {
-                key = groupsConfig.GetString("SecretKey", string.Empty);
-                m_log.DebugFormat("[Groups.RobustConnector]: Starting with secret key {0}", key);
-            }
-//            else
-//                m_log.DebugFormat("[Groups.RobustConnector]: Unable to find {0} section in configuration", m_ConfigName);
 
             m_GroupsService = new GroupsService(config);
 
@@ -78,6 +68,7 @@ namespace OpenSim.Groups
 
     public class GroupsServicePostHandler : BaseStreamHandler
     {
+        private const int MaxRequestBodyBytes = 1024 * 1024;
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private GroupsService m_GroupsService;
@@ -92,10 +83,16 @@ namespace OpenSim.Groups
                 IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
         {
             string body;
-            using(StreamReader sr = new StreamReader(requestData))
-                body = sr.ReadToEnd();
-
-            body = body.Trim();
+            try
+            {
+                body = ReadBoundedBody(requestData, httpRequest).Trim();
+            }
+            catch (InvalidDataException e)
+            {
+                m_log.WarnFormat("[GROUPS HANDLER]: Rejected request: {0}", e.Message);
+                httpResponse.StatusCode = 413;
+                return FailureResult("Request body too large");
+            }
 
             //m_log.DebugFormat("[XXX]: query String: {0}", body);
 
@@ -833,6 +830,27 @@ namespace OpenSim.Groups
 
 
         #region Helpers
+
+        private static string ReadBoundedBody(Stream input, IOSHttpRequest request)
+        {
+            if (input == null)
+                throw new InvalidDataException("Request body is unavailable.");
+            if (request != null && request.ContentLength64 > MaxRequestBodyBytes)
+                throw new InvalidDataException("Request body exceeds the service limit.");
+
+            using MemoryStream body = new MemoryStream();
+            byte[] buffer = new byte[8192];
+            int total = 0;
+            int read;
+            while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                total += read;
+                if (total > MaxRequestBodyBytes)
+                    throw new InvalidDataException("Request body exceeds the service limit.");
+                body.Write(buffer, 0, read);
+            }
+            return Encoding.UTF8.GetString(body.ToArray());
+        }
 
         private void NullResult(Dictionary<string, object> result, string reason)
         {

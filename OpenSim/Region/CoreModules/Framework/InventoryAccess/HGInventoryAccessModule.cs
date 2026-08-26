@@ -92,7 +92,9 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
                     IConfig thisModuleConfig = source.Configs["HGInventoryAccessModule"];
                     if (thisModuleConfig != null)
                     {
-                        m_OutboundPermission = thisModuleConfig.GetBoolean("OutboundPermission", true);
+                        // Hypergrid export is opt-in.  A missing setting must not
+                        // silently permit residents' assets to leave the grid.
+                        m_OutboundPermission = thisModuleConfig.GetBoolean("OutboundPermission", false);
                         m_RestrictInventoryAccessAbroad = thisModuleConfig.GetBoolean("RestrictInventoryAccessAbroad", true);
                         m_CheckSeparateAssets = thisModuleConfig.GetBoolean("CheckSeparateAssets", false);
                         m_LocalAssetsURL = thisModuleConfig.GetString("RegionHGAssetServerURI", string.Empty);
@@ -380,7 +382,11 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess
             if (isForeignSender && senderAssetServer != string.Empty)
                 m_assMapper.Get(item.AssetID, sender, senderAssetServer);
 
-            if (isForeignReceiver && receiverAssetServer != string.Empty && m_OutboundPermission)
+            bool itemExportAllowed =
+                (item.CurrentPermissions &
+                    (uint)OpenSim.Framework.PermissionMask.Export) != 0;
+            if (isForeignReceiver && receiverAssetServer != string.Empty &&
+                m_OutboundPermission && itemExportAllowed)
                 m_assMapper.Post(item.AssetID, receiver, receiverAssetServer);
         }
 

@@ -624,7 +624,12 @@ namespace OpenSim.Groups
 
         public ExtendedGroupMembershipData SetAgentActiveGroup(string RequestingAgentID, string AgentID, UUID GroupID)
         {
-            // TODO: check perms
+            if (!String.Equals(RequestingAgentID, AgentID, StringComparison.Ordinal) ||
+                (!GroupID.IsZero() && m_Database.RetrieveMember(GroupID, AgentID) == null))
+            {
+                return null;
+            }
+
             PrincipalData principal = new PrincipalData();
             principal.PrincipalID = AgentID;
             principal.ActiveGroupID = GroupID;
@@ -719,9 +724,18 @@ namespace OpenSim.Groups
 
         public void SetAgentActiveGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
         {
+            if (!String.Equals(RequestingAgentID, AgentID, StringComparison.Ordinal))
+                return;
+
             MembershipData data = m_Database.RetrieveMember(GroupID, AgentID);
             if (data == null)
                 return;
+
+            if (!RoleID.IsZero() &&
+                m_Database.RetrieveRoleMember(GroupID, RoleID, AgentID) == null)
+            {
+                return;
+            }
 
             data.Data["SelectedRoleID"] = RoleID.ToString();
             m_Database.StoreMember(data);
@@ -729,7 +743,8 @@ namespace OpenSim.Groups
 
         public void UpdateMembership(string RequestingAgentID, string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile)
         {
-            // TODO: check perms
+            if (!String.Equals(RequestingAgentID, AgentID, StringComparison.Ordinal))
+                return;
 
             MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
             if (membership == null)

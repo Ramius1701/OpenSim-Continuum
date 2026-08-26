@@ -43,8 +43,8 @@ region.
 | MySQL/MariaDB | Required legacy backend | Required provider | Certify the actual production server/version. |
 | PostgreSQL and SQLite | Not part of the preserved legacy product | Independent providers present | Required for ContinuumEconomy; provider parity is a release gate. |
 | Currency purchase limits | Legacy quote/buy behavior, disabled by default | Daily/weekly/monthly limits present, disabled by default | Keep purchases opt-in and test limits/replay. Real-money settlement is out of ledger scope. |
-| Initial/periodic stipends | Compatibility has a Continuum-added scheduler | Not yet a complete WhiteCore-equivalent policy subsystem | Do not couple products. Design idempotent scheduled adjustments for ContinuumEconomy separately. |
-| Group balances and accounting | No complete WhiteCore-equivalent group ledger | Missing | Highest-value WhiteCore behavior still absent; requires group authority, liabilities, history and permissions design. |
+| Initial/periodic stipends | Compatibility has a Continuum-added scheduler | Replay-safe day/week/month scheduler with anchor, eligibility and balance-limit policy | Keep the two implementations separate and certify restart/replay behavior on all providers. |
+| Group balances and accounting | No complete WhiteCore-equivalent group ledger | Typed group accounts, transfers, bounded history and permission-checked viewer Summary/Details/Transactions are present | Liabilities and dividends remain separate missing scheduled behaviors; do not infer them from resident balances. |
 | Recurring directory/group charges | Partial core fee hooks, not WhiteCore scheduling | Missing scheduler | Port behavior only after group accounting and idempotent job ownership are designed. |
 | Group dividends/liabilities | Missing | Missing | Defer until group accounting is proven; never infer liability from a resident balance. |
 | Purchase history and administrator reporting | Legacy history exists | Ledger/history exists, dedicated UI absent | WhiteCore WebUI/API phase should consume authenticated Continuum APIs, never database tables directly. |

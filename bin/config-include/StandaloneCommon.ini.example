@@ -392,7 +392,7 @@
     ;; If you want to protect your assets from being copied by foreign visitors
     ;; uncomment the next line. You may want to do this on sims that have licensed content.
     ;; true = allow exports, false = disallow exports. True by default.
-    ; OutboundPermission = True
+    ; OutboundPermission = False
 
     ;; Send visual reminder to local users that their inventories are unavailable while they are traveling
     ;; and available when they return. True by default.

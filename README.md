@@ -30,7 +30,8 @@ Do not replace a running production installation in place. Build a separate test
 - Hypergrid stale service-URL, circuit, and cached-identity repair
 - RSA key authentication and Terms of Service acceptance support
 - `InternalPort = MATCHING` region configuration support
-- Viewer Abuse Report submission, screenshot handling, Robust service, and SQLite, MySQL/MariaDB, and PostgreSQL storage providers
+- Viewer Abuse Report submission, screenshot handling, Robust service, SQLite/MySQL/MariaDB/PostgreSQL storage, and optional post-storage estate-owner SMTP notification
+- Firestorm `GroupAPIv1` ban workflow with permission checks, bounded requests, banned-join enforcement, and SQLite/MySQL/MariaDB/PostgreSQL persistence
 - Mobius parcel auto-return details and in-world terrain console commands
 
 ### Experiences and scripting
@@ -38,6 +39,7 @@ Do not replace a running production installation in place. Build a separate test
 - Tranquillity/Mobius Experience service, connectors, CAPS, estate/parcel allowed, blocked and trusted controls, SQLite, MySQL/MariaDB, and PostgreSQL providers, and restart handling
 - Second Life-compatible Experiences floater contracts for Search, Allowed, Blocked, Admin, Contributor, and Owned; viewer-local Events remain viewer-managed
 - Gunthar Experience scripting additions reconciled with the authoritative Tranquillity service
+- Archived opensim-lickx `lxGetAgentViewer` script compatibility API
 - Experience permission, Combat2 damage, and path-update script events
 - Experience KVP, permission, sit, environment, and information APIs
 - EEP region, parcel, and agent environment functions
@@ -61,7 +63,7 @@ The extended scripting surface is powerful and has estate/security implications.
 - OpenSimMarketplace direct-delivery addon
 - Gloebit money module
 - MoneyServer Compatibility: the maintained DTL/NSL-compatible service and region module for grids that need the established protocol
-- ContinuumEconomy: a separately named service and region module with atomic MySQL/MariaDB, PostgreSQL and SQLite providers, idempotent operations, viewer currency purchase controls, and delivery-safe object purchase holds; it is ready for the production-test runbook, not live cutover
+- ContinuumEconomy: a separately named service and region module with atomic MySQL/MariaDB, PostgreSQL and SQLite providers, idempotent operations, viewer currency purchase controls, delivery-safe object purchase holds, typed group accounts/viewer accounting history, and replay-safe scheduled stipends; it is ready for the production-test runbook, not live cutover
 - HoloPhysicsGuard
 - OpenSimSearch viewer-directory compatibility client (requires a separately deployed compatible search service)
 - OpenSimTide
@@ -70,9 +72,9 @@ The extended scripting surface is powerful and has estate/security implications.
 
 These are independent optional components. They are not all required for a grid, and enabling multiple economy modules simultaneously is not supported unless their interaction has been explicitly designed and tested.
 
-HoloPhysicsGuard `PersistSleep` remains MySQL/MariaDB-only; SQLite and
-PostgreSQL deployments are limited to its non-persistent `ReportOnly` mode until
-dedicated providers are implemented and certified.
+HoloPhysicsGuard `PersistSleep` has MySQL/MariaDB, PostgreSQL, and SQLite paths.
+Each deployment still requires its provider-specific sleep/restart/wake test
+before enabling persistence on production regions.
 
 ### Rendering, physics, and tooling
 
@@ -113,7 +115,7 @@ standalone deployments and both MySQL/MariaDB and PostgreSQL for grid/Robust
 deployments. Imported services must not be described as generally ready while
 they provide only a MySQL implementation.
 
-The Experience service, Abuse Reports, and aliases now include SQLite,
+The Experience service, Abuse Reports, aliases, Offline IM V2, and Groups v2 now include SQLite,
 MySQL/MariaDB, and PostgreSQL provider paths; their clean-install and upgrade
 migrations still require runtime certification on every database. MoneyServer
 Compatibility remains MySQL-specific by design. ContinuumEconomy provides its

@@ -148,6 +148,39 @@ namespace OpenSim.Data.SQLite
             }
         }
 
+        public virtual long GetCount(string field, string key)
+        {
+            return GetCount(new string[] { field }, new string[] { key });
+        }
+
+        public virtual long GetCount(string[] fields, string[] keys)
+        {
+            if (fields == null || keys == null || fields.Length != keys.Length ||
+                fields.Length == 0)
+                return 0;
+
+            List<string> terms = new List<string>(fields.Length);
+            using SQLiteCommand command = new SQLiteCommand();
+            for (int i = 0; i < fields.Length; ++i)
+            {
+                if (string.IsNullOrWhiteSpace(fields[i]) ||
+                    fields[i].IndexOfAny(new[] { '`', '\'', '"', ';' }) >= 0)
+                    return 0;
+
+                string parameter = ":count" + i;
+                terms.Add("`" + fields[i] + "` = " + parameter);
+                command.Parameters.Add(new SQLiteParameter(parameter, keys[i]));
+            }
+
+            command.CommandText = "select count(*) from " + m_Realm +
+                " where " + string.Join(" and ", terms);
+            lock (m_Connection)
+            {
+                command.Connection = m_Connection;
+                return Convert.ToInt64(command.ExecuteScalar());
+            }
+        }
+
         protected T[] DoQuery(SQLiteCommand cmd)
         {
             IDataReader reader = ExecuteReader(cmd, m_Connection);

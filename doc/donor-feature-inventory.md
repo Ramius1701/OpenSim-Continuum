@@ -273,13 +273,23 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 - **Donor and checkpoint:** user-preserved last available copy at `S:\Github\opensim-lickx`, archival commit `6614599b7506b63861763e6cae5eefde861f8749`; the project is no longer on GitHub and the archive has no configured remote or earlier Git history.
 - **Feature and intended behaviour:** an optional `Lickx_Api` exposing viewer-name lookup to scripts; an OpenSimMutelist module; a DTL/NSL-derived MoneyServer/currency distribution; and historical PHP/MySQL OpenSimSearch crawler/helper files.
 - **Current Dev/Continuum equivalent:** Continuum already has current script APIs and viewer circuit metadata, native mute-list support, separately preserved MoneyServer Compatibility plus ContinuumEconomy, and a hardened optional OpenSimSearch viewer connector. The archive does not establish that any of these should replace the selected implementations.
-- **Genuinely missing behaviour:** `lxGetAgentViewer()` is a narrow optional script convenience not currently exposed under that donor API name. Any missing mute, economy, or search behaviour must be demonstrated by code and runtime comparison rather than inferred from file presence.
+- **Genuinely missing behaviour:** the archival `lxGetAgentViewer()` compatibility API has now been ported under its donor API name. Any missing mute, economy, or search behaviour must be demonstrated by code and runtime comparison rather than inferred from file presence.
 - **Affected files and services:** script API registration/runtime; mute-list region module; MoneyServer, MySQL wrapper, region currency connector and helper URI; search crawler database and PHP endpoints.
-- **Addon versus core:** prefer optional addons. Do not add a donor-specific core script API until its registration, threat model and compatibility value are proven. Currency and crawler code must remain outside core.
+- **Addon versus core:** the three-file script API is a narrow core compatibility patch because YEngine discovers APIs and runtime stubs from its core assemblies. Currency and crawler code remain outside core.
 - **Compatibility:** archive documentation targets OpenSim 0.9.x, .NET 8 and MySQL for currency. SQLite/PostgreSQL, current Windows service operation, Robust, Hypergrid trust, current viewer and multi-region behaviour are unproven.
 - **Licensing and provenance:** the OpenSim tree declares BSD-3-Clause. `opensim.currency-lickx` separately declares MIT and credits DTL/NSL. Preserve both lineages. Embedded certificate files, PHP helpers and every other addon asset require separate provenance/security review; archival commit identity is not original upstream provenance.
 - **Tests required:** compare APIs and schemas with current Continuum; build each candidate separately; test script permissions and viewer privacy, mute persistence/crossings, MoneyServer migration and all supported database boundaries, helper authentication, search privacy/paging/deletion, Windows paths, Robust restart and Hypergrid inputs.
-- **Recommendation:** audit-only donor. Evaluate the narrow Lickx API and Mutelist first; use currency only as a MoneyServer parity reference; quarantine bundled certificates and historical PHP search/economy helpers unless independently secured and justified.
+- **Recommendation:** retain the narrow Lickx API port and native Continuum mute-list implementation; use currency only as a MoneyServer parity reference; quarantine bundled certificates and historical PHP search/economy helpers unless independently secured and justified.
+
+### 15. SL-compatible parcel prim accounting
+
+- **Classification / behaviour:** upstream-quality bug fix. `llGetParcelPrimCount` now handles every category for same-owner simulator-wide land and counts non-mesh temporary objects for parcel or simulator scope; parcel-detail capacity and usage report simulator-wide values.
+- **Donor and commit:** Gunthar `3b2321ff69` (with parcel-detail correction `48c71206b8`).
+- **Current Dev equivalent / missing behaviour:** Dev only supported total simulator count, returned zero for other simulator categories and temporary objects, and returned single-parcel capacity/usage.
+- **Affected files and services:** `LSL_Api.cs`; simulator script execution and parcel accounting only. This is a narrow core compatibility patch, with no Robust or database dependency and no Hypergrid persistence effect.
+- **Compatibility / requirements:** MySQL, PostgreSQL, SQLite and Windows-neutral; requires an SL-compatible viewer only to observe parcel UI values. Foreign objects and visitors remain subject to the destination region's counts.
+- **Licensing and provenance:** OpenSim-derived Gunthar source, retained under the repository BSD lineage with exact commits recorded above.
+- **Tests required / recommendation:** build plus scripted parcel fixtures covering owner/group/other/selected/temp, multiple same-owner parcels, mesh exclusions and attachments. Retain for production testing.
 
 ## Already-present and unsuitable observations
 

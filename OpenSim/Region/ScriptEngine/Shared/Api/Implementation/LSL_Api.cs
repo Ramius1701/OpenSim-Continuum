@@ -3393,18 +3393,48 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_Integer llGiveMoney(LSL_Key destination, LSL_Integer amount)
         {
-            if (m_item.PermsGranter.IsZero())
+            if (amount <= 0)
+            {
+                Error("llGiveMoney", "Amount must be greater than zero");
                 return 0;
+            }
 
-            if ((m_item.PermsMask & ScriptBaseClass.PERMISSION_DEBIT) == 0)
+            if (m_host.OwnerID.Equals(m_host.GroupID))
+            {
+                Error("llGiveMoney", "Group-owned objects cannot give money");
+                return 0;
+            }
+
+            if (m_item is null || m_item.PermsGranter.IsZero() ||
+                (m_item.PermsMask & ScriptBaseClass.PERMISSION_DEBIT) == 0)
             {
                 Error("llGiveMoney", "No permissions to give money");
+                return 0;
+            }
+
+            if (!m_item.PermsGranter.Equals(m_host.OwnerID))
+            {
+                Error("llGiveMoney", "PERMISSION_DEBIT must be granted by the object owner");
                 return 0;
             }
 
             if (!UUID.TryParse(destination, out UUID toID))
             {
                 Error("llGiveMoney", "Bad key in llGiveMoney");
+                return 0;
+            }
+
+            if (World.GetSceneObjectPart(toID) is not null)
+            {
+                Error("llGiveMoney", "Destination must be an avatar");
+                return 0;
+            }
+
+            if (!World.TryGetScenePresence(toID, out ScenePresence _) &&
+                (m_userAccountService is null ||
+                    m_userAccountService.GetUserAccount(RegionScopeID, toID) is null))
+            {
+                Error("llGiveMoney", "Destination avatar not found");
                 return 0;
             }
 
@@ -3415,14 +3445,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 return 0;
             }
 
-            void act(string _)
+            bool result = money.ObjectGiveMoney(
+                m_host.ParentGroup.RootPart.UUID,
+                m_host.ParentGroup.RootPart.OwnerID,
+                toID,
+                amount,
+                UUID.Zero,
+                out string reason);
+            if (!result)
             {
-                money.ObjectGiveMoney(m_host.ParentGroup.RootPart.UUID, m_host.ParentGroup.RootPart.OwnerID,
-                                        toID, amount, UUID.Zero, out _);
+                if (!string.IsNullOrEmpty(reason))
+                    Error("llGiveMoney", reason);
+                return ScriptBaseClass.FALSE;
             }
 
-            m_AsyncCommands.DataserverPlugin.RegisterRequest(m_host.LocalId, m_item.ItemID, act);
-            return 0;
+            return ScriptBaseClass.TRUE;
         }
 
         public void llMakeExplosion(int particles, double scale, double vel, double lifetime, double arc, string texture, LSL_Vector offset)
@@ -6400,7 +6437,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_String llGetAnimation(LSL_Key id)
         {
-            // This should only return a value if the avatar is in the same region
             if(!UUID.TryParse(id, out UUID avatar) || avatar.IsZero())
                 return "";
 
@@ -6408,10 +6444,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (presence == null || presence.IsChildAgent || presence.Animator == null)
                 return string.Empty;
 
-            //if (presence.SitGround)
-            //    return "Sitting on Ground";
-            //if (presence.ParentID != 0 || presence.ParentUUID != UUID.Zero)
-            //    return "Sitting";
+            if (presence.SitGround)
+                return "Sitting on Ground";
+
+            if (presence.ParentID != 0 || presence.ParentUUID.IsNotZero() ||
+                presence.ParentPart is not null)
+                return "Sitting";
+
             string movementAnimation = presence.Animator.CurrentMovementAnimation;
             if (MovementAnimationsForLSL.TryGetValue(movementAnimation, out string lslMovementAnimation))
                 return lslMovementAnimation;
@@ -7826,19 +7865,35 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public LSL_String llGetAgentLanguage(LSL_Key id)
         {
-            // This should only return a value if the avatar is in the same region, but eh. idc.
-            if (World.AgentPreferencesService == null)
+            if (!UUID.TryParse(id, out UUID key) || key.IsZero())
+                return LSL_String.Empty;
+
+            ScenePresence presence = World.GetScenePresence(key);
+            if (presence is null || presence.IsChildAgent ||
+                World.AgentPreferencesService == null)
+                return LSL_String.Empty;
+
+            try
             {
-                Error("llGetAgentLanguage", "No AgentPreferencesService present");
+                AgentPrefs prefs =
+                    World.AgentPreferencesService.GetAgentPreferences(key);
+                if (prefs is null || !prefs.LanguageIsPublic ||
+                    string.IsNullOrWhiteSpace(prefs.Language))
+                    return LSL_String.Empty;
+
+                string language = prefs.Language.Trim();
+                int lineBreak = language.IndexOfAny(new[] { '\r', '\n' });
+                if (lineBreak >= 0)
+                    language = language[..lineBreak].Trim();
+
+                return string.IsNullOrEmpty(language)
+                    ? LSL_String.Empty
+                    : new LSL_String(language);
             }
-            else
+            catch
             {
-                if (UUID.TryParse(id, out UUID key) && key.IsNotZero())
-                {
-                    return new LSL_String(World.AgentPreferencesService.GetLang(key));
-                }
+                return LSL_String.Empty;
             }
-            return new LSL_String("en-us");
         }
         /// <summary>
         /// http://wiki.secondlife.com/wiki/LlGetAgentList
@@ -16819,6 +16874,100 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             ScriptSleep(m_sleepMsOnResetLandPassList);
         }
 
+        private static int GetParcelPrimCountForCategory(IPrimCounts pc, int category)
+        {
+            if (pc is null)
+                return 0;
+
+            if (category == ScriptBaseClass.PARCEL_COUNT_TOTAL)
+                return pc.Total;
+            if (category == ScriptBaseClass.PARCEL_COUNT_OWNER)
+                return pc.Owner;
+            if (category == ScriptBaseClass.PARCEL_COUNT_GROUP)
+                return pc.Group;
+            if (category == ScriptBaseClass.PARCEL_COUNT_OTHER)
+                return pc.Others;
+            if (category == ScriptBaseClass.PARCEL_COUNT_SELECTED)
+                return pc.Selected;
+
+            return 0;
+        }
+
+        private static bool IsMeshObject(SceneObjectGroup group)
+        {
+            SceneObjectPart[] parts = group.Parts;
+            for (int i = 0; i < parts.Length; ++i)
+            {
+                if (parts[i].Shape.MeshFlagEntry)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private int GetParcelTempPrimCount(ILandObject baseParcel, bool simWide)
+        {
+            if (baseParcel?.LandData is null)
+                return 0;
+
+            HashSet<UUID> parcelIDs = new();
+            UUID baseOwner = baseParcel.LandData.OwnerID;
+
+            if (simWide)
+            {
+                foreach (ILandObject parcel in World.LandChannel.AllParcels())
+                {
+                    LandData landData = parcel?.LandData;
+                    if (landData is not null && landData.OwnerID.Equals(baseOwner))
+                        parcelIDs.Add(landData.GlobalID);
+                }
+            }
+            else
+            {
+                parcelIDs.Add(baseParcel.LandData.GlobalID);
+            }
+
+            int count = 0;
+            World.ForEachSOG(delegate(SceneObjectGroup group)
+            {
+                if (group is null || group.IsDeleted || group.IsAttachment || !group.IsTemporary)
+                    return;
+
+                if (IsMeshObject(group))
+                    return;
+
+                Vector3 position = group.AbsolutePosition;
+                ILandObject parcel = World.LandChannel.GetLandObject(position.X, position.Y);
+                if (parcel?.LandData is not null && parcelIDs.Contains(parcel.LandData.GlobalID))
+                    count += group.PrimCount;
+            });
+
+            return count;
+        }
+
+        private int GetSimulatorParcelPrimCount(ILandObject baseParcel, int category)
+        {
+            if (baseParcel?.LandData is null)
+                return 0;
+
+            if (category == ScriptBaseClass.PARCEL_COUNT_TEMP)
+                return GetParcelTempPrimCount(baseParcel, true);
+
+            UUID baseOwner = baseParcel.LandData.OwnerID;
+            int count = 0;
+
+            foreach (ILandObject parcel in World.LandChannel.AllParcels())
+            {
+                LandData landData = parcel?.LandData;
+                if (landData is null || !landData.OwnerID.Equals(baseOwner))
+                    continue;
+
+                count += GetParcelPrimCountForCategory(parcel.PrimCounts, category);
+            }
+
+            return count;
+        }
+
         public LSL_Integer llGetParcelPrimCount(LSL_Vector pos, int category, int sim_wide)
         {
 
@@ -16827,37 +16976,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (lo == null)
                 return 0;
 
-            IPrimCounts pc = lo.PrimCounts;
-
             if (sim_wide != ScriptBaseClass.FALSE)
-            {
-                if (category == ScriptBaseClass.PARCEL_COUNT_TOTAL)
-                {
-                    return pc.Simulator;
-                }
-                else
-                {
-                    // counts not implemented yet
-                    return 0;
-                }
-            }
-            else
-            {
-                if (category == ScriptBaseClass.PARCEL_COUNT_TOTAL)
-                    return pc.Total;
-                else if (category == ScriptBaseClass.PARCEL_COUNT_OWNER)
-                    return pc.Owner;
-                else if (category == ScriptBaseClass.PARCEL_COUNT_GROUP)
-                    return pc.Group;
-                else if (category == ScriptBaseClass.PARCEL_COUNT_OTHER)
-                    return pc.Others;
-                else if (category == ScriptBaseClass.PARCEL_COUNT_SELECTED)
-                    return pc.Selected;
-                else if (category == ScriptBaseClass.PARCEL_COUNT_TEMP)
-                    return 0; // counts not implemented yet
-            }
+                return GetSimulatorParcelPrimCount(lo, category);
 
-            return 0;
+            if (category == ScriptBaseClass.PARCEL_COUNT_TEMP)
+                return GetParcelTempPrimCount(lo, false);
+
+            return GetParcelPrimCountForCategory(lo.PrimCounts, category);
         }
 
         public LSL_List llGetParcelPrimOwners(LSL_Vector pos)
@@ -16950,10 +17075,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                         ret.Add(new LSL_Integer(land.SeeAVs ? 1 : 0));
                         break;
                     case ScriptBaseClass.PARCEL_DETAILS_PRIM_CAPACITY:
-                        ret.Add(new LSL_Integer(parcel.GetParcelMaxPrimCount()));
+                        ret.Add(new LSL_Integer(parcel.GetSimulatorMaxPrimCount()));
                         break;
-                    case 8:
-                        ret.Add(new LSL_Integer(parcel.PrimCounts.Total));
+                    case ScriptBaseClass.PARCEL_DETAILS_PRIM_USED:
+                        ret.Add(new LSL_Integer(parcel.PrimCounts.Simulator));
                         break;
                     case ScriptBaseClass.PARCEL_DETAILS_LANDING_POINT:
                         ret.Add(new LSL_Vector(land.UserLocation));
@@ -17445,7 +17570,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                             ret.Add(new LSL_String(date.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture)));
                             break;
                         case ScriptBaseClass.OBJECT_SELECT_COUNT:
-                            ret.Add(new LSL_Integer(0));
+                            ret.Add(new LSL_Integer(obj.ParentGroup.IsSelected ? 1 : 0));
                             break;
                         case ScriptBaseClass.OBJECT_SIT_COUNT:
                             ret.Add(new LSL_Integer(obj.ParentGroup.GetSittingAvatarsCount()));
@@ -19591,7 +19716,19 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     break;
                 }
 
+                if (!m_item.PermsGranter.Equals(m_host.OwnerID))
+                {
+                    replydata = "MISSING_PERMISSION_DEBIT";
+                    break;
+                }
+
                 if (!UUID.TryParse(destination, out toID))
+                {
+                    replydata = "INVALID_AGENT";
+                    break;
+                }
+
+                if (World.GetSceneObjectPart(toID) is not null)
                 {
                     replydata = "INVALID_AGENT";
                     break;
@@ -19616,7 +19753,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 int replycode = 0;
                 try
                 {
-                    UserAccount account = m_userAccountService.GetUserAccount(RegionScopeID, toID);
+                    UserAccount account = m_userAccountService?.GetUserAccount(RegionScopeID, toID);
                     if (account is null)
                     {
                         replydata = "LINDENDOLLAR_ENTITYDOESNOTEXIST";
