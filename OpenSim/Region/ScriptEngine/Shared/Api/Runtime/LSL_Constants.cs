@@ -51,6 +51,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int STATUS_RETURN_AT_EDGE = 256;
         public const int STATUS_CAST_SHADOWS = 512;
         public const int STATUS_BLOCK_GRAB_OBJECT = 1024;
+        public const int STATUS_DIE_AT_NO_ENTRY = 2048;
 
         public const int AGENT = 1;
         public const int AGENT_BY_LEGACY_NAME = 1;
@@ -60,6 +61,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int ACTIVE = 2;
         public const int PASSIVE = 4;
         public const int SCRIPTED = 8;
+        public const int DAMAGEABLE = 32;
 
         public const int CONTROL_FWD = 1;
         public const int CONTROL_BACK = 2;
@@ -408,6 +410,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int HTTP_VERBOSE_THROTTLE = 4;
         public const int HTTP_CUSTOM_HEADER = 5;
         public const int HTTP_PRAGMA_NO_CACHE = 6;
+        public const int HTTP_USER_AGENT = 7;
+        public const int HTTP_ACCEPT = 8;
+        public const int HTTP_EXTENDED_ERROR = 9;
 
         // llSetContentType
         public const int CONTENT_TYPE_TEXT = 0; //text/plain
@@ -467,6 +472,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PRIM_GLTF_METALLIC_ROUGHNESS = 47;
         public const int PRIM_GLTF_BASE_COLOR = 48;
         public const int PRIM_RENDER_MATERIAL = 49;
+        public const int PRIM_SIT_FLAGS = 50;
+        public const int PRIM_DAMAGE = 51;
+        public const int PRIM_HEALTH = 52;
 
         // parameters
 
@@ -552,6 +560,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int MASK_GROUP = 2;
         public const int MASK_EVERYONE = 3;
         public const int MASK_NEXT = 4;
+        public const int MASK_COMBINED = 16;
 
         public const int PERM_TRANSFER = 0x2000;
         public const int PERM_MODIFY = 0x4000;
@@ -572,6 +581,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int PARCEL_MEDIA_COMMAND_TYPE = 10;
         public const int PARCEL_MEDIA_COMMAND_SIZE = 11;
         public const int PARCEL_MEDIA_COMMAND_DESC = 12;
+        public const int PARCEL_MEDIA_COMMAND_LOOP_SET = 13;
 
         public const int PARCEL_FLAG_ALLOW_FLY = 0x1;                           // parcel allows flying
         public const int PARCEL_FLAG_ALLOW_SCRIPTS = 0x2;                       // parcel allows outside scripts
@@ -697,6 +707,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int OBJECT_SCALE = 47;
         public const int OBJECT_TEXT_COLOR = 48;
         public const int OBJECT_TEXT_ALPHA = 49;
+        public const int OBJECT_HEALTH = 50;
+        public const int OBJECT_DAMAGE = 51;
+        public const int OBJECT_DAMAGE_TYPE = 52;
+        public const int OBJECT_PERMS = 53;
+        public const int OBJECT_PERMS_COMBINED = 54;
 
 
         // Pathfinding types

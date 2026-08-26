@@ -237,12 +237,27 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
             m_scene = scene;
 
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-            if (renderers.Count > 0)
-                m_log.Info("[MAPTILE]: Loaded prim mesher " + renderers[0]);
+            string preferredRenderer = SelectPrimMesherFile(renderers);
+            if (preferredRenderer != null)
+                m_log.Info("[MAPTILE]: Loaded prim mesher " + preferredRenderer);
             else
                 m_log.Info("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
 
             m_scene.RegisterModuleInterface<IMapImageGenerator>(this);
+        }
+
+        private static string SelectPrimMesherFile(List<string> renderers)
+        {
+            if (renderers.Count == 0)
+                return null;
+
+            foreach (string renderer in renderers)
+            {
+                if (System.IO.Path.GetFileName(renderer).IndexOf("Meshmerizer", StringComparison.OrdinalIgnoreCase) >= 0)
+                    return renderer;
+            }
+
+            return renderers[0];
         }
 
         public void RegionLoaded(Scene scene)
@@ -314,10 +329,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private Bitmap CreateMapTileLocked()
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-            if (renderers.Count > 0)
-            {
-                m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
-            }
+            string rendererFile = SelectPrimMesherFile(renderers);
+            if (rendererFile != null)
+                m_primMesher = RenderingLoader.LoadRenderer(rendererFile);
 
             try
             {
@@ -361,10 +375,9 @@ namespace OpenSim.Region.CoreModules.World.Warp3DMap
         private Bitmap CreateViewImageLocked(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
         {
             List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-            if (renderers.Count > 0)
-            {
-                m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
-            }
+            string rendererFile = SelectPrimMesherFile(renderers);
+            if (rendererFile != null)
+                m_primMesher = RenderingLoader.LoadRenderer(rendererFile);
 
             cameraPos = camPos;
             cameraDir = camDir;
