@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 using MySql.Data.MySqlClient;
 using Npgsql;
 using System.Data.SQLite;
@@ -33,6 +34,8 @@ namespace ContinuumSearch.Service
             string key = (provider ?? String.Empty).Trim().ToLowerInvariant();
             if (key is "sqlite" or "system.data.sqlite")
                 ConfigureSQLiteNativeLibrary();
+            else if (key is "mysql" or "mysql.data")
+                ConfigureMySQLCompatibility();
             return key switch
             {
                 "mysql" or "mysql.data" => new SearchStore("MySQL", connectionString,
@@ -43,6 +46,15 @@ namespace ContinuumSearch.Service
                     () => new SQLiteConnection(connectionString)),
                 _ => throw new NotSupportedException("Search StorageProvider must be MySQL, PostgreSQL, or SQLite")
             };
+        }
+
+        private static void ConfigureMySQLCompatibility()
+        {
+            // MySql.Data still requests this compatibility assembly at runtime. Standalone
+            // services do not probe arbitrary loose files unless they appear in the deps file.
+            string candidate = Path.Combine(AppContext.BaseDirectory, "System.Security.Permissions.dll");
+            if (File.Exists(candidate))
+                AssemblyLoadContext.Default.LoadFromAssemblyPath(candidate);
         }
 
         private static void ConfigureSQLiteNativeLibrary()

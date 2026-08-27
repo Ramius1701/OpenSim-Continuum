@@ -15,8 +15,14 @@ namespace ContinuumSearch.Service
         {
             try
             {
-                if (args.Length == 2 && args[0] == "self-test")
-                    return SearchAcceptanceSuite.Run(args[1]);
+                if (args.Length > 0 && args[0] == "self-test")
+                {
+                    if (args.Length == 2)
+                        return SearchAcceptanceSuite.Run("SQLite", "Data Source=" + args[1] + ";Version=3;");
+                    return SearchAcceptanceSuite.Run(
+                        Environment.GetEnvironmentVariable("CONTINUUM_SEARCH_STORAGE_PROVIDER"),
+                        Environment.GetEnvironmentVariable("CONTINUUM_SEARCH_CONNECTION_STRING"));
+                }
                 string ini = args.Length > 0 ? args[0] : "ContinuumSearch.ini";
                 IniConfigSource source = new(ini);
                 IConfig service = source.Configs["ContinuumSearchService"] ??

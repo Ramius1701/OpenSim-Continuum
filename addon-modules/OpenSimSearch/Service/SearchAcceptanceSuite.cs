@@ -6,16 +6,16 @@ namespace ContinuumSearch.Service
 {
     internal static class SearchAcceptanceSuite
     {
-        internal static int Run(string databasePath)
+        internal static int Run(string provider, string connectionString)
         {
-            if (String.IsNullOrWhiteSpace(databasePath) ||
-                databasePath.IndexOf("test", StringComparison.OrdinalIgnoreCase) < 0)
+            if (String.IsNullOrWhiteSpace(provider) || String.IsNullOrWhiteSpace(connectionString) ||
+                connectionString.IndexOf("test", StringComparison.OrdinalIgnoreCase) < 0)
             {
-                Console.Error.WriteLine("Search self-test requires a SQLite filename containing 'test'.");
+                Console.Error.WriteLine("Search self-test requires provider/connection environment variables naming a dedicated test database.");
                 return 2;
             }
 
-            using SearchStore store = SearchStore.Open("SQLite", "Data Source=" + databasePath + ";Version=3;");
+            using SearchStore store = SearchStore.Open(provider, connectionString);
             store.EnsureSchema();
             XmlDocument document = new() { XmlResolver = null };
             document.LoadXml("<region category='PG'><info>" +
@@ -57,7 +57,7 @@ namespace ContinuumSearch.Service
             Require(store.GetEvent(new Hashtable { ["eventID"] = "900001" }).Count == 1, "event details query");
             Console.WriteLine("PASS: DataSnapshot parse and idempotent region replacement");
             Console.WriteLine("PASS: places, popular, land, events and event-details viewer query contracts");
-            Console.WriteLine("ContinuumSearch SQLite acceptance self-test passed.");
+            Console.WriteLine("ContinuumSearch {0} acceptance self-test passed.", store.Provider);
             return 0;
         }
 

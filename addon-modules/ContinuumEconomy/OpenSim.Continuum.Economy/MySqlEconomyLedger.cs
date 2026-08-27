@@ -23,7 +23,7 @@ namespace OpenSim.Continuum.Economy
         public void EnsureSchema()
         {
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = SchemaSql;
             command.ExecuteNonQuery();
@@ -32,7 +32,7 @@ namespace OpenSim.Continuum.Economy
         public void ValidateSchema()
         {
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT COUNT(*) FROM information_schema.columns
                 WHERE table_schema = DATABASE() AND (
@@ -70,7 +70,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = "SELECT balance FROM continuum_economy_accounts WHERE account_id = ?account";
             command.Parameters.AddWithValue("?account", accountID.ToString());
@@ -83,7 +83,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = "SELECT 1 FROM continuum_economy_accounts WHERE account_id = ?account LIMIT 1";
             command.Parameters.AddWithValue("?account", accountID.ToString());
@@ -97,7 +97,7 @@ namespace OpenSim.Continuum.Economy
                 throw new ArgumentOutOfRangeException(nameof(limit), "Account query limit must be between 1 and 500");
             List<Guid> accounts = new(limit);
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT account_id FROM continuum_economy_accounts
                 WHERE account_type=?type AND account_id>?after
@@ -109,8 +109,11 @@ namespace OpenSim.Continuum.Economy
             command.Parameters.AddWithValue("?limit", limit);
             using MySqlDataReader reader = command.ExecuteReader();
             while (reader.Read())
-                if (Guid.TryParse(reader.GetString(0), out Guid account) && account != Guid.Empty)
+            {
+                Guid account = MySqlValue.Guid(reader, 0);
+                if (account != Guid.Empty)
                     accounts.Add(account);
+            }
             return accounts;
         }
 
@@ -119,7 +122,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = "INSERT IGNORE INTO continuum_economy_accounts (account_id, balance) VALUES (?account, 0)";
             command.Parameters.AddWithValue("?account", accountID.ToString());
@@ -131,7 +134,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT a.balance - COALESCE(SUM(CASE WHEN p.state = 1 THEN p.amount ELSE 0 END), 0)
                 FROM continuum_economy_accounts a
@@ -152,7 +155,7 @@ namespace OpenSim.Continuum.Economy
             try
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
                 LedgerTransferResult prior = ReadPrior(connection, transaction, request.TransactionID, fingerprint);
                 if (prior != null)
@@ -204,7 +207,7 @@ namespace OpenSim.Continuum.Economy
             catch (MySqlException e) when (e.Number == 1062)
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 return ReadPrior(connection, null, request.TransactionID, fingerprint) ??
                     Result(request.TransactionID, LedgerResultCode.TransactionConflict, 0, 0,
                         "The transaction ID was committed concurrently with different data");
@@ -221,7 +224,7 @@ namespace OpenSim.Continuum.Economy
             try
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
                 LedgerAdjustmentResult prior = ReadPriorAdjustment(connection, transaction, request.OperationID, fingerprint);
                 if (prior != null)
@@ -277,7 +280,7 @@ namespace OpenSim.Continuum.Economy
             catch (MySqlException e) when (e.Number == 1062)
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 return ReadPriorAdjustment(connection, null, request.OperationID, fingerprint) ??
                     AdjustmentResult(request.OperationID, LedgerResultCode.TransactionConflict, 0,
                         "The operation ID was committed concurrently with different data");
@@ -292,37 +295,38 @@ namespace OpenSim.Continuum.Economy
                 throw new ArgumentOutOfRangeException(nameof(limit), "History limit must be between 1 and 500");
 
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT transaction_id, sender_id, receiver_id, amount, transaction_type,
                     region_id, object_id, description, status, sender_balance, receiver_balance,
                     failure_reason, created_utc
                 FROM continuum_economy_transactions
-                WHERE (sender_id = ?account OR receiver_id = ?account)
-                  AND (?before IS NULL OR created_utc < ?before)
+                WHERE ?account IN (sender_id, receiver_id)" +
+                (beforeUtc.HasValue ? " AND created_utc < ?before" : String.Empty) + @"
                 ORDER BY created_utc DESC, transaction_id DESC
                 LIMIT ?limit";
             command.Parameters.AddWithValue("?account", accountID.ToString());
-            command.Parameters.AddWithValue("?before", beforeUtc.HasValue ? beforeUtc.Value.ToUniversalTime() : DBNull.Value);
+            if (beforeUtc.HasValue)
+                command.Parameters.AddWithValue("?before", beforeUtc.Value.ToUniversalTime());
             command.Parameters.AddWithValue("?limit", limit);
 
             List<LedgerHistoryEntry> entries = new(limit * 2);
             using MySqlDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
-                Guid senderID = Guid.Parse(reader.GetString(1));
-                Guid receiverID = Guid.Parse(reader.GetString(2));
+                Guid senderID = MySqlValue.Guid(reader,1);
+                Guid receiverID = MySqlValue.Guid(reader,2);
                 bool isCredit = receiverID == accountID;
                 entries.Add(new LedgerHistoryEntry
                 {
-                    TransactionID = Guid.Parse(reader.GetString(0)),
+                    TransactionID = MySqlValue.Guid(reader,0),
                     AccountID = accountID,
                     CounterpartyID = isCredit ? senderID : receiverID,
                     ActorID = Guid.Empty,
                     Amount = reader.GetInt64(3),
                     TransactionType = reader.GetInt32(4),
-                    RegionID = Guid.Parse(reader.GetString(5)),
-                    ObjectID = Guid.Parse(reader.GetString(6)),
+                    RegionID = MySqlValue.Guid(reader,5),
+                    ObjectID = MySqlValue.Guid(reader,6),
                     Description = reader.GetString(7),
                     Succeeded = reader.GetInt32(8) == 1,
                     ResultingBalance = isCredit ? reader.GetInt64(10) : reader.GetInt64(9),
@@ -338,20 +342,22 @@ namespace OpenSim.Continuum.Economy
             adjustmentCommand.CommandText = @"SELECT operation_id, actor_id, amount, adjustment_kind,
                     transaction_type, reason, status, resulting_balance, failure_reason, created_utc
                 FROM continuum_economy_adjustments
-                WHERE account_id = ?account AND (?before IS NULL OR created_utc < ?before)
+                WHERE account_id = ?account" +
+                (beforeUtc.HasValue ? " AND created_utc < ?before" : String.Empty) + @"
                 ORDER BY created_utc DESC, operation_id DESC
                 LIMIT ?limit";
             adjustmentCommand.Parameters.AddWithValue("?account", accountID.ToString());
-            adjustmentCommand.Parameters.AddWithValue("?before", beforeUtc.HasValue ? beforeUtc.Value.ToUniversalTime() : DBNull.Value);
+            if (beforeUtc.HasValue)
+                adjustmentCommand.Parameters.AddWithValue("?before", beforeUtc.Value.ToUniversalTime());
             adjustmentCommand.Parameters.AddWithValue("?limit", limit);
             using MySqlDataReader adjustmentReader = adjustmentCommand.ExecuteReader();
             while (adjustmentReader.Read())
             {
                 bool isCredit = adjustmentReader.GetInt32(3) == (int)LedgerAdjustmentKind.Credit;
-                Guid actorID = Guid.Parse(adjustmentReader.GetString(1));
+                Guid actorID = MySqlValue.Guid(adjustmentReader,1);
                 entries.Add(new LedgerHistoryEntry
                 {
-                    TransactionID = Guid.Parse(adjustmentReader.GetString(0)),
+                    TransactionID = MySqlValue.Guid(adjustmentReader,0),
                     AccountID = accountID,
                     CounterpartyID = actorID,
                     ActorID = actorID,
@@ -383,7 +389,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT COALESCE(SUM(amount), 0) FROM continuum_economy_adjustments
                 WHERE account_id = ?account AND transaction_type = ?type
@@ -399,7 +405,7 @@ namespace OpenSim.Continuum.Economy
             if (accountID == Guid.Empty)
                 throw new ArgumentException("A non-zero account ID is required", nameof(accountID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT
                 (SELECT COUNT(*) FROM continuum_economy_transactions
@@ -419,7 +425,7 @@ namespace OpenSim.Continuum.Economy
             if (operationID == Guid.Empty)
                 throw new ArgumentException("A non-zero operation ID is required", nameof(operationID));
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using (MySqlCommand command = connection.CreateCommand())
             {
                 command.CommandText = @"SELECT sender_id,receiver_id,amount,transaction_type,region_id,object_id,
@@ -429,11 +435,11 @@ namespace OpenSim.Continuum.Economy
                 using MySqlDataReader reader = command.ExecuteReader();
                 if (reader.Read())
                 {
-                    Guid sender = Guid.Parse(reader.GetString(0));
+                    Guid sender = MySqlValue.Guid(reader,0);
                     return new LedgerHistoryEntry { TransactionID=operationID, AccountID=sender,
-                        CounterpartyID=Guid.Parse(reader.GetString(1)), Amount=reader.GetInt64(2),
-                        TransactionType=reader.GetInt32(3), RegionID=Guid.Parse(reader.GetString(4)),
-                        ObjectID=Guid.Parse(reader.GetString(5)), Description=reader.GetString(6),
+                        CounterpartyID=MySqlValue.Guid(reader,1), Amount=reader.GetInt64(2),
+                        TransactionType=reader.GetInt32(3), RegionID=MySqlValue.Guid(reader,4),
+                        ObjectID=MySqlValue.Guid(reader,5), Description=reader.GetString(6),
                         Succeeded=reader.GetInt32(7)==1, ResultingBalance=reader.GetInt64(8),
                         FailureReason=reader.GetString(9), CreatedUtc=DateTime.SpecifyKind(reader.GetDateTime(10),DateTimeKind.Utc),
                         IsCredit=false, IsAdjustment=false };
@@ -447,8 +453,8 @@ namespace OpenSim.Continuum.Economy
                 command.Parameters.AddWithValue("?operation", operationID.ToString());
                 using MySqlDataReader reader = command.ExecuteReader();
                 if (!reader.Read()) return null;
-                return new LedgerHistoryEntry { TransactionID=operationID, AccountID=Guid.Parse(reader.GetString(0)),
-                    CounterpartyID=Guid.Parse(reader.GetString(1)), ActorID=Guid.Parse(reader.GetString(1)),
+                return new LedgerHistoryEntry { TransactionID=operationID, AccountID=MySqlValue.Guid(reader,0),
+                    CounterpartyID=MySqlValue.Guid(reader,1), ActorID=MySqlValue.Guid(reader,1),
                     Amount=reader.GetInt64(2), IsCredit=reader.GetInt32(3)==(int)LedgerAdjustmentKind.Credit,
                     TransactionType=reader.GetInt32(4), Description=reader.GetString(5),
                     Succeeded=reader.GetInt32(6)==1, ResultingBalance=reader.GetInt64(7),

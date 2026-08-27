@@ -31,7 +31,7 @@ namespace OpenSim.Continuum.Economy
             try
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
                 LedgerResultCode? prior = ReadPrior(connection, transaction, request.OperationID, hash, out message);
                 if (prior.HasValue) { transaction.Commit(); return prior.Value; }
@@ -89,7 +89,7 @@ namespace OpenSim.Continuum.Economy
             catch (MySqlException e) when (e.Number == 1062)
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 LedgerResultCode? prior = ReadPrior(connection, null, request.OperationID, hash, out message);
                 if (prior.HasValue)
                     return prior.Value;

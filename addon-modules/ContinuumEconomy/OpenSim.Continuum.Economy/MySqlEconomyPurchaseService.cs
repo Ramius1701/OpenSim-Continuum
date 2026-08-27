@@ -27,7 +27,7 @@ namespace OpenSim.Continuum.Economy
             try
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
                 PurchaseRow prior = Read(connection, transaction, request.PurchaseID, true);
                 if (prior != null) return Finish(transaction, PriorResult(prior, fingerprint));
@@ -55,7 +55,7 @@ namespace OpenSim.Continuum.Economy
             catch (MySqlException e) when (e.Number == 1062)
             {
                 using MySqlConnection connection = new(m_connectionString);
-                connection.Open();
+                MySqlValue.Open(connection);
                 PurchaseRow prior = Read(connection, null, request.PurchaseID, false);
                 return prior == null ? Conflict(request.PurchaseID) : PriorResult(prior, fingerprint);
             }
@@ -66,7 +66,7 @@ namespace OpenSim.Continuum.Economy
             if (purchaseID == Guid.Empty || expectedBuyerID == Guid.Empty)
                 return Invalid(purchaseID, "Non-zero purchase and buyer IDs are required");
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             PurchaseRow row = Read(connection, transaction, purchaseID, true);
             if (row == null) return Finish(transaction, Invalid(purchaseID, "Purchase not found"));
@@ -117,7 +117,7 @@ namespace OpenSim.Continuum.Economy
             if (purchaseID == Guid.Empty || expectedBuyerID == Guid.Empty)
                 return Invalid(purchaseID, "Non-zero purchase and buyer IDs are required");
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlTransaction transaction = connection.BeginTransaction(IsolationLevel.ReadCommitted);
             PurchaseRow row = Read(connection, transaction, purchaseID, true);
             if (row == null) return Finish(transaction, Invalid(purchaseID, "Purchase not found"));
@@ -140,7 +140,7 @@ namespace OpenSim.Continuum.Economy
             if (limit < 1 || limit > 500)
                 throw new ArgumentOutOfRangeException(nameof(limit), "Pending purchase limit must be between 1 and 500");
             using MySqlConnection connection = new(m_connectionString);
-            connection.Open();
+            MySqlValue.Open(connection);
             using MySqlCommand command = connection.CreateCommand();
             command.CommandText = @"SELECT purchase_id,buyer_id,seller_id,amount,transaction_type,
                     region_id,object_id,description,created_utc
@@ -154,10 +154,10 @@ namespace OpenSim.Continuum.Economy
             {
                 pending.Add(new LedgerPendingPurchase
                 {
-                    PurchaseID=Guid.Parse(reader.GetString(0)), BuyerID=Guid.Parse(reader.GetString(1)),
-                    SellerID=Guid.Parse(reader.GetString(2)), Amount=reader.GetInt64(3),
-                    TransactionType=reader.GetInt32(4), RegionID=Guid.Parse(reader.GetString(5)),
-                    ObjectID=Guid.Parse(reader.GetString(6)), Description=reader.GetString(7),
+                    PurchaseID=MySqlValue.Guid(reader,0), BuyerID=MySqlValue.Guid(reader,1),
+                    SellerID=MySqlValue.Guid(reader,2), Amount=reader.GetInt64(3),
+                    TransactionType=reader.GetInt32(4), RegionID=MySqlValue.Guid(reader,5),
+                    ObjectID=MySqlValue.Guid(reader,6), Description=reader.GetString(7),
                     CreatedUtc=DateTime.SpecifyKind(reader.GetDateTime(8),DateTimeKind.Utc)
                 });
             }
@@ -186,9 +186,9 @@ namespace OpenSim.Continuum.Economy
             command.Parameters.AddWithValue("?purchase", purchaseID.ToString());
             using MySqlDataReader reader = command.ExecuteReader();
             if (!reader.Read()) return null;
-            return new PurchaseRow { ID=purchaseID, RequestHash=reader.GetString(0), BuyerID=Guid.Parse(reader.GetString(1)),
-                SellerID=Guid.Parse(reader.GetString(2)), Amount=reader.GetInt64(3), TransactionType=reader.GetInt32(4),
-                RegionID=Guid.Parse(reader.GetString(5)), ObjectID=Guid.Parse(reader.GetString(6)), Description=reader.GetString(7),
+            return new PurchaseRow { ID=purchaseID, RequestHash=reader.GetString(0), BuyerID=MySqlValue.Guid(reader,1),
+                SellerID=MySqlValue.Guid(reader,2), Amount=reader.GetInt64(3), TransactionType=reader.GetInt32(4),
+                RegionID=MySqlValue.Guid(reader,5), ObjectID=MySqlValue.Guid(reader,6), Description=reader.GetString(7),
                 State=(LedgerPurchaseState)reader.GetInt32(8), BuyerBalance=reader.GetInt64(9), SellerBalance=reader.GetInt64(10),
                 FailureReason=reader.GetString(11) };
         }
