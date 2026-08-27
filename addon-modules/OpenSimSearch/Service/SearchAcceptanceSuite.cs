@@ -43,8 +43,20 @@ namespace ContinuumSearch.Service
             landRequest["type"] = UInt32.MaxValue.ToString();
             ArrayList land = store.FindLand(landRequest);
             Require(land.Count == 1 && Convert.ToInt32(((Hashtable)land[0])["sale_price"]) == 250, "land query");
+            store.SaveEvent(new SearchEvent
+            {
+                ID = 900001, OwnerID = "22222222-2222-2222-2222-222222222222",
+                CreatorID = "22222222-2222-2222-2222-222222222222", Name = "Continuum Test Event",
+                Category = 1, Description = "Search acceptance event", DateUtc = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds(),
+                Duration = 60, SimName = "Welcome Test", ParcelID = "33333333-3333-3333-3333-333333333333",
+                GlobalPosition = "128,128,25", Flags = 0
+            });
+            Hashtable eventRequest = Request("u|0|Continuum", 0x07000020);
+            ArrayList events = store.FindEvents(eventRequest);
+            Require(events.Count == 1 && Convert.ToInt32(((Hashtable)events[0])["event_id"]) == 900001, "events query");
+            Require(store.GetEvent(new Hashtable { ["eventID"] = "900001" }).Count == 1, "event details query");
             Console.WriteLine("PASS: DataSnapshot parse and idempotent region replacement");
-            Console.WriteLine("PASS: places, popular and land viewer query contracts");
+            Console.WriteLine("PASS: places, popular, land, events and event-details viewer query contracts");
             Console.WriteLine("ContinuumSearch SQLite acceptance self-test passed.");
             return 0;
         }
