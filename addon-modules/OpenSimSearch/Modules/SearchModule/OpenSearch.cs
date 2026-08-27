@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -45,6 +46,9 @@ namespace OpenSimSearch.Modules.OpenSearch
         private int m_MaxConcurrentRequests = 8;
         private int m_ActiveRequests;
         private bool m_Closing;
+        private IGroupsModule m_GroupsService;
+        private readonly ExpiringCache<string, List<UserAccount>> m_PeopleCache = new();
+        private readonly ExpiringCache<string, List<DirGroupsReplyData>> m_GroupCache = new();
 
         #region IRegionModuleBase implementation
         public void Initialise(IConfigSource config)
@@ -135,6 +139,8 @@ namespace OpenSimSearch.Modules.OpenSearch
 
         public void RegionLoaded(Scene scene)
         {
+            if (m_Enabled && m_GroupsService == null)
+                m_GroupsService = scene.RequestModuleInterface<IGroupsModule>();
         }
 
         public Type ReplaceableInterface
@@ -528,12 +534,99 @@ namespace OpenSimSearch.Modules.OpenSearch
         public void DirFindQuery(IClientAPI remoteClient, UUID queryID,
                 string queryText, uint queryFlags, int queryStart)
         {
+            if (((DirFindFlags)queryFlags & DirFindFlags.People) == DirFindFlags.People)
+            {
+                DirPeopleQuery(remoteClient, queryID, queryText, queryStart);
+                return;
+            }
+            if (((DirFindFlags)queryFlags & DirFindFlags.Groups) == DirFindFlags.Groups)
+            {
+                DirGroupsQuery(remoteClient, queryID, queryText, queryStart);
+                return;
+            }
             if (((DirFindFlags)queryFlags & DirFindFlags.DateEvents) == DirFindFlags.DateEvents)
             {
                 DirEventsQuery(remoteClient, queryID, queryText, queryFlags,
                         queryStart);
                 return;
             }
+        }
+
+        private void DirPeopleQuery(IClientAPI remoteClient, UUID queryID, string queryText, int queryStart)
+        {
+            string search = (queryText ?? string.Empty).Trim().ToLowerInvariant();
+            if (search.Length == 0)
+            {
+                remoteClient.SendDirPeopleReply(queryID, Array.Empty<DirPeopleReplyData>());
+                return;
+            }
+
+            List<UserAccount> accounts;
+            if (!m_PeopleCache.TryGetValue(search, out accounts))
+            {
+                Scene scene = remoteClient.Scene as Scene;
+                accounts = scene?.UserAccountService?.GetUserAccounts(scene.RegionInfo.ScopeID, search)
+                    ?? new List<UserAccount>();
+                m_PeopleCache.AddOrUpdate(search, accounts, 30.0);
+            }
+
+            HashSet<UUID> online = new();
+            Scene presenceScene = remoteClient.Scene as Scene;
+            if (accounts.Count > 0 && presenceScene?.PresenceService != null)
+            {
+                try
+                {
+                    OpenSim.Services.Interfaces.PresenceInfo[] presences = presenceScene.PresenceService.GetAgents(
+                        accounts.Select(account => account.PrincipalID.ToString()).ToArray());
+                    if (presences != null)
+                        foreach (OpenSim.Services.Interfaces.PresenceInfo presence in presences)
+                            if (presence != null && UUID.TryParse(presence.UserID, out UUID id)) online.Add(id);
+                }
+                catch (Exception e)
+                {
+                    m_log.DebugFormat("[SEARCH]: Presence lookup for people search failed: {0}", e.Message);
+                }
+            }
+
+            int start = Math.Clamp(queryStart, 0, accounts.Count);
+            int count = Math.Min(101, accounts.Count - start);
+            DirPeopleReplyData[] result = new DirPeopleReplyData[count];
+            for (int i = 0; i < count; ++i)
+            {
+                UserAccount account = accounts[start + i];
+                result[i] = new DirPeopleReplyData
+                {
+                    agentID = account.PrincipalID,
+                    firstName = account.FirstName,
+                    lastName = account.LastName,
+                    online = online.Contains(account.PrincipalID),
+                    group = string.Empty,
+                    reputation = 0
+                };
+            }
+            remoteClient.SendDirPeopleReply(queryID, result);
+        }
+
+        private void DirGroupsQuery(IClientAPI remoteClient, UUID queryID, string queryText, int queryStart)
+        {
+            string search = (queryText ?? string.Empty).Trim().ToLowerInvariant();
+            if (search.Length == 0 || m_GroupsService == null)
+            {
+                if (m_GroupsService == null)
+                    m_log.Warn("[SEARCH]: Groups service is unavailable; group directory search is disabled");
+                remoteClient.SendDirGroupsReply(queryID, Array.Empty<DirGroupsReplyData>());
+                return;
+            }
+
+            List<DirGroupsReplyData> groups;
+            if (!m_GroupCache.TryGetValue(search, out groups))
+            {
+                groups = m_GroupsService.FindGroups(remoteClient, search) ?? new List<DirGroupsReplyData>();
+                m_GroupCache.AddOrUpdate(search, groups, 30.0);
+            }
+            List<DirGroupsReplyData> visible = groups.Where(group => group.members > 0).ToList();
+            int start = Math.Clamp(queryStart, 0, visible.Count);
+            remoteClient.SendDirGroupsReply(queryID, visible.Skip(start).Take(101).ToArray());
         }
 
         public void DirEventsQuery(IClientAPI remoteClient, UUID queryID,
