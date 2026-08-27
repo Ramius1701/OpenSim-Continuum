@@ -1,6 +1,6 @@
 # OpenSim Continuum integration progress
 
-Last updated: 2026-08-20
+Last updated: 2026-08-28
 
 Branch: protected `master`; active integration branch `development`
 
@@ -8,8 +8,18 @@ OpenSim upstream synchronized through `58b7b39db676a166c68d47256f50588cdf330630`
 
 This ledger distinguishes code completion from runtime certification. A feature
 is not production-approved merely because it compiles or passes an isolated
-test. The branch remains an alpha integration build until every applicable live
-grid gate here and in `donor-feature-test-handoff.md` passes.
+test. The branch is an operational beta-test candidate after process-level
+gates on all required databases. It remains short of production certification
+until the real-viewer workflows in `donor-feature-test-handoff.md` pass.
+
+On 2026-08-28, fresh MySQL/MariaDB and PostgreSQL ROBUST deployments each ran
+two independent simulators through registration, neighbour discovery,
+Firestorm-style authentication and capability creation, persistence, and a
+clean simulator restart. SQLite standalone passed the equivalent fresh-start,
+login/capability, service-activation, persistence, and restart gate. The same
+pass corrected the shipped Groups Messaging V2 profiles, whose required
+`MessageOnlineUsersOnly` setting had been missing. The final Release solution
+build completed with zero warnings and zero errors.
 
 The four baseline CS9193 warnings were removed by passing local quaternion
 variables with the explicit `in` modifier to the `ref readonly` conjugation API

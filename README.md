@@ -2,9 +2,9 @@
 
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
-The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The repository has subsequently synchronized OpenSim upstream through `58b7b39db676a166c68d47256f50588cdf330630` while retaining the audited Continuum feature set. The active hardening branch remains an **alpha integration build**, not a production-approved release. The complete solution builds cleanly, but cross-simulator Display Names, viewer currency purchasing, Experiences, Abuse Reports, search propagation, Hypergrid behavior, voice, and other distributed paths still require the recorded live-grid verification. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md), [the integration progress ledger](doc/integration-progress.md), and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
+The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The repository has subsequently synchronized OpenSim upstream through `58b7b39db676a166c68d47256f50588cdf330630` while retaining the audited Continuum feature set. The `development` branch is now an **operational beta-test candidate**, not a production-certified release. Complete MySQL/MariaDB and PostgreSQL ROBUST topologies and SQLite standalone have passed clean startup, service activation, Firestorm-style login/capability creation, persistence, and restart gates. Real-viewer crossings and user workflows—including nameplates, currency purchasing, Experience panels/scripts, Abuse Reports, search, Hypergrid, and voice—remain the beta acceptance work. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md), [the integration progress ledger](doc/integration-progress.md), and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
 
-## Project status — alpha
+## Project status — operational beta-test candidate
 
 - Target runtime: .NET 8
 - Required deployment targets: Windows standalone with SQLite; Windows grid mode
@@ -12,6 +12,8 @@ The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743d
 - Original baseline build: successful with four known CS9193 compiler warnings
 - The four CS9193 warnings have been corrected without changing their quaternion calculations
 - Latest complete Release build: successful with zero warnings and zero errors
+- MySQL/MariaDB and PostgreSQL: two independent simulators plus ROBUST passed registration, neighbour discovery, Firestorm-style login/CAPS, persistence, and clean restart
+- SQLite: standalone services, region, Firestorm-style login/CAPS, persistence, and clean restart passed
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
