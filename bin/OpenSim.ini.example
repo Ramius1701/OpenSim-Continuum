@@ -1221,6 +1221,17 @@
     ; data with this and/or other search providers.
     ; data_services="http://metaverseink.com/cgi-bin/register.py"
 
+    ;; Continuum native search service. Enable index_sims above and point this
+    ;; at ContinuumSearch.Service's RegistrationPath on the grid service host.
+    ; DATA_SRV_ContinuumSearch = "http://127.0.0.1:8010/search/register"
+
+[Search]
+    ;; To use ContinuumSearch.Service, also set SearchModule = OpenSimSearch in
+    ;; the active architecture file's [Modules] section.
+    ; SearchURL = "http://127.0.0.1:8010/"
+    ; RequestTimeoutMs = 5000
+    ; MaxConcurrentRequests = 8
+
     ;; New way of specifying data services, one per service
     ;DATA_SRV_MISearch = "http://metaverseink.com/cgi-bin/register.py"
 

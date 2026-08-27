@@ -1,0 +1,375 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.Common;
+using System.Globalization;
+using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using MySql.Data.MySqlClient;
+using Npgsql;
+using System.Data.SQLite;
+
+namespace ContinuumSearch.Service
+{
+    internal sealed class SearchStore : IDisposable
+    {
+        private readonly string m_connectionString;
+        private readonly Func<DbConnection> m_connectionFactory;
+        internal string Provider { get; }
+
+        private SearchStore(string provider, string connectionString, Func<DbConnection> factory)
+        {
+            Provider = provider;
+            m_connectionString = connectionString;
+            m_connectionFactory = factory;
+        }
+
+        internal static SearchStore Open(string provider, string connectionString)
+        {
+            if (String.IsNullOrWhiteSpace(connectionString))
+                throw new InvalidOperationException("Search database ConnectionString is required");
+            string key = (provider ?? String.Empty).Trim().ToLowerInvariant();
+            if (key is "sqlite" or "system.data.sqlite")
+                ConfigureSQLiteNativeLibrary();
+            return key switch
+            {
+                "mysql" or "mysql.data" => new SearchStore("MySQL", connectionString,
+                    () => new MySqlConnection(connectionString)),
+                "postgresql" or "postgres" or "pgsql" or "npgsql" => new SearchStore("PostgreSQL", connectionString,
+                    () => new NpgsqlConnection(connectionString)),
+                "sqlite" or "system.data.sqlite" => new SearchStore("SQLite", connectionString,
+                    () => new SQLiteConnection(connectionString)),
+                _ => throw new NotSupportedException("Search StorageProvider must be MySQL, PostgreSQL, or SQLite")
+            };
+        }
+
+        private static void ConfigureSQLiteNativeLibrary()
+        {
+            NativeLibrary.SetDllImportResolver(typeof(SQLiteConnection).Assembly, (name, assembly, path) =>
+            {
+                if (!name.Equals("e_sqlite3", StringComparison.OrdinalIgnoreCase)) return IntPtr.Zero;
+                string file = OperatingSystem.IsWindows() ? "e_sqlite3.dll" :
+                    OperatingSystem.IsMacOS() ? (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ?
+                        "libe_sqlite3_OSX_arm64.dylib" : "libe_sqlite3_OSX_x64.dylib") :
+                    (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "libe_sqlite3-arm64.so" : "libe_sqlite3.so");
+                string candidate = Path.Combine(AppContext.BaseDirectory, "lib64", file);
+                return File.Exists(candidate) ? NativeLibrary.Load(candidate) : IntPtr.Zero;
+            });
+        }
+
+        internal void EnsureSchema()
+        {
+            string text = Provider == "MySQL" ? "TEXT" : "TEXT";
+            string real = Provider == "MySQL" ? "DOUBLE" : "REAL";
+            string integer = Provider == "PostgreSQL" ? "BIGINT" : "INTEGER";
+            string createIndex = Provider == "MySQL" ? "CREATE INDEX " : "CREATE INDEX IF NOT EXISTS ";
+            string[] sql =
+            {
+                "CREATE TABLE IF NOT EXISTS continuum_search_hosts (host VARCHAR(255) NOT NULL, port INTEGER NOT NULL, secret VARCHAR(64) NOT NULL, next_check " + integer + " NOT NULL, failures INTEGER NOT NULL, PRIMARY KEY(host,port))",
+                "CREATE TABLE IF NOT EXISTS continuum_search_regions (region_id VARCHAR(36) NOT NULL PRIMARY KEY, name VARCHAR(255) NOT NULL, region_handle VARCHAR(32) NOT NULL, url VARCHAR(1024) NOT NULL, owner_id VARCHAR(36) NOT NULL, owner_name VARCHAR(255) NOT NULL, maturity INTEGER NOT NULL)",
+                "CREATE TABLE IF NOT EXISTS continuum_search_parcels (region_id VARCHAR(36) NOT NULL, parcel_id VARCHAR(36) NOT NULL PRIMARY KEY, info_id VARCHAR(36) NOT NULL, name VARCHAR(255) NOT NULL, description " + text + " NOT NULL, category INTEGER NOT NULL, landing VARCHAR(255) NOT NULL, area INTEGER NOT NULL, sale_price INTEGER NOT NULL, parent_estate INTEGER NOT NULL DEFAULT 1, for_sale INTEGER NOT NULL, show_in_search INTEGER NOT NULL, dwell " + real + " NOT NULL, maturity INTEGER NOT NULL, snapshot_id VARCHAR(36) NOT NULL)",
+                createIndex + "continuum_search_parcels_region_idx ON continuum_search_parcels(region_id)",
+                createIndex + "continuum_search_parcels_name_idx ON continuum_search_parcels(name)",
+                "CREATE TABLE IF NOT EXISTS continuum_search_objects (object_id VARCHAR(36) NOT NULL PRIMARY KEY, region_id VARCHAR(36) NOT NULL, parcel_id VARCHAR(36) NOT NULL, name VARCHAR(255) NOT NULL, description " + text + " NOT NULL, location VARCHAR(255) NOT NULL)",
+                createIndex + "continuum_search_objects_region_idx ON continuum_search_objects(region_id)",
+                "CREATE TABLE IF NOT EXISTS continuum_search_events (event_id INTEGER NOT NULL PRIMARY KEY, owner_id VARCHAR(36) NOT NULL, creator_id VARCHAR(36) NOT NULL, name VARCHAR(255) NOT NULL, category INTEGER NOT NULL, description " + text + " NOT NULL, date_utc " + integer + " NOT NULL, duration INTEGER NOT NULL, cover_charge INTEGER NOT NULL, cover_amount INTEGER NOT NULL, sim_name VARCHAR(255) NOT NULL, global_pos VARCHAR(255) NOT NULL, event_flags INTEGER NOT NULL)"
+            };
+            using DbConnection connection = OpenConnection();
+            foreach (string statement in sql)
+            {
+                try { using DbCommand command = Command(connection, statement); command.ExecuteNonQuery(); }
+                catch (Exception e) when (statement.StartsWith("CREATE INDEX", StringComparison.Ordinal) &&
+                    (e.Message.Contains("exists", StringComparison.OrdinalIgnoreCase) ||
+                     e.Message.Contains("Duplicate key name", StringComparison.OrdinalIgnoreCase))) { }
+            }
+            try
+            {
+                using DbCommand command = Command(connection,
+                    "ALTER TABLE continuum_search_parcels ADD COLUMN parent_estate INTEGER NOT NULL DEFAULT 1");
+                command.ExecuteNonQuery();
+            }
+            catch (Exception e) when (e.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase) ||
+                e.Message.Contains("exists", StringComparison.OrdinalIgnoreCase)) { }
+        }
+
+        internal ArrayList FindPlaces(Hashtable request)
+        {
+            string search = SearchPattern(Text(request, "text"));
+            if (search == null) return new ArrayList();
+            int flags = Number(request, "flags");
+            int category = Number(request, "category");
+            int offset = Offset(request);
+            string where = "show_in_search=1 AND (LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))";
+            List<(string, object)> args = new() { ("@search", search) };
+            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category)); }
+            where += MaturityWhere(flags, args);
+            string order = (flags & 1024) != 0 ? "dwell DESC,name" : "name";
+            return Query("SELECT info_id,name,for_sale,dwell FROM continuum_search_parcels WHERE " + where +
+                " ORDER BY " + order + " LIMIT 101 OFFSET @offset", args, ("@offset", offset), reader => new Hashtable
+                {
+                    ["parcel_id"] = Value(reader, 0), ["name"] = Value(reader, 1),
+                    ["for_sale"] = Bool(reader, 2), ["auction"] = false, ["dwell"] = Double(reader, 3)
+                });
+        }
+
+        internal ArrayList FindPopular(Hashtable request)
+        {
+            int flags = Number(request, "flags");
+            List<(string, object)> args = new();
+            string where = "show_in_search=1" + MaturityWhere(flags, args);
+            return Query("SELECT info_id,name,dwell FROM continuum_search_parcels WHERE " + where +
+                " ORDER BY dwell DESC,name LIMIT 101", args, null, reader => new Hashtable
+                {
+                    ["parcel_id"] = Value(reader, 0), ["name"] = Value(reader, 1), ["dwell"] = Double(reader, 2)
+                });
+        }
+
+        internal ArrayList FindLand(Hashtable request)
+        {
+            int flags = Number(request, "flags");
+            List<(string, object)> args = new();
+            string where = "for_sale=1" + MaturityWhere(flags, args);
+            long type = Int64.TryParse(Text(request, "type"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsedType) ? parsedType : UInt32.MaxValue;
+            if (type != UInt32.MaxValue)
+            {
+                if ((type & 24) == 8) where += " AND parent_estate=1";
+                else if ((type & 24) == 16) where += " AND parent_estate<>1";
+            }
+            if ((flags & 0x100000) != 0) { where += " AND sale_price<=@price"; args.Add(("@price", Number(request, "price"))); }
+            if ((flags & 0x200000) != 0) { where += " AND area>=@area"; args.Add(("@area", Number(request, "area"))); }
+            string order = (flags & 0x80000) != 0 ? "name" : (flags & 0x10000) != 0 ? "sale_price" :
+                (flags & 0x40000) != 0 ? "area" : "(sale_price * 1.0 / CASE WHEN area=0 THEN 1 ELSE area END)";
+            order += (flags & 0x8000) != 0 ? " ASC" : " DESC";
+            return Query("SELECT info_id,name,sale_price,area,landing,region_id FROM continuum_search_parcels WHERE " +
+                where + " ORDER BY " + order + " LIMIT 101 OFFSET @offset", args, ("@offset", Offset(request)), reader => new Hashtable
+                {
+                    ["parcel_id"] = Value(reader, 0), ["name"] = Value(reader, 1), ["auction"] = false,
+                    ["for_sale"] = true, ["sale_price"] = Int(reader, 2), ["area"] = Int(reader, 3),
+                    ["landing_point"] = Value(reader, 4), ["region_UUID"] = Value(reader, 5)
+                });
+        }
+
+        internal ArrayList FindEvents(Hashtable request)
+        {
+            string raw = Text(request, "text");
+            string[] parts = raw.Split('|');
+            string search = parts.Length > 2 ? SearchPattern(parts[2]) : null;
+            int category = parts.Length > 1 && Int32.TryParse(parts[1], out int parsed) ? parsed : 0;
+            int flags = Number(request, "flags");
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            List<(string, object)> args = new();
+            string day = parts.Length > 0 ? parts[0].Trim().ToLowerInvariant() : "0";
+            string where;
+            if (day == "u")
+            {
+                where = "date_utc + duration * 60 >= @now";
+                args.Add(("@now", now));
+            }
+            else
+            {
+                int offset = day is "y" or "yesterday" ? -1 : day is "tom" or "tm" or "tomorrow" or "m" ? 1 :
+                    Int32.TryParse(day, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsedDay) ? parsedDay : 0;
+                TimeZoneInfo zone = PacificTimeZone();
+                DateTime localDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, zone).Date.AddDays(offset);
+                long start = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localDate, zone)).ToUnixTimeSeconds();
+                long end = new DateTimeOffset(TimeZoneInfo.ConvertTimeToUtc(localDate.AddDays(1), zone)).ToUnixTimeSeconds();
+                where = "date_utc>=@start AND date_utc<@end";
+                args.Add(("@start", start)); args.Add(("@end", end));
+            }
+            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category)); }
+            if (search != null) { where += " AND (LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))"; args.Add(("@search", search)); }
+            where += EventMaturityWhere(flags, args);
+            return Query("SELECT owner_id,name,event_id,date_utc,event_flags,global_pos,sim_name,duration FROM continuum_search_events WHERE " +
+                where + " ORDER BY date_utc,event_id LIMIT 101 OFFSET @offset", args, ("@offset", Offset(request)), reader => new Hashtable
+                {
+                    ["owner_id"] = Value(reader, 0), ["name"] = Value(reader, 1), ["event_id"] = Int(reader, 2),
+                    ["date"] = DateTimeOffset.FromUnixTimeSeconds(Long(reader, 3)).ToLocalTime().ToString("MM/dd hh:mm tt", CultureInfo.InvariantCulture),
+                    ["unix_time"] = Long(reader, 3), ["event_flags"] = Int(reader, 4), ["landing_point"] = Value(reader, 5),
+                    ["globalposition"] = Value(reader, 5), ["simname"] = Value(reader, 6), ["duration"] = Int(reader, 7)
+                });
+        }
+
+        internal ArrayList FindClassifieds(Hashtable request)
+        {
+            string search = SearchPattern(Text(request, "text"));
+            if (search == null) return new ArrayList();
+            int category = Number(request, "category");
+            List<(string, object)> args = new() { ("@search", search) };
+            string where = "(LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))";
+            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category)); }
+            int flags = Number(request, "flags");
+            int maturity = 0;
+            if ((flags & 5) != 0) maturity |= 5;
+            if ((flags & 10) != 0) maturity |= 8;
+            if ((flags & 64) != 0) maturity |= 64;
+            if (maturity != 0) { where += " AND (classifiedflags & @maturity)<>0"; args.Add(("@maturity", maturity)); }
+            return Query("SELECT classifieduuid,name,classifiedflags,creationdate,expirationdate,priceforlisting FROM classifieds WHERE " +
+                where + " ORDER BY priceforlisting DESC LIMIT 101 OFFSET @offset", args, ("@offset", Offset(request)), reader => new Hashtable
+                {
+                    ["classifiedid"] = Value(reader, 0), ["name"] = Value(reader, 1), ["classifiedflags"] = Int(reader, 2),
+                    ["creation_date"] = Long(reader, 3), ["expiration_date"] = Long(reader, 4), ["priceforlisting"] = Int(reader, 5)
+                });
+        }
+
+        internal ArrayList GetEvent(Hashtable request) => Query(
+            "SELECT event_id,creator_id,name,category,description,date_utc,duration,cover_charge,cover_amount,sim_name,global_pos,event_flags FROM continuum_search_events WHERE event_id=@id LIMIT 1",
+            new List<(string, object)> { ("@id", Number(request, "eventID")) }, null, reader => new Hashtable
+            {
+                ["event_id"] = Int(reader, 0), ["creator"] = Value(reader, 1), ["name"] = Value(reader, 2),
+                ["category"] = Value(reader, 3), ["description"] = Value(reader, 4),
+                ["date"] = DateTimeOffset.FromUnixTimeSeconds(Long(reader, 5)).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                ["dateUTC"] = Long(reader, 5), ["duration"] = Int(reader, 6), ["covercharge"] = Int(reader, 7),
+                ["coveramount"] = Int(reader, 8), ["simname"] = Value(reader, 9), ["globalposition"] = Value(reader, 10),
+                ["eventflags"] = Int(reader, 11), ["landing_point"] = Value(reader, 10)
+            });
+
+        internal ArrayList GetClassified(Hashtable request) => Query(
+            "SELECT classifieduuid,creatoruuid,creationdate,expirationdate,category,name,description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname,classifiedflags,priceforlisting FROM classifieds WHERE classifieduuid=@id LIMIT 1",
+            new List<(string, object)> { ("@id", Text(request, "classifiedID")) }, null, reader =>
+            {
+                string[] names = { "classifieduuid", "creatoruuid", "creationdate", "expirationdate", "category", "name", "description", "parceluuid", "parentestate", "snapshotuuid", "simname", "posglobal", "parcelname", "classifiedflags", "priceforlisting" };
+                Hashtable row = new(); for (int i = 0; i < names.Length; ++i) row[names[i]] = Value(reader, i); return row;
+            });
+
+        internal void RegisterHost(string host, int port, string secret, bool online)
+        {
+            using DbConnection connection = OpenConnection();
+            using DbTransaction transaction = connection.BeginTransaction();
+            Execute(connection, transaction, "DELETE FROM continuum_search_hosts WHERE host=@host AND port=@port", ("@host", host), ("@port", port));
+            if (online)
+                Execute(connection, transaction, "INSERT INTO continuum_search_hosts(host,port,secret,next_check,failures) VALUES(@host,@port,@secret,0,0)",
+                    ("@host", host), ("@port", port), ("@secret", secret));
+            transaction.Commit();
+        }
+
+        internal List<SearchHost> DueHosts(long now, int maximum)
+        {
+            List<SearchHost> hosts = new();
+            using DbConnection connection = OpenConnection();
+            using DbCommand command = Command(connection,
+                "SELECT host,port,secret,failures FROM continuum_search_hosts WHERE next_check<=@now AND failures<10 ORDER BY next_check LIMIT @limit",
+                ("@now", now), ("@limit", Math.Clamp(maximum, 1, 100)));
+            using DbDataReader reader = command.ExecuteReader();
+            while (reader.Read()) hosts.Add(new SearchHost(Value(reader, 0), Int(reader, 1), Value(reader, 2), Int(reader, 3)));
+            return hosts;
+        }
+
+        internal void HostChecked(SearchHost host, long nextCheck, bool success)
+        {
+            using DbConnection connection = OpenConnection();
+            Execute(connection, null, "UPDATE continuum_search_hosts SET next_check=@next,failures=@failures WHERE host=@host AND port=@port",
+                ("@next", nextCheck), ("@failures", success ? 0 : host.Failures + 1), ("@host", host.Host), ("@port", host.Port));
+        }
+
+        internal void ReplaceRegion(SearchRegion region)
+        {
+            using DbConnection connection = OpenConnection();
+            using DbTransaction transaction = connection.BeginTransaction();
+            Execute(connection, transaction, "DELETE FROM continuum_search_objects WHERE region_id=@id", ("@id", region.ID));
+            Execute(connection, transaction, "DELETE FROM continuum_search_parcels WHERE region_id=@id", ("@id", region.ID));
+            Execute(connection, transaction, "DELETE FROM continuum_search_regions WHERE region_id=@id", ("@id", region.ID));
+            Execute(connection, transaction, "INSERT INTO continuum_search_regions(region_id,name,region_handle,url,owner_id,owner_name,maturity) VALUES(@id,@name,@handle,@url,@owner,@ownername,@maturity)",
+                ("@id", region.ID), ("@name", region.Name), ("@handle", region.Handle), ("@url", region.Url),
+                ("@owner", region.OwnerID), ("@ownername", region.OwnerName), ("@maturity", region.Maturity));
+            foreach (SearchParcel parcel in region.Parcels)
+                Execute(connection, transaction, "INSERT INTO continuum_search_parcels(region_id,parcel_id,info_id,name,description,category,landing,area,sale_price,parent_estate,for_sale,show_in_search,dwell,maturity,snapshot_id) VALUES(@region,@parcel,@info,@name,@description,@category,@landing,@area,@price,@estate,@sale,@search,@dwell,@maturity,@snapshot)",
+                    ("@region", region.ID), ("@parcel", parcel.ID), ("@info", parcel.InfoID), ("@name", parcel.Name),
+                    ("@description", parcel.Description), ("@category", parcel.Category), ("@landing", parcel.Landing),
+                    ("@area", parcel.Area), ("@price", parcel.SalePrice), ("@estate", parcel.ParentEstate), ("@sale", parcel.ForSale ? 1 : 0),
+                    ("@search", parcel.ShowInSearch ? 1 : 0), ("@dwell", parcel.Dwell), ("@maturity", region.Maturity),
+                    ("@snapshot", parcel.SnapshotID));
+            foreach (SearchObject item in region.Objects)
+                Execute(connection, transaction, "INSERT INTO continuum_search_objects(object_id,region_id,parcel_id,name,description,location) VALUES(@id,@region,@parcel,@name,@description,@location)",
+                    ("@id", item.ID), ("@region", region.ID), ("@parcel", item.ParcelID), ("@name", item.Name),
+                    ("@description", item.Description), ("@location", item.Location));
+            transaction.Commit();
+        }
+
+        private ArrayList Query(string sql, List<(string, object)> args, (string, object)? extra, Func<DbDataReader, Hashtable> map)
+        {
+            if (extra.HasValue) args.Add(extra.Value);
+            ArrayList rows = new();
+            using DbConnection connection = OpenConnection();
+            using DbCommand command = Command(connection, sql, args.ToArray());
+            using DbDataReader reader = command.ExecuteReader();
+            while (reader.Read()) rows.Add(map(reader));
+            return rows;
+        }
+
+        private string MaturityWhere(int flags, List<(string, object)> args)
+        {
+            List<int> levels = new();
+            if ((flags & 0x01000000) != 0) levels.Add(0);
+            if ((flags & 0x02000000) != 0) levels.Add(1);
+            if ((flags & 0x04000000) != 0) levels.Add(2);
+            if (levels.Count == 0) return String.Empty;
+            string[] parameters = new string[levels.Count];
+            for (int i = 0; i < levels.Count; ++i) { parameters[i] = "@maturity" + i; args.Add((parameters[i], levels[i])); }
+            return " AND maturity IN (" + String.Join(',', parameters) + ")";
+        }
+
+        private string EventMaturityWhere(int flags, List<(string, object)> args)
+        {
+            List<int> levels = new();
+            if ((flags & 0x01000000) != 0) levels.Add(0);
+            if ((flags & 0x02000000) != 0) levels.Add(1);
+            if ((flags & 0x04000000) != 0) levels.Add(2);
+            if (levels.Count == 0) return String.Empty;
+            string[] parameters = new string[levels.Count];
+            for (int i = 0; i < levels.Count; ++i)
+            {
+                parameters[i] = "@event_maturity" + i;
+                args.Add((parameters[i], levels[i]));
+            }
+            return " AND event_flags IN (" + String.Join(',', parameters) + ")";
+        }
+        private static string SearchPattern(string text)
+        {
+            text = (text ?? String.Empty).Trim();
+            if (text.Length == 0 || text == "%%%") return null;
+            return "%" + text.Replace(' ', '%') + "%";
+        }
+        private static TimeZoneInfo PacificTimeZone()
+        {
+            try { return TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles"); }
+            catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time"); }
+        }
+        private static int Offset(Hashtable values) => Math.Max(0, Number(values, "query_start"));
+        private static string Text(Hashtable values, string key) => values?[key]?.ToString() ?? String.Empty;
+        private static int Number(Hashtable values, string key) => Int32.TryParse(Text(values, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : 0;
+        private static string Value(DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? String.Empty : Convert.ToString(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        private static int Int(DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? 0 : Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        private static long Long(DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? 0 : Convert.ToInt64(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        private static double Double(DbDataReader reader, int ordinal) => reader.IsDBNull(ordinal) ? 0 : Convert.ToDouble(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+        private static bool Bool(DbDataReader reader, int ordinal) => !reader.IsDBNull(ordinal) && Convert.ToBoolean(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+
+        private DbConnection OpenConnection() { DbConnection connection = m_connectionFactory(); connection.Open(); return connection; }
+        private static DbCommand Command(DbConnection connection, string sql, params (string Name, object Value)[] args)
+        {
+            DbCommand command = connection.CreateCommand(); command.CommandText = sql;
+            foreach ((string name, object value) in args) { DbParameter p = command.CreateParameter(); p.ParameterName = name; p.Value = value ?? DBNull.Value; command.Parameters.Add(p); }
+            return command;
+        }
+        private static int Execute(DbConnection connection, DbTransaction transaction, string sql, params (string Name, object Value)[] args)
+        { using DbCommand command = Command(connection, sql, args); command.Transaction = transaction; return command.ExecuteNonQuery(); }
+        public void Dispose() { }
+    }
+
+    internal readonly record struct SearchHost(string Host, int Port, string Secret, int Failures);
+    internal sealed class SearchRegion
+    {
+        internal string ID = String.Empty, Name = String.Empty, Handle = String.Empty, Url = String.Empty, OwnerID = String.Empty, OwnerName = String.Empty;
+        internal int Maturity;
+        internal readonly List<SearchParcel> Parcels = new();
+        internal readonly List<SearchObject> Objects = new();
+    }
+    internal sealed class SearchParcel
+    {
+        internal string ID = String.Empty, InfoID = String.Empty, Name = String.Empty, Description = String.Empty, Landing = String.Empty, SnapshotID = String.Empty;
+        internal int Category, Area, SalePrice, ParentEstate = 1; internal bool ForSale, ShowInSearch; internal double Dwell;
+    }
+    internal sealed class SearchObject
+    { internal string ID = String.Empty, ParcelID = String.Empty, Name = String.Empty, Description = String.Empty, Location = String.Empty; }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<Project name="ContinuumSearch.Service" path="addon-modules/OpenSimSearch/Service" type="Exe" version="0.1.0-$Rev$" frameworkVersion="net8_0">
+  <Configuration name="Debug"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <Configuration name="Release"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="MySql.Data" localCopy="true" />
+  <Reference name="Npgsql" localCopy="true" />
+  <Reference name="System.Data.SQLite" localCopy="true" />
+  <Reference name="Nini" localCopy="true" />
+  <Reference name="XMLRPC" localCopy="true" />
+  <Reference name="OpenSim.Framework" />
+  <Reference name="OpenSim.Framework.Console" />
+  <Reference name="OpenSim.Framework.Servers.HttpServer" />
+  <Files><Match pattern="*.cs" recurse="false" /></Files>
+</Project>

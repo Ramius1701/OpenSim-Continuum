@@ -1,0 +1,28 @@
+[ContinuumSearchService]
+    ;; XML-RPC endpoint used by [Search] SearchURL in every simulator.
+    Port = 8010
+
+    ;; DataSnapshot regions register here through [DataSnapshot] data_services.
+    RegistrationPath = "/search/register"
+    SnapshotBatchSize = 10
+    SnapshotIntervalSeconds = 600
+    ConnectTimeoutSeconds = 10
+    RequestTimeoutSeconds = 30
+
+    ;; Leave false for an Internet-facing service. Set true only when region
+    ;; DataSnapshot endpoints intentionally use RFC1918/private grid addresses.
+    AllowPrivateSnapshotHosts = false
+
+[Database]
+    ;; Supported: SQLite, MySQL, PostgreSQL.
+    StorageProvider = "SQLite"
+    ;; Use the OpenSim database so profile classifieds are searchable too.
+    ConnectionString = "Data Source=OpenSim.db;Version=3;"
+
+    ;; MySQL example (use the same database that contains profile classifieds):
+    ; StorageProvider = "MySQL"
+    ; ConnectionString = "Data Source=127.0.0.1;Database=opensim;User ID=opensim;Password=CHANGE_ME;Old Guids=true;"
+
+    ;; PostgreSQL example:
+    ; StorageProvider = "PostgreSQL"
+    ; ConnectionString = "Server=127.0.0.1;Database=opensim;User Id=opensim;Password=CHANGE_ME;"

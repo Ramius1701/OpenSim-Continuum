@@ -59,6 +59,7 @@ namespace OpenSim.Continuum.Economy
 
         private static EconomyBackend CreateSQLite(EconomyStorageProvider provider, string connectionString)
         {
+            SQLiteNativeLibrary.Configure();
             SQLiteEconomyStore store = new(connectionString);
             return new EconomyBackend(provider, new SQLiteEconomyLedger(store),
                 new SQLiteEconomyAccountService(store), new SQLiteEconomyPurchaseService(store));
