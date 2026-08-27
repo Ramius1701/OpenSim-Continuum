@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Data;
+using System;
 using MySql.Data.MySqlClient;
 using OpenSim.Framework;
 using System.Collections.Generic;
@@ -50,7 +51,9 @@ namespace OpenSim.Data.MySQL
                     {
                         while (result.Read())
                         {
-                            string uuid = result.GetString(0);
+                            // MySql.Data may expose a CHAR(36) UUID as either
+                            // String or Guid depending on connector/server settings.
+                            string uuid = Convert.ToString(result.GetValue(0));
                             bool allow = result.GetBoolean(2);
 
                             UUID experience_key;
