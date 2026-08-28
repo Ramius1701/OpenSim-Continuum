@@ -113,6 +113,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser));
+            if (key == "regionprofile/modal_profile.html") AddRegionProfile(vars, parameters);
             if (key == "user/friends.html") AddFriends(vars, currentUser);
             if (key == "user/groups.html") AddGroups(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
@@ -384,6 +385,44 @@ namespace OpenSim.Continuum.WebUI
                 ["RegionInfo"] = H(region.ServerURI), ["RegionStatus"] = "Online",
                 ["MoreInfoText"] = "Details", ["HopUrl"] = Hop(region, Vector3.Zero)
             };
+        }
+
+        private void AddRegionProfile(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        {
+            GridRegion region = UUID.TryParse(Value(parameters, "regionid"), out UUID regionID)
+                ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, regionID)) : null;
+            if (region == null) return;
+
+            UserAccount owner = region.EstateOwner == UUID.Zero ? null
+                : Safe(() => _accounts.GetUserAccount(UUID.Zero, region.EstateOwner));
+            var residents = new List<Dictionary<string, object>>();
+            if (_gridUsers != null)
+            {
+                List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
+                foreach (UserAccount account in accounts.Take(10000))
+                {
+                    GridUserInfo info = Safe(() => _gridUsers.GetGridUserInfo(account.PrincipalID.ToString()));
+                    if (info?.Online != true || info.LastRegionID != region.RegionID) continue;
+                    residents.Add(new Dictionary<string, object>
+                    {
+                        ["UserUUID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName)
+                    });
+                }
+            }
+
+            vars["RegionID"] = region.RegionID.ToString(); vars["RegionName"] = H(region.RegionName);
+            vars["RegionNameText"] = "Region"; vars["OwnerNameText"] = "Estate owner";
+            vars["OwnerUUID"] = region.EstateOwner.ToString(); vars["OwnerName"] = H(owner?.FormattedName ?? "Unknown");
+            vars["RegionTypeText"] = "Region type"; vars["RegionType"] = region.RegionSizeX + " x " + region.RegionSizeY;
+            vars["RegionMaturityText"] = "Maturity"; vars["RegionMaturity"] = MaturityName(region.Maturity.ToString(CultureInfo.InvariantCulture));
+            vars["RegionLocationText"] = "Grid location"; vars["RegionLocX"] = region.RegionCoordX; vars["RegionLocY"] = region.RegionCoordY;
+            vars["RegionTerrainText"] = "Terrain"; vars["RegionTerrain"] = "Standard";
+            vars["RegionOnlineText"] = "Status"; vars["RegionOnline"] = "Online";
+            vars["RegionWorldViewURL"] = Texture(region.TerrainImage, "static/icons/no_picture.jpg");
+            vars["NumberOfParcelsInRegion"] = "Available in parcel view"; vars["ParcelsInRegionText"] = "Parcels";
+            vars["NumberOfUsersInRegionText"] = "Residents currently in region";
+            vars["NumberOfUsersInRegion"] = residents.Count; vars["UsersInRegion"] = residents;
+            vars["MenuParcelTitle"] = "Parcels"; vars["UserNameText"] = "Resident";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

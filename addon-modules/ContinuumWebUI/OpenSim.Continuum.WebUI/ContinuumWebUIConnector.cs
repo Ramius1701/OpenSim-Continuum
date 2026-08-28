@@ -227,7 +227,15 @@ namespace OpenSim.Continuum.WebUI
                 ["MainServerURL"] = string.Empty,
                 ["WorldMapServiceURL"] = string.Empty,
                 ["MenuItems"] = menus,
-                ["ModalItems"] = new List<Dictionary<string, object>>(),
+                ["ModalItems"] = new List<Dictionary<string, object>>
+                {
+                    Menu("webprofile-modal_profile", "Resident profile", "webprofile/modal_profile.html"),
+                    Menu("webprofile-modal_groups", "Resident groups", "webprofile/modal_groups.html"),
+                    Menu("webprofile-modal_picks", "Resident picks", "webprofile/modal_picks.html"),
+                    Menu("webprofile-modal_regions", "Resident regions", "webprofile/modal_regions.html"),
+                    Menu("regionprofile-modal_profile", "Region profile", "regionprofile/modal_profile.html"),
+                    Menu("regionprofile-modal_parcels", "Region parcels", "regionprofile/modal_parcels.html")
+                },
                 ["Languages"] = new List<Dictionary<string, object>>(),
                 ["Maintenance"] = false,
                 ["NoMaintenance"] = true,
