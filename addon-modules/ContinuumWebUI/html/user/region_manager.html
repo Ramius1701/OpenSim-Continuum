@@ -1,0 +1,73 @@
+<!-- User region manager -->
+<style>
+  .page-link {background-color: transparent !important;}
+</style>
+
+<div class="col98">
+  <h2>{UserName} {RegionsText}</h2>
+
+  {IfHaveDataBegin}
+    {IsAuthenticatedBegin}
+    <table class="table-compact table-hover" id="regionlist" class="display" cellspacing="0" width="100%">
+      <thead>
+        <tr class="tablehead">
+          <th style="width:100px">{RegionLocXText}</th>
+          <th style="width:100px">{RegionLocYText}</th>
+          <th style="width:200px">{RegionText}</th>
+          <th class="no-sort"></th>
+          <th style="width:50px">{RegionOnlineText}</th>
+          <th class="no-sort" style="width:150px"></th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        {RegionListArrayBegin}
+        <tr onclick="loadusercontent('user-region_edit', 'regionid={RegionID}');">
+          <td class="text-center">{RegionLocX}</td>
+    	    <td class="text-center">{RegionLocY}</td>
+          <td class="text-center">{RegionName}</td>
+    	    <td class="text-left">{RegionInfo}</td>
+    	    <td class="text-centered">{RegionStatus}</td>
+          <td class="text-centered">
+            <a href="#" title="{EditText}">
+              <i class="fa fa-edit fa-lg"></i>
+            </a>
+          </td>
+        </tr>
+        {RegionListArrayEnd}
+
+      </tbody>
+    </table>
+  
+    <script>
+      $(function() {
+        $('#regionlist').dataTable( {
+          dom: 'frtip',
+          "order": [[ 0, "asc" ]],
+          "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
+          "pageLength": 10,
+          "fixedHeader": {
+            header: true,
+             //footer: true
+          },
+        });
+      });
+    </script>
+
+    {IsAuthenticatedEnd}
+  {IfHaveDataEnd}
+
+  {IfNoDataBegin}
+    <div id="error404" align="center">
+      <h4 class="error404">
+        No land found, maybe buy some?
+      </h4>
+      <div class="error404" style="cursor:pointer;">
+        <img src="/static/images/land_for_rent.jpg"/>
+      </div>
+    </div>
+  {IfNoDataEnd}
+
+</div>
+

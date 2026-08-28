@@ -1,0 +1,23 @@
+<!-- Welcomescreen news -->
+
+<div class="gridstatus" id="news">
+  <div>
+    <div class="form-row w-100" style="color:aqua;">
+      <img src="/static/icons/news.png" width="35"/>
+	  &nbsp;<strong>{SystemName} {News}</strong>
+	</div>
+
+	{NewsListArrayBegin}
+	<div class="form-row boxtext w-100" style="margin-left:0px;">
+	 	<a href="{SystemURL}/index.html?page=news_info&newsid={NewsID}" target="_blank">
+	 	 	<div class="col-5 newsdate">
+ 	   		{NewsDate}
+	 	  </div>
+		  {NewsTitle}
+
+		</a>
+
+    </div>
+	{NewsListArrayEnd}
+  </div>
+</div>

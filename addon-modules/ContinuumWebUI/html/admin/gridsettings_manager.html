@@ -1,0 +1,69 @@
+<!-- Grid settings -->
+
+<div class="container-fluid">
+  <h2>{SystemName}: {GridSettingsManager}</h2>
+
+  <form class="form-inline" id="gridsettings_manager_form" action="admin/gridsettings_manager.html" method="post">
+    <div class="row w-100">
+      <div class="col-md-8 offset-md-2">
+
+        <div class="form-group mb-1">
+          <label for="Gridname" class="col-4 col-form-label text-right mr-2">{GridnameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="Gridname" require="true" name="Gridname" type="text" size="40" maxlength="40" value="{Gridname}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="Gridnick" class="col-4 col-form-label text-right mr-2">{GridnickText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="Gridnick" require="true" name="Gridnick" type="text" size="40" maxlength="40" value="{Gridnick}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="WelcomeMessage" class="col-4 col-form-label text-right mr-2">{WelcomeMessageText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="WelcomeMessage" require="true" name="WelcomeMessage" type="text" size="120" maxlength="120" value="{WelcomeMessage}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="GovernorName" class="col-4 col-form-label text-right mr-2">{GovernorNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="Gridnick" require="true" name="GovernorName" type="text" size="40" maxlength="40" value="{GovernorName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="MainlandEstateName" class="col-4 col-form-label text-right mr-2">{MainlandEstateNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="MainlandEstateName" require="true" name="MainlandEstateName" type="text" size="40" maxlength="40" value="{MainlandEstateName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="RealEstateOwnerName" class="col-4 col-form-label text-right mr-2">{RealEstateOwnerNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="RealEstateOwnerName" require="true" name="RealEstateOwnerName" type="text" size="40" maxlength="40" value="{RealEstateOwnerName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="SystemEstateName" class="col-4 col-form-label text-right mr-2">{SystemEstateNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="SystemEstateName" require="true" name="SystemEstateName" type="text" size="40" maxlength="40" value="{SystemEstateName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="BankerName" class="col-4 col-form-label text-right mr-2">{BankerNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="BankerName" require="true" name="BankerName" type="text" size="40" maxlength="40" value="{BankerName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="MarketPlaceOwnerName" class="col-4 col-form-label text-right mr-2">{MarketPlaceOwnerNameText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="MarketPlaceOwnerName" require="true" name="MarketPlaceOwnerName" type="text" size="40" maxlength="40" value="{MarketPlaceOwnerName}">
+        </div>
+
+        <div class="row w-100 mt-3">
+          <div class="col pull-right">
+            <button class="btn-success" onclick="gohome();">{Cancel}</button>
+            <button class="btn-info pull-right" style="width:200px;" onclick="submitupdate('gridsettings_manager_form', 'update=true');">
+              {Save}
+            </button>
+          </div>
+          <div class="col-1"></div>
+        </div>
+
+      </div>
+    </div>
+  </form>
+  
+</div>

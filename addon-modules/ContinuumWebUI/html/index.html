@@ -1,0 +1,322 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>{SystemName}</title>
+	<meta name="keywords" content="{SystemName}" />
+	<meta name="description" content="{SystemName}"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Speaking of Google, don't forget to set your site up:
+       http://google.com/webmasters -->
+  <meta name="google-site-verification" content="" />
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=20190901">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=20190901">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=20190901">
+  <link rel="manifest" href="/static/site.webmanifest">
+
+  <link type="text/css" rel="stylesheet" href="static/css/normalize.min.css?v=20190901">
+	<link type="text/css" rel="stylesheet" href="static/css/bootstrap.min.css?v=20190901" >
+  <link type="text/css" rel="stylesheet" href="static/css/slick.css?v=20190901">
+  <link type="text/css" rel="stylesheet" href="static/css/slick-theme.css?v=20190901">
+  <link type="text/css" rel="stylesheet" href="static/css/bb.alert.css?v=20200601" />
+
+  <link type="text/css" rel="stylesheet" href="static/css/queries.css?v=20190901">
+  <link type="text/css" rel="stylesheet" href="static/css/style.css?v=20190904">
+
+</head>
+
+<body>
+
+	{IfMaintenanceBegin}
+  <section class="hero">
+	  <!--#include file="/maintenance.html" -->
+	</section>
+	{IfMaintenanceEnd}
+
+	{IfNoMaintenanceBegin}
+  <!--#include file="/modal_profile.html" -->
+
+  <section class="hero">
+
+    <section class="navigation">
+      <header>
+        <div class="header-content">
+          <div class="logo">
+          	<img src="../static/images/logo.png" width="25" alt="OpenSim Continuum logo">
+					</div>
+					<div class="systemname">
+						<h5>{SystemName}</h5>
+					</div>
+	       	<div id="toolbar" class="toolbar">
+	      		<div class="toolbarsocial">
+	        		<ul class="toolbar-group">
+								<li><a href="https://github.com/Ramius1701/OpenSim-Continuum" class="icon alt fa-github"><span class="label">GitHub</span></a></li>
+								<li><a href="#" class="icon alt fa-facebook"><span class="label">Facebook</span></a></li>
+								<li><a href="#" class="icon alt fa-youtube"><span class="label">YouTube</span></a></li>
+	        		</ul>
+		      	</div>
+		    	</div>
+
+          <div class="header-nav" style="width:100%;">
+            <nav class="navbar navbar-inverse">
+              <div class="container-fluid">
+                <div id="navbar">
+                  <ul class="primary-nav" id="topmenu">
+    							{MenuItemsArrayBegin}
+    							{IfShowInMenuBegin}
+                    {IfHasNoChildrenBegin}
+    						  	  <li href="#" id="{MenuItemID}" class="active" alt="{MenuItemTitle}">
+                          <!-- disabled -- title="{MenuItemTitleHelp}"-->
+                      {MenuItemTitle}
+                    {IfHasNoChildrenEnd}
+
+    								{IfHasChildrenBegin}
+                      <li class="dropdown" id="{MenuItemID}" alt="{MenuItemTitle}">
+                          <!-- disabled -- title="{MenuItemTitleHelp}" -->
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
+                           aria-haspopup="true" aria-expanded="false">{MenuItemTitle}<span class="caret"></span></a>
+    									  <ul class="dropdown-menu" id="submenu">
+    								      {ChildrenMenuItemsArrayBegin}
+    								        {IfChildShowInMenuBegin}
+    										      <li href="#" id="{ChildMenuItemID}" alt="{ChildMenuItemTitle}">
+                                  <!-- disabled -- title="{ChildMenuItemTitleHelp}"-->
+                                {ChildMenuItemTitle}
+                              </li>
+    								        {IfChildShowInMenuEnd}
+    								      {ChildrenMenuItemsArrayEnd}
+    									   </ul>
+                       </li>
+    								{IfHasChildrenEnd}
+    								</li>
+    							{IfShowInMenuEnd}
+    							{MenuItemsArrayEnd}
+                  </ul>
+
+                  <ul class="member-actions" id="member-actions">
+                    {IsNotAuthenticatedBegin}
+                    <li id="login" title="Log onto WebUI"><a href="#" class="login btn-white btn-xsmall" >Log in</a></li>
+                    <li id="forgot_pass" title="Reset password">
+                      <a class="forgotpass" href="#">
+                        <img src="/static/images/reset_password.png"  title="Reset password"/>
+                      </a>
+                    </li>
+                    <li id="register" title="Register"><a href="#" class="btn-white btn-small">Sign up</a></li>
+                    {IsNotAuthenticatedEnd}
+
+                    {IsAuthenticatedBegin}
+                      <li id="logout" title="Log out of WebUI"><a href="#" class="btn-white btn-small">Logout</a></li>
+                    {IsAuthenticatedEnd}
+                  </ul>
+                </div>
+              </div>
+          	</nav>
+          </div>
+
+	 				{IfShowLanguageTranslatorBarBegin}
+		      <div id="language" class="languageswitch">
+		        <a rel="nofollow" id="language-drop" href="javascript:toggleLanguage();">
+		          <span>LANGUAGE &#9663;</span>
+		        </a>
+		        <ul id="languageList" style="display:none;">
+							{LanguagesArrayBegin}
+					  	<li><a href="{Href}" rel="{Code}" class="languageswitch" alt="{Code}">
+				      <img src="static/flags/flag-{Code}.png" alt="{Code}">{Language}</a></li>
+						{LanguagesArrayEnd}
+						</ul>
+	    		</div>
+          {IfShowLanguageTranslatorBarEnd}
+
+      	  <div class="navicon">
+        	  <a class="nav-toggle" href="#"><span></span></a>
+        	</div>
+      	</div>
+      </header>
+    </section>  <!-- end navigation -->
+
+    <!-- content -->
+    <div class="container" id="container">
+      <div id="modalcontent_disabled"></div>
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="hero-content text-center" id="main_content">
+       			<div id="loading">
+							<img src="../static/icons/loading.gif" alt="Loading..." />
+						</div>
+        	</div>
+      	</div>
+    	</div>
+    </div>
+  </section>
+
+  <section class="intro section-padding">
+    <div class="container">
+      <div class="row">
+        <h2>OpenSim Continuum</h2>
+      </div>
+      <div class="row">
+        <div class="col-4 intro-feature">
+          <div class="intro-icon">
+            <span data-icon="&#xe033;" class="icon"></span>
+          </div>
+          <div class="intro-content">
+            <h5>Easily Customised</h5>
+              <p>Configure OpenSim Continuum for standalone or grid operation, with optional services and modules kept at explicit compatibility boundaries.</p>
+          </div>
+      	</div>
+      	<div class="col-4 intro-feature">
+          <div class="intro-icon">
+            <span data-icon="&#xe030;" class="icon"></span>
+          </div>
+          <div class="intro-content">
+            <h5>Modern Design</h5>
+            <p>A viewer-compatible OpenSimulator platform integrating carefully reviewed grid services, fixes, and optional features.</p>
+          </div>
+      	</div>
+      	<div class="col-4 intro-feature">
+          <div class="intro-icon">
+            <span data-icon="&#xe046;" class="icon"></span>
+          </div>
+          <div class="intro-content last">
+            <h5>Responsive Development</h5>
+            <p>Built for production-style grid validation across regions, ROBUST services, viewers, databases, and Hypergrid boundaries.</p>
+          </div>
+      	</div>
+      </div>
+    </div>
+  </section>
+  {IfNoMaintenanceEnd}
+
+  {IfLocalPageBegin}
+  <a name="localcontent"></a>
+  <section class="localnews_section section-padding">
+    <div class="container">
+      <div class="row">
+        <div class="localnews">
+          <!--#include file="{LocalFrontPage}" -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {IfLocalPageEnd}
+
+	<footer>
+    <div class="container">
+      <div class="row">
+        <div class="col-7">
+          <div class="footer-links">
+            <ul class="footer-group">
+              <li><a href="#">Features</a></li>
+              <li><a href="#">Pricing</a></li>
+              <li><a href="#">Sign up</a></li>
+            </ul>
+            <p>OpenSim Continuum
+              <br>
+              <a href="https://github.com/Ramius1701/OpenSim-Continuum">Source and licences</a> | WebUI design derived from the BSD-licensed WhiteCore integrated WebUI.
+            </p>
+          </div>
+        </div>
+          <div class="social-share">
+         		<ul class="footer-group">
+              <p>OpenSim Continuum</p>
+  						<li><a href="https://github.com/Ramius1701/OpenSim-Continuum" class="icon alt fa-github"><span class="label">GitHub</span></a></li>
+  						<li><a href="#" class="icon alt fa-facebook"><span class="label">Facebook</span></a></li>
+  						<li><a href="#" class="icon alt fa-linkedin"><span class="label">LinkedIn</span></a></li>
+  						<li><a href="#" class="icon alt fa-instagram"><span class="label">Instagram</span></a></li>
+  						<li><a href="#" class="icon alt fa-github"><span class="label">GitHub</span></a></li>
+  						<li><a href="mailto:greythane@gmail.com" class="icon alt fa-envelope"><span class="label">Email</span></a></li>
+				    </ul>
+          </div>
+          <p class=textsize>{PagesUpdateRequired}</p>
+					<p class=textsize>{SettingsUpdateRequired}</p>
+        </div>
+
+    </div>
+  </footer>
+
+
+
+	<!-- Javascript -->
+  <script src="static/js/jquery-3.4.1.min.js?v=20190901"></script>
+  <script src="static/js/retina.js?v=20190901"></script>
+  <script src="static/js/slick.min.js?v=20190901"></script>
+  <script src="static/js/bootstrap.bundle.min.js?v=20190901"></script>
+  <script src="static/js/scripts.js?v=20200603"></script>
+  <script src="static/js/bb.alert.js?v=20200601"></script>
+
+  <script type="text/javascript" src="static/js/menu.js?v=20190910"></script>
+
+	<script>
+
+    <!-- Menu Effect Style slide Up/slide Down -->
+    function mainmenu() {$('#menu ul').css({display: 'none'}); // Opera Fix
+    $('#menu li').hover(function (){$('ul:first', this).stop(true, true).slideDown(200);},
+    function menufirst(){$('ul:first', this).stop(true, true).slideUp(200);});}
+		<!-- Tooltips -->
+		function tooltip() {$('#container *').tooltip({showURL: false});};
+
+    function showlanguagebar(){ $('#language').fadeIn(1500);}
+		setTimeout(function() { $('#language').fadeOut(1500); }, 5000);
+		function toggleLanguage() {
+			$("#languageList").toggle();
+		}
+
+
+		<!-- fade in -->
+	  $(function() {
+			mainmenu();
+			//bgImgRotate();
+
+			$('#container').fadeIn("slow");
+			var result = {};
+			// var sections = $("#menu li");
+			var loading = $("#loading");
+			var main_content = $("#main_content");
+
+			if (window.location.search)	{
+				// split up the query string and store in an associative array
+				var params = window.location.search.slice(1).split("&");
+				for (var i = 0; i < params.length; i++)	{
+					var tmp = params[i].split("=");
+					result[tmp[0]] = unescape(tmp[1]);
+				}
+			}
+			//load selected section
+			var pageName = result["page"];
+			var found = new Boolean(0);
+
+			switch(pageName) {
+	      {MenuItemsArrayBegin}
+				case "{MenuItemID}":
+					main_content.load("{MenuItemLocation}" + window.location.search);
+					found = new Boolean(1);
+					break;
+	      {MenuItemsArrayEnd}
+			}
+
+			if(found == 0)
+				main_content.load("home.html" + window.location.search);
+
+		});
+
+		// fade class
+		$("li.fade, a.fade").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+		$("a.logofade").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+		$("a.languageswitch, a.webprofile").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+		//$("a.welcomescreen, a.world_map, a.copyright").hover(function(){
+    //  $(this).fadeOut(150);
+    //  $(this).fadeIn(150);
+    //});
+	</script>
+</body>
+</html>

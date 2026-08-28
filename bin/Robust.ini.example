@@ -139,7 +139,21 @@
     ;; Continuum: receive grid-wide viewer abuse reports on the private port.
     AbuseReportsServiceConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:AbuseReportsServiceConnector"
 
+    ;; Continuum: WhiteCore-derived integrated grid portal on the public port.
+    ;; Enable [ContinuumWebUI] below before uncommenting this connector.
+    ; ContinuumWebUIConnector = "${Const|PublicPort}/OpenSim.Continuum.WebUI.dll:ContinuumWebUIConnector"
+
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
+
+[ContinuumWebUI]
+    ;; WhiteCore-derived integrated portal. The connector must also be
+    ;; uncommented in [ServiceList]. Keep the portal on the public ROBUST port.
+    Enabled = false
+    MountPath = /webui
+    SystemName = OpenSim Continuum
+    UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
+    AuthenticationService = OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService
+    SessionLifetimeSeconds = 3600
 
 ; * This is common for all services, it's the network setup for the entire
 ; * server instance, if none is specified above

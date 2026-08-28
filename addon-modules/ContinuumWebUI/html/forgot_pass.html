@@ -1,0 +1,32 @@
+<!-- forgot password -->
+
+<section class="sign-up  text-center">
+  <div class="container">
+    <div class="row">
+      <div class="col-2">
+        <img src="static/images/reset_password.png" />
+      </div>
+      <div class="col-6">
+        <h3>{ForgotPassword}</h3>
+        <form class="signup-form" action="forgot_pass.html" id="forgotpass_form" method="POST" role="form">
+          <div class="form-input-group">
+            <i class="fa fa-user"></i>
+            <input type="text" class="" placeholder="{UserNameText}" required name="username" id="login_input">
+          </div>
+          <div class="form-input-group">
+            <i class="fa fa-envelope"></i>
+            <input type="text" class="" placeholder="{UserEmailText}" required name="UserEmail">
+          </div>
+          <button class="btn-fill sign-up-btn" onclick="submitupdate('forgotpass_form');">{Submit}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  $(function() {
+    $("#login_input").focus();
+  });
+</script>
+

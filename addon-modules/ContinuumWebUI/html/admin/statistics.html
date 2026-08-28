@@ -1,0 +1,71 @@
+<!-- Statistics -->
+
+<div class="container-fluid">
+  <h2>{SystemName}: {StatisticsText}</h2>
+  <form class="form-inline" id="statistics_form" action="admin/statistics.html" method="post">
+    <div class="row w-100 mb-3">
+      <div class="col"></div>
+      <div class="col-4 pull-right">
+        <button id="add_news" onClick="loadusercontent('admin-statistics','resetstats=true');">{ClearStatsText}</button>
+      </div>
+    </div>
+
+    <div class="row w-100 mb-2">
+      <div class="col-3">
+        <h3>{ViewersText}</h3>
+      </div>
+      <div class="col"></div>
+    </div>
+
+    {ViewersListArrayBegin}
+      <div class="col-1 d-inline"></div>
+      <div class="col-5 text-right d-inline">{ViewerName}</div>
+      <div class="col-6 text-center d-inline">{ViewerCount}</div>
+    {ViewersListArrayEnd}
+
+    <div class="div20"></div>
+
+    <div class="row w-100 mb-2">
+      <div class="col-3">
+        <h3>{GPUText}</h3>
+      </div>
+      <div class="col"></div>
+    </div>
+
+    {GPUListArrayBegin}
+      <div class="col-1 d-inline"></div>
+      <div class="col-5 text-right d-inline">{GPUType}</div>
+      <div class="col-6 text-center d-inline">{GPUCount}</div>
+    {GPUListArrayEnd}
+
+    <div class="div20"></div>
+    
+    <div class="row w-100">
+      <div class="col-5">
+        <h3>{PerformanceText}</h3>
+        <div class="col"></div>
+      </div>
+    </div>
+
+    <div class="col-3 d-inline text-right">{FPSText}</div>
+    <div class="col-1 d-inline text-left">{FPS}</div>
+
+    <div class="col-3 d-inline text-right">{RegionsVisitedText}</div>
+    <div class="col-1 d-inline text-center">{RegionsVisited}</div>
+
+    <div class="col-3 d-inline text-right">{AgentsInViewText}</div>
+    <div class="col-1 d-inline text-center">{AgentsInView}</div>
+
+    <div class="div20"></div>
+
+    <div class="col-3 d-inline text-right">{RunTimeText}</div>
+    <div class="col-1 d-inline text-left">{RunTime}</div>
+
+    <div class="col-3 d-inline text-right">{MemoryUseageText}</div>
+    <div class="col-1 d-inline text-center">{MemoryUseage}&nbsp;Mb</div>
+
+    <div class="col-3 d-inline text-right">{PingTimeText}</div>
+    <div class="col-1 d-inline text-center">{PingTime}&nbsp;ms</div>
+
+  </form>
+</div>

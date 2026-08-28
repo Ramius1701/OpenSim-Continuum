@@ -1,0 +1,283 @@
+<!-- Edit user -->
+
+<div id="content">
+  <div class="text-center" id="ContentHeaderCenterx" style="display:inline-flex;">
+    <h2>{SystemName}: {EdittingText}<h1 style="margin-left:10px;">{UserName}</h1></h2>
+  </div>
+
+  <!-- User type -->
+  <div class="offset-md-1">
+    <h3 class="text-left">{AdminSetUserTypeText}</h3>
+  </div>
+  <p class="info">{AdminUserTypeInfoText}</p>
+  <form class="form-inline" id="set_user_type_form" action="admin/user_edit.html" method="post">
+    <div class="col-md-8 offset-md-2">
+      <div class="row w-100">
+        <div class="col">
+          <div class="form-group">
+            <label for="UserType" class="col-3 col-form-label text-right mr-2">{AdminSetUserTypeText}</label>
+            <div class="input-group pull-right" style="width:160px">
+              <select class="custom-select form-control" id="UserType" name="UserType">
+                {UserTypeArrayBegin}
+                  <option value="{Index}" {selected}>{Value}</option>
+                {UserTypeArrayEnd}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-3 pull-right">
+          <div class="form-group">
+            <a class="btn btn-info" style="width:200px;" 
+               onclick="submitupdate('set_user_type_form', 'userid={UserID}&setusertype=true');">
+              {SaveUpdates}
+            </a>
+        </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+
+  <div class="div20"></div>
+
+  <!-- Message online user -->
+  <div class="offset-md-1">
+    <h3 class="text-left">{ChangeEmailText}</h3>
+  </div>
+<!--  <p class="info">{NewEmailText}</p>  -->
+  <form class="form-inline" id="user_email_form" action="admin/user_edit.html" method="post">
+    <div class="col-md-8 offset-md-2">
+      <div class="row w-100">
+        <label class="col-form-label">{NewEmailText}</label>
+        <div class="col">
+          <input class="form-control pull-right" style="width:300px;"minlength="3" id="email" require="true" name="email" type="text" size="25" maxlength="30" value="{EmailValue}">
+        </div>
+
+        <div class="col-3 pull-right">
+          <div class="form-group">
+            <a class="btn btn-info" style="width:200px;" 
+               onclick="submitupdate('user_email_form', 'userid={UserID}&updateemail=true');">
+              {MessageUserText}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+
+  <div class="div20"></div>
+
+  <!-- Login -->
+  <div class="offset-md-1">
+    <h3 class="text-left">{AdminLoginInAsUserText}</h3>
+  </div>
+  <p class="info">{AdminLoginInAsUserInfoText}</p>
+  <form class="form-inline" id="login_as_user_form" action="admin/user_edit.html" method="post">
+    <div class="col-md-8 offset-md-2">
+      <div class="row w-100">
+        <div class="col"></div>
+
+        <div class="col-3 pull-right">
+          <div class="form-group">
+            <a class="btn btn-info" style="width:200px;" 
+               onclick="submitupdate('login_as_user_form, 'userid={UserID}&loginasuser=true');">
+              {Login}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="div20"></div>
+
+  <!-- Delete user -->
+  <div class="offset-md-1">
+    <h3 class="text-left">{AdminDeleteUserText}</h3>
+  </div>
+  <label class="text-light">{AdminDeleteUserInfoText}</label>
+  <form class="form-inline" id="delete_user_form" action="admin/user_edit.html" method="post">
+    <div class="col-md-8 offset-md-2">
+      <div class="row w-100">
+        <label class="col-form-label">{TypeUserNameToConfirm}</label>
+        <div class="col">
+          <input class="form-control" style="width:300px;"minlength="3" id="username" require="true" name="username" type="text" size="25" maxlength="30" value="">
+        </div>
+
+        <div class="col-3 pull-right">
+          <div class="form-group">
+            <a class="btn btn-info" style="width:200px;" 
+               onclick="submitupdate('delete_user_form', 'userid={UserID}&deleteuser=true');">
+              {DeleteText}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="div20"></div>
+
+  <!-- UnBan user -->
+  {IfUserBannedBegin}
+    <div class="offset-md-1">
+      <h3 class="text-left">{AdminUnbanUserText}</h3>
+    </div>
+    {IfTempUserBannedBegin}
+      <p class="info">{BannedUntilText} {BannedUntil}</p>
+    {IfTempUserBannedEnd}
+    <form class="form-inline" id="unban_user_form" action="admin/user_edit.html" method="post">
+      <div class="col-md-8 offset-md-2">
+        <div class="row w-100">
+          <div class="col"></div>
+          <div class="col-3 pull-right">
+            <div class="form-group">
+              <a class="btn btn-info" style="width:200px;" 
+                 onclick="submitupdate('unban_user_form', 'userid={UserID}&unban=true');">
+                {UnbanText}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  {IfUserBannedEnd}
+
+  <!-- Temp ban user -->
+  {IfNotUserBannedBegin}
+    <div class="offset-md-1">
+      <h3 class="text-left">{AdminTempBanUserText}</h3>
+    </div>
+    <p class="info">{AdminTempBanUserInfoText}</p>
+    <form class="form-inline" id="temp_ban_form" action="admin/user_edit.html" method="post">
+      <div class="col-md-8 offset-md-2">
+        <div class="row w-100">
+          <div class="col">
+            <label for="UserType" class="col-form-label text-right mr-2">{TimeUntilUnbannedText}</label>
+            <div class="form-group">
+              <div class="col">
+                <div class="input-group mr-2">
+                  <select class="custom-select form-control" id="TimeDays" name="TimeDays">
+                    {DaysArrayBegin}
+                      <option value="{Value}">{Value}</option>
+                    {DaysArrayEnd}
+                  </select>
+                  &nbsp;&nbsp;{DaysText}
+                </div>
+              </div>
+              <div class="col">
+                <div class="input-group">
+                  <select class="custom-select form-control" id="TimeHours" name="TimeHours">
+                    {HoursArrayBegin}
+                      <option value="{Value}">{Value}</option>
+                    {HoursArrayEnd}
+                  </select>
+                  &nbsp;&nbsp;{HoursText}
+                </div>
+              </div>
+              <div class="col">
+                <div class="input-group">
+                  <select class="custom-select form-control" id="TimeMinutes" name="TimeMinutes">
+                    {MinutesArrayBegin}
+                      <option value="{Value}">{Value}</option>
+                    {MinutesArrayEnd}
+                  </select>&nbsp;&nbsp;{MinutesText}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-3 pull-right">
+            <div class="form-group">
+              <a class="btn btn-info" style="width:200px;" 
+                onclick="submitupdate('temp_ban_form', 'userid={UserID}&tempban=true');">
+                {BanText}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="div20"></div>
+
+    <!-- Ban user -->
+    <div class="offset-md-1">
+      <h3 class="text-left">{AdminBanUserText}</h3>
+    </div>
+    <p class="info">{AdminBanUserInfoText}</p>
+    <form class="form-inline" id="ban_user_form" action="admin/user_edit.html" method="post">
+      <div class="col-md-8 offset-md-2">
+        <div class="row w-100">
+          <div class="col"></div>
+          <div class="col-3 pull-right">
+            <div class="form-group">
+              <a class="btn btn-info" style="width:200px;" 
+                 onclick="submitupdate('ban_user_form', 'userid={UserID}&banuser=true');">
+                {BanText}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  {IfNotUserBannedEnd}
+
+  <div class="div20"></div>
+
+
+  {IfUserOnlineBegin}
+    <div class="offset-md-1">
+      <h3 class="text-left">{KickAUserText}</h3>
+    </div>
+    <p class="info">{KickAUserInfoText}</p>
+    <form class="form-inline" id="kick_user_form" action="admin/user_edit.html" method="post">
+      <div class="col-md-8 offset-md-2">
+        <div class="row w-100">
+          <label class="col-form-label">{KickMessageText}</label>
+          <div class="col">
+            <input class="form-control" style="width:300px;"minlength="3" id="KickMessage" require="true" name="KickMessage" type="text" size="25" maxlength="30" value="">
+          </div>
+
+          <div class="col-3 pull-right">
+            <div class="form-group">
+              <a class="btn btn-info" style="width:200px;" 
+                onclick="submitupdate('kick_user_form', 'userid={UserID}&kickuser=true');">
+                {KickUserText}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="div20"></div>
+
+    <!-- Message online user -->
+    <div class="offset-md-1">
+      <h3 class="text-left">{MessageAUserText}</h3>
+    </div>
+    <p class="info">{MessageAUserInfoText}</p>
+    <form class="form-inline" id="message_user_form" action="admin/user_edit.html" method="post">
+      <div class="col-md-8 offset-md-2">
+        <div class="row w-100">
+          <label class="col-form-label">{KickMessageText}</label>
+          <div class="col">
+            <input class="form-control" style="width:300px;"minlength="3" id="Message" require="true" name="Message" type="text" size="25" maxlength="30" value="">
+          </div>
+
+          <div class="col-3 pull-right">
+            <div class="form-group">
+              <a class="btn btn-info" style="width:200px;" 
+                 onclick="submitupdate('message_user_form', 'userid={UserID}&usermsg=true');">
+                {MessageUserText}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  {IfUserOnlineEnd}
+</div>

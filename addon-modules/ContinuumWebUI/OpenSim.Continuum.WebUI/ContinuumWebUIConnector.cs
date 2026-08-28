@@ -1,0 +1,448 @@
+/*
+ * Continuum adaptation of the WhiteCore integrated WebUI.
+ * WhiteCore portions are BSD-3-Clause; see THIRD_PARTY_NOTICES.md.
+ */
+
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.IO.Compression;
+using log4net;
+using Nini.Config;
+using OpenMetaverse;
+using OpenSim.Server.Base;
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
+using OpenSim.Services.Interfaces;
+
+namespace OpenSim.Continuum.WebUI
+{
+    public sealed class ContinuumWebUIConnector : ServiceConnector
+    {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(ContinuumWebUIConnector));
+
+        public ContinuumWebUIConnector(IConfigSource config, IHttpServer server, string configName)
+        {
+            string sectionName = string.IsNullOrWhiteSpace(configName) ? "ContinuumWebUI" : configName;
+            IConfig section = config.Configs[sectionName];
+            if (section == null || !section.GetBoolean("Enabled", false))
+            {
+                Log.Info("[CONTINUUM WEBUI]: Disabled");
+                return;
+            }
+
+            string mountPath = NormalizeMountPath(section.GetString("MountPath", "/webui"));
+            string systemName = section.GetString("SystemName", "OpenSim Continuum").Trim();
+            string accountsPlugin = section.GetString("UserAccountService", "OpenSim.Services.UserAccountService.dll:UserAccountService");
+            string authenticationPlugin = section.GetString("AuthenticationService", "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService");
+            IUserAccountService accounts = ServerUtils.LoadPlugin<IUserAccountService>(accountsPlugin, new object[] { config });
+            IAuthenticationService authentication = ServerUtils.LoadPlugin<IAuthenticationService>(authenticationPlugin, new object[] { config });
+            if (accounts == null || authentication == null)
+                throw new InvalidOperationException("ContinuumWebUI could not load its account or authentication service");
+            int sessionSeconds = Math.Clamp(section.GetInt("SessionLifetimeSeconds", 3600), 300, 86400);
+            var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, sessionSeconds);
+            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath + "/", site.Handle), true);
+            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.HandleRoot));
+            Log.InfoFormat("[CONTINUUM WEBUI]: WhiteCore integrated portal mounted at {0}/", mountPath);
+        }
+
+        private static string NormalizeMountPath(string value)
+        {
+            string path = string.IsNullOrWhiteSpace(value) ? "/webui" : value.Trim();
+            if (!path.StartsWith('/')) path = "/" + path;
+            path = path.TrimEnd('/');
+            if (path.Length == 0 || path.Contains("..", StringComparison.Ordinal))
+                throw new InvalidOperationException("ContinuumWebUI MountPath must be a non-root URL path");
+            return path;
+        }
+    }
+
+    internal sealed class WhiteCoreSite
+    {
+        private static readonly Assembly ThisAssembly = typeof(WhiteCoreSite).Assembly;
+        private static readonly System.Lazy<Dictionary<string, byte[]>> Content = new(LoadContent, true);
+        private static readonly Regex Token = new(@"\{[A-Za-z][A-Za-z0-9]*\}", RegexOptions.Compiled);
+        private readonly string _mountPath;
+        private readonly string _systemName;
+        private readonly IUserAccountService _accounts;
+        private readonly IAuthenticationService _authentication;
+        private readonly int _sessionSeconds;
+
+        internal WhiteCoreSite(string mountPath, string systemName, IUserAccountService accounts,
+            IAuthenticationService authentication, int sessionSeconds)
+        {
+            _mountPath = mountPath;
+            _systemName = string.IsNullOrWhiteSpace(systemName) ? "OpenSim Continuum" : systemName;
+            _accounts = accounts;
+            _authentication = authentication;
+            _sessionSeconds = sessionSeconds;
+        }
+
+        internal void HandleRoot(IOSHttpRequest request, IOSHttpResponse response)
+        {
+            if (string.Equals(request.UriPath, _mountPath, StringComparison.Ordinal))
+                response.Redirect(_mountPath + "/", HttpStatusCode.MovedPermanently);
+            else
+                WriteError(response, HttpStatusCode.NotFound, "Not found");
+        }
+
+        internal void Handle(IOSHttpRequest request, IOSHttpResponse response)
+        {
+            if (request.HttpMethod != "GET" && request.HttpMethod != "HEAD")
+            {
+                if (request.HttpMethod == "POST" && request.UriPath.EndsWith("/login.html", StringComparison.Ordinal))
+                {
+                    HandleLogin(request, response);
+                    return;
+                }
+                if (request.HttpMethod == "POST" && request.UriPath.EndsWith("/logout.html", StringComparison.Ordinal))
+                {
+                    HandleLogout(request, response);
+                    return;
+                }
+                response.AddHeader("Allow", "GET, HEAD, POST");
+                WriteError(response, HttpStatusCode.MethodNotAllowed, "Method not allowed");
+                return;
+            }
+
+            string relative = request.UriPath.Substring((_mountPath + "/").Length);
+            if (string.IsNullOrEmpty(relative)) relative = "index.html";
+            if (!TryNormalize(relative, out relative))
+            {
+                WriteError(response, HttpStatusCode.BadRequest, "Invalid path");
+                return;
+            }
+
+            byte[] content = ReadResource(relative);
+            if (content == null)
+            {
+                WriteError(response, HttpStatusCode.NotFound, "Not found");
+                return;
+            }
+
+            if (relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+                || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase))
+            {
+                string source = Encoding.UTF8.GetString(content);
+                UserAccount currentUser = GetAuthenticatedUser(request, false);
+                source = Render(relative, source, DefaultVariables(currentUser), currentUser != null, 0);
+                source = RewriteAssetPaths(source);
+                content = Encoding.UTF8.GetBytes(source);
+            }
+
+            response.StatusCode = (int)HttpStatusCode.OK;
+            response.ContentType = MimeType(relative);
+            response.AddHeader("X-Content-Type-Options", "nosniff");
+            response.AddHeader("Referrer-Policy", "same-origin");
+            response.AddHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'self'");
+            response.RawBuffer = request.HttpMethod == "HEAD" ? Array.Empty<byte>() : content;
+        }
+
+        private Dictionary<string, object> DefaultVariables(UserAccount currentUser)
+        {
+            var menus = new List<Dictionary<string, object>>
+            {
+                Menu("home", "Home", "home.html"),
+                Menu("world_map", "World map", "world_map.html"),
+                Menu("events", "Events", "events.html"),
+                Menu("classifieds", "Classifieds", "classifieds.html"),
+                Menu("login", "Log in", "login.html"),
+                Menu("register", "Sign up", "register.html"),
+                Menu("logout", "Log out", "logout.html", false)
+            };
+            return new Dictionary<string, object>(StringComparer.Ordinal)
+            {
+                ["SystemName"] = _systemName,
+                ["MenuItems"] = menus,
+                ["ModalItems"] = new List<Dictionary<string, object>>(),
+                ["Languages"] = new List<Dictionary<string, object>>(),
+                ["Maintenance"] = false,
+                ["NoMaintenance"] = true,
+                ["LocalPage"] = false,
+                ["ShowLanguageTranslatorBar"] = false,
+                ["ShowSlideshowBar"] = true,
+                ["PagesUpdateRequired"] = string.Empty,
+                ["SettingsUpdateRequired"] = string.Empty,
+                ["LocalFrontPage"] = string.Empty,
+                ["HomeText"] = "Home",
+                ["HomeTextWelcome"] = "Welcome",
+                ["HomeTextTips"] = string.Empty,
+                ["WelcomeScreen"] = "Welcome",
+                ["WelcomeToText"] = "Welcome to " + _systemName,
+                ["UserLogin"] = true,
+                ["UserName"] = currentUser?.Name ?? string.Empty,
+                ["UserID"] = currentUser?.PrincipalID.ToString() ?? string.Empty,
+                ["ErrorMessage"] = string.Empty,
+                ["Login"] = "Log in",
+                ["UserNameText"] = "User name",
+                ["PasswordText"] = "Password",
+                ["ForgotPassword"] = "Forgot password",
+                ["Submit"] = "Submit",
+                ["GalleryImages"] = GalleryImages()
+            };
+        }
+
+        private static Dictionary<string, object> Menu(string id, string title, string location, bool show = true) => new()
+        {
+            ["MenuItemID"] = id,
+            ["MenuItemTitle"] = title,
+            ["MenuItemTitleHelp"] = title,
+            ["MenuItemLocation"] = location,
+            ["ShowInMenu"] = show,
+            ["HasChildren"] = false,
+            ["HasNoChildren"] = true,
+            ["ChildrenMenuItems"] = new List<Dictionary<string, object>>()
+        };
+
+        private List<Dictionary<string, object>> GalleryImages()
+        {
+            return Content.Value.Keys
+                .Where(n => n.StartsWith("static/images/gallery/", StringComparison.Ordinal)
+                    && (n.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || n.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
+                .Take(20)
+                .Select(n => new Dictionary<string, object>
+                {
+                    ["ImageSRC"] = _mountPath + "/" + n,
+                    ["ImageTitle"] = _systemName,
+                    ["ImageInfo"] = string.Empty
+                }).ToList();
+        }
+
+        private string Render(string original, string source, Dictionary<string, object> variables, bool authenticated, int depth)
+        {
+            if (depth > 12) return string.Empty;
+            string[] lines = source.Replace("\r\n", "\n").Split('\n');
+            var output = new StringBuilder(source.Length);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string clean = lines[i].Trim();
+                if (clean.StartsWith("<!--#include file=\"", StringComparison.Ordinal))
+                {
+                    int start = clean.IndexOf('"') + 1;
+                    int end = clean.IndexOf('"', start);
+                    if (start > 0 && end > start && TryNormalize(clean.Substring(start, end - start).TrimStart('/'), out string include))
+                    {
+                        byte[] bytes = ReadResource(include);
+                        if (bytes != null) output.AppendLine(Render(include, Encoding.UTF8.GetString(bytes), variables, authenticated, depth + 1));
+                    }
+                    continue;
+                }
+
+                if (TryMarker(clean, "ArrayBegin}", out string arrayKey))
+                {
+                    int end = FindEnd(lines, i + 1, "{" + arrayKey + "ArrayEnd}");
+                    if (end < 0) continue;
+                    string block = string.Join("\n", lines.Skip(i + 1).Take(end - i - 1));
+                    if (variables.TryGetValue(arrayKey, out object value) && value is IEnumerable<Dictionary<string, object>> rows)
+                    {
+                        foreach (Dictionary<string, object> row in rows)
+                        {
+                            var merged = new Dictionary<string, object>(variables, StringComparer.Ordinal);
+                            foreach (var pair in row) merged[pair.Key] = pair.Value;
+                            output.AppendLine(Render(original, block, merged, authenticated, depth + 1));
+                        }
+                    }
+                    i = end;
+                    continue;
+                }
+
+                if (clean.StartsWith("{If", StringComparison.Ordinal) && clean.EndsWith("Begin}", StringComparison.Ordinal))
+                {
+                    string key = clean.Substring(3, clean.Length - 9);
+                    int end = FindEnd(lines, i + 1, "{If" + key + "End}");
+                    if (end < 0) continue;
+                    bool enabled = variables.TryGetValue(key, out object value) && value is bool flag && flag;
+                    if (enabled)
+                    {
+                        string block = string.Join("\n", lines.Skip(i + 1).Take(end - i - 1));
+                        output.AppendLine(Render(original, block, variables, authenticated, depth + 1));
+                    }
+                    i = end;
+                    continue;
+                }
+
+                if (clean.StartsWith("{Is", StringComparison.Ordinal) && clean.EndsWith("AuthenticatedBegin}", StringComparison.Ordinal))
+                {
+                    string endMarker = clean.Replace("Begin}", "End}", StringComparison.Ordinal);
+                    int end = FindEnd(lines, i + 1, endMarker);
+                    bool show = clean.StartsWith("{IsNotAuthenticated", StringComparison.Ordinal) ? !authenticated : authenticated;
+                    if (show && end >= 0)
+                    {
+                        string block = string.Join("\n", lines.Skip(i + 1).Take(end - i - 1));
+                        output.AppendLine(Render(original, block, variables, authenticated, depth + 1));
+                    }
+                    if (end >= 0) i = end;
+                    continue;
+                }
+
+                output.AppendLine(ReplaceScalars(lines[i], variables));
+            }
+            return output.ToString();
+        }
+
+        private static bool TryMarker(string line, string suffix, out string key)
+        {
+            key = null;
+            if (!line.StartsWith('{') || !line.EndsWith(suffix, StringComparison.Ordinal)) return false;
+            key = line.Substring(1, line.Length - suffix.Length - 1);
+            return key.Length > 0;
+        }
+
+        private static int FindEnd(string[] lines, int start, string marker)
+        {
+            for (int i = start; i < lines.Length; i++)
+                if (string.Equals(lines[i].Trim(), marker, StringComparison.Ordinal)) return i;
+            return -1;
+        }
+
+        private static string ReplaceScalars(string line, Dictionary<string, object> variables)
+        {
+            foreach (var pair in variables)
+                if (pair.Value is not System.Collections.IEnumerable || pair.Value is string)
+                    line = line.Replace("{" + pair.Key + "}", pair.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
+            return Token.Replace(line, string.Empty);
+        }
+
+        private string RewriteAssetPaths(string value)
+        {
+            return value.Replace("../static/", _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("\"/static/", "\"" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("'/static/", "'" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("\"local/static/", "\"" + _mountPath + "/static/", StringComparison.Ordinal);
+        }
+
+        private static bool TryNormalize(string value, out string normalized)
+        {
+            normalized = null;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            string decoded;
+            try { decoded = Uri.UnescapeDataString(value).Replace('\\', '/'); }
+            catch { return false; }
+            if (decoded.StartsWith('/') || decoded.Contains('\0')) return false;
+            string[] parts = decoded.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Any(p => p == "." || p == "..")) return false;
+            normalized = string.Join('/', parts);
+            return normalized.Length > 0;
+        }
+
+        private static byte[] ReadResource(string relative)
+        {
+            return Content.Value.TryGetValue(relative, out byte[] bytes) ? bytes : null;
+        }
+
+        private void HandleLogin(IOSHttpRequest request, IOSHttpResponse response)
+        {
+            if (request.ContentLength64 < 0 || request.ContentLength64 > 16 * 1024)
+            {
+                WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Login request is too large");
+                return;
+            }
+            string body;
+            using (var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8,
+                true, 1024, true)) body = reader.ReadToEnd();
+            var form = System.Web.HttpUtility.ParseQueryString(body);
+            string username = (form["username"] ?? string.Empty).Trim();
+            string password = form["password"] ?? string.Empty;
+            UserAccount account = FindAccount(username);
+            string token = account == null ? string.Empty : _authentication.Authenticate(account.PrincipalID, password, _sessionSeconds);
+            if (string.IsNullOrEmpty(token))
+            {
+                WriteError(response, HttpStatusCode.Unauthorized, "Invalid user name or password");
+                return;
+            }
+            string cookie = "ContinuumWebUI=" + account.PrincipalID + "." + Uri.EscapeDataString(token)
+                + "; Path=" + _mountPath + "; Max-Age=" + _sessionSeconds + "; HttpOnly; SameSite=Lax"
+                + (request.IsSecured ? "; Secure" : string.Empty);
+            response.AddHeader("Set-Cookie", cookie);
+            response.Redirect(_mountPath + "/", HttpStatusCode.SeeOther);
+        }
+
+        private void HandleLogout(IOSHttpRequest request, IOSHttpResponse response)
+        {
+            if (TryReadCookie(request, out UUID principal, out string token))
+                _authentication.Release(principal, token);
+            response.AddHeader("Set-Cookie", "ContinuumWebUI=; Path=" + _mountPath + "; Max-Age=0; HttpOnly; SameSite=Lax");
+            response.Redirect(_mountPath + "/", HttpStatusCode.SeeOther);
+        }
+
+        private UserAccount GetAuthenticatedUser(IOSHttpRequest request, bool refresh)
+        {
+            if (!TryReadCookie(request, out UUID principal, out string token)) return null;
+            if (!_authentication.Verify(principal, token, refresh ? _sessionSeconds : 0)) return null;
+            return _accounts.GetUserAccount(UUID.Zero, principal);
+        }
+
+        private static bool TryReadCookie(IOSHttpRequest request, out UUID principal, out string token)
+        {
+            principal = UUID.Zero;
+            token = null;
+            string header = request.Headers["Cookie"];
+            if (string.IsNullOrEmpty(header)) return false;
+            foreach (string item in header.Split(';'))
+            {
+                string part = item.Trim();
+                if (!part.StartsWith("ContinuumWebUI=", StringComparison.Ordinal)) continue;
+                string value = part.Substring("ContinuumWebUI=".Length);
+                int dot = value.IndexOf('.');
+                if (dot < 1 || !UUID.TryParse(value.Substring(0, dot), out principal)) return false;
+                token = Uri.UnescapeDataString(value.Substring(dot + 1));
+                return token.Length > 0;
+            }
+            return false;
+        }
+
+        private UserAccount FindAccount(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username) || username.Length > 128) return null;
+            string normalized = username.Replace('.', ' ');
+            int split = normalized.IndexOf(' ');
+            if (split > 0)
+                return _accounts.GetUserAccount(UUID.Zero, normalized.Substring(0, split), normalized.Substring(split + 1).Trim());
+            List<UserAccount> matches = _accounts.GetUserAccounts(UUID.Zero, normalized);
+            return matches?.FirstOrDefault(a => string.Equals(a.Name, normalized, StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(a.LastName, "Resident", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(a.FirstName, normalized, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private static Dictionary<string, byte[]> LoadContent()
+        {
+            string resource = ThisAssembly.GetManifestResourceNames()
+                .Single(n => n.EndsWith("WhiteCoreWebUI.zip", StringComparison.Ordinal));
+            using Stream stream = ThisAssembly.GetManifestResourceStream(resource);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read, false);
+            var result = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+                string key = entry.FullName.Replace('\\', '/').TrimStart('/');
+                using Stream input = entry.Open();
+                using var memory = new MemoryStream((int)Math.Min(entry.Length, int.MaxValue));
+                input.CopyTo(memory);
+                result[key] = memory.ToArray();
+            }
+            return result;
+        }
+
+        private static string MimeType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".html" => "text/html; charset=utf-8", ".css" => "text/css; charset=utf-8",
+            ".js" => "application/javascript; charset=utf-8", ".json" or ".map" => "application/json",
+            ".png" => "image/png", ".jpg" or ".jpeg" => "image/jpeg", ".gif" => "image/gif",
+            ".svg" => "image/svg+xml", ".ico" => "image/x-icon", ".webmanifest" => "application/manifest+json",
+            ".woff" => "font/woff", ".woff2" => "font/woff2", ".ttf" => "font/ttf", ".otf" => "font/otf",
+            _ => "application/octet-stream"
+        };
+
+        private static void WriteError(IOSHttpResponse response, HttpStatusCode status, string message)
+        {
+            response.StatusCode = (int)status;
+            response.ContentType = "text/plain; charset=utf-8";
+            response.RawBuffer = Encoding.UTF8.GetBytes(message);
+        }
+    }
+}

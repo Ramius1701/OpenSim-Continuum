@@ -1,0 +1,80 @@
+<!-- Userhome Dashboard-->
+
+<div class="container">
+  <div class="row justify-content-center">
+    <h1>{UserName} - {DashboardNameText}</h1>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-4">
+      <a href="#">
+        <img class="rounded" title="{UserName} ({UserType})" src="{UserPictureURL}" 
+             alt="{UserName} ({UserType})" height="256" />
+      </a>
+    </div>
+
+    <div class="col-8">
+      <div class="row">
+        <div class="col"><p>{AccountType}</p></div>
+        <div class="col"><p>{UserType}</p></div>
+      </div>
+      <div class="row">
+        <div class="col"><p>{BankBalanceText}</p></div>
+        <div class="col"><p>{UserBalance}</p></div>
+      </div>
+      <div class="row">
+        <div class="col"><p>{HomeText}</p></div>
+        <div class="col"><p>{UserHomeRegion}</p></div>
+      </div>
+      <div class="row">
+        <div class="col"><p>{LastLoginText}</p></div>
+        <div class="col"><p>{UserLastLogin}</p></div>
+      </div>
+      <div class="row">
+        <div class="col"><p>{ResidentSince}</p></div>
+        <div class="col"><p>{UserBorn}</p></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="row justify-content-center">
+    <h4>{UsersGroupsText} ({GroupsJoined})</h4>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col"></div>
+    <div class="col-6">
+      <div class="avatar-contain">
+        {GroupsArrayBegin}
+        <div class="profile_picture_small" id="group_picture">
+          <a href="#">
+            <img class="rounded" height="128"
+                 src="{GroupPictureURL}"
+                 alt="{GroupNameText}: {GroupName}"
+                 title="{GroupNameText}: {GroupName}" />
+          </a>
+          <p class="group_profile_picture_text">{GroupNameText}: {GroupName}</p>
+        </div>
+        {GroupsArrayEnd}
+      </div>
+    </div>
+
+    <div class="col"></div>
+  </div>
+
+</div>
+
+
+<script>
+  $(function() {
+    $('.avatar-contain').slick({
+      infinite: true,
+      slidesToShow: 3,
+      slidesToScroll: 1
+    });
+  
+  });
+</script>

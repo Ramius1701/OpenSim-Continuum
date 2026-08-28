@@ -1,0 +1,54 @@
+<!-- Web UI settings -->
+
+<div class="container-fluid">
+  <h2>{SystemName}: {SettingsManager}</h2>
+  <form class="form-inline" id="settings_manager_form" action="admin/settings_manager.html" method="post">
+    <div class="row w-100">
+      <div class="col-md-9 offset-md-2">
+
+        <div class="form-group mb-1">
+          <label for="WebRegistration" class="col-4 col-form-label text-right mr-2">{WebRegistrationText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="WebRegistration" name="WebRegistration">
+              <option value="0" style="background-color:#FF0000" {WebRegistrationNo}>{No}</option>
+              <option value="1" style="background-color:#00FF00" {WebRegistrationYes}>{Yes}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="GridCenterX" class="col-4 col-form-label text-right mr-2">{GridCenterXText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="GridCenterX" require="true" name="GridCenterX" type="text" size="10" maxlength="10" value="{GridCenterX}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="GridCenterY" class="col-4 col-form-label text-right mr-2">{GridCenterYText}</label>
+          <input class="form-control" style="width:300px;" minlength="3" id="GridCenterY" require="true" name="GridCenterY" type="text" size="10" maxlength="10" value="{GridCenterY}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="LocalFrontPage" class="col-4 col-form-label text-right mr-2">{LocalFrontPageText}</label>
+          <input class="form-control" style="width:300px;" id="LocalFrontPage" name="LocalFrontPage" type="text" size="120" maxlength="120" value="{LocalFrontPage}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="LocalCSS" class="col-4 col-form-label text-right mr-2">{LocalCSSText}</label>
+          <input class="form-control" style="width:300px;" id="LocalCSS" name="LocalCSS" type="text" size="120" maxlength="120" value="{LocalCSS}">
+        </div>
+
+        <div class="row w-100 mt-3">
+          <div class="col pull-right">
+            <button class="btn-success" onclick="gohome();">{Cancel}</button>
+            <button class="btn-info pull-right" style="width:200px;" 
+                    onclick="submitupdate('settings_manager_form', 'update=true');">
+              {Save}
+            </button>
+          </div>
+          <div class="col-1"></div>
+        </div>
+
+      </div>
+    </div>
+  </form>
+</div>
+

@@ -1,0 +1,132 @@
+<!-- Abuse manager -->
+
+
+<div class="col98" id="abuseReport">
+  <h2 class="text-center">{SystemName}: {AbuseReportText}</h2>
+
+  {IsAdminAuthenticatedBegin}
+  <div id="info_message" class="error_message">{InfoMessage}</div>
+
+  <form class="form-inline" id="abuse_report_form" action="admin/abuse_report.html" method="post">
+
+    <div class="row w-100">
+      <div class="col-md-3 text-center">
+        <div class="region_info_picture" style="heightx:256px;cursor:pointer;">
+          <a class="regionslurl" onclick="document.location.href='{HopUrl}'" alt="{RegionName}" title="{RegionName}">
+            <img height="256" src="{ScreenshotURL}" alt="{RegionNameText}: {RegionName}" title="{RegionName}" />  
+            <div class="text-left">
+              {RegionNameText}: {RegionName}
+              <br /> {ObjectNameText}: {ObjectName}
+              <!-- <br /> {HopUrl}  -->
+            </div>
+          </a>
+        </div>
+
+      </div>
+
+      <div class="col-md-9 text-left">
+        <div class="row mb-1">
+          <div class="col-3 text-right">{CategoryText}</div>
+          <div class="col-9">{Category}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{SummaryText}</div>
+          <div class="col-9">{Summary}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{AbuserNameText}</div>
+          <div class="col-9">{AbuserName}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{AbuseReporterNameText}</div>
+          <div class="col-9">{ReporterName}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{RegionNameText}</div>
+          <div class="col-9">{RegionName}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{ObjectNameText}</div>
+          <div class="col-9">{ObjectName}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{LocationText}</div>
+          <div class="col-9">{ObjectPosition}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{UUIDText}</div>
+          <div class="col-9">{ObjectUUID}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{DetailsText}</div>
+          <div class="col-9">{Details}</div>
+        </div>
+
+        <div class="row mb-1">
+          <div class="col-3 text-right">{NotesText}</div>
+          <div class="col-9"  style="height:auto;">
+            <textarea name="AbuseNoteText" style="min-height:140px;" cols="80" rows="5" id="AbuseNoteText" value="{Notes}">{Notes}</textarea>
+          </div>
+        </div>
+        
+        <div class="form-group mb-1">
+          <div class="col-3 text-right mr-2">{ActiveText}</div>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="Active" name="Active">
+              {IsActiveArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {IsActiveArrayEnd}
+
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <div class="col-3 text-right mr-2">{CheckedText}</div>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="Checked" name="Checked">
+              {IsCheckedArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {IsCheckedArrayEnd}
+
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <div class="col-3 text-right mr-2">{AssignedToText}</div>
+          <div class="input-group" style="width:200px">
+            <select class="custom-select form-control" id="AssignedTo" name="AssignedTo" value="{AssignedTo}">
+              {AdminUsersListArrayBegin}
+                <option value="{Value}" {selected}>{Value}</option>
+              {AdminUsersListArrayEnd}
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="row w-100 mt-3">
+        <div class="col"></div>
+        <div class="col-6 pull-right">
+          <button onclick="loadusercontent('admin-abuse_list');">{Cancel}</button>
+          <button class="btn-info pull-right" style="width:200px;" onclick="submitupdate('abuse_report_form', 'cardid={CardNumber}&update=true','admin-abuse_list');">
+            {Submit}
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+  {IsAdminAuthenticatedEnd}
+
+</div>
+

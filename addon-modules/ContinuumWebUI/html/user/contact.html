@@ -1,0 +1,57 @@
+<!-- user email -->
+<section class="text-center">
+
+  <div class="container">
+    <div class="row justify-content-center">
+      <h2>{UserName}:&nbsp;{ChangeContactText}</h2>
+    </div>
+
+    <div class="container justify-content-center">
+      <div class="row">
+        <div class="col-3">
+          <img src="static/images/home.png" />
+        </div>
+
+        <div class="col">
+
+          <form role="form" id="change_contact" action="user/contact.html" method="post">
+            <div class="form-group mb-3">
+              <input type="text" class="" placeholder="{UserAddressText}" name="useraddress" size="50" maxlength="50" value="{RLAddress}">
+            </div>
+            <div class="form-group mb-3">
+              <div class="row">
+              <div class="col-8">
+                <input type="text" class="" placeholder="{UserCityText}" name="usercity" size="50" maxlength="50"   value="{RLCity}">
+              </div>
+              <div class="col-4">
+                <input type="text" class="" placeholder="{UserZipText}" name="userzip" size="15" maxlength="15" value="{RLZip}">
+              </div>
+              </div>
+            </div>
+
+
+            <div class="form-group mb-3">
+              <input type="text" class="" placeholder="{UserCountryText}" name="usercountry" size="25" maxlength="40" value="{RLCountry}">
+            </div>
+
+            <div class="div20"></div>
+            <div class="button-group">
+              <a class="btn btn-sm btn-success" onclick="gohome();">{CancelText}</a>
+              <a class="btn btn-sm btn-warning float-right" 
+                  onclick="submitupdate('change_contact', 'update=true');">
+                {UpdateContactText}
+              </a>
+            </div>
+          </form>
+        </div>
+        <div class="col-3"></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<script>
+  $("#useraddress").focus();
+</script>

@@ -1,0 +1,104 @@
+<!-- Admin Estate edit/create -->
+
+<h2>{SystemName}: {EstateManagerText}</h2>
+{IsAdminAuthenticatedBegin}
+
+  <form class="form-inline" id="estate_edit_form" action="user/estate_edit.html" method="post">
+    <div class="row w-100">
+      <div class="col-md-8 offset-md-2">
+
+        <div class="form-group">
+          <label for="EstateName" class="col-4 col-form-label text-right mr-2">{EstateNameText}</label>
+          <input class="form-control" style="width:300px;"minlength="3" id="EstateName" require="true" name="EstateName" type="text" size="25" maxlength="30" value="{EstateName}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="EstateOwner" class="col-4 col-form-label text-right mr-2">{EstateOwnerText}</label>
+          <div class="input-group" style="width:200px;">
+            <select class="custom-select form-control" id="EstateOwner" name="EstateOwner">
+              {UsersListArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {UsersListArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="PricePerMeter" class="col-4 col-form-label text-right mr-2">{PricePerMeterText}</label>
+          <input class="form-control" style="width:100px;"minlength="3" id="PricePerMeter" require="true" name="PricePerMeter" type="text" size="25" maxlength="30" value="{PricePerMeter}">
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="PublicAccess" class="col-4 col-form-label text-right mr-2">{PublicAccessText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="PublicAccess" name="PublicAccess">
+              {PublicAccessArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {PublicAccessArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="AllowVoice" class="col-4 col-form-label text-right mr-2">{AllowVoiceText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="AllowVoice" name="AllowVoice">
+              {AllowVoiceArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {AllowVoiceArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="TaxFree" class="col-4 col-form-label text-right mr-2">{TaxFreeText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="TaxFree" name="TaxFree">
+              {TaxFreeArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {TaxFreeArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="PublicAccess" class="col-4 col-form-label text-right mr-2">{PublicAccessText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="PublicAccess" name="PublicAccess">
+              {PublicAccessArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {PublicAccessArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mb-1">
+          <label for="AllowDirectTeleport" class="col-4 col-form-label text-right mr-2">{AllowDirectTeleportText}</label>
+          <div class="input-group" style="width:100px">
+            <select class="custom-select form-control" id="AllowDirectTeleport" name="AllowDirectTeleport">
+              {AllowDirectTeleportArrayBegin}
+                <option value="{Index}" {selected}>{Value}</option>
+              {AllowDirectTeleportArrayEnd}
+            </select>
+          </div>
+        </div>
+      </div>
+
+        <div class="row w-100 mt-3">
+          <div class="col"></div>
+          <div class="col-6 pull-right">
+            <button onclick="loadusercontent('admin-estate_manager');">{Cancel}</button>
+            <button class="btn-info pull-right" style="width:200px;" 
+                     onclick="submitupdate('estate_edit_form','estateid={EstateID}&update=true','admin-estate_manager');">
+              {Submit}
+            </button>
+          </div>
+          <div class="col-1"></div>
+      </div>
+    </div>
+  </form>
+
+{IsAdminAuthenticatedEnd}
+
+</div>
+

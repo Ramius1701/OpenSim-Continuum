@@ -1,0 +1,172 @@
+<!-- viewer help -->
+<style>
+	.imageModalBackground {
+    display: none;
+    z-index: 1;
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+	}
+	.imageModalContent {
+    margin: 20% auto;
+    padding: 20px;
+    border-style: solid;
+    border-width: 2px;
+    border-color: black;
+    width: 50%;
+	}
+	.imageClose {
+    color: grey;
+    float: right;
+    font-size: 20px;
+    font-weight: bold;
+	}
+
+	.imageClose:hover {
+	  color: black;
+	  cursor: pointer;
+	}
+	.caption {
+		background-color:white;
+		color:black;
+		padding:2px;
+		font-weight:bold;
+		border-top-left-radius: 7px 15px;
+		border-top-right-radius: 20px 40px;
+		border-bottom-right-radius: 15px 7px;
+		border-bottom-left-radius: 20px 40px;
+		box-shadow: 0px 0px 10px 10px white;
+	}
+</style>
+
+<div class="container">
+	<div class="row text-right">
+		<div class="col pull-right">
+			<a class="btn btn-info" href="#" onclick=loadmodalcontent("irc_chat","","",true)>IRC support</a>
+		</div>
+	</div>
+	<div class="col-12">
+		<h2>{HelpText}</h2>
+		<a href="{ClientLoginURI}">
+			<img  src="static/images/loginscreen.png" alt="Login to WhiteCore" title="WhiteCore Login">
+			<h3>
+				{Login} URI: {LoginURL}
+			</h3>
+		</a>
+	</div>
+
+<div class="viewerhelp">
+
+		<h3>{HelpViewersConfigText}</h3>
+	<div class="help-block text-left">
+		{MoreInfo}
+	</div>
+
+	<div class="row justify-content-center">
+		<div class="col-3">
+			<img class="viewerimage"  title="{Alchemy}" alt="{Alchemy}"
+			     src="static/viewers/alchemy_thumb.png" data-link="static/viewers/alchemy.png" />
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{Firestorm}"  alt="{Firestorm}" 
+			     src="static/viewers/firestorm_thumb_01.jpg" data-link="static/viewers/firestorm_01.jpg"/>
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{Kokua}" alt="{Kokua}"
+				 src="static/viewers/kokua_thumb_01.jpg"  data-link="static/viewers/kokua_01.jpg"/>
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{Singularity}" alt="{Singularity}"
+				 src="static/viewers/singularity_thumb_01.jpg" data-link="static/viewers/singularity_01.jpg"/>
+		</div>
+	</div>
+	<div class="row div10"></div>
+	<div class="row justify-content-center">
+		<div class="col-3">
+			<a href="https://www.alchemyviewer.org/pages/downloads.html" target="_blank">{Alchemy}</a>
+		</div>
+		<div class="col-3">
+			<a href="http://www.firestormviewer.org" target="_blank">{Firestorm}</a>
+		</div>
+		<div class="col-3">
+			<a href="http://kokuaviewer.org" target="_blank">{Kokua}</a>
+		</div>
+		<div class="col-3">
+			<a href="http://www.singularityviewer.org" target="_blank">{Singularity}</a>
+		</div>
+	</div>
+
+	<div class="row div20"></div>
+
+	<div class="row justify-content-center-xs-12">
+		<div class="col-3">
+			<img class="viewerimage" title="{Lumiya}" alt="{Lumiya}"
+				 src="static/viewers/lumiya_thumb.png" data-link="static/viewers/lumiya_01_ics_login.jpg" />
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{MobileGridClient}" alt="{MobileGridClient}"
+				 src="static/viewers/mobilegridclient.png" data-link="static/viewers/mgcx-3.png" />
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{PocketMetaverse}" alt="{PocketMetaverse}"
+				 src="static/viewers/pocketmetaverse.png" data-link="static/viewers/pocketmetaverse_01.png" />
+		</div>
+		<div class="col-3">
+			<img class="viewerimage" title="{Radegast}" alt="{Radegast}"
+				src="static/viewers/radegast.png" data-link="static/viewers/radegast_01.jpg" />
+		</div>
+	</div>
+	<div class="row div10"></div>
+	<div class="row justify-content-center">
+		<div class="col-3">
+			<a href="http://www.lumiyaviewer.com" target="_blank">{Lumiya}</a>
+		</div>
+		<div class="col-3">
+			<a href="http://mobilegridclient.com" target="_blank">{MobileGridClient}</a>
+		</div>
+		<div class="col-3">
+			<a href="http://www.pocketmetaverse.com" target="_blank">{PocketMetaverse}</a>
+		</div>
+		<div class="col-3">
+			<a href="https://radegast.life/" target="_blank">{Radegast}</a>
+		</div>
+	</div>
+</div>
+<div class="row div10"></div>
+
+<div id="imageModal" class="modal imageModalBackground" style="display:none;">
+	<div class="imageModalContent" onclick="document.getElementById('imageModal').style.display='none'">
+	  	<span class="imageClose">✕</span>
+	  	<br>
+		<img id="imageSrc" src="" style="padding-left:10px;max-width:610px;">
+		<br>
+		<div class="caption"></div>
+	</div>
+	<br>
+</div>
+
+
+<script>
+
+	$(".viewerimage").on("click", function(){
+		let datalink = $(this).attr("data-link");
+	  $("#imageSrc").attr("src", datalink);
+	  $(".caption").html(this.alt);
+	  $("#imageModal").css("display", "block");
+	});
+
+  $('img.viewerimage').css('opacity', 0.6);
+  $('img.viewerimage').hover(
+  	function() {
+		  $(this).stop().animate({"opacity": "1.0"}, "0.5");
+		},
+		function() {
+	  	$(this).stop().animate({"opacity": "0.4"}, "0.5");
+  	}
+  );
+
+</script>

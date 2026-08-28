@@ -1,0 +1,75 @@
+<!-- User Estate manager -->
+
+<style>
+  .page-link {background-color: transparent !important;}
+</style>
+
+<div class="col98">
+  <h2>{UserName} {EstateListText}</h2>
+
+  {IsAuthenticatedBegin}
+
+  {IfHaveDataBegin}
+  <table class="table-compact table-hover" id="estatelist" class="display" cellspacing="0" width="100%">
+    <thead>
+      <tr class="tablehead">
+        <th style="width:25%">{EstateText}</th>
+        <th style="width:50px">{PublicAccessText}</th>
+        <th style="width:50px">{AllowVoiceText}</th>
+        <th style="width:50px">{TaxFreeText}</th>
+        <th style="width:50px">{AllowDirectTeleportText}</th>
+        <th style="width:50px">{RegionsText}</th>
+        <th class="no-sort" style="width:30px"</th>
+      </tr>
+    </thead>
+
+    <tbody>
+
+      {EstateListArrayBegin}
+      <tr onclick="loadusercontent('user-estate_edit', 'estateid={EstateID}');">
+        <td class="text-centered">{EstateName}</td>
+        <td class="text-centered">{PublicAccess}</td>
+  	    <td class="text-centered">{AllowVoice}</td>
+  	    <td class="text-centered">{TaxFree}</td>
+  	    <td class="text-centered">{AllowDirectTeleport}</td>
+        <td class="text-centered">{RegionCount}</td>
+        <td class="no-sort text-centered">
+          <a href="#" title="{EditText}">
+            <i class="fa fa-edit fa-lg"></i>
+          </a>
+        </td>
+      </tr>
+      {EstateListArrayEnd}
+
+    </tbody>
+  </table>
+
+  <script>
+    $(function() {
+      $('#estatelist').dataTable( {
+        dom: 'frtip',
+        "order": [[ 0, "asc" ]],
+        "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
+        "pageLength": 10,
+        "fixedHeader": {
+          header: true,
+           //footer: true
+        },
+      });
+    });
+  </script>
+  {IfHaveDataEnd}
+
+  {IfNoDataBegin}
+    <div id="error404" align="center">
+      <h4 class="error404">
+        No estates found, maybe apply for one?
+      </h4>
+      <div class="error404">
+        <img src="/static/images/house_sale.png"/>
+      </div>
+    </div>
+  {IfNoDataEnd}
+
+  {IsAuthenticatedEnd}
+</div>

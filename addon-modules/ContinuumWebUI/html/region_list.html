@@ -1,0 +1,47 @@
+<!-- region listing 
+  No longer used - greythane -
+  -->
+
+<div class="col-xs-12">
+  <h2>{RegionListText}</h2>
+  <table id="regionlist" class="display table-list" width="100%">
+    <thead>
+      <tr class="listhead">
+        <th style="width:200px">{RegionText}</th>
+        <th style="width:100px">{RegionLocXText}</th>
+        <th style="width:100px">{RegionLocYText}</th>
+        <th></th>
+        <th style="width:50px">{RegionOnlineText}</th>
+        <th class="no-sort">{RegionMoreInfo}</th>
+      </tr>
+    </thead>
+
+    <tbody>
+
+      {RegionListArrayBegin}
+      <tr>
+        <td class="text-left">{RegionName}</td>
+        <td class="text-left">{RegionLocX}</td>
+        <td class="text-left">{RegionLocY}</td>
+        <td class="text-left">{RegionInfo}</td>
+        <td class="text-center">{RegionStatus}</td>
+        <td class="text-center"><a target="_self" class='regioninfo' href="regionprofile/?regionid={RegionID}">{MoreInfoText}</a></p></td>
+      </tr>
+      {RegionListArrayEnd}
+
+    </tbody>
+  </table>
+</div>
+
+<script>
+  $(document).ready(function() {
+    $(".regioninfo").colorbox({iframe:true, width:"990px", height:"440px"});
+    $('#regionlist').dataTable( {
+      "order": [[ 0, "asc" ]],
+      "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
+      "aaSorting":[],
+      "language": {"search": "Filter: "},
+    });
+  });
+</script>
+

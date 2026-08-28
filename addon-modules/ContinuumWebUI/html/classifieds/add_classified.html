@@ -1,0 +1,133 @@
+
+<div class="container-fluid">
+
+  <h2>{AddClassifiedText}</h2>
+
+  <div class="col98">
+    <form id="add_classified_form" action="classifieds/add_classified.html" method="post">
+      
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{TitleText}</div>
+        <div class="form-group col">
+          <input class="form-control" id="classifiedName" name="classifiedName" size="60" type="text" />
+        </div>
+        <div class="col-2"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{PriceText}</div>
+        <div class="form-group col-4">
+          <input class="form-control" id="classifiedPrice" style="width:80px;" name="classifiedPrice" 
+                 type="text" value="{ClassifiedPrice}" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{LocationText}</div>
+        <div class="form-group col-4">
+          <select class="custom-select form-control" id="classifiedLocation" name="classifiedLocation">
+            {ClassifiedLocationsArrayBegin}
+              <option {disabled} value="{Index}">{Value}</option>
+            {ClassifiedLocationsArrayEnd}
+          </select>
+        </div>
+        <div class="form-group col"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{CategoryText}</div>
+        <div class="form-group col-3">
+          <div class="input-group" style="width:240px;">
+            <select class="custom-select form-control"  id="eventCategory" name="eventCategory">
+              {ClassifiedCategoriesArrayBegin}
+                <option {selected} value="{Index}">{Value}</option>
+              {ClassifiedCategoriesArrayEnd}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group col-2 text-right">
+          <label for="maturityLevel" class="col-form-label text-right mr-2">{MaturityText}</label>
+        </div>
+        <div class="form-group col-3">
+          <div class="input-group" style="width:240px;">
+            <select class="custom-select form-control"  id="maturityLevel" name="maturityLevel">
+              {MaturityLevelsArrayBegin}
+                <option {selected} value="{Index}">{Value}</option>
+              {MaturityLevelsArrayEnd}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{DescriptionText}</div>
+        <div class="form-group col" style="height:auto;">
+          <textarea class="form-control" id="classifiedDescription" name="classifiedDescription" cols="70" rows="5"></textarea>
+        </div>
+        <div class="col-2"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-2 text-right">{TagsText}</div>
+        <div class="form-group col">
+          <input class="form-control" id="classifiedTags" name="classifiedTags" size="60" type="text" />
+        </div>
+        <div class="col-2"></div>
+      </div>
+
+      <div class="form-row mb-2">
+        <div class="col-2"></div>
+        <div class="col text-right">
+          {AutoRelistText}
+        </div>
+        <div class="col-2">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" id="classifiedAutoRelist" name="classifiedAutoRelist" 
+                   type="checkbox" value="Yes" />
+            <label class="form-check-label mr-2" for="classifiedAutoRelist">({YesText})</label>
+          </div>
+        </div>
+
+        <div class="col-2"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="col-2"></div>
+        <div class="col">
+          <div class="pull-right">
+            <a class="btn btn-sm btn-success mr-3" style="width:100px;" onclick="loadusercontent('user-classifieds');">{Cancel}</a>
+            <a class="btn btn-sm btn-warning" style="width:100px;" 
+                onclick="submitupdate('add_classified_form', 'additem=true');">
+              {Submit}
+            </a>
+          </div>
+        </div>
+        <div class="col-2"></div>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<script>
+  /* date picker */
+  $(function() {
+    $("#eventDate").datepicker({
+      orientation: "bottom left",
+      defaultDate: "+1d",
+      changeMonth: true,
+      numberOfMonths: 3,
+      onClose: function( selectedDate ) {
+        $( "#eventDate" ).datepicker( "option", "minDate", selectedDate );
+      }
+    });
+  });
+
+  $('.event-calendar').on('click',function(){
+    $('#eventDate').datepicker("show");
+  });
+
+</script>
+

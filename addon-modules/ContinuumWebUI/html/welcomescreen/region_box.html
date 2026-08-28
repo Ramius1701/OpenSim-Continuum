@@ -1,0 +1,43 @@
+<!-- Welcomescreen regions -->
+<div class="gridstatus" id="regionbox">
+  <div>
+    <div class="form-row w-100" style="color:aqua;">
+      <div class="col-6 text-center">
+          <a style="cursor:pointer" onclick="document.location.href='?region=RegionName'">
+            <img src="/static/icons/regions.png"/>
+            <strong>{RegionText}</strong>
+        </a>
+      </div>
+      <div class="col-6 text-right">
+        <label>Position</label>
+      </div>
+    </div>
+
+    {RegionListArrayBegin}
+      <div class="mapregion">
+        <a class="regionslurl"
+          onclick="document.location.href='{HopUrl}'">
+          <img
+            class="mt-1"
+            height="60"
+            src="{RegionWorldViewURL}"
+            alt="{RegionName}"
+            title="Teleport to {RegionName}" />
+
+          <div class="pull-right" style="width:75%;">
+            <label>{RegionName}</label>
+          </div>
+          <div class="text-right pull-right mr-2" style="width:50%;margin-top:-42px;">
+            <label>{RegionLocX} : {RegionLocY}</label>
+          </div>
+        </a>
+        <div class="col-12 text-center" style="margin-top:-25px;">
+          <label>{RegionStatus}</label>
+          <a href="#" onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={RegionID}');">
+            <span class="regionlink pull-right" style="margin-top:-23px;">{MoreInfoText}</span>
+          </a>
+        </div>
+      </div>
+    {RegionListArrayEnd}
+  </div>
+</div>

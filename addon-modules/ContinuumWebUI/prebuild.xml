@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<Project name="OpenSim.Continuum.WebUI" path="addon-modules/ContinuumWebUI/OpenSim.Continuum.WebUI" type="Library" version="0.1.0-$Rev$" frameworkVersion="net8_0">
+  <Configuration name="Debug"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <Configuration name="Release"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+  <ReferencePath>../../../bin/</ReferencePath>
+  <Reference name="OpenSim.Framework" />
+  <Reference name="OpenSim.Framework.Servers.HttpServer" />
+  <Reference name="OpenSim.Server.Base" />
+  <Reference name="OpenSim.Server.Handlers" />
+  <Reference name="OpenSim.Services.Interfaces" />
+  <Reference name="OpenMetaverseTypes" />
+  <Reference name="OpenMetaverse" />
+  <Reference name="Nini" />
+  <Reference name="log4net" />
+  <Files>
+    <Match pattern="*.cs" recurse="true"><Exclude name="obj" pattern="obj" /></Match>
+    <Match buildAction="EmbeddedResource" pattern="WhiteCoreWebUI.zip" recurse="false" />
+  </Files>
+</Project>

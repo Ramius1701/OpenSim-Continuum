@@ -1,0 +1,73 @@
+<!-- NewsManager -->
+
+<style>
+  .page-link {background-color: transparent !important;}
+</style>
+
+{IsNotAdminAuthenticatedBegin}
+  <meta http-equiv="REFRESH" content="0;url={SystemURL}">
+{IsNotAdminAuthenticatedEnd}
+
+{IsAdminAuthenticatedBegin}
+<div class="col98">
+  <h2>{SystemName}: {NewsManager}</h2>
+
+  <div class="row w-100 mb-3">
+    <div class="col"></div>
+    <div class="col-4 pull-right">
+      <button id="add_news" onClick="loadusercontent('admin-news_add');">{AddNewsItem}</button>
+    </div>
+  </div>
+
+  <div class="row w-100">
+    <div class="col">
+      <table class="table-compact table-hover" id="news_manager_list" class="display">
+        <thead>
+          <tr class="tablehead">
+            <th>{NewsTitleText}</th>
+            <th>{NewsDateText}</th>
+            <th></th>
+            <th class="no-sort" style="width:80px;"></th>
+            <th class="no-sort" style="width:80px;"></th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {NewsArrayBegin}
+          <tr onclick="loadusercontent('admin-news_edit', 'newsid={NewsID}');">
+            <td>{NewsTitle}</td>
+            <td>{NewsDate}</td>
+            <td>{NewsText}</td>
+            <td class="text-centered">
+              <a href="#" title="{EditText}">
+                <i class="fa fa-edit fa-lg"></i>
+              </a>
+            </td>
+            <td class="text-center">
+              <a title="{DeleteNewsItem}" href="#" onclick="loadusercontent('admin-news_manager', 'delete={NewsID}');">
+                <i class="fa fa-trash fa-red fa-lg"></i>
+              </a>
+            </td>
+          </tr>
+          {NewsArrayEnd}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  $(function() {
+    $('#news_manager_list').dataTable( {
+   	  "order": [[ 0, "asc" ]],
+      "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
+      "fixedHeader": {
+        header: true,
+       //footer: true
+      },
+    });
+});
+</script>
+
+{IsAdminAuthenticatedEnd}
+

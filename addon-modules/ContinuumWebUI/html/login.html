@@ -1,0 +1,37 @@
+<!-- Main non logged in template -->
+<section class="sign-up text-center">
+  <div class="container">
+    <div class="row">
+      <div class="col-2">
+        <img src="static/images/login.png" class="img-fluid" />
+      </div>
+      <div class="col-6">
+        <h3>{Login}</h3>
+        <form class="signup-form" action="login.html" method="POST" id="login_form" role="form">
+          <div class="form-input-group">
+            <i class="fa fa-user"></i>
+            <input type="text" class="" placeholder="{UserNameText}" required name="username" id="login_input">
+          </div>
+          <div class="form-input-group">
+            <i class="fa fa-lock"></i>
+            <input type="password" class="" placeholder="{PasswordText}" required name="password">
+          </div>
+          <button class="btn-fill sign-up-btn" type="submit">
+            {Submit}
+          </button>
+            <a id="forgotpass" href="#" onclick="loadcontent('forgotpass');">
+              <h5>{ForgotPassword}</h5>
+            </a>
+<!--            <a onclick="gohome();">{CancelText}</a>  -->
+
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  $(function() {
+    $("#login_input").focus();
+  });
+</script>

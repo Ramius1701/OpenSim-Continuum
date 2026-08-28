@@ -1,0 +1,199 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>{SystemName}: Welcome Screen</title>
+	<meta name="keywords" content="{SystemName}" />
+	<meta name="description" content="{SystemName}"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Speaking of Google, don't forget to set your site up:
+       http://google.com/webmasters -->
+  <meta name="google-site-verification" content="" />
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v=20190901">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v=20190901">
+  <link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v=20190901">
+  <link rel="manifest" href="/static/site.webmanifest">
+
+  <link type="text/css" rel="stylesheet" href="/static/css/bootstrap.min.css?v=20190901">
+  <link type="text/css" rel="stylesheet" href="/static/css/style.css?v=20190904">
+  <link type="text/css" rel="stylesheet" href="/welcomescreen/welcome.css?v=20200823">
+
+
+
+	<style type="text/css">
+		#container{display:none;}
+		img#mainImage{display:none;}
+	</style> 
+</head>
+
+<body class="welcomescreen">
+	{IfMaintenanceBegin}
+  <section class="hero">
+	  <!--#include file="/maintenance.html" -->
+	</section>
+	{IfMaintenanceEnd}
+
+	{IfNoMaintenanceBegin}
+  <!--#include file="/modal_profile.html" -->
+
+  <section>
+    <div class="header-content" style="margin-top:10px;">
+      <div class="d-inline text-center">
+        <a href="{SystemURL}" alt="{SystemName}" title="{SystemName}">
+          <h1><bold>{SystemName}</bold></h1> 
+        </a>
+      </div>
+    </div>
+    
+    <!-- content -->
+    <div class="container-fluid" id="container">
+
+      <div class="row" id="content">
+        <div id="loading">
+          <img src="/static/icons/loading.gif" alt="Loading..." />
+        </div>
+
+        <div class="col-3" id="topleft" style="min-width:350px;">
+          <!--#include file="welcomescreen/region_box.html" -->
+          <br />
+          <!--#include file="welcomescreen/news.html" -->
+        </div>
+
+        <div class="col"></div>
+
+        <div class="col-3 pull-right" id="topright" style="min-width:320px;">
+          <!--#include file="welcomescreen/gridstatus.html" -->
+          <br />
+          <!--#include file="welcomescreen/info_box.html" -->
+        </div>
+    	</div>  <!-- content -->
+    </div>
+
+  </section>
+  {IfNoMaintenanceEnd}
+
+  <footer class="footer">
+    <div class="container d-inline">
+      <div class="col" id="bottom_image">
+        <a class="logofade" href="{SystemURL}" alt="{SystemName}" title="{SystemName}">
+          <img src="/static/images/logo.png" width="25" alt="WhiteCore Sim logo">
+          <img class="logofade" height="30" src="/static/images/logo2.png" alt="WhiteCore Sim logo" />
+        </a>
+        Copyright &copy; 2014-2022 WhiteCore Sim
+      </div>
+      
+      <div class="col-2 pull-right" id="language">
+
+        {IfShowLanguageTranslatorBarBegin}
+          <div id="language" class="languageswitch">
+            <a rel="nofollow" id="language-drop" href="javascript:toggleLanguage();">
+              <span>LANGUAGE &#9652;</span>
+            </a>
+            <ul id="languageList" style="display:none;margin-top:-135px;">
+              {LanguagesArrayBegin}
+              <li>
+                <a href="{Href}" rel="{Code}" class="languageswitch" alt="{Code}">
+                  <img src="/static/flags/flag-{Code}.png" alt="{Code}">{Language}
+                </a>
+              </li>
+            {LanguagesArrayEnd}
+            </ul>
+          </div>
+        {IfShowLanguageTranslatorBarEnd}
+
+      </div>
+    </div>
+  </footer>
+
+
+	<!-- Javascript -->
+  <script type="text/javascript" src="/static/js/jquery-3.4.1.min.js?v=20190901"></script>
+  <script type="text/javascript" src="/static/js/bootstrap.bundle.min.js?v=20190901"></script>
+  <script type="text/javascript" src="/static/js/randomimageswitch.js?v=20200801"></script>
+
+	<script>
+    $(window).on("load", function() {
+       $("#loading").fadeOut();
+    });
+
+    function toggleLanguage() {
+      $("#languageList").toggle();
+    }
+
+		$(function(){
+			bgImgRotate();
+			$( '#container, img#mainImage, #footer' ).fadeIn("fast");
+
+		});
+
+	 // Tooltips
+
+		//$(function() {$('#container *').tooltip({showURL: false});});
+
+	  $('#bottomright, input.languageswitch, .regionbox, .news, .gridstatus, .infobox, a.languageswitch, a.styleswitch, a.welcomescreen, a.world_map, a.copyright, li.fade, a.fade').css('opacity', 0.3);
+ 		$("#bottomright, input.languageswitch, .regionbox, .news, .gridstatus, .infobox, a.languageswitch, a.styleswitch, a.welcomescreen, a.world_map, a.copyright, li.fade, a.fade")
+      .hover(
+        function() {
+          // Mouse over
+     	    $(this).stop().animate({"opacity": "1.0"}, "3.0");
+        },
+		    function() {
+          // Mouse out
+	  	    $(this).stop().animate({"opacity": "0.3"}, "3.0");
+        }
+      );
+  // regions
+  //$(function() {
+    $('a.regionslurl').hover(function() { 
+      //mouse in
+      $(this).animate({ paddingLeft: '5px' }, 400);
+    }, function() {
+      //mouse out
+      $(this).animate({ paddingLeft: 0 }, 400);
+    });        
+  //});
+  	//$("a.logofade").hover(function(){$(this).fadeOut(150);$(this).fadeIn(150);});
+
+    // fade class
+    $("li.fade, a.fade").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+    $("a.logofade").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+    $("a.languageswitch, a.webprofile").hover(function(){
+      $(this).fadeOut(150);
+      $(this).fadeIn(150);
+    });
+
+  /*- load modal content -*/
+  function loadmodalcontent(pageid, params='', title=''){
+
+  if (params != '') {             // must have some parameters here
+    params = "?" + params;        // add query
+  }
+
+  var content = $("#modalcontent");
+  content.html('');               // clear anything previously loaded
+
+  //load selected page
+  switch(pageid){
+    {ModalItemsArrayBegin}
+    case "{MenuItemID}":
+      content.load("../{MenuItemLocation}" + params);
+      break;
+    {ModalItemsArrayEnd}
+    default:
+      break;
+  }
+
+  $("#profileModal").modal("show");
+};
+
+ </script>
+
+</body>
+</html>

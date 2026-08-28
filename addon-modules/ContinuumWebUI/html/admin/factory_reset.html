@@ -1,0 +1,41 @@
+<!-- Reset menues and grid settings to default -->
+
+{IsAdminAuthenticatedBegin}
+<div id="content">
+  <div id="ContentHeaderCenter"><h1>{FactoryReset}</h1></div>
+  <div id="loginscreen_manager">
+
+    <h3>{ResetMenuText}</h3>
+    <p class="message">{ResetMenuInfoText}</p>
+    <form id="reset_menu_form" action="admin/factory_reset.html" method="post">
+          <div class="row w-100 mt-3">
+          <input type="hidden" name="ResetMenu" value="true">
+
+          <div class="col pull-right">
+            <button class="btn-danger pull-right" style="width:200px;" onclick="submitupdate('reset_menu_form', 'resetmenu=true');">
+              {Reset}
+            </button>
+          </div>
+          <div class="col-1"></div>
+        </div>
+
+    </form>
+
+    <div class="div20"></div>
+
+    <h3>{ResetSettingsText}</h3>
+    <p class="message">{ResetSettingsInfoText}</p>
+    <form id="reset_settings_form" action="admin/factory_reset.html" method="post">
+        <div class="row w-100 mt-3">
+          <div class="col pull-right">
+            <button class="btn-danger pull-right" style="width:200px;" onclick="submitupdate('reset_settings_form', 'resetsettings=true');">
+              {Reset}
+            </button>
+          </div>
+          <div class="col-1"></div>
+        </div>
+    </form>
+  </div>
+</div>
+
+{IsAdminAuthenticatedEnd}
