@@ -10,6 +10,7 @@ using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -108,6 +109,10 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/transactions.html") AddTransactions(vars, currentUser, parameters);
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
                 AddProfile(vars, AccountFromParameter(parameters, currentUser));
+            if (key == "user/profile_edit.html") AddEditableProfile(vars, currentUser);
+            if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser));
+            if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
+            if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser));
             if (key == "user/friends.html") AddFriends(vars, currentUser);
             if (key == "user/groups.html") AddGroups(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
@@ -128,6 +133,7 @@ namespace OpenSim.Continuum.WebUI
                 case "register.html": return Register(form, out message);
                 case "user/password.html": return ChangePassword(form, currentUser, out message);
                 case "user/email.html": return ChangeEmail(form, currentUser, out message);
+                case "user/profile_edit.html": return UpdateProfile(form, currentUser, out message);
                 case "admin/abuse_report.html": return UpdateAbuse(form, currentUser, out message);
                 case "admin/user_edit.html": return UpdateUser(form, currentUser, out message);
                 case "admin/user_password.html": return ResetUserPassword(form, currentUser, out message);
@@ -635,6 +641,54 @@ namespace OpenSim.Continuum.WebUI
             vars["GroupsJoined"] = 0;
         }
 
+        private void AddEditableProfile(Dictionary<string, object> vars, UserAccount account)
+        {
+            if (account == null) return;
+            var profile = new UserProfileProperties { UserId = account.PrincipalID };
+            string result = string.Empty;
+            Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result));
+            vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString();
+            vars["ProfileAbout"] = H(profile.AboutText); vars["ProfileFirstLife"] = H(profile.FirstLifeText);
+            vars["ProfileWebURL"] = H(profile.WebUrl); vars["ProfileImageID"] = profile.ImageId.ToString();
+            vars["ProfileFirstLifeImageID"] = profile.FirstLifeImageId.ToString();
+            vars["ProfileWantText"] = H(profile.WantToText); vars["ProfileSkillsText"] = H(profile.SkillsText);
+            vars["ProfileLanguage"] = H(profile.Language); vars["ProfileWantMask"] = profile.WantToMask;
+            vars["ProfileSkillsMask"] = profile.SkillsMask;
+            vars["ProfilePublishChecked"] = profile.PublishProfile ? "checked" : string.Empty;
+            vars["ProfileMatureChecked"] = profile.PublishMature ? "checked" : string.Empty;
+        }
+
+        private bool UpdateProfile(IReadOnlyDictionary<string, string> form, UserAccount account, out string message)
+        {
+            message = "Authentication required";
+            if (account == null) return true;
+            if (_profiles == null) { message = "Profile service is unavailable"; return true; }
+            var profile = new UserProfileProperties { UserId = account.PrincipalID };
+            string result = string.Empty;
+            if (!Safe(() => _profiles.AvatarPropertiesRequest(ref profile, ref result)))
+            { message = "Profile service is unavailable"; return true; }
+            string about = Value(form, "about").Trim(); string firstLife = Value(form, "firstlife").Trim();
+            string webUrl = Value(form, "weburl").Trim(); string wants = Value(form, "wants").Trim();
+            string skills = Value(form, "skills").Trim(); string language = Value(form, "language").Trim();
+            if (about.Length > 8192 || firstLife.Length > 8192 || wants.Length > 4096 || skills.Length > 4096 || language.Length > 255)
+            { message = "One or more profile fields are too long"; return true; }
+            if (webUrl.Length > 1024 || (webUrl.Length > 0 && (!Uri.TryCreate(webUrl, UriKind.Absolute, out Uri parsed) ||
+                (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))))
+            { message = "Profile web URL must use HTTP or HTTPS"; return true; }
+            if (!UUID.TryParse(Value(form, "imageid"), out UUID image)) image = profile.ImageId;
+            if (!UUID.TryParse(Value(form, "firstlifeimageid"), out UUID firstLifeImage)) firstLifeImage = profile.FirstLifeImageId;
+            profile.AboutText = about; profile.FirstLifeText = firstLife; profile.WebUrl = webUrl;
+            profile.ImageId = image; profile.FirstLifeImageId = firstLifeImage;
+            profile.PublishProfile = form.ContainsKey("publish"); profile.PublishMature = form.ContainsKey("mature");
+            if (!Safe(() => _profiles.AvatarPropertiesUpdate(ref profile, ref result)))
+            { message = "Profile update failed: " + H(result); return true; }
+            profile.WantToText = wants; profile.SkillsText = skills; profile.Language = language;
+            Int32.TryParse(Value(form, "wantmask"), NumberStyles.Integer, CultureInfo.InvariantCulture, out profile.WantToMask);
+            Int32.TryParse(Value(form, "skillsmask"), NumberStyles.Integer, CultureInfo.InvariantCulture, out profile.SkillsMask);
+            message = Safe(() => _profiles.AvatarInterestsUpdate(profile, ref result)) ? "Profile updated" : "Profile saved, but interests could not be updated";
+            return true;
+        }
+
         private void AddFriends(Dictionary<string, object> vars, UserAccount account)
         {
             var rows = new List<Dictionary<string, object>>();
@@ -686,6 +740,70 @@ namespace OpenSim.Continuum.WebUI
             }
             vars["Groups"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["GroupsJoined"] = rows.Count;
+        }
+
+        private void AddPublicGroups(Dictionary<string, object> vars, UserAccount account)
+        {
+            AddGroups(vars, account);
+            if (vars.TryGetValue("Groups", out object value) && value is List<Dictionary<string, object>> rows)
+            {
+                rows.RemoveAll(row => !String.Equals(row["GroupProfileListed"]?.ToString(), "Yes", StringComparison.Ordinal));
+                vars["GroupsJoined"] = rows.Count;
+                vars["HaveData"] = rows.Count > 0;
+                vars["NoData"] = rows.Count == 0;
+            }
+            if (account != null) { vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString(); }
+        }
+
+        private void AddPicks(Dictionary<string, object> vars, UserAccount account)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (account != null && _profiles != null && Safe(() => _profiles.AvatarPicksRequest(account.PrincipalID)) is OSDArray picks)
+            {
+                foreach (OSD value in picks.Take(100))
+                {
+                    if (value is not OSDMap summary || !UUID.TryParse(summary["pickuuid"].AsString(), out UUID pickID)) continue;
+                    var pick = new UserProfilePick { CreatorId = account.PrincipalID, PickId = pickID };
+                    string result = string.Empty;
+                    if (!Safe(() => _profiles.PickInfoRequest(ref pick, ref result))) continue;
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["PickID"] = pick.PickId.ToString(), ["PickName"] = H(pick.Name),
+                        ["PickDescription"] = H(pick.Desc), ["PickRegion"] = H(pick.SimName),
+                        ["PickLocation"] = H(pick.GlobalPos),
+                        ["PickSnapshotURL"] = Texture(pick.SnapshotId, "static/icons/no_picture.jpg"),
+                        ["PickHop"] = PickHop(pick)
+                    });
+                }
+            }
+            vars["Picks"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            if (account != null)
+            {
+                vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString();
+                vars["UserPictureURL"] = Texture(UUID.Zero, "static/icons/no_avatar.jpg");
+            }
+        }
+
+        private void AddOwnedRegions(Dictionary<string, object> vars, UserAccount account)
+        {
+            List<GridRegion> regions = account == null ? new() :
+                (Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new())
+                    .Where(region => region.EstateOwner == account.PrincipalID).ToList();
+            var rows = regions.Select(region =>
+            {
+                Dictionary<string, object> row = RegionRow(region);
+                row["RegionImageURL"] = Texture(region.TerrainImage, "static/icons/no_picture.jpg");
+                return row;
+            }).ToList();
+            vars["RegionList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            if (account != null) { vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString(); }
+        }
+
+        private string PickHop(UserProfilePick pick)
+        {
+            string position = (pick.GlobalPos ?? string.Empty).Trim('<', '>', ' ');
+            ParseLanding(position.Replace(" ", string.Empty), out int x, out int y, out int z);
+            return String.IsNullOrWhiteSpace(pick.SimName) ? string.Empty : Hop(pick.SimName, x, y, z);
         }
 
         private void AddExperiences(Dictionary<string, object> vars, UserAccount account,
@@ -796,7 +914,11 @@ namespace OpenSim.Continuum.WebUI
         {
             string plugin = section.GetString(key, defaultPlugin).Trim();
             if (plugin.Length == 0) return null;
-            try { return ServerUtils.LoadPlugin<T>(plugin, new object[] { config }); }
+            try
+            {
+                T service = ServerUtils.LoadPlugin<T>(plugin, new object[] { config });
+                return service ?? ServerUtils.LoadPlugin<T>(plugin, new object[] { config, key });
+            }
             catch (Exception e) { Log.WarnFormat("[CONTINUUM WEBUI]: Optional {0} unavailable: {1}", key, e.Message); return null; }
         }
 

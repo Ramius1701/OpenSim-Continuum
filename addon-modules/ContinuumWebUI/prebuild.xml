@@ -10,6 +10,7 @@
   <Reference name="OpenSim.Services.Interfaces" />
   <Reference name="OpenMetaverseTypes" />
   <Reference name="OpenMetaverse" />
+  <Reference name="OpenMetaverse.StructuredData" />
   <Reference name="Nini" />
   <Reference name="log4net" />
   <Reference name="XMLRPC" />

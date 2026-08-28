@@ -135,21 +135,7 @@ namespace OpenSim.Continuum.WebUI
                 HandleLogout(request, response);
                 return;
             }
-            Dictionary<string, string> parameters = RequestParameters(request);
-            if (request.HttpMethod == "POST")
-            {
-                if (request.ContentLength64 < 0 || request.ContentLength64 > 64 * 1024)
-                {
-                    WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Request is too large");
-                    return;
-                }
-                using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8, true, 1024, true);
-                var form = System.Web.HttpUtility.ParseQueryString(reader.ReadToEnd());
-                foreach (string key in form.AllKeys)
-                    if (key != null) parameters[key] = form[key];
-            }
-
-            UserAccount currentUser = GetAuthenticatedUser(request, false);
+            UserAccount currentUser = GetAuthenticatedUser(request);
             bool accountPage = relative.StartsWith("user/", StringComparison.OrdinalIgnoreCase)
                 || relative.Equals("userhome.html", StringComparison.OrdinalIgnoreCase)
                 || relative.Equals("friends.html", StringComparison.OrdinalIgnoreCase)
@@ -164,9 +150,19 @@ namespace OpenSim.Continuum.WebUI
                 WriteError(response, HttpStatusCode.Forbidden, "Administrator access required");
                 return;
             }
+            Dictionary<string, string> parameters = RequestParameters(request);
             if (request.HttpMethod == "POST")
             {
                 if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                if (request.ContentLength64 < 0 || request.ContentLength64 > 64 * 1024)
+                {
+                    WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Request is too large");
+                    return;
+                }
+                using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8, true, 1024, true);
+                var form = System.Web.HttpUtility.ParseQueryString(reader.ReadToEnd());
+                foreach (string key in form.AllKeys)
+                    if (key != null) parameters[key] = form[key];
                 if (_integration.HandlePost(relative, parameters, currentUser, out string message))
                 {
                     WriteText(response, HttpStatusCode.OK, message);
@@ -215,6 +211,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("login", "Log in", "login.html"),
                 Menu("register", "Sign up", "register.html"),
                 Menu("userhome", "Account", "userhome.html", false),
+                Menu("profile_edit", "Edit profile", "user/profile_edit.html", false),
                 Menu("friends", "Friends", "friends.html", false),
                 Menu("groups", "Groups", "groups.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
@@ -428,7 +425,7 @@ namespace OpenSim.Continuum.WebUI
             string password = form["password"] ?? string.Empty;
             UserAccount account = FindAccount(username);
             string token = account == null ? string.Empty : _authentication.Authenticate(
-                account.PrincipalID, Util.Md5Hash(password), _sessionSeconds);
+                account.PrincipalID, Util.Md5Hash(password), SessionLifetimeMinutes);
             if (string.IsNullOrEmpty(token))
             {
                 WriteError(response, HttpStatusCode.Unauthorized, "Invalid user name or password");
@@ -449,12 +446,15 @@ namespace OpenSim.Continuum.WebUI
             response.Redirect(_mountPath + "/", HttpStatusCode.SeeOther);
         }
 
-        private UserAccount GetAuthenticatedUser(IOSHttpRequest request, bool refresh)
+        private UserAccount GetAuthenticatedUser(IOSHttpRequest request)
         {
             if (!TryReadCookie(request, out UUID principal, out string token)) return null;
-            if (!_authentication.Verify(principal, token, refresh ? _sessionSeconds : 0)) return null;
+            if (!_authentication.Verify(principal, token, SessionLifetimeMinutes)) return null;
             return _accounts.GetUserAccount(UUID.Zero, principal);
         }
+
+        // OpenSim authentication lifetimes are expressed in minutes, while HTTP Max-Age is seconds.
+        private int SessionLifetimeMinutes => Math.Max(1, (_sessionSeconds + 59) / 60);
 
         private static bool TryReadCookie(IOSHttpRequest request, out UUID principal, out string token)
         {

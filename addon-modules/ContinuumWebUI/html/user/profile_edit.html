@@ -1,0 +1,17 @@
+<!-- Grid Interface profile editing in the WhiteCore resident workflow. -->
+<section class="container">
+  <h2>{UserName}: Edit profile</h2>
+  <form method="post" action="profile_edit.html">
+    <div class="form-group"><label>About</label><textarea class="form-control" name="about" maxlength="8192" rows="5">{ProfileAbout}</textarea></div>
+    <div class="form-group"><label>Profile image asset UUID</label><input class="form-control" name="imageid" value="{ProfileImageID}"></div>
+    <div class="form-group"><label>Web URL</label><input class="form-control" type="url" name="weburl" maxlength="1024" value="{ProfileWebURL}"></div>
+    <div class="form-group"><label>Looking for</label><textarea class="form-control" name="wants" maxlength="4096">{ProfileWantText}</textarea><input type="hidden" name="wantmask" value="{ProfileWantMask}"></div>
+    <div class="form-group"><label>Skills</label><textarea class="form-control" name="skills" maxlength="4096">{ProfileSkillsText}</textarea><input type="hidden" name="skillsmask" value="{ProfileSkillsMask}"></div>
+    <div class="form-group"><label>Languages</label><input class="form-control" name="language" maxlength="255" value="{ProfileLanguage}"></div>
+    <div class="form-group"><label>First Life</label><textarea class="form-control" name="firstlife" maxlength="8192" rows="4">{ProfileFirstLife}</textarea></div>
+    <div class="form-group"><label>First Life image asset UUID</label><input class="form-control" name="firstlifeimageid" value="{ProfileFirstLifeImageID}"></div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="publish" value="true" {ProfilePublishChecked}><label class="form-check-label">Publish profile</label></div>
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="mature" value="true" {ProfileMatureChecked}><label class="form-check-label">Mature profile</label></div>
+    <button class="btn btn-info mt-3" type="submit">Save profile</button>
+  </form>
+</section>
