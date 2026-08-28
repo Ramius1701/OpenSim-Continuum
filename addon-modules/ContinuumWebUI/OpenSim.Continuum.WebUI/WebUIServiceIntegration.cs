@@ -104,6 +104,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters);
             if (key == "destinations.html") AddDestinations(vars, parameters);
             if (key == "online_users.html") AddOnlineUsers(vars);
+            if (key == "user_search.html") AddUserSearch(vars, parameters, currentUser);
             if (key == "register.html") AddRegistration(vars);
             if (key is "userhome.html" or "user/userhome.html") AddUserHome(vars, currentUser);
             if (key == "user/transactions.html") AddTransactions(vars, currentUser, parameters);
@@ -480,6 +481,34 @@ namespace OpenSim.Continuum.WebUI
                 }
             }
             vars["UsersOnlineList"] = rows;
+        }
+
+        private void AddUserSearch(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount currentUser)
+        {
+            string search = Value(parameters, "username").Trim();
+            List<UserAccount> accounts = search.Length < 2
+                ? new List<UserAccount>()
+                : Safe(() => _accounts.GetUserAccounts(UUID.Zero, search)) ?? new List<UserAccount>();
+            var rows = new List<Dictionary<string, object>>();
+            foreach (UserAccount account in accounts.Take(100))
+            {
+                var profile = new UserProfileProperties { UserId = account.PrincipalID };
+                string result = string.Empty;
+                Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result));
+                rows.Add(new Dictionary<string, object>
+                {
+                    ["UserID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName),
+                    ["UserType"] = H(AccountType(account)),
+                    ["UserPictureURL"] = Texture(profile.ImageId, "static/icons/no_avatar.jpg")
+                });
+            }
+            vars["UsersList"] = rows; vars["UserSearchText"] = "Resident search";
+            vars["UserNameText"] = "Resident name"; vars["SearchForUserText"] = "Search for a resident";
+            vars["SearchResultForUserText"] = "Search results"; vars["Search"] = "Search";
+            vars["NoDetailsText"] = search.Length < 2 ? "Enter at least two characters" :
+                rows.Count == 0 ? "No matching residents" : string.Empty;
+            vars["CanEdit"] = IsAdmin(currentUser);
         }
 
         private void AddUserHome(Dictionary<string, object> vars, UserAccount account)

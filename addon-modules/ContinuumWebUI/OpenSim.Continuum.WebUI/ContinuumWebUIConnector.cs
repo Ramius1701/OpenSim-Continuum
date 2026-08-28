@@ -210,6 +210,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("classifieds", "Classifieds", "classifieds.html"),
                 Menu("experiences", "Experiences", "experiences.html"),
                 Menu("online_users", "Online users", "online_users.html"),
+                Menu("user_search", "Residents", "user_search.html"),
                 Menu("region_search", "Regions", "region_search.html"),
                 Menu("login", "Log in", "login.html"),
                 Menu("register", "Sign up", "register.html"),
