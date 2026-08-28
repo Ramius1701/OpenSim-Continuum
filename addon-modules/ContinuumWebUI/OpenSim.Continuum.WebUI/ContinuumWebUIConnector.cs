@@ -205,6 +205,7 @@ namespace OpenSim.Continuum.WebUI
             {
                 Menu("home", "Home", "home.html"),
                 Menu("world_map", "World map", "world_map.html"),
+                Menu("destinations", "Destinations", "destinations.html"),
                 Menu("events", "Events", "events.html"),
                 Menu("classifieds", "Classifieds", "classifieds.html"),
                 Menu("experiences", "Experiences", "experiences.html"),

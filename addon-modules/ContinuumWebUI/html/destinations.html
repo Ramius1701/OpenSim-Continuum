@@ -1,0 +1,33 @@
+<!-- OpenSim-Grid-Interface destination discovery in the WhiteCore WebUI shell. -->
+<section class="container-fluid">
+  <h2>Destinations</h2>
+  <p>Discover public places across {SystemName}.</p>
+  <form method="get" action="destinations.html" class="form-inline mb-3">
+    <input class="form-control mr-2" type="search" name="q" maxlength="128" value="{DestinationSearch}" placeholder="Region, parcel, or keyword">
+    <select class="form-control mr-2" name="tab">
+      <option value="popular">Popular</option><option value="featured">Featured</option><option value="discover">Discover</option>
+    </select>
+    <select class="form-control mr-2" name="m">
+      <option value="">Any maturity</option><option value="general">General</option><option value="mature">Mature</option><option value="adult">Adult</option>
+    </select>
+    <button class="btn btn-info" type="submit">Search</button>
+  </form>
+  {IfHaveDataBegin}
+  <div class="row">
+    {DestinationsArrayBegin}
+    <article class="col-lg-4 col-md-6 mb-4">
+      <div class="card bg-dark text-light h-100">
+        <img class="card-img-top" style="height:180px;object-fit:cover" src="{DestinationImage}" alt="{DestinationName}">
+        <div class="card-body">
+          <h3 class="h5">{DestinationName}</h3>
+          <p>{DestinationDescription}</p>
+          <p><strong>{DestinationRegion}</strong><br>{DestinationCategory} · {DestinationMaturity} · Traffic {DestinationDwell}</p>
+          <a class="btn btn-success" href="{DestinationHop}">Teleport</a>
+        </div>
+      </div>
+    </article>
+    {DestinationsArrayEnd}
+  </div>
+  {IfHaveDataEnd}
+  {IfNoDataBegin}<p>No public destinations matched this search.</p>{IfNoDataEnd}
+</section>

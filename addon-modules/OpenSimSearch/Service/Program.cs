@@ -70,6 +70,7 @@ namespace ContinuumSearch.Service
         {
             server.AddXmlRPCHandler("dir_places_query", Places);
             server.AddXmlRPCHandler("dir_popular_query", Popular);
+            server.AddXmlRPCHandler("parcel_info_query", ParcelInfo);
             server.AddXmlRPCHandler("dir_land_query", Land);
             server.AddXmlRPCHandler("dir_events_query", Events);
             server.AddXmlRPCHandler("dir_classified_query", Classifieds);
@@ -80,6 +81,7 @@ namespace ContinuumSearch.Service
 
         private XmlRpcResponse Places(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindPlaces(Args(request)));
         private XmlRpcResponse Popular(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindPopular(Args(request)));
+        private XmlRpcResponse ParcelInfo(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.GetParcel(Args(request)));
         private XmlRpcResponse Land(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindLand(Args(request)));
         private XmlRpcResponse Events(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindEvents(Args(request)));
         private XmlRpcResponse Classifieds(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindClassifieds(Args(request)));

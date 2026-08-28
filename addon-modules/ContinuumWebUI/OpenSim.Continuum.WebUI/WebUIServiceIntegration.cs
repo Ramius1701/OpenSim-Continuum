@@ -48,7 +48,7 @@ namespace OpenSim.Continuum.WebUI
         {
             _accounts = accounts;
             _adminLevel = Math.Clamp(section.GetInt("AdminUserLevel", 200), 1, 255);
-            _hopBase = section.GetString("HopURLBase", "hop://").TrimEnd('/');
+            _hopBase = section.GetString("HopURLBase", "hop://").Trim();
             _textureBase = section.GetString("TextureURL", string.Empty).TrimEnd('/');
             _publicBase = section.GetString("PublicURL", string.Empty).TrimEnd('/');
             _mapBase = section.GetString("MapServiceURL", _publicBase).TrimEnd('/');
@@ -74,6 +74,7 @@ namespace OpenSim.Continuum.WebUI
                 "world_map.html" => "world.html",
                 "events.html" => "events/events.html",
                 "classifieds.html" => "classifieds/classifieds.html",
+                "destinations.html" => "destinations.html",
                 "profile.html" => "user/profile.html",
                 "friends.html" => "user/friends.html",
                 "transactions.html" => "user/transactions.html",
@@ -97,6 +98,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "world.html") AddWorldMap(vars);
             if (key == "events/events.html") AddEvents(vars, parameters);
             if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters);
+            if (key == "destinations.html") AddDestinations(vars, parameters);
             if (key == "online_users.html") AddOnlineUsers(vars);
             if (key == "register.html") AddRegistration(vars);
             if (key is "userhome.html" or "user/userhome.html") AddUserHome(vars, currentUser);
@@ -477,6 +479,70 @@ namespace OpenSim.Continuum.WebUI
             vars["PG_checked"] = "checked"; vars["MA_checked"] = "checked"; vars["AO_checked"] = string.Empty;
         }
 
+        private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        {
+            string text = Value(parameters, "q").Trim();
+            string tab = Value(parameters, "tab").Trim().ToLowerInvariant();
+            if (tab is not ("popular" or "featured" or "discover")) tab = "popular";
+            int.TryParse(Value(parameters, "cat"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int category);
+            int flags = MaturityFlags(Value(parameters, "m"));
+            string method = tab == "popular" && text.Length == 0 && category == 0 ? "dir_popular_query" : "dir_places_query";
+            Hashtable response = Search(method, new Hashtable
+            {
+                ["text"] = text.Length == 0 ? "%" : text, ["flags"] = flags.ToString(CultureInfo.InvariantCulture),
+                ["category"] = category.ToString(CultureInfo.InvariantCulture), ["query_start"] = "0"
+            });
+            var rows = new List<Dictionary<string, object>>();
+            if (response?["data"] is ArrayList data)
+            {
+                foreach (Hashtable summary in data.OfType<Hashtable>().Take(100))
+                {
+                    Hashtable detailsResponse = Search("parcel_info_query", new Hashtable { ["parcel_id"] = Text(summary, "parcel_id") });
+                    Hashtable detail = (detailsResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault();
+                    if (detail == null) continue;
+                    string regionName = Text(detail, "region_name");
+                    ParseLanding(Text(detail, "landing_point"), out int x, out int y, out int z);
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["DestinationName"] = H(Text(detail, "name")), ["DestinationDescription"] = H(Text(detail, "description")),
+                        ["DestinationRegion"] = H(regionName), ["DestinationCategory"] = H(CategoryName(Text(detail, "category"))),
+                        ["DestinationMaturity"] = H(MaturityName(Text(detail, "maturity"))), ["DestinationDwell"] = H(Text(detail, "dwell")),
+                        ["DestinationArea"] = H(Text(detail, "area")), ["DestinationPrice"] = H(Text(detail, "sale_price")),
+                        ["DestinationForSale"] = String.Equals(Text(detail, "for_sale"), "True", StringComparison.OrdinalIgnoreCase) ? "For sale" : string.Empty,
+                        ["DestinationImage"] = Texture(UUID.TryParse(Text(detail, "snapshot_id"), out UUID image) ? image : UUID.Zero, "static/icons/no_picture.jpg"),
+                        ["DestinationHop"] = Hop(regionName, x, y, z)
+                    });
+                }
+            }
+            vars["Destinations"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["DestinationSearch"] = H(text); vars["DestinationTab"] = H(tab);
+        }
+
+        private static int MaturityFlags(string maturity) => maturity.Trim().ToLowerInvariant() switch
+        {
+            "general" or "pg" => 0x01000000,
+            "mature" => 0x02000000,
+            "adult" => 0x04000000,
+            _ => 0x01000000 | 0x02000000 | 0x04000000
+        };
+
+        private static void ParseLanding(string value, out int x, out int y, out int z)
+        {
+            string[] parts = (value ?? string.Empty).Split(',');
+            x = parts.Length > 0 && Int32.TryParse(parts[0], out int px) ? Math.Clamp(px, 0, 4096) : 128;
+            y = parts.Length > 1 && Int32.TryParse(parts[1], out int py) ? Math.Clamp(py, 0, 4096) : 128;
+            z = parts.Length > 2 && Int32.TryParse(parts[2], out int pz) ? Math.Clamp(pz, 0, 10000) : 25;
+        }
+
+        private static string CategoryName(string value) => value switch
+        {
+            "3" => "Arts & Culture", "4" => "Business", "5" => "Education", "6" => "Gaming",
+            "7" => "Hangout", "8" => "Newcomer", "9" => "Parks & Nature", "10" => "Residential",
+            "11" => "Shopping", "14" => "Rental", _ => "Other"
+        };
+
+        private static string MaturityName(string value) => value switch { "1" => "Mature", "2" => "Adult", _ => "General" };
+
         private void AddTransactions(Dictionary<string, object> vars, UserAccount account, IReadOnlyDictionary<string, string> parameters)
         {
             var rows = new List<Dictionary<string, object>>();
@@ -663,8 +729,11 @@ namespace OpenSim.Continuum.WebUI
 
         private string Texture(UUID id, string fallback) => id == UUID.Zero || string.IsNullOrEmpty(_textureBase)
             ? fallback : _textureBase + "/" + id;
-        private string Hop(GridRegion region, Vector3 position) => _hopBase + "/" + Uri.EscapeDataString(region.RegionName)
-            + "/" + (int)position.X + "/" + (int)position.Y + "/" + (int)position.Z;
+        private string Hop(GridRegion region, Vector3 position) => Hop(region.RegionName,
+            (int)position.X, (int)position.Y, (int)position.Z);
+        private string Hop(string regionName, int x, int y, int z) => _hopBase +
+            (_hopBase.EndsWith("/", StringComparison.Ordinal) ? string.Empty : "/") +
+            Uri.EscapeDataString(regionName) + "/" + x + "/" + y + "/" + z;
         private static string AccountType(UserAccount account) => account.UserLevel >= 200 ? "Administrator" : account.UserLevel < 0 ? "Disabled" : "Resident";
         private static string H(string value) => WebUtility.HtmlEncode(value ?? string.Empty);
         private static string Value(IReadOnlyDictionary<string, string> values, string key) => values.TryGetValue(key, out string value) ? value ?? string.Empty : string.Empty;
