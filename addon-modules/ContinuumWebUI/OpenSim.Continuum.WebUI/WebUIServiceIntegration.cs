@@ -33,6 +33,7 @@ namespace OpenSim.Continuum.WebUI
         private readonly IUserProfilesService _profiles;
         private readonly IAbuseReportsService _abuse;
         private readonly IExperienceService _experiences;
+        private readonly IGroupsService _groups;
         private readonly int _adminLevel;
         private readonly string _hopBase;
         private readonly string _textureBase;
@@ -63,6 +64,7 @@ namespace OpenSim.Continuum.WebUI
             _profiles = Load<IUserProfilesService>(config, section, "UserProfilesService", "OpenSim.Services.UserProfilesService.dll:UserProfilesService");
             _abuse = Load<IAbuseReportsService>(config, section, "AbuseReportsService", "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService");
             _experiences = Load<IExperienceService>(config, section, "ExperienceService", "OpenSim.Services.ExperienceService.dll:ExperienceService");
+            _groups = Load<IGroupsService>(config, section, "GroupsService", "OpenSim.Addons.Groups.dll:GroupsService");
         }
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
@@ -77,6 +79,7 @@ namespace OpenSim.Continuum.WebUI
                 "destinations.html" => "destinations.html",
                 "profile.html" => "user/profile.html",
                 "friends.html" => "user/friends.html",
+                "groups.html" => "user/groups.html",
                 "transactions.html" => "user/transactions.html",
                 "abuse_manager.html" => "admin/abuse_manager.html",
                 "abuse_report.html" => "admin/abuse_report.html",
@@ -106,6 +109,7 @@ namespace OpenSim.Continuum.WebUI
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
                 AddProfile(vars, AccountFromParameter(parameters, currentUser));
             if (key == "user/friends.html") AddFriends(vars, currentUser);
+            if (key == "user/groups.html") AddGroups(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -175,6 +179,11 @@ namespace OpenSim.Continuum.WebUI
                 if (create == null) { message = "Account creation is unavailable on this service"; return true; }
                 var created = create.Invoke(_accounts, new object[] { UUID.Zero, UUID.Random(), first, last, password, email, string.Empty }) as UserAccount;
                 if (created == null) { message = "Account creation failed"; return true; }
+                if (_authenticationForPassword == null || !_authenticationForPassword.SetPassword(created.PrincipalID, password))
+                {
+                    message = "Account was created, but its password could not be stored; contact a grid administrator";
+                    return true;
+                }
                 if (_gridUsers != null && form.TryGetValue("UserHomeRegion", out string homeText) && UUID.TryParse(homeText, out UUID home))
                     _gridUsers.SetHome(created.PrincipalID.ToString(), home, new Vector3(128, 128, 25), new Vector3(0, 1, 0));
                 message = "Account created successfully";
@@ -192,7 +201,7 @@ namespace OpenSim.Continuum.WebUI
             string password = Value(form, "passwordnew");
             string confirmation = Value(form, "passwordconf");
             if (password.Length < 8 || password.Length > 128 || password != confirmation) { message = "New passwords must match and contain at least eight characters"; return true; }
-            string token = _authenticationForPassword?.Authenticate(account.PrincipalID, oldPassword, 60);
+            string token = _authenticationForPassword?.Authenticate(account.PrincipalID, Util.Md5Hash(oldPassword), 60);
             if (string.IsNullOrEmpty(token)) { message = "Current password is incorrect"; return true; }
             _authenticationForPassword.Release(account.PrincipalID, token);
             message = _authenticationForPassword.SetPassword(account.PrincipalID, password) ? "Password updated" : "Password update failed";
@@ -409,8 +418,7 @@ namespace OpenSim.Continuum.WebUI
             vars["UserPictureURL"] = Texture(UUID.Zero, "static/icons/no_avatar.jpg");
             Hashtable statement = EconomyStatement(account.PrincipalID, null, 1);
             vars["UserBalance"] = statement != null && statement.ContainsKey("balance") ? statement["balance"] : "Unavailable";
-            vars["Groups"] = new List<Dictionary<string, object>>();
-            vars["GroupsJoined"] = 0;
+            AddGroups(vars, account);
         }
 
         private void AddEvents(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
@@ -654,6 +662,30 @@ namespace OpenSim.Continuum.WebUI
             vars["UserFriendsList"] = rows;
             vars["HaveData"] = rows.Count > 0;
             vars["NoData"] = rows.Count == 0;
+        }
+
+        private void AddGroups(Dictionary<string, object> vars, UserAccount account)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (account != null && _groups != null)
+            {
+                List<GroupMembershipData> memberships = Safe(() => _groups.GetAgentGroupMemberships(
+                    account.PrincipalID.ToString(), account.PrincipalID.ToString())) ?? new();
+                foreach (GroupMembershipData membership in memberships.OrderBy(m => m.GroupName).Take(1000))
+                {
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["GroupID"] = membership.GroupID.ToString(), ["GroupName"] = H(membership.GroupName),
+                        ["GroupTitle"] = H(membership.GroupTitle), ["GroupCharter"] = H(membership.Charter),
+                        ["GroupPictureURL"] = Texture(membership.GroupPicture, "static/icons/no_picture.jpg"),
+                        ["GroupActive"] = membership.Active ? "Active" : string.Empty,
+                        ["GroupNotices"] = membership.AcceptNotices ? "Yes" : "No",
+                        ["GroupProfileListed"] = membership.ListInProfile ? "Yes" : "No"
+                    });
+                }
+            }
+            vars["Groups"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["GroupsJoined"] = rows.Count;
         }
 
         private void AddExperiences(Dictionary<string, object> vars, UserAccount account,

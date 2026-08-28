@@ -1,0 +1,23 @@
+<!-- Resident group memberships through the native OpenSim Groups service. -->
+<section class="container-fluid">
+  <h2>{UserName}: Groups</h2>
+  <p>{GroupsJoined} memberships</p>
+  {IfHaveDataBegin}
+  <div class="row">
+    {GroupsArrayBegin}
+    <article class="col-lg-4 col-md-6 mb-4">
+      <div class="card bg-dark text-light h-100">
+        <img class="card-img-top" style="height:160px;object-fit:contain" src="{GroupPictureURL}" alt="{GroupName}">
+        <div class="card-body">
+          <h3 class="h5">{GroupName}</h3>
+          <p><strong>{GroupTitle}</strong> {GroupActive}</p>
+          <p>{GroupCharter}</p>
+          <small>Notices {GroupNotices} · Profile {GroupProfileListed}</small>
+        </div>
+      </div>
+    </article>
+    {GroupsArrayEnd}
+  </div>
+  {IfHaveDataEnd}
+  {IfNoDataBegin}<p>This resident has no group memberships.</p>{IfNoDataEnd}
+</section>

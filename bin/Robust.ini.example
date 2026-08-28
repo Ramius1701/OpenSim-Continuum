@@ -162,6 +162,7 @@
     UserProfilesService = OpenSim.Services.UserProfilesService.dll:UserProfilesService
     AbuseReportsService = OpenSim.Services.AbuseReportsService.dll:AbuseReportsService
     ExperienceService = OpenSim.Services.ExperienceService.dll:ExperienceService
+    GroupsService = OpenSim.Addons.Groups.dll:GroupsService
     ; TextureURL = http://127.0.0.1:8002/assets
     HopURLBase = hop://
     ; PublicURL = http://127.0.0.1:8002

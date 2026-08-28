@@ -15,6 +15,7 @@ using System.IO.Compression;
 using log4net;
 using Nini.Config;
 using OpenMetaverse;
+using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
@@ -215,6 +216,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("register", "Sign up", "register.html"),
                 Menu("userhome", "Account", "userhome.html", false),
                 Menu("friends", "Friends", "friends.html", false),
+                Menu("groups", "Groups", "groups.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };
@@ -425,7 +427,8 @@ namespace OpenSim.Continuum.WebUI
             string username = (form["username"] ?? string.Empty).Trim();
             string password = form["password"] ?? string.Empty;
             UserAccount account = FindAccount(username);
-            string token = account == null ? string.Empty : _authentication.Authenticate(account.PrincipalID, password, _sessionSeconds);
+            string token = account == null ? string.Empty : _authentication.Authenticate(
+                account.PrincipalID, Util.Md5Hash(password), _sessionSeconds);
             if (string.IsNullOrEmpty(token))
             {
                 WriteError(response, HttpStatusCode.Unauthorized, "Invalid user name or password");
