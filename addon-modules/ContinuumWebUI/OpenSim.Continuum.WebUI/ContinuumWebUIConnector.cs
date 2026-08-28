@@ -49,6 +49,7 @@ namespace OpenSim.Continuum.WebUI
             var integration = new WebUIServiceIntegration(config, section, accounts);
             integration.SetAuthenticationService(authentication);
             var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, integration, sessionSeconds);
+            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.HandleRoot));
             server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.Handle), true);
             Log.InfoFormat("[CONTINUUM WEBUI]: WhiteCore integrated portal mounted at {0}/", mountPath);
         }
@@ -91,6 +92,8 @@ namespace OpenSim.Continuum.WebUI
         {
             if (string.Equals(request.UriPath, _mountPath, StringComparison.Ordinal))
                 response.Redirect(_mountPath + "/", HttpStatusCode.MovedPermanently);
+            else if (string.Equals(request.UriPath, _mountPath + "/", StringComparison.Ordinal))
+                Handle(request, response);
             else
                 WriteError(response, HttpStatusCode.NotFound, "Not found");
         }
