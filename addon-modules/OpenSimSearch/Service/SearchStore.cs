@@ -182,6 +182,24 @@ namespace ContinuumSearch.Service
                 });
         }
 
+        internal ArrayList GetRegionParcels(Hashtable request)
+        {
+            string id = Text(request, "region_id").Trim();
+            if (!Guid.TryParse(id, out Guid parsed) || parsed == Guid.Empty) return new ArrayList();
+            return Query(
+                "SELECT info_id,parcel_id,name,description,landing,area,sale_price,for_sale,dwell,maturity,snapshot_id " +
+                "FROM continuum_search_parcels WHERE region_id=@id AND show_in_search=1 ORDER BY name LIMIT 1000",
+                new List<(string, object)> { ("@id", parsed.ToString()) }, null, reader => new Hashtable
+                {
+                    ["parcel_id"] = Value(reader, 0), ["parcel_uuid"] = Value(reader, 1),
+                    ["name"] = Value(reader, 2), ["description"] = Value(reader, 3),
+                    ["landing_point"] = Value(reader, 4), ["area"] = Int(reader, 5),
+                    ["sale_price"] = Int(reader, 6), ["for_sale"] = Bool(reader, 7),
+                    ["dwell"] = Double(reader, 8), ["maturity"] = Int(reader, 9),
+                    ["snapshot_id"] = Value(reader, 10)
+                });
+        }
+
         internal ArrayList FindLand(Hashtable request)
         {
             int flags = Number(request, "flags");

@@ -114,6 +114,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser));
             if (key == "regionprofile/modal_profile.html") AddRegionProfile(vars, parameters);
+            if (key == "regionprofile/modal_parcels.html") AddRegionParcels(vars, parameters);
             if (key == "user/friends.html") AddFriends(vars, currentUser);
             if (key == "user/groups.html") AddGroups(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
@@ -423,6 +424,38 @@ namespace OpenSim.Continuum.WebUI
             vars["NumberOfUsersInRegionText"] = "Residents currently in region";
             vars["NumberOfUsersInRegion"] = residents.Count; vars["UsersInRegion"] = residents;
             vars["MenuParcelTitle"] = "Parcels"; vars["UserNameText"] = "Resident";
+        }
+
+        private void AddRegionParcels(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        {
+            GridRegion region = UUID.TryParse(Value(parameters, "regionid"), out UUID regionID)
+                ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, regionID)) : null;
+            if (region == null) return;
+            Hashtable response = Search("region_parcels_query", new Hashtable { ["region_id"] = region.RegionID.ToString() });
+            var rows = new List<Dictionary<string, object>>();
+            if (response?["data"] is ArrayList data)
+            {
+                foreach (Hashtable parcel in data.OfType<Hashtable>())
+                {
+                    ParseLanding(Text(parcel, "landing_point"), out int x, out int y, out int z);
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["ParcelID"] = H(Text(parcel, "parcel_id")), ["ParcelName"] = H(Text(parcel, "name")),
+                        ["ParcelDescription"] = H(Text(parcel, "description")), ["ParcelArea"] = H(Text(parcel, "area")),
+                        ["ParcelSnapshotURL"] = Texture(UUID.TryParse(Text(parcel, "snapshot_id"), out UUID image) ? image : UUID.Zero,
+                            "static/icons/no_picture.jpg"),
+                        ["ParcelHop"] = Hop(region.RegionName, x, y, z)
+                    });
+                }
+            }
+            vars["RegionID"] = region.RegionID.ToString(); vars["RegionName"] = H(region.RegionName);
+            vars["RegionNameText"] = "Region"; vars["RegionTypeText"] = "Region type";
+            vars["RegionType"] = region.RegionSizeX + " x " + region.RegionSizeY;
+            vars["RegionLocationText"] = "Grid location"; vars["RegionLocX"] = region.RegionCoordX; vars["RegionLocY"] = region.RegionCoordY;
+            vars["RegionImageURL"] = Texture(region.ParcelImage != UUID.Zero ? region.ParcelImage : region.TerrainImage,
+                "static/icons/no_picture.jpg");
+            vars["ParcelsInRegionText"] = "Published parcels"; vars["NumberOfParcelsInRegion"] = rows.Count;
+            vars["ParcelInRegion"] = rows; vars["MenuRegionTitle"] = "Region";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

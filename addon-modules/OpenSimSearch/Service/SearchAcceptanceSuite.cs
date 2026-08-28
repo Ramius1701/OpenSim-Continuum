@@ -45,6 +45,10 @@ namespace ContinuumSearch.Service
                 "public parcel details query");
             Require(store.GetParcel(new Hashtable { ["parcel_id"] = "not-a-uuid" }).Count == 0,
                 "invalid parcel details query");
+            ArrayList regionParcels = store.GetRegionParcels(new Hashtable
+                { ["region_id"] = "11111111-1111-1111-1111-111111111111" });
+            Require(regionParcels.Count == 1 && ((Hashtable)regionParcels[0])["name"].ToString() == "Continuum Plaza",
+                "region parcels query");
             Hashtable landRequest = Request(String.Empty, 0x07000000);
             landRequest["type"] = UInt32.MaxValue.ToString();
             ArrayList land = store.FindLand(landRequest);
@@ -62,7 +66,7 @@ namespace ContinuumSearch.Service
             Require(events.Count == 1 && Convert.ToInt32(((Hashtable)events[0])["event_id"]) == 900001, "events query");
             Require(store.GetEvent(new Hashtable { ["eventID"] = "900001" }).Count == 1, "event details query");
             Console.WriteLine("PASS: DataSnapshot parse and idempotent region replacement");
-            Console.WriteLine("PASS: places, popular, parcel details, land, events and event-details query contracts");
+            Console.WriteLine("PASS: places, popular, parcel details, region parcels, land, events and event-details query contracts");
             Console.WriteLine("ContinuumSearch {0} acceptance self-test passed.", store.Provider);
             return 0;
         }
