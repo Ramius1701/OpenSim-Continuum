@@ -106,6 +106,7 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
             server.AddXmlRPCHandler("RegisterEconomyAccount", RegisterEconomyAccount);
             server.AddXmlRPCHandler("GetGroupAccount", GetGroupAccount);
+            server.AddXmlRPCHandler("GetAccountStatement", GetAccountStatement);
             server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
             server.AddXmlRPCHandler("buyLandPrep", BuyLandPrep);
         }
@@ -170,6 +171,40 @@ namespace ContinuumEconomy.Service
                 { "totalCredits", ViewerBalance(credits) }, { "totalDebits", ViewerBalance(debits) },
                 { "startDate", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
                 { "history", history }
+            });
+        }
+
+        private XmlRpcResponse GetAccountStatement(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            if (!Secret(p) || !Guid.TryParse(Text(p, "accountID"), out Guid account) || account == Guid.Empty)
+                return Failure("Invalid account statement request");
+            int limit = Math.Clamp(ParseInt(p, "limit"), 1, 500);
+            DateTime? before = null;
+            if (DateTime.TryParse(Text(p, "beforeUtc"), CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime parsed))
+                before = parsed;
+            ArrayList history = new();
+            foreach (LedgerHistoryEntry row in m_backend.Ledger.GetHistory(account, before, limit))
+            {
+                history.Add(new Hashtable
+                {
+                    ["transactionID"] = row.TransactionID.ToString(),
+                    ["counterpartyID"] = row.CounterpartyID.ToString(),
+                    ["amount"] = SignedViewerAmount(row.IsCredit ? row.Amount : -row.Amount),
+                    ["balance"] = ViewerBalance(row.ResultingBalance),
+                    ["transactionType"] = row.TransactionType,
+                    ["description"] = row.Description ?? String.Empty,
+                    ["createdUtc"] = row.CreatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
+                    ["succeeded"] = row.Succeeded
+                });
+            }
+            return Reply(new Hashtable
+            {
+                ["success"] = true,
+                ["balance"] = ViewerBalance(m_backend.Ledger.GetBalance(account)),
+                ["availableBalance"] = ViewerBalance(m_backend.Ledger.GetAvailableBalance(account)),
+                ["history"] = history
             });
         }
 

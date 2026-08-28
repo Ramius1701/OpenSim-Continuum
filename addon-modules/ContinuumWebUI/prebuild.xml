@@ -12,6 +12,7 @@
   <Reference name="OpenMetaverse" />
   <Reference name="Nini" />
   <Reference name="log4net" />
+  <Reference name="XMLRPC" />
   <Files>
     <Match pattern="*.cs" recurse="true"><Exclude name="obj" pattern="obj" /></Match>
     <Match buildAction="EmbeddedResource" pattern="WhiteCoreWebUI.zip" recurse="false" />

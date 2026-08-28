@@ -1,0 +1,18 @@
+<div class="col98" id="experiences">
+  <h2>Experiences</h2>
+  <form action="experiences.html" method="get">
+    <input name="q" value="{ExperienceSearch}" placeholder="Search experiences" maxlength="128" />
+    <button class="btn btn-info" type="submit">Search</button>
+  </form>
+  {IfHaveDataBegin}
+  <table class="table-compact table-hover display" width="100%">
+    <thead><tr><th>Name</th><th>Description</th><th>Maturity</th><th>Owner</th></tr></thead>
+    <tbody>
+      {ExperiencesArrayBegin}
+      <tr data-experience-id="{ExperienceID}"><td>{ExperienceName}</td><td>{ExperienceDescription}</td><td>{ExperienceMaturity}</td><td>{ExperienceOwner}</td></tr>
+      {ExperiencesArrayEnd}
+    </tbody>
+  </table>
+  {IfHaveDataEnd}
+  {IfNoDataBegin}<p>No experiences matched this view.</p>{IfNoDataEnd}
+</div>

@@ -154,6 +154,24 @@
     UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
     AuthenticationService = OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService
     SessionLifetimeSeconds = 3600
+    AdminUserLevel = 200
+    AllowRegistration = true
+    GridService = OpenSim.Services.GridService.dll:GridService
+    GridUserService = OpenSim.Services.UserAccountService.dll:GridUserService
+    FriendsService = OpenSim.Services.FriendsService.dll:FriendsService
+    UserProfilesService = OpenSim.Services.UserProfilesService.dll:UserProfilesService
+    AbuseReportsService = OpenSim.Services.AbuseReportsService.dll:AbuseReportsService
+    ExperienceService = OpenSim.Services.ExperienceService.dll:ExperienceService
+    ; TextureURL = http://127.0.0.1:8002/assets
+    HopURLBase = hop://
+    ; PublicURL = http://127.0.0.1:8002
+    ; MapServiceURL = http://127.0.0.1:8002
+    ;; Existing ContinuumSearch XML-RPC endpoint used for events/classifieds.
+    ; SearchServiceURL = http://127.0.0.1:8003
+    ;; Existing ContinuumEconomy service and its server-side shared secret.
+    ; EconomyServiceURL = http://127.0.0.1:8009
+    ; EconomySharedSecret = CHANGE-THIS-TO-THE-CONTINUUM-ECONOMY-SECRET
+    ServiceTimeoutMilliseconds = 5000
 
 ; * This is common for all services, it's the network setup for the entire
 ; * server instance, if none is specified above

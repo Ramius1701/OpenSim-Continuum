@@ -45,9 +45,10 @@ namespace OpenSim.Continuum.WebUI
             if (accounts == null || authentication == null)
                 throw new InvalidOperationException("ContinuumWebUI could not load its account or authentication service");
             int sessionSeconds = Math.Clamp(section.GetInt("SessionLifetimeSeconds", 3600), 300, 86400);
-            var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, sessionSeconds);
-            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath + "/", site.Handle), true);
-            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.HandleRoot));
+            var integration = new WebUIServiceIntegration(config, section, accounts);
+            integration.SetAuthenticationService(authentication);
+            var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, integration, sessionSeconds);
+            server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.Handle), true);
             Log.InfoFormat("[CONTINUUM WEBUI]: WhiteCore integrated portal mounted at {0}/", mountPath);
         }
 
@@ -71,15 +72,17 @@ namespace OpenSim.Continuum.WebUI
         private readonly string _systemName;
         private readonly IUserAccountService _accounts;
         private readonly IAuthenticationService _authentication;
+        private readonly WebUIServiceIntegration _integration;
         private readonly int _sessionSeconds;
 
         internal WhiteCoreSite(string mountPath, string systemName, IUserAccountService accounts,
-            IAuthenticationService authentication, int sessionSeconds)
+            IAuthenticationService authentication, WebUIServiceIntegration integration, int sessionSeconds)
         {
             _mountPath = mountPath;
             _systemName = string.IsNullOrWhiteSpace(systemName) ? "OpenSim Continuum" : systemName;
             _accounts = accounts;
             _authentication = authentication;
+            _integration = integration;
             _sessionSeconds = sessionSeconds;
         }
 
@@ -93,18 +96,18 @@ namespace OpenSim.Continuum.WebUI
 
         internal void Handle(IOSHttpRequest request, IOSHttpResponse response)
         {
-            if (request.HttpMethod != "GET" && request.HttpMethod != "HEAD")
+            if (string.Equals(request.UriPath, _mountPath, StringComparison.Ordinal))
             {
-                if (request.HttpMethod == "POST" && request.UriPath.EndsWith("/login.html", StringComparison.Ordinal))
-                {
-                    HandleLogin(request, response);
-                    return;
-                }
-                if (request.HttpMethod == "POST" && request.UriPath.EndsWith("/logout.html", StringComparison.Ordinal))
-                {
-                    HandleLogout(request, response);
-                    return;
-                }
+                response.Redirect(_mountPath + "/", HttpStatusCode.MovedPermanently);
+                return;
+            }
+            if (!request.UriPath.StartsWith(_mountPath + "/", StringComparison.Ordinal))
+            {
+                WriteError(response, HttpStatusCode.NotFound, "Not found");
+                return;
+            }
+            if (request.HttpMethod != "GET" && request.HttpMethod != "HEAD" && request.HttpMethod != "POST")
+            {
                 response.AddHeader("Allow", "GET, HEAD, POST");
                 WriteError(response, HttpStatusCode.MethodNotAllowed, "Method not allowed");
                 return;
@@ -116,6 +119,58 @@ namespace OpenSim.Continuum.WebUI
             {
                 WriteError(response, HttpStatusCode.BadRequest, "Invalid path");
                 return;
+            }
+            relative = _integration.ResolvePage(relative);
+
+            if (request.HttpMethod == "POST" && relative == "login.html")
+            {
+                if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                HandleLogin(request, response);
+                return;
+            }
+            if (request.HttpMethod == "POST" && relative == "logout.html")
+            {
+                if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                HandleLogout(request, response);
+                return;
+            }
+            Dictionary<string, string> parameters = RequestParameters(request);
+            if (request.HttpMethod == "POST")
+            {
+                if (request.ContentLength64 < 0 || request.ContentLength64 > 64 * 1024)
+                {
+                    WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Request is too large");
+                    return;
+                }
+                using var reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8, true, 1024, true);
+                var form = System.Web.HttpUtility.ParseQueryString(reader.ReadToEnd());
+                foreach (string key in form.AllKeys)
+                    if (key != null) parameters[key] = form[key];
+            }
+
+            UserAccount currentUser = GetAuthenticatedUser(request, false);
+            bool accountPage = relative.StartsWith("user/", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("userhome.html", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("friends.html", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("transactions.html", StringComparison.OrdinalIgnoreCase);
+            if (accountPage && currentUser == null)
+            {
+                WriteError(response, HttpStatusCode.Unauthorized, "Authentication required");
+                return;
+            }
+            if (relative.StartsWith("admin/", StringComparison.OrdinalIgnoreCase) && !_integration.IsAdmin(currentUser))
+            {
+                WriteError(response, HttpStatusCode.Forbidden, "Administrator access required");
+                return;
+            }
+            if (request.HttpMethod == "POST")
+            {
+                if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                if (_integration.HandlePost(relative, parameters, currentUser, out string message))
+                {
+                    WriteText(response, HttpStatusCode.OK, message);
+                    return;
+                }
             }
 
             byte[] content = ReadResource(relative);
@@ -129,8 +184,9 @@ namespace OpenSim.Continuum.WebUI
                 || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase))
             {
                 string source = Encoding.UTF8.GetString(content);
-                UserAccount currentUser = GetAuthenticatedUser(request, false);
-                source = Render(relative, source, DefaultVariables(currentUser), currentUser != null, 0);
+                var variables = DefaultVariables(currentUser);
+                _integration.Populate(relative, parameters, currentUser, variables);
+                source = Render(relative, source, variables, currentUser != null, _integration.IsAdmin(currentUser), 0);
                 source = RewriteAssetPaths(source);
                 content = Encoding.UTF8.GetBytes(source);
             }
@@ -151,13 +207,22 @@ namespace OpenSim.Continuum.WebUI
                 Menu("world_map", "World map", "world_map.html"),
                 Menu("events", "Events", "events.html"),
                 Menu("classifieds", "Classifieds", "classifieds.html"),
+                Menu("experiences", "Experiences", "experiences.html"),
+                Menu("online_users", "Online users", "online_users.html"),
+                Menu("region_search", "Regions", "region_search.html"),
                 Menu("login", "Log in", "login.html"),
                 Menu("register", "Sign up", "register.html"),
+                Menu("userhome", "Account", "userhome.html", false),
+                Menu("friends", "Friends", "friends.html", false),
+                Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };
             return new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 ["SystemName"] = _systemName,
+                ["SystemURL"] = _mountPath + "/",
+                ["MainServerURL"] = string.Empty,
+                ["WorldMapServiceURL"] = string.Empty,
                 ["MenuItems"] = menus,
                 ["ModalItems"] = new List<Dictionary<string, object>>(),
                 ["Languages"] = new List<Dictionary<string, object>>(),
@@ -213,7 +278,8 @@ namespace OpenSim.Continuum.WebUI
                 }).ToList();
         }
 
-        private string Render(string original, string source, Dictionary<string, object> variables, bool authenticated, int depth)
+        private string Render(string original, string source, Dictionary<string, object> variables,
+            bool authenticated, bool admin, int depth)
         {
             if (depth > 12) return string.Empty;
             string[] lines = source.Replace("\r\n", "\n").Split('\n');
@@ -228,7 +294,7 @@ namespace OpenSim.Continuum.WebUI
                     if (start > 0 && end > start && TryNormalize(clean.Substring(start, end - start).TrimStart('/'), out string include))
                     {
                         byte[] bytes = ReadResource(include);
-                        if (bytes != null) output.AppendLine(Render(include, Encoding.UTF8.GetString(bytes), variables, authenticated, depth + 1));
+                        if (bytes != null) output.AppendLine(Render(include, Encoding.UTF8.GetString(bytes), variables, authenticated, admin, depth + 1));
                     }
                     continue;
                 }
@@ -244,7 +310,7 @@ namespace OpenSim.Continuum.WebUI
                         {
                             var merged = new Dictionary<string, object>(variables, StringComparer.Ordinal);
                             foreach (var pair in row) merged[pair.Key] = pair.Value;
-                            output.AppendLine(Render(original, block, merged, authenticated, depth + 1));
+                            output.AppendLine(Render(original, block, merged, authenticated, admin, depth + 1));
                         }
                     }
                     i = end;
@@ -260,7 +326,7 @@ namespace OpenSim.Continuum.WebUI
                     if (enabled)
                     {
                         string block = string.Join("\n", lines.Skip(i + 1).Take(end - i - 1));
-                        output.AppendLine(Render(original, block, variables, authenticated, depth + 1));
+                        output.AppendLine(Render(original, block, variables, authenticated, admin, depth + 1));
                     }
                     i = end;
                     continue;
@@ -270,11 +336,14 @@ namespace OpenSim.Continuum.WebUI
                 {
                     string endMarker = clean.Replace("Begin}", "End}", StringComparison.Ordinal);
                     int end = FindEnd(lines, i + 1, endMarker);
-                    bool show = clean.StartsWith("{IsNotAuthenticated", StringComparison.Ordinal) ? !authenticated : authenticated;
+                    bool show;
+                    if (clean.StartsWith("{IsNotAdminAuthenticated", StringComparison.Ordinal)) show = !admin;
+                    else if (clean.StartsWith("{IsAdminAuthenticated", StringComparison.Ordinal)) show = admin;
+                    else show = clean.StartsWith("{IsNotAuthenticated", StringComparison.Ordinal) ? !authenticated : authenticated;
                     if (show && end >= 0)
                     {
                         string block = string.Join("\n", lines.Skip(i + 1).Take(end - i - 1));
-                        output.AppendLine(Render(original, block, variables, authenticated, depth + 1));
+                        output.AppendLine(Render(original, block, variables, authenticated, admin, depth + 1));
                     }
                     if (end >= 0) i = end;
                     continue;
@@ -305,7 +374,13 @@ namespace OpenSim.Continuum.WebUI
             foreach (var pair in variables)
                 if (pair.Value is not System.Collections.IEnumerable || pair.Value is string)
                     line = line.Replace("{" + pair.Key + "}", pair.Value?.ToString() ?? string.Empty, StringComparison.Ordinal);
-            return Token.Replace(line, string.Empty);
+            return Token.Replace(line, match => match.Value.EndsWith("Text}", StringComparison.Ordinal)
+                ? Humanize(match.Value.Substring(1, match.Value.Length - 6)) : string.Empty);
+        }
+
+        private static string Humanize(string value)
+        {
+            return Regex.Replace(value, "([a-z0-9])([A-Z])", "$1 $2");
         }
 
         private string RewriteAssetPaths(string value)
@@ -409,6 +484,23 @@ namespace OpenSim.Continuum.WebUI
                     && string.Equals(a.FirstName, normalized, StringComparison.OrdinalIgnoreCase)));
         }
 
+        private static Dictionary<string, string> RequestParameters(IOSHttpRequest request)
+        {
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (KeyValuePair<string, string> pair in request.QueryAsDictionary)
+                values[pair.Key] = pair.Value;
+            return values;
+        }
+
+        private static bool IsSameOrigin(IOSHttpRequest request)
+        {
+            string origin = request.Headers["Origin"];
+            if (string.IsNullOrWhiteSpace(origin)) return true;
+            return Uri.TryCreate(origin, UriKind.Absolute, out Uri parsed)
+                && string.Equals(parsed.Scheme, request.Url.Scheme, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(parsed.Authority, request.Url.Authority, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static Dictionary<string, byte[]> LoadContent()
         {
             string resource = ThisAssembly.GetManifestResourceNames()
@@ -443,6 +535,15 @@ namespace OpenSim.Continuum.WebUI
             response.StatusCode = (int)status;
             response.ContentType = "text/plain; charset=utf-8";
             response.RawBuffer = Encoding.UTF8.GetBytes(message);
+        }
+
+
+        private static void WriteText(IOSHttpResponse response, HttpStatusCode status, string message)
+        {
+            response.StatusCode = (int)status;
+            response.ContentType = "text/plain; charset=utf-8";
+            response.AddHeader("X-Content-Type-Options", "nosniff");
+            response.RawBuffer = Encoding.UTF8.GetBytes(message ?? string.Empty);
         }
     }
 }
