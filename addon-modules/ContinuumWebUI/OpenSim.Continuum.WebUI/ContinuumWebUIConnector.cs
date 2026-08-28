@@ -218,6 +218,8 @@ namespace OpenSim.Continuum.WebUI
                 Menu("profile_edit", "Edit profile", "user/profile_edit.html", false),
                 Menu("friends", "Friends", "friends.html", false),
                 Menu("groups", "Groups", "groups.html", false),
+                Menu("user-region_manager", "My regions", "user/region_manager.html", false),
+                Menu("admin-region_manager", "Grid regions", "admin/region_manager.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };

@@ -9,13 +9,6 @@
   {IsAdminAuthenticatedBegin}
     {IfHaveDataBegin}
 
-      <div class="row w-100 mb-3">
-        <div class="col"></div>
-        <div class="col-3 pull-right">
-          <button onClick="loadusercontent('admin-region_edit.html','addregion=true');">{AddRegionText}</button>
-        </div>
-      </div>
-
       <div class="row w-100">
         <div class="col">
           <table class="table-compact table-hover" id="regionlist" class="display" cellspacing="0" width="100%">
@@ -33,15 +26,15 @@
             <tbody>
 
               {RegionListArrayBegin}
-              <tr onclick="loadusercontent('admin-region_edit', 'regionid={RegionID}');">
+              <tr onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={RegionID}');">
                 <td class="text-left">{RegionName}</td>
                 <td class="text-center">{RegionLocX}</td>
           	    <td class="text-center">{RegionLocY}</td>
           	    <td class="text-left">{RegionInfo}</td>
           	    <td class="text-center">{RegionStatus}</td>
                 <td class="text-center">
-                  <a href="#" title="{EditText}">
-                    <i class="fa fa-edit"></i>
+                  <a href="#" title="{ViewText}">
+                    <i class="fa fa-eye"></i>
                   </a>
                 </td>
               </tr>

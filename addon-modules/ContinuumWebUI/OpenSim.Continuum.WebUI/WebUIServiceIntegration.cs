@@ -118,6 +118,8 @@ namespace OpenSim.Continuum.WebUI
             if (key == "regionprofile/modal_parcels.html") AddRegionParcels(vars, parameters);
             if (key == "user/friends.html") AddFriends(vars, currentUser);
             if (key == "user/groups.html") AddGroups(vars, currentUser);
+            if (key == "user/region_manager.html") AddManagedRegions(vars, currentUser, false);
+            if (key == "admin/region_manager.html") AddManagedRegions(vars, currentUser, true);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -457,6 +459,23 @@ namespace OpenSim.Continuum.WebUI
                 "static/icons/no_picture.jpg");
             vars["ParcelsInRegionText"] = "Published parcels"; vars["NumberOfParcelsInRegion"] = rows.Count;
             vars["ParcelInRegion"] = rows; vars["MenuRegionTitle"] = "Region";
+        }
+
+        private void AddManagedRegions(Dictionary<string, object> vars, UserAccount account, bool administratorView)
+        {
+            var regions = new List<GridRegion>();
+            if (account != null && (!administratorView || IsAdmin(account)))
+            {
+                regions = Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new List<GridRegion>();
+                if (!administratorView) regions.RemoveAll(region => region.EstateOwner != account.PrincipalID);
+            }
+            List<Dictionary<string, object>> rows = regions.OrderBy(region => region.RegionName)
+                .Select(RegionRow).ToList();
+            vars["RegionList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["UserName"] = H(account?.FormattedName ?? string.Empty); vars["RegionsText"] = "regions";
+            vars["RegionListText"] = "regions"; vars["RegionText"] = "Region";
+            vars["RegionLocXText"] = "Grid X"; vars["RegionLocYText"] = "Grid Y";
+            vars["RegionOnlineText"] = "Status"; vars["ViewText"] = "View";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

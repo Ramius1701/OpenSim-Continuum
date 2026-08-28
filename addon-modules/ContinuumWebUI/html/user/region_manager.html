@@ -23,15 +23,15 @@
       <tbody>
 
         {RegionListArrayBegin}
-        <tr onclick="loadusercontent('user-region_edit', 'regionid={RegionID}');">
+        <tr onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={RegionID}');">
           <td class="text-center">{RegionLocX}</td>
     	    <td class="text-center">{RegionLocY}</td>
           <td class="text-center">{RegionName}</td>
     	    <td class="text-left">{RegionInfo}</td>
     	    <td class="text-centered">{RegionStatus}</td>
           <td class="text-centered">
-            <a href="#" title="{EditText}">
-              <i class="fa fa-edit fa-lg"></i>
+            <a href="#" title="{ViewText}">
+              <i class="fa fa-eye fa-lg"></i>
             </a>
           </td>
         </tr>
@@ -70,4 +70,3 @@
   {IfNoDataEnd}
 
 </div>
-
