@@ -7,10 +7,8 @@
 
   <div class="container">
     <h2>{UserName}: {TransactionsText}</h2>
-<!--    <legend class="text-left">{DateInfoText}</legend>  -->
-
     <div class="col-12">
-      <form class="form form-inline" role="form" id="transactions_search_form" action="user/user_transactions" method="post">
+      <form class="form form-inline" role="form" id="transactions_search_form" action="user/transactions.html" method="post">
 
         <div class="col-4 form-group" data-date-format="dd-mm-yyyy">
           <label for="date_start">{DateStartText}&nbsp;&nbsp;</label>
@@ -26,7 +24,6 @@
 
         <div class="col-2 form-group">
           <input hidden type="hidden" label="Submit" id="Submit" name="Submit" value="Submit" />
-<!--          <button class="button" style="float:right;width:200px;" id="Submit" type="Submit" name="Submit">{Search}</button>  -->
           <a class="button" style="float:right;width:200px;" 
               onclick="submitpagesearch('transactions_search_form', 'transpage');">
             {Search}
@@ -75,17 +72,13 @@
     $('#transactions_list').dataTable({
       dom: 'frtip',
       "order": [[ 0, "asc" ]],
-      "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
-      /*"aaSorting":[], */
       "oLanguage": {"sSearch": "Filter: "},
       "pageLength": 10,
       "fixedHeader": {
-        header: true,
-         //footer: true
+        header: true
       },
     });
 
-    <!--  /* date pickers */ -->
     $( "#date_start" ).datepicker({
       showTrigger: '<button type="button" class="trigger">...</button>',
       defaultDate: "-1w",
@@ -97,7 +90,6 @@
     });
 
     $( "#date_end" ).datepicker({
-      //defaultDate: "+1w",
       showTrigger: '<button type="button" class="trigger">...</button>',
       changeMonth: true,
       numberOfMonths: 3,
@@ -106,22 +98,5 @@
       }
     });
 
-    //$('#date_start,#date_end').datepicker({
-    //  showTrigger: '<button type="button" class="trigger">...</button>'});
-
   });
-
-  /* attach a submit handler to the form */
-//  $("#transactions_search_form").submit(function(event) {
-
-    /* stop form from submitting normally */
-//    event.preventDefault();
-    /* get some values from elements on the page: */
-//    var $form = $( this ),
-//        url = $form.attr( 'action' );
-    /* Send the data using post and put the results in a div */
-//    $.post( url, $form.serialize(), function( data ) {
-//      $("#fullPage").empty().append(data);
-//    });
-//  });
 </script>

@@ -877,6 +877,10 @@ namespace OpenSim.Continuum.WebUI
             List<Dictionary<string, object>> rows = TransactionRows(account, parameters);
             vars["TransactionsList"] = rows; vars["TransactionsText"] = "Transactions";
             vars["DateStart"] = H(Value(parameters, "date_start")); vars["DateEnd"] = H(Value(parameters, "date_end"));
+            vars["DateStartText"] = "From"; vars["DateEndText"] = "Through"; vars["Search"] = "Filter";
+            vars["TransactionDateText"] = "Date"; vars["TransactionFromAgentText"] = "From";
+            vars["TransactionToAgentText"] = "To"; vars["TransactionDetailText"] = "Description";
+            vars["TransactionAmountText"] = "Amount"; vars["TransactionBalanceText"] = "Resulting balance";
         }
 
         private void AddAdminTransactions(Dictionary<string, object> vars, UserAccount administrator,
