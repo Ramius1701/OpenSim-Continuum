@@ -8,9 +8,6 @@
   <!-- selection - search -->
   <div class="row justify-content-center">
     <div class="col" style="margin-bottom:10px;">
-      {IsAuthenticatedBegin}
-        <button class="btn btn-xs btn-default" style="float:right;margin-left:10px;" onClick="loadusercontent('events-add_event');">{AddEventText}</button>
-      {IsAuthenticatedEnd}
       
       <form id="events_search_form" action="events/events.html" method="post">
         <div class="form-group row">
@@ -86,7 +83,7 @@
               <div class="info">
                 <h2 class="title">
                   <img alt="{SimName}" src="{CategoryImage}" style="display:inline;width:50px;height:50px;" />
-                  {Name}
+                  <a class="regionlink" href="{EventHop}" title="Visit {Name} in {SimName}">{Name}</a>
                 </h2>
                 <p class="desc">{Description}</p>
                <ul>
@@ -94,13 +91,6 @@
                   <li style="width:25%;"><span class="fa fa-user"></span>{Maturity}</li>
                   <li style="width:25%;"><span class="fa fa-money"></span>{CoverCharge}</li>
                   <li style="width:25%;"><span class="fa fa-time"></span>{DurationText}</li>
-                </ul>
-              </div>
-              <div class="social">
-                <ul>
-                  <li class="facebook" style="width:33%;"><a href="#facebook"><span class="fa fa-facebook"></span></a></li>
-                  <li class="twitter" style="width:33%;"><a href="#twitter"><span class="fa fa-twitter"></span></a></li>
-                  <li class="google-plus" style="width:33%;"><a href="#google-plus"><span><img src="static/icons/mewe.png" style="height:20px;width:20px;" /></span></a></li>
                 </ul>
               </div>
             </li>
@@ -111,24 +101,16 @@
   </div>
 
 
-  {IsAuthenticatedBegin}
     {IfNoDataBegin}
       <div id="error404" align="center">
         <h4 class="error404">
           No events found?
         </h4>
         <div class="error404" style="cursor:pointer;">
-          <a class="btn btn-xs btn-default" onClick="loadusercontent('events-add_event');">
-            <img src="/static/images/special_event.jpg" height="80"/>
-            <br/>
-            <div class="btn-success">
-              {AddEventText}
-            </div>
-          </a>
+          <img src="/static/images/special_event.jpg" height="80"/>
         </div>
       </div>
     {IfNoDataEnd}
-  {IsAuthenticatedEnd}
 </div>
 <!--
 
@@ -162,5 +144,4 @@
   </table>
 </div>
 -->
-
 

@@ -626,9 +626,19 @@ namespace OpenSim.Continuum.WebUI
         private void AddEvents(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
         {
             string text = Value(parameters, "text");
+            string categoryValue = Value(parameters, "category");
+            int category = EventCategory(categoryValue);
+            string timeframeValue = Value(parameters, "timeframe");
+            string day = timeframeValue.Equals("Tomorrow", StringComparison.OrdinalIgnoreCase) ? "1" :
+                timeframeValue.Equals("This week", StringComparison.OrdinalIgnoreCase) ? "u" : "0";
+            int maturityFlags = parameters.Count == 0 ? 0x01000000 | 0x02000000 : 0;
+            if (parameters.ContainsKey("display_pg")) maturityFlags |= 0x01000000;
+            if (parameters.ContainsKey("display_ma")) maturityFlags |= 0x02000000;
+            if (parameters.ContainsKey("display_ao")) maturityFlags |= 0x04000000;
             Hashtable response = Search("dir_events_query", new Hashtable
             {
-                ["text"] = text, ["flags"] = "0", ["query_start"] = "0"
+                ["text"] = day + "|" + category.ToString(CultureInfo.InvariantCulture) + "|" + text,
+                ["flags"] = maturityFlags.ToString(CultureInfo.InvariantCulture), ["query_start"] = "0"
             });
             var rows = new List<Dictionary<string, object>>();
             if (response?["data"] is ArrayList data)
@@ -638,6 +648,8 @@ namespace OpenSim.Continuum.WebUI
                     Hashtable detailResponse = Search("event_info_query", new Hashtable { ["eventID"] = Text(summary, "event_id") });
                     Hashtable detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
                     DateTime.TryParse(Text(detail, "date"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime date);
+                    DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
+                    string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
                     {
                         ["EventDateTimeUTC"] = date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
@@ -646,9 +658,10 @@ namespace OpenSim.Continuum.WebUI
                         ["EventMinuteTime"] = date == default ? string.Empty : date.Year.ToString(CultureInfo.InvariantCulture),
                         ["EventTime"] = date == default ? string.Empty : date.ToString("t", CultureInfo.InvariantCulture),
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
-                        ["Category"] = H(Text(detail, "category")), ["CategoryImage"] = "static/icons/event.png",
-                        ["SimName"] = H(Text(detail, "simname")), ["Maturity"] = H(Text(detail, "eventflags")),
-                        ["CoverCharge"] = H(Text(detail, "coveramount")), ["DurationText"] = H(Text(detail, "duration"))
+                        ["Category"] = H(EventCategoryName(Text(detail, "category"))), ["CategoryImage"] = "static/icons/event.png",
+                        ["SimName"] = H(simName), ["Maturity"] = H(Text(detail, "eventflags")),
+                        ["CoverCharge"] = H(Text(detail, "coveramount")), ["DurationText"] = H(Text(detail, "duration")),
+                        ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z)
                     });
                 }
             }
@@ -658,6 +671,17 @@ namespace OpenSim.Continuum.WebUI
             vars["TimeFrame"] = SelectOptions(new[] { "Today", "Tomorrow", "This week" }, Value(parameters, "timeframe"));
             vars["PG_checked"] = "checked"; vars["MA_checked"] = "checked"; vars["AO_checked"] = string.Empty;
         }
+
+        private static int EventCategory(string value) => value.Trim().ToLowerInvariant() switch
+        {
+            "discussion" => 18, "sports" => 19, "live music" => 20, "commercial" => 22,
+            _ => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : 0
+        };
+
+        private static string EventCategoryName(string value) => EventCategory(value) switch
+        {
+            18 => "Discussion", 19 => "Sports", 20 => "Live Music", 22 => "Commercial", _ => "General"
+        };
 
         private void AddClassifieds(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
         {
@@ -673,13 +697,19 @@ namespace OpenSim.Continuum.WebUI
                 {
                     Hashtable detailResponse = Search("classifieds_info_query", new Hashtable { ["classifiedID"] = Text(summary, "classifiedid") });
                     Hashtable detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
+                    DirectoryLocation(Text(detail, "posglobal"), out int x, out int y, out int z);
+                    string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
                     {
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
                         ["CreationDate"] = UnixDate(Text(detail, "creationdate", Text(summary, "creation_date"))),
                         ["ExpirationDate"] = UnixDate(Text(detail, "expirationdate", Text(summary, "expiration_date"))),
                         ["Maturity"] = H(Text(detail, "classifiedflags", Text(summary, "classifiedflags"))),
-                        ["PriceForListing"] = H(Text(detail, "priceforlisting", Text(summary, "priceforlisting")))
+                        ["PriceForListing"] = H(Text(detail, "priceforlisting", Text(summary, "priceforlisting"))),
+                        ["ClassifiedImage"] = Texture(UUID.TryParse(Text(detail, "snapshotuuid"), out UUID image) ? image : UUID.Zero,
+                            "static/icons/no_picture.jpg"),
+                        ["ClassifiedRegion"] = H(simName),
+                        ["ClassifiedHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z)
                     });
                 }
             }
@@ -742,6 +772,21 @@ namespace OpenSim.Continuum.WebUI
             x = parts.Length > 0 && Int32.TryParse(parts[0], out int px) ? Math.Clamp(px, 0, 4096) : 128;
             y = parts.Length > 1 && Int32.TryParse(parts[1], out int py) ? Math.Clamp(py, 0, 4096) : 128;
             z = parts.Length > 2 && Int32.TryParse(parts[2], out int pz) ? Math.Clamp(pz, 0, 10000) : 25;
+        }
+
+        private static void DirectoryLocation(string value, out int x, out int y, out int z)
+        {
+            string[] parts = (value ?? string.Empty).Trim('<', '>', ' ').Split(',');
+            static int Coordinate(string text, bool horizontal, int fallback)
+            {
+                if (!Double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)) return fallback;
+                int result = (int)Math.Floor(parsed);
+                if (horizontal && result >= 256) result %= 256;
+                return Math.Clamp(result, 0, horizontal ? 4096 : 10000);
+            }
+            x = Coordinate(parts.Length > 0 ? parts[0] : null, true, 128);
+            y = Coordinate(parts.Length > 1 ? parts[1] : null, true, 128);
+            z = Coordinate(parts.Length > 2 ? parts[2] : null, false, 25);
         }
 
         private static string CategoryName(string value) => value switch
