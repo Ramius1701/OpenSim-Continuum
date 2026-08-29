@@ -35,6 +35,7 @@ namespace OpenSim.Continuum.WebUI
         private readonly IAbuseReportsService _abuse;
         private readonly IExperienceService _experiences;
         private readonly IGroupsService _groups;
+        private readonly IEstateDataService _estates;
         private readonly int _adminLevel;
         private readonly string _hopBase;
         private readonly string _textureBase;
@@ -66,6 +67,7 @@ namespace OpenSim.Continuum.WebUI
             _abuse = Load<IAbuseReportsService>(config, section, "AbuseReportsService", "OpenSim.Services.AbuseReportsService.dll:AbuseReportsService");
             _experiences = Load<IExperienceService>(config, section, "ExperienceService", "OpenSim.Services.ExperienceService.dll:ExperienceService");
             _groups = Load<IGroupsService>(config, section, "GroupsService", "OpenSim.Addons.Groups.dll:GroupsService");
+            _estates = Load<IEstateDataService>(config, section, "EstateDataService", "OpenSim.Services.EstateService.dll:EstateDataService");
         }
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
@@ -121,6 +123,8 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/region_manager.html") AddManagedRegions(vars, currentUser, false);
             if (key == "admin/region_manager.html") AddManagedRegions(vars, currentUser, true);
             if (key == "admin/statistics.html") AddStatistics(vars, currentUser);
+            if (key == "user/estate_manager.html") AddEstates(vars, currentUser, false);
+            if (key == "admin/estate_manager.html") AddEstates(vars, currentUser, true);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -511,6 +515,43 @@ namespace OpenSim.Continuum.WebUI
             vars["MemoryUseageText"] = "Working memory";
             vars["MemoryUseage"] = Math.Round(process.WorkingSet64 / 1048576d, 1).ToString(CultureInfo.InvariantCulture);
             vars["PingTimeText"] = "Generated"; vars["PingTime"] = DateTime.UtcNow.ToString("HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+        }
+
+        private void AddEstates(Dictionary<string, object> vars, UserAccount account, bool administratorView)
+        {
+            var estates = new List<EstateSettings>();
+            if (_estates != null && account != null && (!administratorView || IsAdmin(account)))
+            {
+                List<int> ids = administratorView
+                    ? Safe(() => _estates.GetEstatesAll()) ?? new List<int>()
+                    : Safe(() => _estates.GetEstatesByOwner(account.PrincipalID)) ?? new List<int>();
+                foreach (int id in ids.Distinct().Take(10000))
+                {
+                    EstateSettings estate = Safe(() => _estates.LoadEstateSettings(id));
+                    if (estate != null) estates.Add(estate);
+                }
+            }
+            var rows = new List<Dictionary<string, object>>();
+            foreach (EstateSettings estate in estates.OrderBy(estate => estate.EstateName))
+            {
+                UserAccount owner = estate.EstateOwner == UUID.Zero ? null
+                    : Safe(() => _accounts.GetUserAccount(UUID.Zero, estate.EstateOwner));
+                int regionCount = Safe(() => _estates.GetRegions((int)estate.EstateID))?.Count ?? 0;
+                rows.Add(new Dictionary<string, object>
+                {
+                    ["EstateID"] = estate.EstateID, ["EstateName"] = H(estate.EstateName),
+                    ["EstateOwner"] = H(owner?.FormattedName ?? estate.EstateOwner.ToString()),
+                    ["PublicAccess"] = estate.PublicAccess ? "Yes" : "No",
+                    ["AllowVoice"] = estate.AllowVoice ? "Yes" : "No", ["TaxFree"] = estate.TaxFree ? "Yes" : "No",
+                    ["AllowDirectTeleport"] = estate.AllowDirectTeleport ? "Yes" : "No", ["RegionCount"] = regionCount
+                });
+            }
+            vars["EstateList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["UserName"] = H(account?.FormattedName ?? string.Empty); vars["EstateManagerText"] = "estates";
+            vars["EstateListText"] = "estates"; vars["EstateText"] = "Estate"; vars["EstateOwnerText"] = "Owner";
+            vars["PublicAccessText"] = "Public"; vars["AllowVoiceText"] = "Voice";
+            vars["TaxFreeText"] = "Access override"; vars["AllowDirectTeleportText"] = "Direct teleport";
+            vars["RegionsText"] = "Regions"; vars["NoDetails"] = "No estates found";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

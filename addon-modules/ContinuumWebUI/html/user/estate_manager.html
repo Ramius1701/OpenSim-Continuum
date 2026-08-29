@@ -26,18 +26,14 @@
     <tbody>
 
       {EstateListArrayBegin}
-      <tr onclick="loadusercontent('user-estate_edit', 'estateid={EstateID}');">
+      <tr>
         <td class="text-centered">{EstateName}</td>
         <td class="text-centered">{PublicAccess}</td>
   	    <td class="text-centered">{AllowVoice}</td>
   	    <td class="text-centered">{TaxFree}</td>
   	    <td class="text-centered">{AllowDirectTeleport}</td>
         <td class="text-centered">{RegionCount}</td>
-        <td class="no-sort text-centered">
-          <a href="#" title="{EditText}">
-            <i class="fa fa-edit fa-lg"></i>
-          </a>
-        </td>
+        <td class="no-sort text-centered"></td>
       </tr>
       {EstateListArrayEnd}
 
