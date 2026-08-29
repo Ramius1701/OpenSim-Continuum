@@ -125,6 +125,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "admin/statistics.html") AddStatistics(vars, currentUser);
             if (key == "user/estate_manager.html") AddEstates(vars, currentUser, false);
             if (key == "admin/estate_manager.html") AddEstates(vars, currentUser, true);
+            if (key == "user/classifieds.html") AddOwnedClassifieds(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -552,6 +553,38 @@ namespace OpenSim.Continuum.WebUI
             vars["PublicAccessText"] = "Public"; vars["AllowVoiceText"] = "Voice";
             vars["TaxFreeText"] = "Access override"; vars["AllowDirectTeleportText"] = "Direct teleport";
             vars["RegionsText"] = "Regions"; vars["NoDetails"] = "No estates found";
+        }
+
+        private void AddOwnedClassifieds(Dictionary<string, object> vars, UserAccount account)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (account != null && _profiles != null && Safe(() => _profiles.AvatarClassifiedsRequest(account.PrincipalID)) is OSDArray records)
+            {
+                foreach (OSD value in records.Take(1000))
+                {
+                    if (value is not OSDMap summary || !UUID.TryParse(summary["classifieduuid"].AsString(), out UUID classifiedID)) continue;
+                    var classified = new UserClassifiedAdd { ClassifiedId = classifiedID, CreatorId = account.PrincipalID };
+                    string result = string.Empty;
+                    if (!Safe(() => _profiles.ClassifiedInfoRequest(ref classified, ref result))) continue;
+                    DirectoryLocation(classified.GlobalPos, out int x, out int y, out int z);
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["ClassifiedID"] = classified.ClassifiedId.ToString(), ["Name"] = H(classified.Name),
+                        ["Description"] = H(classified.Description), ["Category"] = classified.Category,
+                        ["CreationDate"] = UnixDate(classified.CreationDate.ToString(CultureInfo.InvariantCulture)),
+                        ["ExpirationDate"] = UnixDate(classified.ExpirationDate.ToString(CultureInfo.InvariantCulture)),
+                        ["Maturity"] = (classified.Flags & 4) != 0 ? "Mature" : "General",
+                        ["PriceForListing"] = classified.Price, ["ClassifiedRegion"] = H(classified.SimName),
+                        ["ClassifiedHop"] = string.IsNullOrWhiteSpace(classified.SimName) ? string.Empty : Hop(classified.SimName, x, y, z)
+                    });
+                }
+            }
+            vars["ClassifiedList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["UserName"] = H(account?.FormattedName ?? string.Empty); vars["ClassifiedsText"] = "classifieds";
+            vars["CreationDateText"] = "Created"; vars["ExpirationDateText"] = "Expires";
+            vars["CategoryText"] = "Category"; vars["ClassifiedNameText"] = "Classified";
+            vars["DescriptionText"] = "Description"; vars["MaturityText"] = "Maturity";
+            vars["PriceOfListingText"] = "Listing price";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

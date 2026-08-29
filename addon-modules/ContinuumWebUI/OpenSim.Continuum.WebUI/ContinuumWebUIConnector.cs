@@ -229,6 +229,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("groups", "Groups", "groups.html", false),
                 Menu("user-region_manager", "My regions", "user/region_manager.html", false),
                 Menu("user-estate_manager", "My estates", "user/estate_manager.html", false),
+                Menu("user-classifieds", "My classifieds", "user/classifieds.html", false),
                 Menu("admin-region_manager", "Grid regions", "admin/region_manager.html", false),
                 Menu("admin-estate_manager", "Grid estates", "admin/estate_manager.html", false),
                 Menu("admin-statistics", "Grid statistics", "admin/statistics.html", false),
