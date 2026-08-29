@@ -981,8 +981,12 @@ namespace OpenSim.Continuum.WebUI
             vars["IsOnline"] = gridUser?.Online == true ? "Yes" : "No";
             vars["UserIsOnline"] = gridUser?.Online == true;
             vars["OnlineLocation"] = H(region?.RegionName ?? string.Empty);
-            vars["Groups"] = new List<Dictionary<string, object>>();
-            vars["GroupsJoined"] = 0;
+            AddGroups(vars, account);
+            if (vars.TryGetValue("Groups", out object value) && value is List<Dictionary<string, object>> groups)
+            {
+                groups.RemoveAll(group => !String.Equals(group["GroupProfileListed"]?.ToString(), "Yes", StringComparison.Ordinal));
+                vars["GroupsJoined"] = groups.Count;
+            }
         }
 
         private void AddEditableProfile(Dictionary<string, object> vars, UserAccount account)
