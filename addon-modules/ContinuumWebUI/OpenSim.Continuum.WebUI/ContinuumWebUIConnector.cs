@@ -67,6 +67,7 @@ namespace OpenSim.Continuum.WebUI
 
     internal sealed class WhiteCoreSite
     {
+        private static readonly ILog Log = LogManager.GetLogger(typeof(WhiteCoreSite));
         private static readonly Assembly ThisAssembly = typeof(WhiteCoreSite).Assembly;
         private static readonly System.Lazy<Dictionary<string, byte[]>> Content = new(LoadContent, true);
         private static readonly Regex Token = new(@"\{[A-Za-z][A-Za-z0-9]*\}", RegexOptions.Compiled);
@@ -183,12 +184,20 @@ namespace OpenSim.Continuum.WebUI
             if (relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
                 || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase))
             {
-                string source = Encoding.UTF8.GetString(content);
-                var variables = DefaultVariables(currentUser);
-                _integration.Populate(relative, parameters, currentUser, variables);
-                source = Render(relative, source, variables, currentUser != null, _integration.IsAdmin(currentUser), 0);
-                source = RewriteAssetPaths(source);
-                content = Encoding.UTF8.GetBytes(source);
+                try
+                {
+                    string source = Encoding.UTF8.GetString(content);
+                    var variables = DefaultVariables(currentUser);
+                    _integration.Populate(relative, parameters, currentUser, variables);
+                    source = Render(relative, source, variables, currentUser != null, _integration.IsAdmin(currentUser), 0);
+                    source = RewriteAssetPaths(source);
+                    content = Encoding.UTF8.GetBytes(source);
+                }
+                catch (Exception e)
+                {
+                    Log.ErrorFormat("[CONTINUUM WEBUI]: Failed to render {0}: {1}", relative, e);
+                    throw;
+                }
             }
 
             response.StatusCode = (int)HttpStatusCode.OK;
@@ -220,6 +229,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("groups", "Groups", "groups.html", false),
                 Menu("user-region_manager", "My regions", "user/region_manager.html", false),
                 Menu("admin-region_manager", "Grid regions", "admin/region_manager.html", false),
+                Menu("admin-statistics", "Grid statistics", "admin/statistics.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };

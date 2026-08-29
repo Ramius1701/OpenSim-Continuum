@@ -120,6 +120,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/groups.html") AddGroups(vars, currentUser);
             if (key == "user/region_manager.html") AddManagedRegions(vars, currentUser, false);
             if (key == "admin/region_manager.html") AddManagedRegions(vars, currentUser, true);
+            if (key == "admin/statistics.html") AddStatistics(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -476,6 +477,40 @@ namespace OpenSim.Continuum.WebUI
             vars["RegionListText"] = "regions"; vars["RegionText"] = "Region";
             vars["RegionLocXText"] = "Grid X"; vars["RegionLocYText"] = "Grid Y";
             vars["RegionOnlineText"] = "Status"; vars["ViewText"] = "View";
+        }
+
+        private void AddStatistics(Dictionary<string, object> vars, UserAccount administrator)
+        {
+            if (!IsAdmin(administrator)) return;
+            List<GridRegion> regions = Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new();
+            List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
+            int online = 0;
+            foreach (UserAccount account in accounts.Take(10000))
+                if (Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()))?.Online == true) online++;
+
+            using System.Diagnostics.Process process = System.Diagnostics.Process.GetCurrentProcess();
+            vars["StatisticsText"] = "Operational statistics";
+            vars["ViewersText"] = "Grid services";
+            vars["ViewersList"] = new List<Dictionary<string, object>>
+            {
+                new() { ["ViewerName"] = "Registered residents", ["ViewerCount"] = accounts.Count },
+                new() { ["ViewerName"] = "Residents online", ["ViewerCount"] = online },
+                new() { ["ViewerName"] = "Regions online", ["ViewerCount"] = regions.Count }
+            };
+            vars["GPUText"] = "Region capacity";
+            vars["GPUList"] = regions.GroupBy(region => region.RegionSizeX + " x " + region.RegionSizeY)
+                .Select(group => new Dictionary<string, object>
+                {
+                    ["GPUType"] = H(group.Key), ["GPUCount"] = group.Count()
+                }).ToList();
+            vars["PerformanceText"] = "Robust process"; vars["FPSText"] = "Regions online";
+            vars["FPS"] = regions.Count; vars["RegionsVisitedText"] = "Registered residents";
+            vars["RegionsVisited"] = accounts.Count; vars["AgentsInViewText"] = "Residents online";
+            vars["AgentsInView"] = online; vars["RunTimeText"] = "Process uptime";
+            vars["RunTime"] = (DateTime.Now - process.StartTime).ToString("d'.'hh':'mm':'ss", CultureInfo.InvariantCulture);
+            vars["MemoryUseageText"] = "Working memory";
+            vars["MemoryUseage"] = Math.Round(process.WorkingSet64 / 1048576d, 1).ToString(CultureInfo.InvariantCulture);
+            vars["PingTimeText"] = "Generated"; vars["PingTime"] = DateTime.UtcNow.ToString("HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

@@ -2,13 +2,7 @@
 
 <div class="container-fluid">
   <h2>{SystemName}: {StatisticsText}</h2>
-  <form class="form-inline" id="statistics_form" action="admin/statistics.html" method="post">
-    <div class="row w-100 mb-3">
-      <div class="col"></div>
-      <div class="col-4 pull-right">
-        <button id="add_news" onClick="loadusercontent('admin-statistics','resetstats=true');">{ClearStatsText}</button>
-      </div>
-    </div>
+  <div class="form-inline" id="statistics_view">
 
     <div class="row w-100 mb-2">
       <div class="col-3">
@@ -67,5 +61,5 @@
     <div class="col-3 d-inline text-right">{PingTimeText}</div>
     <div class="col-1 d-inline text-center">{PingTime}&nbsp;ms</div>
 
-  </form>
+  </div>
 </div>
