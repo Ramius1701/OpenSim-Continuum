@@ -74,6 +74,7 @@ namespace ContinuumSearch.Service
             server.AddXmlRPCHandler("region_parcels_query", RegionParcels);
             server.AddXmlRPCHandler("dir_land_query", Land);
             server.AddXmlRPCHandler("dir_events_query", Events);
+            server.AddXmlRPCHandler("continuum_owner_events_query", OwnerEvents);
             server.AddXmlRPCHandler("dir_classified_query", Classifieds);
             server.AddXmlRPCHandler("event_info_query", EventInfo);
             server.AddXmlRPCHandler("classifieds_info_query", ClassifiedInfo);
@@ -86,6 +87,7 @@ namespace ContinuumSearch.Service
         private XmlRpcResponse RegionParcels(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.GetRegionParcels(Args(request)));
         private XmlRpcResponse Land(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindLand(Args(request)));
         private XmlRpcResponse Events(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindEvents(Args(request)));
+        private XmlRpcResponse OwnerEvents(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindOwnerEvents(Args(request)));
         private XmlRpcResponse Classifieds(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindClassifieds(Args(request)));
         private XmlRpcResponse EventInfo(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.GetEvent(Args(request)));
         private XmlRpcResponse ClassifiedInfo(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.GetClassified(Args(request)));

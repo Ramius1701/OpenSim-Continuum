@@ -288,6 +288,26 @@ namespace ContinuumSearch.Service
                 });
         }
 
+        internal ArrayList FindOwnerEvents(Hashtable request)
+        {
+            string creator = Text(request, "creatoruuid");
+            if (!Guid.TryParse(creator, out Guid parsed)) return new ArrayList();
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            return Query(
+                "SELECT eventid,creatoruuid,name,category,description,dateUTC,duration,covercharge,coveramount,simname,globalPos,eventflags " +
+                "FROM search_events WHERE creatoruuid=@creator AND dateUTC + duration * 60 >= @now " +
+                "ORDER BY dateUTC,eventid LIMIT 1000 OFFSET @offset",
+                new List<(string, object)> { ("@creator", parsed.ToString()), ("@now", now) }, ("@offset", Offset(request)), reader => new Hashtable
+                {
+                    ["event_id"] = Int(reader, 0), ["creator"] = Value(reader, 1), ["name"] = Value(reader, 2),
+                    ["category"] = Value(reader, 3), ["description"] = Value(reader, 4),
+                    ["date"] = DateTimeOffset.FromUnixTimeSeconds(Long(reader, 5)).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                    ["dateUTC"] = Long(reader, 5), ["duration"] = Int(reader, 6), ["covercharge"] = Int(reader, 7),
+                    ["coveramount"] = Int(reader, 8), ["simname"] = Value(reader, 9), ["globalposition"] = Value(reader, 10),
+                    ["eventflags"] = Int(reader, 11), ["landing_point"] = Value(reader, 10)
+                });
+        }
+
         internal ArrayList GetEvent(Hashtable request) => Query(
             "SELECT eventid,creatoruuid,name,category,description,dateUTC,duration,covercharge,coveramount,simname,globalPos,eventflags FROM search_events WHERE eventid=@id LIMIT 1",
             new List<(string, object)> { ("@id", Number(request, "eventID")) }, null, reader => new Hashtable

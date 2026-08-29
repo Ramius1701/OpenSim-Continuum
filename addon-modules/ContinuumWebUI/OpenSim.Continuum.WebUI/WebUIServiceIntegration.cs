@@ -126,6 +126,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/estate_manager.html") AddEstates(vars, currentUser, false);
             if (key == "admin/estate_manager.html") AddEstates(vars, currentUser, true);
             if (key == "user/classifieds.html") AddOwnedClassifieds(vars, currentUser);
+            if (key == "user/events.html") AddOwnedEvents(vars, currentUser);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -585,6 +586,41 @@ namespace OpenSim.Continuum.WebUI
             vars["CategoryText"] = "Category"; vars["ClassifiedNameText"] = "Classified";
             vars["DescriptionText"] = "Description"; vars["MaturityText"] = "Maturity";
             vars["PriceOfListingText"] = "Listing price";
+        }
+
+        private void AddOwnedEvents(Dictionary<string, object> vars, UserAccount account)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            Hashtable response = account == null ? null : Search("continuum_owner_events_query", new Hashtable
+            {
+                ["creatoruuid"] = account.PrincipalID.ToString(), ["query_start"] = "0"
+            });
+            if (response?["data"] is ArrayList data)
+            {
+                foreach (Hashtable item in data.OfType<Hashtable>().Take(1000))
+                {
+                    DirectoryLocation(Text(item, "globalposition", Text(item, "landing_point")), out int x, out int y, out int z);
+                    string simName = Text(item, "simname");
+                    long.TryParse(Text(item, "dateUTC"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long timestamp);
+                    int.TryParse(Text(item, "eventflags"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int flags);
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["EventID"] = H(Text(item, "event_id")),
+                        ["EventDateUTC"] = timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.InvariantCulture) : H(Text(item, "date")),
+                        ["SimName"] = H(simName), ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z),
+                        ["Name"] = H(Text(item, "name")), ["Description"] = H(Text(item, "description")),
+                        ["Category"] = H(EventCategoryName(Text(item, "category"))),
+                        ["Maturity"] = (flags & 0x04000000) != 0 ? "Adult" : (flags & 0x02000000) != 0 ? "Mature" : "General",
+                        ["Duration"] = H(Text(item, "duration")) + " minutes",
+                        ["CoverCharge"] = Text(item, "covercharge") == "0" ? "Free" : H(Text(item, "coveramount"))
+                    });
+                }
+            }
+            vars["EventList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["UserName"] = H(account?.FormattedName ?? string.Empty); vars["EventsText"] = "Events";
+            vars["EventDateText"] = "Date"; vars["LocationText"] = "Location"; vars["DescriptionText"] = "Event";
+            vars["CategoryText"] = "Category"; vars["MaturityText"] = "Maturity";
+            vars["DurationText"] = "Duration"; vars["CoverChargeText"] = "Cover charge";
         }
 
         private void AddOnlineUsers(Dictionary<string, object> vars)

@@ -64,9 +64,15 @@ namespace ContinuumSearch.Service
             Hashtable eventRequest = Request("u|0|Continuum", 0x07000020);
             ArrayList events = store.FindEvents(eventRequest);
             Require(events.Count == 1 && Convert.ToInt32(((Hashtable)events[0])["event_id"]) == 900001, "events query");
+            ArrayList ownerEvents = store.FindOwnerEvents(new Hashtable
+                { ["creatoruuid"] = "22222222-2222-2222-2222-222222222222", ["query_start"] = "0" });
+            Require(ownerEvents.Count == 1 && Convert.ToInt32(((Hashtable)ownerEvents[0])["event_id"]) == 900001,
+                "owner events query");
+            Require(store.FindOwnerEvents(new Hashtable { ["creatoruuid"] = "not-a-uuid" }).Count == 0,
+                "invalid owner events query");
             Require(store.GetEvent(new Hashtable { ["eventID"] = "900001" }).Count == 1, "event details query");
             Console.WriteLine("PASS: DataSnapshot parse and idempotent region replacement");
-            Console.WriteLine("PASS: places, popular, parcel details, region parcels, land, events and event-details query contracts");
+            Console.WriteLine("PASS: places, popular, parcel details, region parcels, land, events, owner events and event-details query contracts");
             Console.WriteLine("ContinuumSearch {0} acceptance self-test passed.", store.Provider);
             return 0;
         }
