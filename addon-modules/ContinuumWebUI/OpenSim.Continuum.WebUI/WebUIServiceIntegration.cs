@@ -123,6 +123,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/region_manager.html") AddManagedRegions(vars, currentUser, false);
             if (key == "admin/region_manager.html") AddManagedRegions(vars, currentUser, true);
             if (key == "admin/statistics.html") AddStatistics(vars, currentUser);
+            if (key == "admin/transactions.html") AddAdminTransactions(vars, currentUser, parameters);
             if (key == "user/estate_manager.html") AddEstates(vars, currentUser, false);
             if (key == "admin/estate_manager.html") AddEstates(vars, currentUser, true);
             if (key == "user/classifieds.html") AddOwnedClassifieds(vars, currentUser);
@@ -869,32 +870,57 @@ namespace OpenSim.Continuum.WebUI
 
         private void AddTransactions(Dictionary<string, object> vars, UserAccount account, IReadOnlyDictionary<string, string> parameters)
         {
-            var rows = new List<Dictionary<string, object>>();
-            if (account != null)
-            {
-                DateTime? before = null;
-                if (DateTime.TryParse(Value(parameters, "date_end"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime parsed)) before = parsed.ToUniversalTime().AddDays(1);
-                Hashtable statement = EconomyStatement(account.PrincipalID, before, 500);
-                if (statement?["history"] is ArrayList history)
-                {
-                    foreach (Hashtable item in history.OfType<Hashtable>())
-                    {
-                        UUID.TryParse(Text(item, "counterpartyID"), out UUID counterpartyID);
-                        UserAccount counterparty = counterpartyID == UUID.Zero ? null : Safe(() => _accounts.GetUserAccount(UUID.Zero, counterpartyID));
-                        long.TryParse(Text(item, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount);
-                        rows.Add(new Dictionary<string, object>
-                        {
-                            ["Date"] = H(Text(item, "createdUtc")),
-                            ["FromAgent"] = H(amount >= 0 ? counterparty?.FormattedName ?? "System" : account.FormattedName),
-                            ["ToAgent"] = H(amount >= 0 ? account.FormattedName : counterparty?.FormattedName ?? "System"),
-                            ["Description"] = H(Text(item, "description")), ["Amount"] = amount,
-                            ["ToBalance"] = H(Text(item, "balance"))
-                        });
-                    }
-                }
-            }
+            List<Dictionary<string, object>> rows = TransactionRows(account, parameters);
             vars["TransactionsList"] = rows; vars["TransactionsText"] = "Transactions";
             vars["DateStart"] = H(Value(parameters, "date_start")); vars["DateEnd"] = H(Value(parameters, "date_end"));
+        }
+
+        private void AddAdminTransactions(Dictionary<string, object> vars, UserAccount administrator,
+            IReadOnlyDictionary<string, string> parameters)
+        {
+            string search = Value(parameters, "user_name").Trim();
+            string normalized = search.Replace('.', ' ');
+            int separator = normalized.IndexOf(' ');
+            UserAccount account = IsAdmin(administrator) && separator > 0 && separator < normalized.Length - 1
+                ? Safe(() => _accounts.GetUserAccount(UUID.Zero, normalized.Substring(0, separator), normalized.Substring(separator + 1).Trim())) : null;
+            vars["TransactionsList"] = TransactionRows(account, parameters);
+            vars["TransactionsText"] = "Resident transactions"; vars["SearchUser"] = H(search);
+            vars["DateStart"] = H(Value(parameters, "date_start")); vars["DateEnd"] = H(Value(parameters, "date_end"));
+            vars["DateStartText"] = "From"; vars["DateEndText"] = "Through"; vars["SearchUserText"] = "Resident";
+            vars["Search"] = "Search"; vars["TransactionDateText"] = "Date";
+            vars["TransactionFromAgentText"] = "From"; vars["TransactionToAgentText"] = "To";
+            vars["TransactionDetailText"] = "Description"; vars["TransactionAmountText"] = "Amount";
+            vars["TransactionBalanceText"] = "Resulting balance";
+        }
+
+        private List<Dictionary<string, object>> TransactionRows(UserAccount account,
+            IReadOnlyDictionary<string, string> parameters)
+        {
+            var rows = new List<Dictionary<string, object>>();
+            if (account == null) return rows;
+            DateTime? start = DateTime.TryParse(Value(parameters, "date_start"), CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal, out DateTime parsedStart) ? parsedStart.ToUniversalTime() : null;
+            DateTime? before = DateTime.TryParse(Value(parameters, "date_end"), CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeLocal, out DateTime parsedEnd) ? parsedEnd.ToUniversalTime().AddDays(1) : null;
+            Hashtable statement = EconomyStatement(account.PrincipalID, before, 500);
+            if (statement?["history"] is not ArrayList history) return rows;
+            foreach (Hashtable item in history.OfType<Hashtable>())
+            {
+                if (start.HasValue && DateTime.TryParse(Text(item, "createdUtc"), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out DateTime created) && created.ToUniversalTime() < start.Value) continue;
+                UUID.TryParse(Text(item, "counterpartyID"), out UUID counterpartyID);
+                UserAccount counterparty = counterpartyID == UUID.Zero ? null : Safe(() => _accounts.GetUserAccount(UUID.Zero, counterpartyID));
+                long.TryParse(Text(item, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount);
+                rows.Add(new Dictionary<string, object>
+                {
+                    ["Date"] = H(Text(item, "createdUtc")),
+                    ["FromAgent"] = H(amount >= 0 ? counterparty?.FormattedName ?? "System" : account.FormattedName),
+                    ["ToAgent"] = H(amount >= 0 ? account.FormattedName : counterparty?.FormattedName ?? "System"),
+                    ["Description"] = H(Text(item, "description")), ["Amount"] = amount,
+                    ["ToBalance"] = H(Text(item, "balance"))
+                });
+            }
+            return rows;
         }
 
         private Hashtable Search(string method, Hashtable parameters)
