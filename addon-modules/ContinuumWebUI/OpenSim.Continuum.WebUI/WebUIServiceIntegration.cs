@@ -355,6 +355,10 @@ namespace OpenSim.Continuum.WebUI
                     ["Index"] = item.Item1, ["Value"] = item.Item2,
                     ["selected"] = account.UserLevel == item.Item1 ? "selected" : string.Empty
                 }).ToList();
+            vars["EdittingText"] = "Edit resident"; vars["AdminSetUserTypeText"] = "Account access";
+            vars["AdminUserTypeInfoText"] = "Disabled accounts cannot log in. Administrator access grants control of grid services exposed here.";
+            vars["ChangeEmailText"] = "Email address"; vars["NewEmailText"] = "Email";
+            vars["SaveUpdates"] = "Save";
         }
 
         private bool UpdateUser(IReadOnlyDictionary<string, string> form, UserAccount admin, out string message)

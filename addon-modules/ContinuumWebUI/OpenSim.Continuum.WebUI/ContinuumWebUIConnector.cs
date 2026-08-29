@@ -235,6 +235,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("admin-estate_manager", "Grid estates", "admin/estate_manager.html", false),
                 Menu("admin-statistics", "Grid statistics", "admin/statistics.html", false),
                 Menu("admin-transactions", "Grid transactions", "admin/transactions.html", false),
+                Menu("admin-user_manager", "Resident administration", "admin/user_manager.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };

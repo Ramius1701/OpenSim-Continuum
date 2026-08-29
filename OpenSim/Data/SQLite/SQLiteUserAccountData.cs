@@ -83,7 +83,19 @@ namespace OpenSim.Data.SQLite
 
         public UserAccountData[] GetUsersWhere(UUID scopeID, string where)
         {
-            return null;
+            if (String.IsNullOrWhiteSpace(where))
+                return [];
+
+            using SQLiteCommand cmd = new SQLiteCommand();
+            if (!scopeID.IsZero())
+            {
+                where = "(ScopeID=:ScopeID or ScopeID=:UUIDZero) and (" + where + ")";
+                cmd.Parameters.AddWithValue(":ScopeID", scopeID.ToString());
+                cmd.Parameters.AddWithValue(":UUIDZero", UUID.Zero.ToString());
+            }
+
+            cmd.CommandText = String.Format("select * from {0} where " + where, m_Realm);
+            return DoQuery(cmd);
         }
     }
 }
