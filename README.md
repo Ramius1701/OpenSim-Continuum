@@ -17,9 +17,9 @@ The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743d
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
-- OpenSim-Grid-Interface and WhiteCore WebUI work is intentionally deferred until the simulator, Robust services, and addons are complete
-- OpenSim-Grid-Interface checkpoint `ecb377d42b5a1f0ec7a969a65f48596c8e5dbe87` is the secondary portal donor: use it to fill demonstrated WhiteCore WebUI gaps while retaining one WhiteCore-led portal shell, route map and user experience
-- When that portal phase begins, the target is the actual WhiteCore-Dev integrated WebUI—including its C# page sources, HTML templates and static assets—not a newly designed substitute; only incompatible WhiteCore backend/service boundaries are to be adapted to OpenSim/Robust
+- The WhiteCore integrated WebUI portal phase is active. Continuum retains the WhiteCore HTML, static assets, page model and BSD attribution while adapting its incompatible backend boundaries to native OpenSim and Robust services.
+- OpenSim-Grid-Interface checkpoint `ecb377d42b5a1f0ec7a969a65f48596c8e5dbe87` is the secondary portal donor used to fill demonstrated workflow gaps without replacing the WhiteCore-led shell.
+- Implemented portal workflows include secure account sessions and registration, resident profiles/picks/groups/friends/regions, directory and destination search, region and parcel profiles, Experiences, Abuse Reports, economy statements, administrator account operations, region inventories and operational statistics. Live deployment acceptance is still required.
 
 Do not replace a running production installation in place. Build a separate test deployment, back up all databases and configuration, and rehearse every migration against a copy of production data.
 
@@ -71,6 +71,15 @@ The extended scripting surface is powerful and has estate/security implications.
 - OpenSimTide
 - OpenSimWeather
 - Viewer Abuse Reports
+
+### Integrated WhiteCore WebUI
+
+- WhiteCore-Dev HTML templates and static assets are embedded in the optional `ContinuumWebUI` Robust connector; their original BSD-3-Clause provenance is retained in the module notices.
+- Native OpenSim services supply authentication, accounts, profiles, friends, groups, grid users, regions, Experiences and Abuse Reports.
+- ContinuumSearch supplies events, classifieds, destinations and published region parcels through provider-neutral XML-RPC contracts.
+- ContinuumEconomy can supply authenticated resident statements when its endpoint and shared secret are configured.
+- OpenSim-Grid-Interface-derived account and profile workflows fill gaps in the WhiteCore portal without introducing a separate replacement website.
+- Unsupported WhiteCore simulator creation/reset and direct-database administration controls are not exposed. Region administration remains read-only until a current authenticated OpenSim service contract can perform those mutations safely.
 
 These are independent optional components. They are not all required for a grid, and enabling multiple economy modules simultaneously is not supported unless their interaction has been explicitly designed and tested.
 
@@ -190,8 +199,8 @@ Licensing and attribution must be reviewed per addon and asset. The OpenSimulato
 
 ## Deliberately deferred or excluded
 
-- OpenSim-Grid-Interface and WhiteCore WebUI are deferred to a later portal phase.
-- WhiteCore WebUI is not copied into Robust because its service, persistence, authentication, and page architecture is incompatible with current OpenSim.
+- Remaining WebUI deployment acceptance—including reverse-proxy HTTPS, production database volume, browser compatibility and operator policy—is deferred to beta testing; the portal implementation itself is no longer deferred.
+- Incompatible WhiteCore service and persistence internals are not copied into Robust. Continuum uses the WhiteCore presentation and workflow code through native OpenSim service adapters.
 - Donor-specific endpoints, credentials, forced defaults, curated destinations, destructive update/reset scripts, and obsolete architecture rewrites are excluded.
 - The separate local checkout explicitly excluded from this work was not used.
 
