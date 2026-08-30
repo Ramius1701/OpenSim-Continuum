@@ -252,13 +252,16 @@ namespace ContinuumSearch.Service
             if (search != null) { where += " AND (LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))"; args.Add(("@search", search)); }
             where += EventMaturityWhere(flags, args);
             where = where.Replace("date_utc", "dateUTC").Replace("event_flags", "eventflags");
-            return Query("SELECT owneruuid,name,eventid,dateUTC,eventflags,globalPos,simname,duration FROM search_events WHERE " +
+            return Query("SELECT owneruuid,name,eventid,dateUTC,eventflags,globalPos,simname,duration,creatoruuid,category,description,covercharge,coveramount FROM search_events WHERE " +
                 where + " ORDER BY dateUTC,eventid LIMIT 101 OFFSET @offset", args, ("@offset", Offset(request)), reader => new Hashtable
                 {
                     ["owner_id"] = Value(reader, 0), ["name"] = Value(reader, 1), ["event_id"] = Int(reader, 2),
                     ["date"] = DateTimeOffset.FromUnixTimeSeconds(Long(reader, 3)).ToLocalTime().ToString("MM/dd hh:mm tt", CultureInfo.InvariantCulture),
+                    ["dateUTC"] = Long(reader, 3),
                     ["unix_time"] = Long(reader, 3), ["event_flags"] = Int(reader, 4), ["landing_point"] = Value(reader, 5),
-                    ["globalposition"] = Value(reader, 5), ["simname"] = Value(reader, 6), ["duration"] = Int(reader, 7)
+                    ["globalposition"] = Value(reader, 5), ["simname"] = Value(reader, 6), ["duration"] = Int(reader, 7),
+                    ["creator"] = Value(reader, 8), ["category"] = Value(reader, 9), ["description"] = Value(reader, 10),
+                    ["covercharge"] = Int(reader, 11), ["coveramount"] = Int(reader, 12), ["eventflags"] = Int(reader, 4)
                 });
         }
 
@@ -276,11 +279,16 @@ namespace ContinuumSearch.Service
             if ((flags & 10) != 0) maturity |= 8;
             if ((flags & 64) != 0) maturity |= 64;
             if (maturity != 0) { where += " AND (classifiedflags & @maturity)<>0"; args.Add(("@maturity", maturity)); }
-            return Query("SELECT classifieduuid,name,classifiedflags,creationdate,expirationdate,priceforlisting FROM classifieds WHERE " +
+            return Query("SELECT classifieduuid,name,classifiedflags,creationdate,expirationdate,priceforlisting," +
+                "creatoruuid,category,description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname FROM classifieds WHERE " +
                 where + " ORDER BY priceforlisting DESC LIMIT 101 OFFSET @offset", args, ("@offset", Offset(request)), reader => new Hashtable
                 {
                     ["classifiedid"] = Value(reader, 0), ["name"] = Value(reader, 1), ["classifiedflags"] = Int(reader, 2),
-                    ["creation_date"] = Long(reader, 3), ["expiration_date"] = Long(reader, 4), ["priceforlisting"] = Int(reader, 5)
+                    ["creation_date"] = Long(reader, 3), ["expiration_date"] = Long(reader, 4), ["priceforlisting"] = Int(reader, 5),
+                    ["classifieduuid"] = Value(reader, 0), ["creatoruuid"] = Value(reader, 6), ["category"] = Int(reader, 7),
+                    ["description"] = Value(reader, 8), ["parceluuid"] = Value(reader, 9), ["parentestate"] = Int(reader, 10),
+                    ["snapshotuuid"] = Value(reader, 11), ["simname"] = Value(reader, 12), ["posglobal"] = Value(reader, 13),
+                    ["parcelname"] = Value(reader, 14), ["creationdate"] = Long(reader, 3), ["expirationdate"] = Long(reader, 4)
                 });
         }
 

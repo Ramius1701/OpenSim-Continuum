@@ -67,7 +67,9 @@ namespace ContinuumSearch.Service
             });
             Hashtable eventRequest = Request("u|0|Continuum", 0x07000020);
             ArrayList events = store.FindEvents(eventRequest);
-            Require(events.Count == 1 && Convert.ToInt32(((Hashtable)events[0])["event_id"]) == 900001, "events query");
+            Require(events.Count == 1 && Convert.ToInt32(((Hashtable)events[0])["event_id"]) == 900001 &&
+                ((Hashtable)events[0])["description"].ToString() == "Search acceptance event" &&
+                ((Hashtable)events[0])["simname"].ToString() == "Welcome Test", "enriched events query");
             ArrayList ownerEvents = store.FindOwnerEvents(new Hashtable
                 { ["creatoruuid"] = "22222222-2222-2222-2222-222222222222", ["query_start"] = "0" });
             Require(ownerEvents.Count == 1 && Convert.ToInt32(((Hashtable)ownerEvents[0])["event_id"]) == 900001,

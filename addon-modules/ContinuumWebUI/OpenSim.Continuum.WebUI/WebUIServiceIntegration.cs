@@ -837,8 +837,12 @@ namespace OpenSim.Continuum.WebUI
             {
                 foreach (Hashtable summary in data.OfType<Hashtable>().Take(50))
                 {
-                    Hashtable detailResponse = Search("event_info_query", new Hashtable { ["eventID"] = Text(summary, "event_id") });
-                    Hashtable detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
+                    Hashtable detail = summary;
+                    if (!detail.ContainsKey("description") || !detail.ContainsKey("category"))
+                    {
+                        Hashtable detailResponse = Search("event_info_query", new Hashtable { ["eventID"] = Text(summary, "event_id") });
+                        detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
+                    }
                     DateTime.TryParse(Text(detail, "date"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime date);
                     DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
@@ -887,8 +891,12 @@ namespace OpenSim.Continuum.WebUI
             {
                 foreach (Hashtable summary in data.OfType<Hashtable>().Take(50))
                 {
-                    Hashtable detailResponse = Search("classifieds_info_query", new Hashtable { ["classifiedID"] = Text(summary, "classifiedid") });
-                    Hashtable detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
+                    Hashtable detail = summary;
+                    if (!detail.ContainsKey("description") || !detail.ContainsKey("simname"))
+                    {
+                        Hashtable detailResponse = Search("classifieds_info_query", new Hashtable { ["classifiedID"] = Text(summary, "classifiedid") });
+                        detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
+                    }
                     DirectoryLocation(Text(detail, "posglobal"), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
