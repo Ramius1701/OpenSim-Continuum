@@ -1389,10 +1389,25 @@ namespace OpenSim.Continuum.WebUI
                     experiences = ids.Length == 0 ? Array.Empty<ExperienceInfo>() : Safe(() => _experiences.GetExperienceInfos(ids)) ?? Array.Empty<ExperienceInfo>();
                 }
             }
-            foreach (ExperienceInfo experience in experiences)
+            bool administrator = IsAdmin(account);
+            List<ExperienceInfo> visibleExperiences = experiences.Where(experience =>
             {
-                UserAccount owner = experience.owner_id == UUID.Zero ? null
-                    : Safe(() => _accounts.GetUserAccount(UUID.Zero, experience.owner_id));
+                ExperienceFlags flags = (ExperienceFlags)experience.properties;
+                bool related = account != null && (experience.owner_id == account.PrincipalID
+                    || permissions.ContainsKey(experience.public_id));
+                if ((flags & ExperienceFlags.Private) != 0 && !related && !administrator) return false;
+                return ((flags & (ExperienceFlags.Suspended | ExperienceFlags.Disabled)) == 0)
+                    || related || administrator;
+            }).Take(100).ToList();
+            List<string> ownerIDs = visibleExperiences.Select(experience => experience.owner_id)
+                .Where(id => id != UUID.Zero).Distinct().Select(id => id.ToString()).ToList();
+            List<UserAccount> owners = ownerIDs.Count == 0 ? new List<UserAccount>()
+                : Safe(() => _accounts.GetUserAccounts(UUID.Zero, ownerIDs)) ?? new List<UserAccount>();
+            Dictionary<UUID, UserAccount> ownersByID = owners.GroupBy(owner => owner.PrincipalID)
+                .ToDictionary(group => group.Key, group => group.First());
+            foreach (ExperienceInfo experience in visibleExperiences)
+            {
+                ownersByID.TryGetValue(experience.owner_id, out UserAccount owner);
                 string permission = permissions.TryGetValue(experience.public_id, out bool allowed)
                     ? allowed ? "Allowed" : "Blocked"
                     : account != null && experience.owner_id == account.PrincipalID ? "Owned" : "Not granted";
