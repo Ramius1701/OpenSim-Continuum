@@ -45,9 +45,14 @@ namespace OpenSim.Continuum.WebUI
             if (accounts == null || authentication == null)
                 throw new InvalidOperationException("ContinuumWebUI could not load its account or authentication service");
             int sessionSeconds = Math.Clamp(section.GetInt("SessionLifetimeSeconds", 3600), 300, 86400);
+            int loginAttempts = Math.Clamp(section.GetInt("LoginAttemptsPerWindow", 10), 1, 1000);
+            int loginWindow = Math.Clamp(section.GetInt("LoginAttemptWindowSeconds", 300), 10, 86400);
+            int registrationAttempts = Math.Clamp(section.GetInt("RegistrationAttemptsPerWindow", 3), 1, 1000);
+            int registrationWindow = Math.Clamp(section.GetInt("RegistrationAttemptWindowSeconds", 3600), 10, 86400);
             var integration = new WebUIServiceIntegration(config, section, accounts);
             integration.SetAuthenticationService(authentication);
-            var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, integration, sessionSeconds);
+            var site = new WhiteCoreSite(mountPath, systemName, accounts, authentication, integration, sessionSeconds,
+                loginAttempts, loginWindow, registrationAttempts, registrationWindow);
             server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.HandleRoot));
             server.AddSimpleStreamHandler(new SimpleStreamHandler(mountPath, site.Handle), true);
             Log.InfoFormat("[CONTINUUM WEBUI]: WhiteCore integrated portal mounted at {0}/", mountPath);
@@ -87,9 +92,16 @@ namespace OpenSim.Continuum.WebUI
         private readonly IAuthenticationService _authentication;
         private readonly WebUIServiceIntegration _integration;
         private readonly int _sessionSeconds;
+        private readonly int _loginAttempts;
+        private readonly TimeSpan _loginWindow;
+        private readonly int _registrationAttempts;
+        private readonly TimeSpan _registrationWindow;
+        private readonly object _attemptsLock = new();
+        private readonly Dictionary<string, Queue<DateTime>> _attempts = new(StringComparer.Ordinal);
 
         internal WhiteCoreSite(string mountPath, string systemName, IUserAccountService accounts,
-            IAuthenticationService authentication, WebUIServiceIntegration integration, int sessionSeconds)
+            IAuthenticationService authentication, WebUIServiceIntegration integration, int sessionSeconds,
+            int loginAttempts, int loginWindowSeconds, int registrationAttempts, int registrationWindowSeconds)
         {
             _mountPath = mountPath;
             _systemName = string.IsNullOrWhiteSpace(systemName) ? "OpenSim Continuum" : systemName;
@@ -97,6 +109,10 @@ namespace OpenSim.Continuum.WebUI
             _authentication = authentication;
             _integration = integration;
             _sessionSeconds = sessionSeconds;
+            _loginAttempts = loginAttempts;
+            _loginWindow = TimeSpan.FromSeconds(loginWindowSeconds);
+            _registrationAttempts = registrationAttempts;
+            _registrationWindow = TimeSpan.FromSeconds(registrationWindowSeconds);
         }
 
         internal void HandleRoot(IOSHttpRequest request, IOSHttpResponse response)
@@ -175,6 +191,9 @@ namespace OpenSim.Continuum.WebUI
             if (request.HttpMethod == "POST")
             {
                 if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                if (relative.Equals("register.html", StringComparison.OrdinalIgnoreCase)
+                    && !AllowAttempt("register:" + request.RemoteIPEndPoint?.Address, _registrationAttempts, _registrationWindow))
+                { WriteError(response, (HttpStatusCode)429, "Too many registration attempts; try again later"); return; }
                 if (request.ContentLength64 < 0 || request.ContentLength64 > 64 * 1024)
                 {
                     WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Request is too large");
@@ -462,6 +481,12 @@ namespace OpenSim.Continuum.WebUI
 
         private void HandleLogin(IOSHttpRequest request, IOSHttpResponse response)
         {
+            string attemptKey = "login:" + request.RemoteIPEndPoint?.Address;
+            if (!AllowAttempt(attemptKey, _loginAttempts, _loginWindow))
+            {
+                WriteError(response, (HttpStatusCode)429, "Too many login attempts; try again later");
+                return;
+            }
             if (request.ContentLength64 < 0 || request.ContentLength64 > 16 * 1024)
             {
                 WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Login request is too large");
@@ -481,6 +506,7 @@ namespace OpenSim.Continuum.WebUI
                 WriteError(response, HttpStatusCode.Unauthorized, "Invalid user name or password");
                 return;
             }
+            ClearAttempts(attemptKey);
             string cookie = "ContinuumWebUI=" + account.PrincipalID + "." + Uri.EscapeDataString(token)
                 + "; Path=" + _mountPath + "; Max-Age=" + _sessionSeconds + "; HttpOnly; SameSite=Lax"
                 + (request.IsSecured ? "; Secure" : string.Empty);
@@ -505,6 +531,26 @@ namespace OpenSim.Continuum.WebUI
 
         // OpenSim authentication lifetimes are expressed in minutes, while HTTP Max-Age is seconds.
         private int SessionLifetimeMinutes => Math.Max(1, (_sessionSeconds + 59) / 60);
+
+        private bool AllowAttempt(string key, int maximum, TimeSpan window)
+        {
+            DateTime now = DateTime.UtcNow;
+            lock (_attemptsLock)
+            {
+                if (_attempts.Count > 10000) _attempts.Clear();
+                if (!_attempts.TryGetValue(key, out Queue<DateTime> entries))
+                    _attempts[key] = entries = new Queue<DateTime>();
+                while (entries.Count > 0 && now - entries.Peek() >= window) entries.Dequeue();
+                if (entries.Count >= maximum) return false;
+                entries.Enqueue(now);
+                return true;
+            }
+        }
+
+        private void ClearAttempts(string key)
+        {
+            lock (_attemptsLock) _attempts.Remove(key);
+        }
 
         private static bool TryReadCookie(IOSHttpRequest request, out UUID principal, out string token)
         {

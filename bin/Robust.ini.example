@@ -158,6 +158,10 @@
     AllowRegistration = true
     ;; Minimum age accepted by the public account registration form.
     MinimumRegistrationAge = 16
+    LoginAttemptsPerWindow = 10
+    LoginAttemptWindowSeconds = 300
+    RegistrationAttemptsPerWindow = 3
+    RegistrationAttemptWindowSeconds = 3600
     GridService = OpenSim.Services.GridService.dll:GridService
     GridUserService = OpenSim.Services.UserAccountService.dll:GridUserService
     FriendsService = OpenSim.Services.FriendsService.dll:FriendsService
