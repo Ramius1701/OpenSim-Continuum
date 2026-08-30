@@ -156,6 +156,8 @@
     SessionLifetimeSeconds = 3600
     AdminUserLevel = 200
     AllowRegistration = true
+    ;; Minimum age accepted by the public account registration form.
+    MinimumRegistrationAge = 16
     GridService = OpenSim.Services.GridService.dll:GridService
     GridUserService = OpenSim.Services.UserAccountService.dll:GridUserService
     FriendsService = OpenSim.Services.FriendsService.dll:FriendsService

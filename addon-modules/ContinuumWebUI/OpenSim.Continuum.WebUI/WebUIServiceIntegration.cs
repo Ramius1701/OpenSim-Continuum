@@ -42,6 +42,7 @@ namespace OpenSim.Continuum.WebUI
         private readonly string _publicBase;
         private readonly string _mapBase;
         private readonly bool _allowRegistration;
+        private readonly int _minimumRegistrationAge;
         private readonly string _searchUrl;
         private readonly string _economyUrl;
         private readonly string _economySecret;
@@ -56,6 +57,7 @@ namespace OpenSim.Continuum.WebUI
             _publicBase = section.GetString("PublicURL", string.Empty).TrimEnd('/');
             _mapBase = section.GetString("MapServiceURL", _publicBase).TrimEnd('/');
             _allowRegistration = section.GetBoolean("AllowRegistration", true);
+            _minimumRegistrationAge = Math.Clamp(section.GetInt("MinimumRegistrationAge", 16), 0, 100);
             _searchUrl = section.GetString("SearchServiceURL", string.Empty).Trim();
             _economyUrl = section.GetString("EconomyServiceURL", string.Empty).Trim();
             _economySecret = section.GetString("EconomySharedSecret", string.Empty);
@@ -176,7 +178,9 @@ namespace OpenSim.Continuum.WebUI
             vars["Months"] = Enumerable.Range(1, 12).Select(n => Option(n.ToString("00", CultureInfo.InvariantCulture))).ToList();
             vars["Days"] = Enumerable.Range(1, 31).Select(n => Option(n.ToString("00", CultureInfo.InvariantCulture))).ToList();
             int year = DateTime.UtcNow.Year;
-            vars["Years"] = Enumerable.Range(year - 100, 87).Reverse().Select(n => Option(n.ToString(CultureInfo.InvariantCulture))).ToList();
+            int youngestYear = year - _minimumRegistrationAge;
+            vars["Years"] = Enumerable.Range(year - 100, 101 - _minimumRegistrationAge).Reverse()
+                .Select(n => Option(n.ToString(CultureInfo.InvariantCulture))).ToList();
             vars["AvatarArchive"] = new List<Dictionary<string, object>>();
             vars["RegionList"] = (Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 1000)) ?? new List<GridRegion>())
                 .Select(r => new Dictionary<string, object> { ["RegionUUID"] = r.RegionID.ToString(), ["RegionName"] = H(r.RegionName) }).ToList();
@@ -201,6 +205,11 @@ namespace OpenSim.Continuum.WebUI
             string email = Value(form, "UserEmail").Trim();
             if (!ValidName(first) || !ValidName(last)) { message = "Avatar name is invalid"; return true; }
             if (password.Length < 8 || password.Length > 128 || password != confirmation) { message = "Passwords must match and contain at least eight characters"; return true; }
+            if (!ValidEmail(email)) { message = "Email address is invalid"; return true; }
+            if (!DateTime.TryParseExact(Value(form, "UserDOBYear") + "-" + Value(form, "UserDOBMonth") + "-" + Value(form, "UserDOBDay"),
+                "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime birthDate)
+                || birthDate > DateTime.UtcNow.Date.AddYears(-_minimumRegistrationAge))
+            { message = "A valid date of birth meeting the minimum registration age is required"; return true; }
             if (!form.TryGetValue("ToSAccept", out string accepted) || accepted != "Accepted") { message = "The terms of service must be accepted"; return true; }
             if (_accounts.GetUserAccount(UUID.Zero, first, last) != null) { message = "That avatar name is already registered"; return true; }
             try
@@ -246,7 +255,7 @@ namespace OpenSim.Continuum.WebUI
             message = "Authentication required";
             if (account == null) return true;
             string email = Value(form, "emailnew").Trim();
-            if (email != Value(form, "emailnewconf").Trim() || email.Length > 254 || !email.Contains('@')) { message = "Email addresses do not match or are invalid"; return true; }
+            if (email != Value(form, "emailnewconf").Trim() || !ValidEmail(email)) { message = "Email addresses do not match or are invalid"; return true; }
             account.Email = email;
             message = _accounts.StoreUserAccount(account) ? "Email address updated" : "Email update failed";
             return true;
@@ -384,7 +393,7 @@ namespace OpenSim.Continuum.WebUI
             else if (form.ContainsKey("updateemail"))
             {
                 string email = Value(form, "email").Trim();
-                if (email.Length > 254 || !email.Contains('@')) { message = "Email address is invalid"; return true; }
+                if (!ValidEmail(email)) { message = "Email address is invalid"; return true; }
                 account.Email = email;
             }
             else { message = "That WhiteCore account operation is not supported safely by OpenSim"; return true; }
@@ -1326,6 +1335,9 @@ namespace OpenSim.Continuum.WebUI
         private static string H(string value) => WebUtility.HtmlEncode(value ?? string.Empty);
         private static string Value(IReadOnlyDictionary<string, string> values, string key) => values.TryGetValue(key, out string value) ? value ?? string.Empty : string.Empty;
         private static bool ValidName(string value) => value.Length is >= 1 and <= 31 && Regex.IsMatch(value, "^[A-Za-z][A-Za-z0-9'-]*$");
+        private static bool ValidEmail(string value) => value.Length is > 2 and <= 254
+            && System.Net.Mail.MailAddress.TryCreate(value, out System.Net.Mail.MailAddress address)
+            && String.Equals(address.Address, value, StringComparison.OrdinalIgnoreCase);
         private static Dictionary<string, object> Option(string value) => new() { ["Value"] = value };
         private static bool TryInt(IReadOnlyDictionary<string, string> values, string key, out int result)
         {
