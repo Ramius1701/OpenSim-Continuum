@@ -1,7 +1,7 @@
 <!-- Grid Interface profile editing in the WhiteCore resident workflow. -->
 <section class="container">
   <h2>{UserName}: Edit profile</h2>
-  <form method="post" action="profile_edit.html">
+  <form id="profile_edit_form" method="post" action="user/profile_edit.html">
     <div class="form-group"><label>About</label><textarea class="form-control" name="about" maxlength="8192" rows="5">{ProfileAbout}</textarea></div>
     <div class="form-group"><label>Profile image asset UUID</label><input class="form-control" name="imageid" value="{ProfileImageID}"></div>
     <div class="form-group"><label>Web URL</label><input class="form-control" type="url" name="weburl" maxlength="1024" value="{ProfileWebURL}"></div>
@@ -12,6 +12,6 @@
     <div class="form-group"><label>First Life image asset UUID</label><input class="form-control" name="firstlifeimageid" value="{ProfileFirstLifeImageID}"></div>
     <div class="form-check"><input class="form-check-input" type="checkbox" name="publish" value="true" {ProfilePublishChecked}><label class="form-check-label">Publish profile</label></div>
     <div class="form-check"><input class="form-check-input" type="checkbox" name="mature" value="true" {ProfileMatureChecked}><label class="form-check-label">Mature profile</label></div>
-    <button class="btn btn-info mt-3" type="submit">Save profile</button>
+    <button class="btn btn-info mt-3" type="button" onclick="submitupdate('profile_edit_form');">Save profile</button>
   </form>
 </section>

@@ -79,6 +79,10 @@ namespace OpenSim.Continuum.WebUI
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
 
+        internal static bool IsSuccessfulMutation(string message) => message is
+            "Account created successfully" or "Password updated" or "Email address updated"
+            or "Abuse report updated" or "User account updated" or "Profile updated";
+
         internal string ContentSecurityPolicy
         {
             get
@@ -110,6 +114,7 @@ namespace OpenSim.Continuum.WebUI
                 "classifieds.html" => "classifieds/classifieds.html",
                 "destinations.html" => "destinations.html",
                 "profile.html" => "user/profile.html",
+                "profile_edit.html" => "user/profile_edit.html",
                 "friends.html" => "user/friends.html",
                 "groups.html" => "user/groups.html",
                 "transactions.html" => "user/transactions.html",

@@ -7,7 +7,7 @@ $(function() {
 	/***************** Nav Transformicon ******************/
 
 	/* When user clicks the Icon */
-	$('.nav-toggle').click(function() {
+	$('.nav-toggle').click(function(event) {
 		$(this).toggleClass('active');
 		$('.header-nav').toggleClass('open');
 		event.preventDefault();
@@ -20,7 +20,7 @@ $(function() {
 	});
 
 	/* When user clicks the sidebar Icon */
-	$('#toggleSideNav').click(function() {
+	$('#toggleSideNav').click(function(event) {
 		$('body').toggleClass('sbheader-visible');
 		event.preventDefault();
 	});
@@ -88,8 +88,9 @@ $(function() {
 /***************** WhiteCore specific ******************/
 
 /* submit a form */
-function submitupdate(formname, parms="", menuid="") {
-  event.preventDefault();
+function submitupdate(formname, parms="", menuid="", currentEvent=null) {
+  currentEvent = currentEvent || window.event;
+  if (currentEvent) currentEvent.preventDefault();
 
   var $form = $("#" + formname);
   var url = $form.attr("action");
@@ -111,16 +112,18 @@ function submitupdate(formname, parms="", menuid="") {
       	}, 1000);
       }
     }
-  });
+  }).fail(function() { MsgError("The WebUI request failed", 4000, 0); });
   
-  event.stopPropagation();
+  if (currentEvent) currentEvent.stopPropagation();
+  return false;
 
 };
 
 
-function submitpagesearch(formname, destdiv) {
+function submitpagesearch(formname, destdiv, currentEvent=null) {
   // submit form details and post return data to 'destdiv'
-  event.preventDefault();
+  currentEvent = currentEvent || window.event;
+  if (currentEvent) currentEvent.preventDefault();
 
   var $form = $("#" + formname);
   var url = $form.attr("action");
@@ -134,9 +137,10 @@ function submitpagesearch(formname, destdiv) {
     } else {
       $("#" + destdiv).empty().append(data);
     }
-  });
+  }).fail(function() { MsgError("The WebUI request failed", 4000, 0); });
 
-  event.stopPropagation();
+  if (currentEvent) currentEvent.stopPropagation();
+  return false;
 
 };
 
