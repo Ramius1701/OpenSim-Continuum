@@ -1245,7 +1245,7 @@ namespace OpenSim.Continuum.WebUI
             IReadOnlyDictionary<string, string> parameters)
         {
             if (!IsAdmin(admin) || _abuse == null || !TryInt(parameters, "cardid", out int reportID)) return;
-            AbuseReportData report = Safe(() => _abuse.GetReport(reportID, false));
+            AbuseReportData report = Safe(() => _abuse.GetReport(reportID, true));
             if (report == null) return;
             vars["CardNumber"] = report.ReportID; vars["Category"] = H(report.Category);
             vars["Summary"] = H(report.Summary); vars["AbuserName"] = H(report.AbuserName);
@@ -1253,10 +1253,24 @@ namespace OpenSim.Continuum.WebUI
             vars["ObjectName"] = string.Empty; vars["ObjectPosition"] = H(report.Position);
             vars["ObjectUUID"] = report.ObjectID.ToString(); vars["Details"] = H(report.Details);
             vars["Notes"] = H(report.ModeratorNotes); vars["AssignedTo"] = H(report.ModeratorName);
-            vars["ScreenshotURL"] = "static/icons/no_picture.jpg"; vars["HopUrl"] = string.Empty;
+            vars["ScreenshotURL"] = BrowserImage(report.ImageData) ?? "static/icons/no_picture.jpg";
+            ParseLanding(report.Position, out int x, out int y, out int z);
+            vars["HopUrl"] = string.IsNullOrWhiteSpace(report.AbuseRegionName)
+                ? string.Empty : Hop(report.AbuseRegionName, x, y, z);
             vars["IsActive"] = SelectOptions(new[] { "Open", "Investigating", "Resolved", "Closed" }, report.Status);
             vars["IsChecked"] = SelectOptions(new[] { "No", "Yes" }, report.CheckFlags != 0 ? "Yes" : "No");
             vars["AdminUsersList"] = new List<Dictionary<string, object>>();
+        }
+
+        private static string BrowserImage(byte[] data)
+        {
+            if (data == null || data.Length < 4) return null;
+            string mime = data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4e && data[3] == 0x47 ? "image/png"
+                : data[0] == 0xff && data[1] == 0xd8 ? "image/jpeg"
+                : data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x38 ? "image/gif"
+                : data.Length >= 12 && data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46
+                    && data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50 ? "image/webp" : null;
+            return mime == null ? null : "data:" + mime + ";base64," + Convert.ToBase64String(data);
         }
 
         private UserAccount AccountFromParameter(IReadOnlyDictionary<string, string> parameters, UserAccount fallback)
