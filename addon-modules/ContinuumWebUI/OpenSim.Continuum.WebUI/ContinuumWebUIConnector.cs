@@ -224,16 +224,20 @@ namespace OpenSim.Continuum.WebUI
                 return;
             }
 
-            if (relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
+            bool templatedContent = relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
                 || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase)
-                || relative.Equals("map/mapapi.js", StringComparison.OrdinalIgnoreCase))
+                || relative.Equals("map/mapapi.js", StringComparison.OrdinalIgnoreCase);
+            if (templatedContent || relative.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
                     string source = Encoding.UTF8.GetString(content);
-                    var variables = DefaultVariables(currentUser);
-                    _integration.Populate(relative, parameters, currentUser, variables);
-                    source = Render(relative, source, variables, currentUser != null, _integration.IsAdmin(currentUser), 0);
+                    if (templatedContent)
+                    {
+                        var variables = DefaultVariables(currentUser);
+                        _integration.Populate(relative, parameters, currentUser, variables);
+                        source = Render(relative, source, variables, currentUser != null, _integration.IsAdmin(currentUser), 0);
+                    }
                     source = RewriteAssetPaths(source);
                     content = Encoding.UTF8.GetBytes(source);
                 }
@@ -500,6 +504,12 @@ namespace OpenSim.Continuum.WebUI
             return value.Replace("../static/", _mountPath + "/static/", StringComparison.Ordinal)
                 .Replace("\"/static/", "\"" + _mountPath + "/static/", StringComparison.Ordinal)
                 .Replace("'/static/", "'" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("\"static/", "\"" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("'static/", "'" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("url(/static/", "url(" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("url(static/", "url(" + _mountPath + "/static/", StringComparison.Ordinal)
+                .Replace("\"/welcomescreen/", "\"" + _mountPath + "/welcomescreen/", StringComparison.Ordinal)
+                .Replace("'/welcomescreen/", "'" + _mountPath + "/welcomescreen/", StringComparison.Ordinal)
                 .Replace("\"local/static/", "\"" + _mountPath + "/static/", StringComparison.Ordinal);
         }
 
