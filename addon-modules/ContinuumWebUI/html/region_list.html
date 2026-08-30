@@ -10,7 +10,6 @@
         <th style="width:200px">{RegionText}</th>
         <th style="width:100px">{RegionLocXText}</th>
         <th style="width:100px">{RegionLocYText}</th>
-        <th></th>
         <th style="width:50px">{RegionOnlineText}</th>
         <th class="no-sort">{RegionMoreInfo}</th>
       </tr>
@@ -23,9 +22,8 @@
         <td class="text-left">{RegionName}</td>
         <td class="text-left">{RegionLocX}</td>
         <td class="text-left">{RegionLocY}</td>
-        <td class="text-left">{RegionInfo}</td>
         <td class="text-center">{RegionStatus}</td>
-        <td class="text-center"><a target="_self" class='regioninfo' href="regionprofile/?regionid={RegionID}">{MoreInfoText}</a></p></td>
+        <td class="text-center"><a href="#" onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={RegionID}'); return false;">{MoreInfoText}</a></td>
       </tr>
       {RegionListArrayEnd}
 
@@ -44,4 +42,3 @@
     });
   });
 </script>
-
