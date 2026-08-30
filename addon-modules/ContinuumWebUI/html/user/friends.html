@@ -27,15 +27,19 @@
             </a>
           </td>
           <td>
+            {IfCanSeeLocationBegin}
             <a title="{FriendRegion}" href="#" 
                onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={FriendRegionID}');">
-            <span class="regionlink">{FriendRegion}</span>
-          </a>
-        </td>
-          <td>
-            <a class="regionslurl" onclick="document.location.href='{HopUrl}'">
-              {FriendLocation}
+              <span class="regionlink">{FriendRegion}</span>
             </a>
+            {IfCanSeeLocationEnd}
+            {IfCannotSeeLocationBegin}<span>{FriendRegion}</span>{IfCannotSeeLocationEnd}
+          </td>
+          <td>
+            {IfCanSeeLocationBegin}<a class="regionslurl" href="{HopUrl}">
+              {FriendLocation}
+            </a>{IfCanSeeLocationEnd}
+            {IfCannotSeeLocationBegin}<span>{FriendLocation}</span>{IfCannotSeeLocationEnd}
           </td>
         </tr>
       {UserFriendsListArrayEnd}

@@ -1064,15 +1064,26 @@ namespace OpenSim.Continuum.WebUI
                     if (semicolon >= 0) idText = idText.Substring(0, semicolon);
                     if (!UUID.TryParse(idText, out UUID friendID)) continue;
                     UserAccount friendAccount = Safe(() => _accounts.GetUserAccount(UUID.Zero, friendID));
-                    GridUserInfo info = Safe(() => _gridUsers?.GetGridUserInfo(friendID.ToString()));
-                    GridRegion region = info == null ? null : Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID));
+                    bool canSeeOnline = friend.TheirFlags != -1
+                        && (friend.TheirFlags & (int)FriendRights.CanSeeOnline) != 0;
+                    bool canSeeLocation = friend.TheirFlags != -1
+                        && (friend.TheirFlags & (int)FriendRights.CanSeeOnMap) != 0;
+                    GridUserInfo info = canSeeOnline
+                        ? Safe(() => _gridUsers?.GetGridUserInfo(friendID.ToString()))
+                        : null;
+                    bool isOnline = info?.Online == true;
+                    GridRegion region = isOnline && canSeeLocation
+                        ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID))
+                        : null;
                     rows.Add(new Dictionary<string, object>
                     {
                         ["FriendID"] = friendID.ToString(), ["FriendName"] = H(friendAccount?.FormattedName ?? friendID.ToString()),
-                        ["FriendRegion"] = H(info?.Online == true ? region?.RegionName ?? "Unknown" : "Offline"),
-                        ["FriendRegionID"] = info?.LastRegionID.ToString() ?? UUID.Zero.ToString(),
-                        ["FriendLocation"] = H(info?.Online == true ? info.LastPosition.ToString() : "Offline"),
-                        ["HopUrl"] = info?.Online == true && region != null ? Hop(region, info.LastPosition) : string.Empty
+                        ["FriendRegion"] = H(!isOnline ? "Offline" : canSeeLocation ? region?.RegionName ?? "Unknown" : "Online"),
+                        ["FriendRegionID"] = region?.RegionID.ToString() ?? UUID.Zero.ToString(),
+                        ["FriendLocation"] = H(isOnline && canSeeLocation ? info.LastPosition.ToString() : isOnline ? "Location hidden" : "Offline"),
+                        ["HopUrl"] = isOnline && canSeeLocation && region != null ? Hop(region, info.LastPosition) : string.Empty,
+                        ["IfCanSeeLocation"] = isOnline && canSeeLocation && region != null,
+                        ["IfCannotSeeLocation"] = !isOnline || !canSeeLocation || region == null
                     });
                 }
             }
