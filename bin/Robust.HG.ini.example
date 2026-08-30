@@ -186,11 +186,13 @@
     AbuseReportsService = OpenSim.Services.AbuseReportsService.dll:AbuseReportsService
     ExperienceService = OpenSim.Services.ExperienceService.dll:ExperienceService
     GroupsService = OpenSim.Addons.Groups.dll:GroupsService
+    EstateDataService = OpenSim.Services.EstateService.dll:EstateDataService
     ; TextureURL = http://127.0.0.1:8002/assets
     HopURLBase = hop://
     ; PublicURL = http://127.0.0.1:8002
     ; MapServiceURL = http://127.0.0.1:8002
-    ;; Existing ContinuumSearch XML-RPC endpoint used for events/classifieds.
+    ;; Existing ContinuumSearch XML-RPC endpoint used for directory, parcel,
+    ;; event, classified and resident-owned event queries.
     ; SearchServiceURL = http://127.0.0.1:8003
     ;; Existing ContinuumEconomy service and its server-side shared secret.
     ; EconomyServiceURL = http://127.0.0.1:8009
