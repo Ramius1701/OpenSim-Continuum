@@ -8,7 +8,13 @@
       <option value="popular">Popular</option><option value="featured">Featured</option><option value="discover">Discover</option>
     </select>
     <select class="form-control mr-2" name="m">
-      <option value="">Any maturity</option><option value="general">General</option><option value="mature">Mature</option><option value="adult">Adult</option>
+      {IsAuthenticatedBegin}
+      <option value="">Any maturity</option>
+      {IsAuthenticatedEnd}
+      <option value="general">General</option>
+      {IsAuthenticatedBegin}
+      <option value="mature">Mature</option><option value="adult">Adult</option>
+      {IsAuthenticatedEnd}
     </select>
     <button class="btn btn-info" type="submit">Search</button>
   </form>

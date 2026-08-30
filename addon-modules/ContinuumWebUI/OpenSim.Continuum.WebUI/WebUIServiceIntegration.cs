@@ -158,7 +158,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "world.html") AddWorldMap(vars);
             if (key == "events/events.html") AddEvents(vars, parameters, currentUser);
             if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters, currentUser);
-            if (key == "destinations.html") AddDestinations(vars, parameters);
+            if (key == "destinations.html") AddDestinations(vars, parameters, currentUser);
             if (key == "online_users.html") AddOnlineUsers(vars);
             if (key == "user_search.html") AddUserSearch(vars, parameters, currentUser);
             if (key == "register.html") AddRegistration(vars);
@@ -935,13 +935,15 @@ namespace OpenSim.Continuum.WebUI
             vars["AO_checked"] = (maturityFlags & 64) != 0 ? "checked" : string.Empty;
         }
 
-        private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount currentUser)
         {
             string text = Value(parameters, "q").Trim();
             string tab = Value(parameters, "tab").Trim().ToLowerInvariant();
             if (tab is not ("popular" or "featured" or "discover")) tab = "popular";
             int.TryParse(Value(parameters, "cat"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int category);
-            int flags = MaturityFlags(Value(parameters, "m"));
+            string maturity = currentUser == null ? "general" : Value(parameters, "m");
+            int flags = MaturityFlags(maturity);
             string method = tab == "popular" && text.Length == 0 && category == 0 ? "dir_popular_query" : "dir_places_query";
             Hashtable response = Search(method, new Hashtable
             {
