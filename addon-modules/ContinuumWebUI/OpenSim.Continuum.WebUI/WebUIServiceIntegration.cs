@@ -723,15 +723,14 @@ namespace OpenSim.Continuum.WebUI
                     DirectoryLocation(Text(item, "globalposition", Text(item, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(item, "simname");
                     bool hasDate = TryEventDateUtc(item, item, out DateTime date);
-                    int.TryParse(Text(item, "eventflags"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int flags);
                     rows.Add(new Dictionary<string, object>
                     {
                         ["EventID"] = H(Text(item, "event_id")),
-                        ["EventDateUTC"] = hasDate ? date.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture) : H(Text(item, "date")),
+                        ["EventDateUTC"] = hasDate ? EventDisplayDate(date).ToString("yyyy-MM-dd HH:mm 'SLT'", CultureInfo.InvariantCulture) : H(Text(item, "date")),
                         ["SimName"] = H(simName), ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z),
                         ["Name"] = H(Text(item, "name")), ["Description"] = H(Text(item, "description")),
                         ["Category"] = H(EventCategoryName(Text(item, "category"))),
-                        ["Maturity"] = (flags & 0x04000000) != 0 ? "Adult" : (flags & 0x02000000) != 0 ? "Mature" : "General",
+                        ["Maturity"] = MaturityName(Text(item, "eventflags")),
                         ["Duration"] = H(Text(item, "duration")) + " minutes",
                         ["CoverCharge"] = Text(item, "covercharge") == "0" ? "Free" : H(Text(item, "coveramount"))
                     });
@@ -855,18 +854,19 @@ namespace OpenSim.Continuum.WebUI
                         detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
                     }
                     bool hasDate = TryEventDateUtc(detail, summary, out DateTime date);
+                    DateTime displayDate = hasDate ? EventDisplayDate(date) : default;
                     DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
                     {
                         ["EventDateTimeUTC"] = hasDate ? date.ToString("o", CultureInfo.InvariantCulture) : string.Empty,
-                        ["EventDateTime"] = hasDate ? date.Day.ToString(CultureInfo.InvariantCulture) : H(Text(summary, "date")),
-                        ["EventHourTime"] = hasDate ? date.ToString("MMM", CultureInfo.InvariantCulture) : string.Empty,
-                        ["EventMinuteTime"] = hasDate ? date.Year.ToString(CultureInfo.InvariantCulture) : string.Empty,
-                        ["EventTime"] = hasDate ? date.ToString("HH:mm 'UTC'", CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventDateTime"] = hasDate ? displayDate.Day.ToString(CultureInfo.InvariantCulture) : H(Text(summary, "date")),
+                        ["EventHourTime"] = hasDate ? displayDate.ToString("MMM", CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventMinuteTime"] = hasDate ? displayDate.Year.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventTime"] = hasDate ? displayDate.ToString("HH:mm 'SLT'", CultureInfo.InvariantCulture) : string.Empty,
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
                         ["Category"] = H(EventCategoryName(Text(detail, "category"))), ["CategoryImage"] = "static/icons/event.png",
-                        ["SimName"] = H(simName), ["Maturity"] = H(Text(detail, "eventflags")),
+                        ["SimName"] = H(simName), ["Maturity"] = MaturityName(Text(detail, "eventflags")),
                         ["CoverCharge"] = H(Text(detail, "coveramount")), ["DurationText"] = H(Text(detail, "duration")),
                         ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z)
                     });
@@ -1165,6 +1165,14 @@ namespace OpenSim.Continuum.WebUI
             value = Text(detail, "date", Text(summary, "date"));
             return DateTime.TryParse(value, CultureInfo.InvariantCulture,
                 DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out date);
+        }
+
+        private static DateTime EventDisplayDate(DateTime utc)
+        {
+            TimeZoneInfo zone;
+            try { zone = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles"); }
+            catch (TimeZoneNotFoundException) { zone = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time"); }
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utc, DateTimeKind.Utc), zone);
         }
 
         private void AddProfile(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
