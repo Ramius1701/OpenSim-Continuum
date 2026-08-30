@@ -875,7 +875,8 @@ namespace OpenSim.Continuum.WebUI
             vars["EventList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["EventsText"] = "Events"; vars["AddEventText"] = "Add event"; vars["SearchText"] = "Search";
             vars["CategoryType"] = SelectOptions(new[] { "All", "Discussion", "Sports", "Live Music", "Commercial",
-                "Nightlife/Entertainment", "Games/Contests", "Pageants", "Education", "Arts and Culture", "Miscellaneous" },
+                "Nightlife/Entertainment", "Games/Contests", "Pageants", "Education", "Arts and Culture",
+                "Charity/Support Groups", "Miscellaneous" },
                 Value(parameters, "category"));
             vars["TimeFrame"] = SelectOptions(new[] { "Today", "Tomorrow", "This week" }, Value(parameters, "timeframe"));
             vars["PG_checked"] = (maturityFlags & 0x01000000) != 0 ? "checked" : string.Empty;
@@ -887,7 +888,7 @@ namespace OpenSim.Continuum.WebUI
         {
             "discussion" => 18, "sports" => 19, "live music" => 20, "commercial" => 22,
             "nightlife/entertainment" => 23, "games/contests" => 24, "pageants" => 25,
-            "education" => 26, "arts and culture" => 27, "miscellaneous" => 28,
+            "education" => 26, "arts and culture" => 27, "charity/support groups" => 28, "miscellaneous" => 29,
             _ => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : 0
         };
 
@@ -895,7 +896,7 @@ namespace OpenSim.Continuum.WebUI
         {
             18 => "Discussion", 19 => "Sports", 20 => "Live Music", 22 => "Commercial",
             23 => "Nightlife/Entertainment", 24 => "Games/Contests", 25 => "Pageants", 26 => "Education",
-            27 => "Arts and Culture", 28 => "Miscellaneous", _ => "General"
+            27 => "Arts and Culture", 28 => "Charity/Support Groups", 29 => "Miscellaneous", _ => "General"
         };
 
         private void AddClassifieds(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
