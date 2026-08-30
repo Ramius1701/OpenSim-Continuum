@@ -774,16 +774,19 @@ namespace OpenSim.Continuum.WebUI
                 ? new List<UserAccount>()
                 : Safe(() => _accounts.GetUserAccounts(UUID.Zero, search)) ?? new List<UserAccount>();
             var rows = new List<Dictionary<string, object>>();
-            foreach (UserAccount account in accounts.Take(100))
+            bool administrator = IsAdmin(currentUser);
+            foreach (UserAccount account in accounts.Where(item => item.UserLevel >= 0 || administrator).Take(100))
             {
                 var profile = new UserProfileProperties { UserId = account.PrincipalID };
                 string result = string.Empty;
-                Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result));
+                bool profileFound = Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result)) ?? false;
+                bool showProfileImage = profileFound && (profile.PublishProfile || administrator
+                    || currentUser?.PrincipalID == account.PrincipalID);
                 rows.Add(new Dictionary<string, object>
                 {
                     ["UserID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName),
                     ["UserType"] = H(AccountType(account)),
-                    ["UserPictureURL"] = Texture(profile.ImageId, "static/icons/no_avatar.jpg")
+                    ["UserPictureURL"] = Texture(showProfileImage ? profile.ImageId : UUID.Zero, "static/icons/no_avatar.jpg")
                 });
             }
             vars["UsersList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
