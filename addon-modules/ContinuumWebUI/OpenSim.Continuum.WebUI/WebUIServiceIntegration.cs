@@ -134,7 +134,18 @@ namespace OpenSim.Continuum.WebUI
             if (key == "admin/user_manager.html") AddUserManager(vars, currentUser);
             if (key is "admin/user_edit.html" or "admin/user_password.html")
                 AddAdminUser(vars, currentUser, parameters);
-            if (key == "user/email.html" && currentUser != null) vars["UserEmail"] = H(currentUser.Email);
+            if (key == "user/email.html" && currentUser != null)
+            {
+                vars["UserEmail"] = H(currentUser.Email); vars["ChangeEmailText"] = "Change email";
+                vars["NewEmailText"] = "New email"; vars["NewEmailConfirmationText"] = "Confirm new email";
+                vars["CancelText"] = "Cancel";
+            }
+            if (key == "user/password.html")
+            {
+                vars["ChangePasswordText"] = "Change password"; vars["PasswordText"] = "Current password";
+                vars["NewPasswordText"] = "New password"; vars["NewPasswordConfirmationText"] = "Confirm new password";
+                vars["CancelText"] = "Cancel";
+            }
         }
 
         internal bool HandlePost(string page, IReadOnlyDictionary<string, string> form,

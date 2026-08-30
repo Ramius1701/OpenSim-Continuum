@@ -240,6 +240,8 @@ namespace OpenSim.Continuum.WebUI
                 Menu("register", "Sign up", "register.html"),
                 Menu("userhome", "Account", "userhome.html", false),
                 Menu("profile_edit", "Edit profile", "user/profile_edit.html", false),
+                Menu("user-email", "Change email", "user/email.html", false),
+                Menu("user-password", "Change password", "user/password.html", false),
                 Menu("friends", "Friends", "friends.html", false),
                 Menu("groups", "Groups", "groups.html", false),
                 Menu("user-region_manager", "My regions", "user/region_manager.html", false),
