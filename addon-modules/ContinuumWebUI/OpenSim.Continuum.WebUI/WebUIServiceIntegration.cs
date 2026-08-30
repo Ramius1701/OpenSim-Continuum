@@ -422,19 +422,14 @@ namespace OpenSim.Continuum.WebUI
 
             UserAccount owner = region.EstateOwner == UUID.Zero ? null
                 : Safe(() => _accounts.GetUserAccount(UUID.Zero, region.EstateOwner));
-            var residents = new List<Dictionary<string, object>>();
+            int residentsOnline = 0;
             if (_gridUsers != null)
             {
                 List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
-                foreach (UserAccount account in accounts.Take(10000))
-                {
-                    GridUserInfo info = Safe(() => _gridUsers.GetGridUserInfo(account.PrincipalID.ToString()));
-                    if (info?.Online != true || info.LastRegionID != region.RegionID) continue;
-                    residents.Add(new Dictionary<string, object>
-                    {
-                        ["UserUUID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName)
-                    });
-                }
+                string[] ids = accounts.Take(10000).Select(item => item.PrincipalID.ToString()).ToArray();
+                GridUserInfo[] users = ids.Length == 0 ? Array.Empty<GridUserInfo>()
+                    : Safe(() => _gridUsers.GetGridUserInfo(ids)) ?? Array.Empty<GridUserInfo>();
+                residentsOnline = users.Count(info => info?.Online == true && info.LastRegionID == region.RegionID);
             }
 
             vars["RegionID"] = region.RegionID.ToString(); vars["RegionName"] = H(region.RegionName);
@@ -446,9 +441,10 @@ namespace OpenSim.Continuum.WebUI
             vars["RegionTerrainText"] = "Terrain"; vars["RegionTerrain"] = "Standard";
             vars["RegionOnlineText"] = "Status"; vars["RegionOnline"] = "Online";
             vars["RegionWorldViewURL"] = Texture(region.TerrainImage, "static/icons/no_picture.jpg");
+            vars["HopUrl"] = Hop(region, new Vector3(128, 128, 50));
             vars["NumberOfParcelsInRegion"] = "Available in parcel view"; vars["ParcelsInRegionText"] = "Parcels";
             vars["NumberOfUsersInRegionText"] = "Residents currently in region";
-            vars["NumberOfUsersInRegion"] = residents.Count; vars["UsersInRegion"] = residents;
+            vars["NumberOfUsersInRegion"] = residentsOnline;
             vars["MenuParcelTitle"] = "Parcels"; vars["UserNameText"] = "Resident";
         }
 
@@ -645,10 +641,14 @@ namespace OpenSim.Continuum.WebUI
             if (_gridUsers != null)
             {
                 List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
-                foreach (UserAccount account in accounts.Take(10000))
+                Dictionary<UUID, UserAccount> accountsByID = accounts.Take(10000).ToDictionary(item => item.PrincipalID);
+                string[] ids = accountsByID.Keys.Select(id => id.ToString()).ToArray();
+                GridUserInfo[] users = ids.Length == 0 ? Array.Empty<GridUserInfo>()
+                    : Safe(() => _gridUsers.GetGridUserInfo(ids)) ?? Array.Empty<GridUserInfo>();
+                foreach (GridUserInfo info in users)
                 {
-                    GridUserInfo info = Safe(() => _gridUsers.GetGridUserInfo(account.PrincipalID.ToString()));
                     if (info == null || !info.Online) continue;
+                    if (!UUID.TryParse(info.UserID, out UUID userID) || !accountsByID.TryGetValue(userID, out UserAccount account)) continue;
                     GridRegion region = Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID));
                     rows.Add(new Dictionary<string, object>
                     {

@@ -23,8 +23,7 @@
     <div class="row">
       <div class="col-4">
         <div class="region_info_picture" style="height: 256px;">
-          <a class="regionslurl" title="{RegionNameText}: {RegionName}" 
-             href="hop://{MainServerURL}/{RegionName}/128/128/50">
+          <a class="regionslurl" title="{RegionNameText}: {RegionName}" href="{HopUrl}">
             <img title="{RegionNameText}: {RegionName}" src="{RegionWorldViewURL}" 
                  alt="{RegionNameText}: {RegionName}" height="256" />
           </a>
@@ -84,7 +83,7 @@
                 Y:&nbsp;{RegionLocY}
               </div>
               <div class="col-12 text-center">
-                <a href="hop://{RegionName}/128/128/50">
+                <a href="{HopUrl}">
                   <span class="regionlink">Teleport to {RegionName}</span>
                 </a>
               </div>
@@ -120,24 +119,8 @@
             {NumberOfUsersInRegion}
           </div>
         </div>
-
-        <div class="row">
-          <div class="col-3 text-right">
-            {UserNameText}:
-          </div>
-          <div class="col-9">
-            {UsersInRegionArrayBegin}
-            <div class="col-3">
-              <a class="agentlink"  href="#" onclick="loadmodalcontent('webprofile-modal_profile', 'userid={UserUUID}');">
-                <span class="agentlink">{UserName}</span>
-              </a>
-            </div>
-            {UsersInRegionArrayEnd}
-          </div>
-        </div>
       </div>
 
     </div>
 
   </div>
-
