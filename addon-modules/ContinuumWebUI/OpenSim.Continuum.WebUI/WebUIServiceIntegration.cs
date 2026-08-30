@@ -131,7 +131,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser));
-            if (key == "regionprofile/modal_profile.html") AddRegionProfile(vars, parameters);
+            if (key == "regionprofile/modal_profile.html") AddRegionProfile(vars, parameters, currentUser);
             if (key == "regionprofile/modal_parcels.html") AddRegionParcels(vars, parameters);
             if (key == "user/friends.html") AddFriends(vars, currentUser);
             if (key == "user/groups.html") AddGroups(vars, currentUser);
@@ -449,7 +449,8 @@ namespace OpenSim.Continuum.WebUI
             };
         }
 
-        private void AddRegionProfile(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        private void AddRegionProfile(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount viewer)
         {
             GridRegion region = UUID.TryParse(Value(parameters, "regionid"), out UUID regionID)
                 ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, regionID)) : null;
@@ -458,7 +459,8 @@ namespace OpenSim.Continuum.WebUI
             UserAccount owner = region.EstateOwner == UUID.Zero ? null
                 : Safe(() => _accounts.GetUserAccount(UUID.Zero, region.EstateOwner));
             int residentsOnline = 0;
-            if (_gridUsers != null)
+            bool showOccupancy = IsAdmin(viewer);
+            if (showOccupancy && _gridUsers != null)
             {
                 List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
                 string[] ids = accounts.Take(10000).Select(item => item.PrincipalID.ToString()).ToArray();
@@ -480,6 +482,7 @@ namespace OpenSim.Continuum.WebUI
             vars["NumberOfParcelsInRegion"] = "Available in parcel view"; vars["ParcelsInRegionText"] = "Parcels";
             vars["NumberOfUsersInRegionText"] = "Residents currently in region";
             vars["NumberOfUsersInRegion"] = residentsOnline;
+            vars["ShowOccupancy"] = showOccupancy;
             vars["MenuParcelTitle"] = "Parcels"; vars["UserNameText"] = "Resident";
         }
 
