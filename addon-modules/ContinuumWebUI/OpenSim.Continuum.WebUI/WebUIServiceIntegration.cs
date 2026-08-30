@@ -269,15 +269,8 @@ namespace OpenSim.Continuum.WebUI
             if (_accounts.GetUserAccount(UUID.Zero, first, last) != null) { message = "That avatar name is already registered"; return true; }
             try
             {
-                MethodInfo create = _accounts.GetType().GetMethod("CreateUser", new[] { typeof(UUID), typeof(UUID), typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) });
-                if (create == null) { message = "Account creation is unavailable on this service"; return true; }
-                var created = create.Invoke(_accounts, new object[] { UUID.Zero, UUID.Random(), first, last, password, email, string.Empty }) as UserAccount;
+                UserAccount created = CreateUser(first, last, password, email);
                 if (created == null) { message = "Account creation failed"; return true; }
-                if (_authenticationForPassword == null || !_authenticationForPassword.SetPassword(created.PrincipalID, password))
-                {
-                    message = "Account was created, but its password could not be stored; contact a grid administrator";
-                    return true;
-                }
                 if (_gridUsers != null && form.TryGetValue("UserHomeRegion", out string homeText) && UUID.TryParse(homeText, out UUID home))
                     _gridUsers.SetHome(created.PrincipalID.ToString(), home, new Vector3(128, 128, 25), new Vector3(0, 1, 0));
                 message = "Account created successfully";
@@ -293,6 +286,25 @@ namespace OpenSim.Continuum.WebUI
                 message = "Account creation failed; contact a grid administrator";
             }
             return true;
+        }
+
+        private UserAccount CreateUser(string first, string last, string password, string email)
+        {
+            Type serviceType = _accounts.GetType();
+            MethodInfo local = serviceType.GetMethod("CreateUser", new[] { typeof(UUID), typeof(UUID),
+                typeof(string), typeof(string), typeof(string), typeof(string), typeof(string) });
+            if (local != null)
+                return local.Invoke(_accounts, new object[] { UUID.Zero, UUID.Random(), first, last,
+                    password, email, string.Empty }) as UserAccount;
+
+            MethodInfo remote = serviceType.GetMethod("CreateUser", new[] { typeof(string), typeof(string),
+                typeof(string), typeof(string), typeof(UUID) });
+            if (remote != null)
+                return remote.Invoke(_accounts, new object[] { first, last, password, email, UUID.Zero }) as UserAccount;
+
+            Log.ErrorFormat("[CONTINUUM WEBUI]: Account service {0} does not expose an OpenSim CreateUser method",
+                serviceType.FullName);
+            return null;
         }
 
         private bool ChangePassword(IReadOnlyDictionary<string, string> form, UserAccount account, out string message)
