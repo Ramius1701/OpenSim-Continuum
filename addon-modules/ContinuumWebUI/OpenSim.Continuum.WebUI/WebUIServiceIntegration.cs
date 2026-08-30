@@ -672,7 +672,8 @@ namespace OpenSim.Continuum.WebUI
                     ["UserPictureURL"] = Texture(profile.ImageId, "static/icons/no_avatar.jpg")
                 });
             }
-            vars["UsersList"] = rows; vars["UserSearchText"] = "Resident search";
+            vars["UsersList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
+            vars["UserSearchText"] = "Resident search";
             vars["UserNameText"] = "Resident name"; vars["SearchForUserText"] = "Search for a resident";
             vars["SearchResultForUserText"] = "Search results"; vars["Search"] = "Search";
             vars["NoDetailsText"] = search.Length < 2 ? "Enter at least two characters" :
