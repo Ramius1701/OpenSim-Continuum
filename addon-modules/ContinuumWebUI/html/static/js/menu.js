@@ -98,6 +98,13 @@ function loadcontent(pageid, params=''){
 	}
 };
 
+// WhiteCore account and administration fragments use this legacy function
+// name. Continuum renders those fragments in the main shell, so keep one
+// navigation implementation and route the legacy calls through it.
+function loadusercontent(pageid, params=''){
+	loadcontent(pageid, params);
+};
+
 function loadmodalcontent(pageid, params='', title='', static=false){
 	if (params != '') {			// must have some parameters here
 		params = "?" + params;

@@ -312,7 +312,10 @@ namespace OpenSim.Continuum.WebUI
                 Menu("online_users", "Online users", "online_users.html", false),
                 Menu("admin-transactions", "Grid transactions", "admin/transactions.html", false),
                 Menu("admin-user_manager", "Resident administration", "admin/user_manager.html", false),
+                Menu("admin-user_edit", "Edit resident", "admin/user_edit.html", false),
+                Menu("admin-user_password", "Reset resident password", "admin/user_password.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),
+                Menu("admin-abuse_report", "Review abuse report", "admin/abuse_report.html", false),
                 Menu("logout", "Log out", "logout.html", false)
             };
             return new Dictionary<string, object>(StringComparer.Ordinal)

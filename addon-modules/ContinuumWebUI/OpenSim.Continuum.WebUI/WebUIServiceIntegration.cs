@@ -473,7 +473,7 @@ namespace OpenSim.Continuum.WebUI
                 rows.Add(new Dictionary<string, object>
                 {
                     ["UserID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName),
-                    ["UserDisplayName"] = string.Empty, ["UserType"] = H(AccountType(account)),
+                    ["UserDisplayName"] = H(account.DisplayName ?? string.Empty), ["UserType"] = H(AccountType(account)),
                     ["UserPictureURL"] = Texture(UUID.Zero, "static/icons/no_avatar.jpg"),
                     ["UserRegion"] = H(region?.RegionName ?? "Unknown"),
                     ["Position"] = H(info?.LastPosition.ToString() ?? string.Empty),
@@ -531,6 +531,7 @@ namespace OpenSim.Continuum.WebUI
         {
             message = "Administrator access required";
             if (!IsAdmin(admin) || !UUID.TryParse(Value(form, "userid"), out UUID id)) return true;
+            if (_authenticationForPassword == null) { message = "Password service is unavailable"; return true; }
             string password = Value(form, "passwordnew");
             if (password.Length < 8 || password.Length > 128 || password != Value(form, "passwordconf"))
             { message = "Passwords must match and contain at least eight characters"; return true; }
