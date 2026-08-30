@@ -1231,24 +1231,40 @@ namespace OpenSim.Continuum.WebUI
             var rows = new List<Dictionary<string, object>>();
             if (account != null && _friends != null)
             {
-                foreach (FriendInfo friend in Safe(() => _friends.GetFriends(account.PrincipalID)) ?? Array.Empty<FriendInfo>())
+                List<(FriendInfo Friend, UUID ID)> friendships = (Safe(() => _friends.GetFriends(account.PrincipalID))
+                    ?? Array.Empty<FriendInfo>()).Select(friend => (Friend: friend, ID: FriendID(friend.Friend)))
+                    .Where(item => item.ID != UUID.Zero).Take(1000).ToList();
+                List<string> friendIDs = friendships.Select(item => item.ID.ToString()).Distinct().ToList();
+                List<UserAccount> friendAccounts = friendIDs.Count == 0 ? new List<UserAccount>()
+                    : Safe(() => _accounts.GetUserAccounts(UUID.Zero, friendIDs)) ?? new List<UserAccount>();
+                Dictionary<UUID, UserAccount> accountsByID = friendAccounts.GroupBy(item => item.PrincipalID)
+                    .ToDictionary(group => group.Key, group => group.First());
+                string[] presenceIDs = friendships.Where(item => item.Friend.TheirFlags != -1
+                        && (item.Friend.TheirFlags & (int)FriendRights.CanSeeOnline) != 0)
+                    .Select(item => item.ID.ToString()).Distinct().ToArray();
+                GridUserInfo[] gridUsers = presenceIDs.Length == 0 || _gridUsers == null ? Array.Empty<GridUserInfo>()
+                    : Safe(() => _gridUsers.GetGridUserInfo(presenceIDs)) ?? Array.Empty<GridUserInfo>();
+                Dictionary<UUID, GridUserInfo> usersByID = gridUsers.Where(item => item != null
+                        && UUID.TryParse(item.UserID, out UUID id) && id != UUID.Zero)
+                    .GroupBy(item => UUID.Parse(item.UserID)).ToDictionary(group => group.Key, group => group.First());
+                var regionsByID = new Dictionary<UUID, GridRegion>();
+                foreach ((FriendInfo friend, UUID friendID) in friendships)
                 {
-                    string idText = friend.Friend;
-                    int semicolon = idText.IndexOf(';');
-                    if (semicolon >= 0) idText = idText.Substring(0, semicolon);
-                    if (!UUID.TryParse(idText, out UUID friendID)) continue;
-                    UserAccount friendAccount = Safe(() => _accounts.GetUserAccount(UUID.Zero, friendID));
+                    accountsByID.TryGetValue(friendID, out UserAccount friendAccount);
                     bool canSeeOnline = friend.TheirFlags != -1
                         && (friend.TheirFlags & (int)FriendRights.CanSeeOnline) != 0;
                     bool canSeeLocation = friend.TheirFlags != -1
                         && (friend.TheirFlags & (int)FriendRights.CanSeeOnMap) != 0;
-                    GridUserInfo info = canSeeOnline
-                        ? Safe(() => _gridUsers?.GetGridUserInfo(friendID.ToString()))
-                        : null;
+                    GridUserInfo info = canSeeOnline && usersByID.TryGetValue(friendID, out GridUserInfo foundInfo)
+                        ? foundInfo : null;
                     bool isOnline = info?.Online == true;
-                    GridRegion region = isOnline && canSeeLocation
-                        ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID))
-                        : null;
+                    GridRegion region = null;
+                    if (isOnline && canSeeLocation && info.LastRegionID != UUID.Zero
+                        && !regionsByID.TryGetValue(info.LastRegionID, out region))
+                    {
+                        region = Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID));
+                        regionsByID[info.LastRegionID] = region;
+                    }
                     rows.Add(new Dictionary<string, object>
                     {
                         ["FriendID"] = friendID.ToString(), ["FriendName"] = H(friendAccount?.FormattedName ?? friendID.ToString()),
