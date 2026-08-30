@@ -339,11 +339,24 @@ namespace OpenSim.Continuum.WebUI
         {
             if (!IsAdmin(admin)) return;
             List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
+            List<UserAccount> limitedAccounts = accounts.Take(10000).ToList();
+            string[] accountIDs = limitedAccounts.Select(account => account.PrincipalID.ToString()).ToArray();
+            GridUserInfo[] gridUsers = accountIDs.Length == 0 || _gridUsers == null ? Array.Empty<GridUserInfo>()
+                : Safe(() => _gridUsers.GetGridUserInfo(accountIDs)) ?? Array.Empty<GridUserInfo>();
+            var usersByID = new Dictionary<UUID, GridUserInfo>();
+            foreach (GridUserInfo info in gridUsers)
+                if (info != null && UUID.TryParse(info.UserID, out UUID userID)) usersByID[userID] = info;
+            var regionsByID = new Dictionary<UUID, GridRegion>();
             var rows = new List<Dictionary<string, object>>();
-            foreach (UserAccount account in accounts.Take(10000))
+            foreach (UserAccount account in limitedAccounts)
             {
-                GridUserInfo info = Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()));
-                GridRegion region = info == null ? null : Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID));
+                usersByID.TryGetValue(account.PrincipalID, out GridUserInfo info);
+                GridRegion region = null;
+                if (info != null && info.LastRegionID != UUID.Zero && !regionsByID.TryGetValue(info.LastRegionID, out region))
+                {
+                    region = Safe(() => _grid?.GetRegionByUUID(UUID.Zero, info.LastRegionID));
+                    regionsByID[info.LastRegionID] = region;
+                }
                 rows.Add(new Dictionary<string, object>
                 {
                     ["UserID"] = account.PrincipalID.ToString(), ["UserName"] = H(account.FormattedName),
@@ -511,9 +524,10 @@ namespace OpenSim.Continuum.WebUI
             if (!IsAdmin(administrator)) return;
             List<GridRegion> regions = Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new();
             List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
-            int online = 0;
-            foreach (UserAccount account in accounts.Take(10000))
-                if (Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()))?.Online == true) online++;
+            string[] accountIDs = accounts.Take(10000).Select(account => account.PrincipalID.ToString()).ToArray();
+            GridUserInfo[] gridUsers = accountIDs.Length == 0 || _gridUsers == null ? Array.Empty<GridUserInfo>()
+                : Safe(() => _gridUsers.GetGridUserInfo(accountIDs)) ?? Array.Empty<GridUserInfo>();
+            int online = gridUsers.Count(info => info?.Online == true);
 
             using System.Diagnostics.Process process = System.Diagnostics.Process.GetCurrentProcess();
             vars["StatisticsText"] = "Operational statistics";
