@@ -47,6 +47,12 @@ namespace OpenSim.Continuum.WebUI
         private readonly string _economyUrl;
         private readonly string _economySecret;
         private readonly int _rpcTimeoutMs;
+        private readonly TimeSpan _gridStatusCacheLifetime;
+        private readonly object _gridStatusLock = new();
+        private DateTime _gridStatusExpiresUtc;
+        private int _cachedRegionCount;
+        private int _cachedAccountCount;
+        private int _cachedOnlineCount;
 
         internal WebUIServiceIntegration(IConfigSource config, IConfig section, IUserAccountService accounts)
         {
@@ -67,6 +73,7 @@ namespace OpenSim.Continuum.WebUI
             _economyUrl = section.GetString("EconomyServiceURL", string.Empty).Trim();
             _economySecret = section.GetString("EconomySharedSecret", string.Empty);
             _rpcTimeoutMs = Math.Clamp(section.GetInt("ServiceTimeoutMilliseconds", 5000), 500, 30000);
+            _gridStatusCacheLifetime = TimeSpan.FromSeconds(Math.Clamp(section.GetInt("GridStatusCacheSeconds", 30), 5, 300));
             _grid = Load<IGridService>(config, section, "GridService", "OpenSim.Services.GridService.dll:GridService");
             _gridUsers = Load<IGridUserService>(config, section, "GridUserService", "OpenSim.Services.UserAccountService.dll:GridUserService");
             _friends = Load<IFriendsService>(config, section, "FriendsService", "OpenSim.Services.FriendsService.dll:FriendsService");
@@ -272,8 +279,16 @@ namespace OpenSim.Continuum.WebUI
                     _gridUsers.SetHome(created.PrincipalID.ToString(), home, new Vector3(128, 128, 25), new Vector3(0, 1, 0));
                 message = "Account created successfully";
             }
-            catch (TargetInvocationException e) { message = "Account creation failed: " + H(e.InnerException?.Message ?? e.Message); }
-            catch (Exception e) { message = "Account creation failed: " + H(e.Message); }
+            catch (TargetInvocationException e)
+            {
+                Log.WarnFormat("[CONTINUUM WEBUI]: Account creation failed: {0}", e.InnerException?.Message ?? e.Message);
+                message = "Account creation failed; contact a grid administrator";
+            }
+            catch (Exception e)
+            {
+                Log.WarnFormat("[CONTINUUM WEBUI]: Account creation failed: {0}", e.Message);
+                message = "Account creation failed; contact a grid administrator";
+            }
             return true;
         }
 
@@ -322,25 +337,41 @@ namespace OpenSim.Continuum.WebUI
 
         private void AddGridStatus(Dictionary<string, object> vars)
         {
-            List<GridRegion> regions = Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new();
-            List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
-            int online = 0;
-            if (_gridUsers != null && accounts.Count > 0)
+            int regionCount;
+            int accountCount;
+            int onlineCount;
+            lock (_gridStatusLock)
             {
-                string[] ids = accounts.Take(10000).Select(a => a.PrincipalID.ToString()).ToArray();
-                GridUserInfo[] infos = Safe(() => _gridUsers.GetGridUserInfo(ids));
-                online = infos?.Count(i => i != null && i.Online) ?? 0;
+                if (DateTime.UtcNow >= _gridStatusExpiresUtc)
+                {
+                    List<GridRegion> regions = Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new();
+                    List<UserAccount> accounts = Safe(() => _accounts.GetUserAccountsWhere(UUID.Zero, "1=1")) ?? new();
+                    int online = 0;
+                    if (_gridUsers != null && accounts.Count > 0)
+                    {
+                        string[] ids = accounts.Take(10000).Select(a => a.PrincipalID.ToString()).ToArray();
+                        GridUserInfo[] infos = Safe(() => _gridUsers.GetGridUserInfo(ids));
+                        online = infos?.Count(i => i != null && i.Online) ?? 0;
+                    }
+                    _cachedRegionCount = regions.Count;
+                    _cachedAccountCount = accounts.Count;
+                    _cachedOnlineCount = online;
+                    _gridStatusExpiresUtc = DateTime.UtcNow.Add(_gridStatusCacheLifetime);
+                }
+                regionCount = _cachedRegionCount;
+                accountCount = _cachedAccountCount;
+                onlineCount = _cachedOnlineCount;
             }
             vars["GridStatus"] = "status";
-            vars["GridOnline"] = regions.Count > 0 ? "Online" : "Offline";
+            vars["GridOnline"] = regionCount > 0 ? "Online" : "Offline";
             vars["TotalUserCount"] = "Residents";
-            vars["UserCount"] = accounts.Count;
+            vars["UserCount"] = accountCount;
             vars["TotalRegionCount"] = "Online regions";
-            vars["RegionCount"] = regions.Count;
+            vars["RegionCount"] = regionCount;
             vars["UniqueVisitors"] = "Registered residents";
-            vars["UniqueVisitorCount"] = accounts.Count;
+            vars["UniqueVisitorCount"] = accountCount;
             vars["OnlineNow"] = "Online now";
-            vars["OnlineNowCount"] = online;
+            vars["OnlineNowCount"] = onlineCount;
             vars["VoiceActiveLabel"] = "Voice";
             vars["VoiceActive"] = "Configured by grid";
             vars["CurrencyActiveLabel"] = "Currency";

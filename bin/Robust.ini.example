@@ -182,6 +182,8 @@
     ; EconomyServiceURL = http://127.0.0.1:8009
     ; EconomySharedSecret = CHANGE-THIS-TO-THE-CONTINUUM-ECONOMY-SECRET
     ServiceTimeoutMilliseconds = 5000
+    ; Cache public grid status totals briefly to avoid repeated full presence/account scans.
+    GridStatusCacheSeconds = 30
 
 ; * This is common for all services, it's the network setup for the entire
 ; * server instance, if none is specified above
