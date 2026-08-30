@@ -79,6 +79,18 @@ namespace OpenSim.Continuum.WebUI
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
 
+        internal bool IsExpectedOrigin(string origin, Uri requestUri)
+        {
+            if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri parsed)) return false;
+            if (SameAuthority(parsed, requestUri)) return true;
+            return Uri.TryCreate(_publicBase, UriKind.Absolute, out Uri publicUri)
+                && SameAuthority(parsed, publicUri);
+        }
+
+        private static bool SameAuthority(Uri left, Uri right) => right != null
+            && string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.Authority, right.Authority, StringComparison.OrdinalIgnoreCase);
+
         internal static bool IsSuccessfulMutation(string message) => message is
             "Account created successfully" or "Password updated" or "Email address updated"
             or "Abuse report updated" or "User account updated" or "Profile updated";

@@ -253,6 +253,11 @@ namespace OpenSim.Continuum.WebUI
             response.AddHeader("X-Content-Type-Options", "nosniff");
             response.AddHeader("Referrer-Policy", "same-origin");
             response.AddHeader("Content-Security-Policy", _integration.ContentSecurityPolicy);
+            if (templatedContent)
+            {
+                response.AddHeader("Cache-Control", "no-store");
+                response.AddHeader("Vary", "Cookie");
+            }
             response.RawBuffer = request.HttpMethod == "HEAD" ? Array.Empty<byte>() : content;
         }
 
@@ -620,7 +625,18 @@ namespace OpenSim.Continuum.WebUI
             DateTime now = DateTime.UtcNow;
             lock (_attemptsLock)
             {
-                if (_attempts.Count > 10000) _attempts.Clear();
+                if (!_attempts.ContainsKey(key) && _attempts.Count >= 10000)
+                {
+                    foreach (string existingKey in _attempts.Keys.ToArray())
+                    {
+                        Queue<DateTime> existing = _attempts[existingKey];
+                        TimeSpan retention = existingKey.StartsWith("register:", StringComparison.Ordinal)
+                            ? _registrationWindow : _loginWindow;
+                        while (existing.Count > 0 && now - existing.Peek() >= retention) existing.Dequeue();
+                        if (existing.Count == 0) _attempts.Remove(existingKey);
+                    }
+                    if (_attempts.Count >= 10000) return false;
+                }
                 if (!_attempts.TryGetValue(key, out Queue<DateTime> entries))
                     _attempts[key] = entries = new Queue<DateTime>();
                 while (entries.Count > 0 && now - entries.Peek() >= window) entries.Dequeue();
@@ -675,13 +691,11 @@ namespace OpenSim.Continuum.WebUI
             return values;
         }
 
-        private static bool IsSameOrigin(IOSHttpRequest request)
+        private bool IsSameOrigin(IOSHttpRequest request)
         {
             string origin = request.Headers["Origin"];
             if (string.IsNullOrWhiteSpace(origin)) return true;
-            return Uri.TryCreate(origin, UriKind.Absolute, out Uri parsed)
-                && string.Equals(parsed.Scheme, request.Url.Scheme, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(parsed.Authority, request.Url.Authority, StringComparison.OrdinalIgnoreCase);
+            return _integration.IsExpectedOrigin(origin, request.Url);
         }
 
         private static Dictionary<string, byte[]> LoadContent()
@@ -717,6 +731,8 @@ namespace OpenSim.Continuum.WebUI
         {
             response.StatusCode = (int)status;
             response.ContentType = "text/plain; charset=utf-8";
+            response.AddHeader("Cache-Control", "no-store");
+            response.AddHeader("X-Content-Type-Options", "nosniff");
             response.RawBuffer = Encoding.UTF8.GetBytes(message);
         }
 
@@ -725,6 +741,7 @@ namespace OpenSim.Continuum.WebUI
         {
             response.StatusCode = (int)status;
             response.ContentType = "text/plain; charset=utf-8";
+            response.AddHeader("Cache-Control", "no-store");
             response.AddHeader("X-Content-Type-Options", "nosniff");
             response.RawBuffer = Encoding.UTF8.GetBytes(message ?? string.Empty);
         }
