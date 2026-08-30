@@ -26,7 +26,6 @@ namespace OpenSim.Continuum.WebUI
     public sealed class ContinuumWebUIConnector : ServiceConnector
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(ContinuumWebUIConnector));
-
         public ContinuumWebUIConnector(IConfigSource config, IHttpServer server, string configName)
         {
             string sectionName = string.IsNullOrWhiteSpace(configName) ? "ContinuumWebUI" : configName;
@@ -71,6 +70,17 @@ namespace OpenSim.Continuum.WebUI
         private static readonly Assembly ThisAssembly = typeof(WhiteCoreSite).Assembly;
         private static readonly System.Lazy<Dictionary<string, byte[]>> Content = new(LoadContent, true);
         private static readonly Regex Token = new(@"\{[A-Za-z][A-Za-z0-9]*\}", RegexOptions.Compiled);
+        private static readonly HashSet<string> UnsupportedLegacyPages = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "forgot_pass.html", "classifieds/add_classified.html", "events/add_event.html",
+            "admin/estate_edit.html", "admin/factory_reset.html", "admin/gridsettings_manager.html",
+            "admin/news_add.html", "admin/news_edit.html", "admin/news_manager.html",
+            "admin/page_manager.html", "admin/purchases.html", "admin/region_edit.html",
+            "admin/settings_manager.html", "admin/sim_console.html", "admin/user_register.html",
+            "admin/welcomescreen_manager.html", "user/contact.html", "user/deleteaccount.html",
+            "user/edit_event.html", "user/estate_edit.html", "user/partnership.html",
+            "user/purchases.html", "user/region_edit.html", "user/update_user.html"
+        };
         private readonly string _mountPath;
         private readonly string _systemName;
         private readonly IUserAccountService _accounts;
@@ -126,6 +136,11 @@ namespace OpenSim.Continuum.WebUI
                 return;
             }
             relative = _integration.ResolvePage(relative);
+            if (UnsupportedLegacyPages.Contains(relative))
+            {
+                WriteError(response, HttpStatusCode.NotFound, "This legacy WhiteCore workflow is not available through OpenSim services");
+                return;
+            }
 
             if (request.HttpMethod == "POST" && relative == "login.html")
             {
