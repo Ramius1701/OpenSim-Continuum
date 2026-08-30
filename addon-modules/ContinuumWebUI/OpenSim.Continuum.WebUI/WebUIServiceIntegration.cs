@@ -156,8 +156,8 @@ namespace OpenSim.Continuum.WebUI
             if (key is "region_list.html" or "region_search.html")
                 AddRegions(vars, parameters.TryGetValue("regionname", out string name) ? name : string.Empty);
             if (key == "world.html") AddWorldMap(vars);
-            if (key == "events/events.html") AddEvents(vars, parameters);
-            if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters);
+            if (key == "events/events.html") AddEvents(vars, parameters, currentUser);
+            if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters, currentUser);
             if (key == "destinations.html") AddDestinations(vars, parameters);
             if (key == "online_users.html") AddOnlineUsers(vars);
             if (key == "user_search.html") AddUserSearch(vars, parameters, currentUser);
@@ -815,7 +815,8 @@ namespace OpenSim.Continuum.WebUI
             AddGroups(vars, account);
         }
 
-        private void AddEvents(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        private void AddEvents(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount currentUser)
         {
             string text = Value(parameters, "text");
             string categoryValue = Value(parameters, "category");
@@ -823,10 +824,13 @@ namespace OpenSim.Continuum.WebUI
             string timeframeValue = Value(parameters, "timeframe");
             string day = timeframeValue.Equals("Tomorrow", StringComparison.OrdinalIgnoreCase) ? "1" :
                 timeframeValue.Equals("This week", StringComparison.OrdinalIgnoreCase) ? "u" : "0";
-            int maturityFlags = parameters.Count == 0 ? 0x01000000 | 0x02000000 : 0;
+            bool maturitySpecified = parameters.ContainsKey("display_pg") || parameters.ContainsKey("display_ma")
+                || parameters.ContainsKey("display_ao");
+            int maturityFlags = !maturitySpecified ? 0x01000000 | (currentUser != null ? 0x02000000 : 0) : 0;
             if (parameters.ContainsKey("display_pg")) maturityFlags |= 0x01000000;
-            if (parameters.ContainsKey("display_ma")) maturityFlags |= 0x02000000;
-            if (parameters.ContainsKey("display_ao")) maturityFlags |= 0x04000000;
+            if (currentUser != null && parameters.ContainsKey("display_ma")) maturityFlags |= 0x02000000;
+            if (currentUser != null && parameters.ContainsKey("display_ao")) maturityFlags |= 0x04000000;
+            if (maturityFlags == 0) maturityFlags = 0x01000000;
             Hashtable response = Search("dir_events_query", new Hashtable
             {
                 ["text"] = day + "|" + category.ToString(CultureInfo.InvariantCulture) + "|" + text,
@@ -865,7 +869,9 @@ namespace OpenSim.Continuum.WebUI
             vars["EventsText"] = "Events"; vars["AddEventText"] = "Add event"; vars["SearchText"] = "Search";
             vars["CategoryType"] = SelectOptions(new[] { "All", "Discussion", "Sports", "Live Music", "Commercial" }, Value(parameters, "category"));
             vars["TimeFrame"] = SelectOptions(new[] { "Today", "Tomorrow", "This week" }, Value(parameters, "timeframe"));
-            vars["PG_checked"] = "checked"; vars["MA_checked"] = "checked"; vars["AO_checked"] = string.Empty;
+            vars["PG_checked"] = (maturityFlags & 0x01000000) != 0 ? "checked" : string.Empty;
+            vars["MA_checked"] = (maturityFlags & 0x02000000) != 0 ? "checked" : string.Empty;
+            vars["AO_checked"] = (maturityFlags & 0x04000000) != 0 ? "checked" : string.Empty;
         }
 
         private static int EventCategory(string value) => value.Trim().ToLowerInvariant() switch
@@ -879,11 +885,19 @@ namespace OpenSim.Continuum.WebUI
             18 => "Discussion", 19 => "Sports", 20 => "Live Music", 22 => "Commercial", _ => "General"
         };
 
-        private void AddClassifieds(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
+        private void AddClassifieds(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount currentUser)
         {
+            bool maturitySpecified = parameters.ContainsKey("display_pg") || parameters.ContainsKey("display_ma")
+                || parameters.ContainsKey("display_ao");
+            int maturityFlags = !maturitySpecified ? 5 | (currentUser != null ? 10 : 0) : 0;
+            if (parameters.ContainsKey("display_pg")) maturityFlags |= 5;
+            if (currentUser != null && parameters.ContainsKey("display_ma")) maturityFlags |= 10;
+            if (currentUser != null && parameters.ContainsKey("display_ao")) maturityFlags |= 64;
+            if (maturityFlags == 0) maturityFlags = 5;
             Hashtable response = Search("dir_classified_query", new Hashtable
             {
-                ["text"] = Value(parameters, "text"), ["flags"] = "0",
+                ["text"] = Value(parameters, "text"), ["flags"] = maturityFlags.ToString(CultureInfo.InvariantCulture),
                 ["category"] = Value(parameters, "category"), ["query_start"] = "0"
             });
             var rows = new List<Dictionary<string, object>>();
@@ -916,7 +930,9 @@ namespace OpenSim.Continuum.WebUI
             vars["ClassifiedList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["ClassifiedsText"] = "Classifieds"; vars["SearchText"] = "Search";
             vars["CategoryType"] = SelectOptions(new[] { "All", "Shopping", "Land rental", "Property rental", "Special attraction", "New products", "Employment", "Wanted", "Service", "Personal" }, Value(parameters, "category"));
-            vars["PG_checked"] = "checked"; vars["MA_checked"] = "checked"; vars["AO_checked"] = string.Empty;
+            vars["PG_checked"] = (maturityFlags & 5) != 0 ? "checked" : string.Empty;
+            vars["MA_checked"] = (maturityFlags & 10) != 0 ? "checked" : string.Empty;
+            vars["AO_checked"] = (maturityFlags & 64) != 0 ? "checked" : string.Empty;
         }
 
         private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters)
