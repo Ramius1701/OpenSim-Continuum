@@ -76,20 +76,26 @@ $(function(){
 });
 
 // embedded page content
+function continuumPageUrl(location, params=''){
+	var query = [];
+	params = (params || '').replace(/^[?&]+/, '');
+	var existing = (window.location.search || '').replace(/^\?/, '');
+	if (params !== '') query.push(params);
+	if (existing !== '') query.push(existing);
+	return location + (query.length ? '?' + query.join('&') : '');
+};
+
 function loadcontent(pageid, params=''){
 	var main_content = $("#main_content");
-	if (params!= '') {
-		params = "?" + params;
-	}
 	//load selected page
 	switch(pageid){
 		{MenuItemsArrayBegin}
 			case "{MenuItemID}":
-	    	main_content.load("{MenuItemLocation}" + params + window.location.search);
+			main_content.load(continuumPageUrl("{MenuItemLocation}", params));
 				break;
 			{ChildrenMenuItemsArrayBegin}
 			case "{ChildMenuItemID}":
-				main_content.load("{ChildMenuItemLocation}" + params + window.location.search);
+				main_content.load(continuumPageUrl("{ChildMenuItemLocation}", params));
 				break;
 			{ChildrenMenuItemsArrayEnd}
 		{MenuItemsArrayEnd}
@@ -106,10 +112,6 @@ function loadusercontent(pageid, params=''){
 };
 
 function loadmodalcontent(pageid, params='', title='', static=false){
-	if (params != '') {			// must have some parameters here
-		params = "?" + params;
-	}
-	
 	var modal_content = $("#modalcontent");
 	modal_content.html('');		// clear anything previously loaded
 
@@ -117,7 +119,7 @@ function loadmodalcontent(pageid, params='', title='', static=false){
 	switch(pageid){
 		{ModalItemsArrayBegin}
 			case "{MenuItemID}":
-		    modal_content.load("{MenuItemLocation}" + params + window.location.search);
+		    modal_content.load(continuumPageUrl("{MenuItemLocation}", params));
 				break;
 		{ModalItemsArrayEnd}
 		default:

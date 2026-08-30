@@ -11,7 +11,7 @@
 
     <div class="row w-100">
       <div class="col-md-3 text-center">
-        <div class="region_info_picture" style="heightx:256px;cursor:pointer;">
+        <div class="region_info_picture" style="height:256px;cursor:pointer;">
           <a class="regionslurl" href="{HopUrl}" title="{RegionName}">
             <img height="256" src="{ScreenshotURL}" alt="{RegionNameText}: {RegionName}" title="{RegionName}" />  
             <div class="text-left">
@@ -72,7 +72,7 @@
         <div class="row mb-1">
           <div class="col-3 text-right">{NotesText}</div>
           <div class="col-9"  style="height:auto;">
-            <textarea name="AbuseNoteText" style="min-height:140px;" cols="80" rows="5" id="AbuseNoteText" value="{Notes}">{Notes}</textarea>
+            <textarea name="AbuseNoteText" style="min-height:140px;" cols="80" rows="5" id="AbuseNoteText" maxlength="4096">{Notes}</textarea>
           </div>
         </div>
         
@@ -93,8 +93,8 @@
       <div class="row w-100 mt-3">
         <div class="col"></div>
         <div class="col-6 pull-right">
-          <button onclick="loadusercontent('abuse_manager');">{Cancel}</button>
-          <button class="btn-info pull-right" style="width:200px;" onclick="submitupdate('abuse_report_form', 'cardid={CardNumber}&update=true','abuse_manager');">
+          <button type="button" onclick="loadusercontent('abuse_manager');">{Cancel}</button>
+          <button type="button" class="btn-info pull-right" style="width:200px;" onclick="submitupdate('abuse_report_form', 'cardid={CardNumber}&update=true','abuse_manager');">
             {Submit}
           </button>
         </div>

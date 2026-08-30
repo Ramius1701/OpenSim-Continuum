@@ -363,7 +363,9 @@ namespace OpenSim.Continuum.WebUI
             if (!new[] { "Open", "Investigating", "Resolved", "Closed" }.Contains(status, StringComparer.OrdinalIgnoreCase))
                 status = "Open";
             string notes = Value(form, "AbuseNoteText");
-            if (notes.Length > 8192) notes = notes.Substring(0, 8192);
+            // The abuse service accepts at most 16 KiB of UTF-8 moderator notes.
+            // Four UTF-8 bytes per UTF-16 code unit is a conservative cross-provider bound.
+            if (notes.Length > 4096) notes = notes.Substring(0, 4096);
             message = _abuse.UpdateReport(id, status, notes, admin.PrincipalID, admin.Name) ? "Abuse report updated" : "Abuse report update failed";
             return true;
         }
