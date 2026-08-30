@@ -14,10 +14,11 @@
 
     </div>
     <div class="col-8">
-      <div class="row">
+      {IfUserStatusVisibleBegin}<div class="row">
         <div class="col"><p>{IsOnlineText}</p></div>
         <div class="col"><p>{IsOnline}</p></div>
-      </div>
+      </div>{IfUserStatusVisibleEnd}
+      {IfUserStatusHiddenBegin}<div class="row"><div class="col"><p>Online status</p></div><div class="col"><p>Not shared</p></div></div>{IfUserStatusHiddenEnd}
 
       {IfUserIsOnlineBegin}
       <div class="row">

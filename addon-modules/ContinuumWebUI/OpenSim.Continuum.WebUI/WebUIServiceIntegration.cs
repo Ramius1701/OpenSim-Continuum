@@ -111,7 +111,7 @@ namespace OpenSim.Continuum.WebUI
             if (key is "userhome.html" or "user/userhome.html") AddUserHome(vars, currentUser);
             if (key == "user/transactions.html") AddTransactions(vars, currentUser, parameters);
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
-                AddProfile(vars, AccountFromParameter(parameters, currentUser));
+                AddProfile(vars, AccountFromParameter(parameters, currentUser), currentUser);
             if (key == "user/profile_edit.html") AddEditableProfile(vars, currentUser);
             if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser));
             if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
@@ -976,14 +976,30 @@ namespace OpenSim.Continuum.WebUI
         private static string UnixDate(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds)
             ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime.ToString("d", CultureInfo.InvariantCulture) : H(value);
 
-        private void AddProfile(Dictionary<string, object> vars, UserAccount account)
+        private void AddProfile(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
         {
             if (account == null) return;
             var profile = new UserProfileProperties { UserId = account.PrincipalID };
             string result = string.Empty;
             bool found = Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result)) ?? false;
-            GridUserInfo gridUser = Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()));
-            GridRegion region = gridUser == null ? null : Safe(() => _grid?.GetRegionByUUID(UUID.Zero, gridUser.LastRegionID));
+            bool canSeeOnline = viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer));
+            bool canSeeLocation = canSeeOnline;
+            if (!canSeeOnline && viewer != null && _friends != null)
+            {
+                FriendInfo friendship = (Safe(() => _friends.GetFriends(viewer.PrincipalID)) ?? Array.Empty<FriendInfo>())
+                    .FirstOrDefault(friend => FriendID(friend.Friend) == account.PrincipalID);
+                canSeeOnline = friendship != null && friendship.TheirFlags != -1
+                    && (friendship.TheirFlags & (int)FriendRights.CanSeeOnline) != 0;
+                canSeeLocation = friendship != null && friendship.TheirFlags != -1
+                    && (friendship.TheirFlags & (int)FriendRights.CanSeeOnMap) != 0;
+            }
+            GridUserInfo gridUser = canSeeOnline
+                ? Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()))
+                : null;
+            bool isOnline = gridUser?.Online == true;
+            GridRegion region = isOnline && canSeeLocation
+                ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, gridUser.LastRegionID))
+                : null;
             UserAccount partner = found && profile.PartnerId != UUID.Zero ? Safe(() => _accounts.GetUserAccount(UUID.Zero, profile.PartnerId)) : null;
             vars["UserName"] = H(account.FormattedName);
             vars["UserType"] = H(AccountType(account));
@@ -991,8 +1007,10 @@ namespace OpenSim.Continuum.WebUI
             vars["UserPartner"] = H(partner?.FormattedName ?? "None");
             vars["UserAboutMe"] = H(found ? profile.AboutText : string.Empty);
             vars["UserPictureURL"] = Texture(found ? profile.ImageId : UUID.Zero, "static/icons/no_avatar.jpg");
-            vars["IsOnline"] = gridUser?.Online == true ? "Yes" : "No";
-            vars["UserIsOnline"] = gridUser?.Online == true;
+            vars["IsOnline"] = isOnline ? "Yes" : "No";
+            vars["UserStatusVisible"] = canSeeOnline;
+            vars["UserStatusHidden"] = !canSeeOnline;
+            vars["UserIsOnline"] = isOnline && canSeeLocation;
             vars["OnlineLocation"] = H(region?.RegionName ?? string.Empty);
             AddGroups(vars, account);
             if (vars.TryGetValue("Groups", out object value) && value is List<Dictionary<string, object>> groups)
@@ -1088,6 +1106,14 @@ namespace OpenSim.Continuum.WebUI
             vars["UserFriendsList"] = rows;
             vars["HaveData"] = rows.Count > 0;
             vars["NoData"] = rows.Count == 0;
+        }
+
+        private static UUID FriendID(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return UUID.Zero;
+            int semicolon = value.IndexOf(';');
+            if (semicolon >= 0) value = value.Substring(0, semicolon);
+            return UUID.TryParse(value, out UUID id) ? id : UUID.Zero;
         }
 
         private void AddGroups(Dictionary<string, object> vars, UserAccount account)
