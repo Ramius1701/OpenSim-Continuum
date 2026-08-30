@@ -324,6 +324,9 @@ namespace OpenSim.Continuum.WebUI
             var rows = regions.Select(RegionRow).ToList();
             vars["RegionList"] = rows;
             vars["RegionsList"] = rows;
+            vars["HaveData"] = rows.Count > 0;
+            vars["NoData"] = rows.Count == 0;
+            vars["RegionSearch"] = H(search);
             vars["NoDetailsText"] = rows.Count == 0 ? "No matching regions" : string.Empty;
             vars["CurrentPage"] = 1;
             vars["BackOne"] = 0;
