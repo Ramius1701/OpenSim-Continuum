@@ -171,7 +171,8 @@
     GroupsService = OpenSim.Addons.Groups.dll:GroupsService
     EstateDataService = OpenSim.Services.EstateService.dll:EstateDataService
     ; TextureURL = http://127.0.0.1:8002/assets
-    HopURLBase = hop://
+    ;; Viewer teleport URI prefix. Set this to the externally reachable grid login authority.
+    HopURLBase = hop://grid.example.org:8002
     ; PublicURL = http://127.0.0.1:8002
     ; MapServiceURL = http://127.0.0.1:8002
     ;; Existing ContinuumSearch XML-RPC endpoint used for directory, parcel,

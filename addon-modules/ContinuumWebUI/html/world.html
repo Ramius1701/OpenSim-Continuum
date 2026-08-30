@@ -15,8 +15,7 @@
     <label>{RegionText}</label>
     {RegionListArrayBegin}
       <div class="mapregion">
-        <a class="regionslurl"
-          onclick="document.location.href='hop://{MainServerURL}/{RegionName}/128/128/50'">
+        <a class="regionslurl" href="{HopUrl}">
           <img
             height="60"
             src="{RegionWorldViewURL}"
@@ -24,8 +23,6 @@
             title="Teleport to {RegionName}" />
           <label>{RegionName}</label>
             <!--{RegionLocX},{RegionLocY}-->
-          <br/>
-            {RegionInfo}
           <br/>
             {RegionStatus}
         </a>
@@ -67,4 +64,3 @@
     loadmap();
   });
 </script>
-

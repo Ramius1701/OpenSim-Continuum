@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.IO.Compression;
 using log4net;
@@ -188,6 +189,11 @@ namespace OpenSim.Continuum.WebUI
                 return;
             }
             Dictionary<string, string> parameters = RequestParameters(request);
+            if (relative.Equals("get-region-name-by-coords", StringComparison.OrdinalIgnoreCase))
+            {
+                HandleMapRegionLookup(response, parameters);
+                return;
+            }
             if (request.HttpMethod == "POST")
             {
                 if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
@@ -218,7 +224,8 @@ namespace OpenSim.Continuum.WebUI
             }
 
             if (relative.EndsWith(".html", StringComparison.OrdinalIgnoreCase)
-                || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase))
+                || relative.EndsWith("menu.js", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("map/mapapi.js", StringComparison.OrdinalIgnoreCase))
             {
                 try
                 {
@@ -300,6 +307,7 @@ namespace OpenSim.Continuum.WebUI
             {
                 ["SystemName"] = _systemName,
                 ["SystemURL"] = _mountPath + "/",
+                ["WorldMapAPIServiceURL"] = _mountPath,
                 ["MainServerURL"] = string.Empty,
                 ["WorldMapServiceURL"] = string.Empty,
                 ["MenuItems"] = menus,
@@ -554,6 +562,36 @@ namespace OpenSim.Continuum.WebUI
                 _authentication.Release(principal, token);
             response.AddHeader("Set-Cookie", "ContinuumWebUI=; Path=" + _mountPath + "; Max-Age=0; HttpOnly; SameSite=Lax");
             response.Redirect(_mountPath + "/", HttpStatusCode.SeeOther);
+        }
+
+        private void HandleMapRegionLookup(IOSHttpResponse response, IReadOnlyDictionary<string, string> parameters)
+        {
+            string callback = parameters.TryGetValue("var", out string requested) ? requested : "wcRegionName";
+            if (!Regex.IsMatch(callback, "^[A-Za-z_$][A-Za-z0-9_$]{0,63}$")
+                || !Int32.TryParse(parameters.TryGetValue("grid_x", out string x) ? x : string.Empty, out int gridX)
+                || !Int32.TryParse(parameters.TryGetValue("grid_y", out string y) ? y : string.Empty, out int gridY))
+            {
+                WriteError(response, HttpStatusCode.BadRequest, "Invalid map coordinates");
+                return;
+            }
+
+            OpenSim.Services.Interfaces.GridRegion region = _integration.GetMapRegion(gridX, gridY);
+            object payload = region == null
+                ? new { error = true }
+                : new
+                {
+                    error = false,
+                    regionName = region.RegionName,
+                    xloc = region.RegionCoordX,
+                    yloc = region.RegionCoordY,
+                    xsize = region.RegionSizeX,
+                    ysize = region.RegionSizeY
+                };
+            response.StatusCode = (int)HttpStatusCode.OK;
+            response.ContentType = "application/javascript; charset=utf-8";
+            response.AddHeader("Cache-Control", "no-store");
+            response.AddHeader("X-Content-Type-Options", "nosniff");
+            response.RawBuffer = Encoding.UTF8.GetBytes(callback + " = " + JsonSerializer.Serialize(payload) + ";");
         }
 
         private UserAccount GetAuthenticatedUser(IOSHttpRequest request)

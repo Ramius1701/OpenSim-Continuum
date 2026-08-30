@@ -46,10 +46,11 @@ $.namespace('$.wc.maps');
 $.wc.maps.config = {
     wc_base_url: "{MainServerURL}",
     tile_url: "{WorldMapServiceURL}",
+    hop_base: "{HopURLBase}",
     base_regionsize: "{WorldRegionSize}",
 
     // Default Destination Information
-    default_title: "Welcome to WhiteCore Sim",
+    default_title: "Welcome to OpenSim Continuum",
     default_img: "http://whitecore-sim.org/wiki/default/default-new.jpg",
     default_msg: "WhiteCore is a virtual space for meeting friends, doing business, and sharing knowledge. <strong>If you have a Second Life or alternative viewer installed on your computer<strong>, teleport in and start exploring!",
 
@@ -190,7 +191,10 @@ function WCMap(mapElement, mapOptions)
         }
     });
 
-    var tiles = new WCTileLayer($.wc.maps.config.tile_url + "/map-{z}-{region_x}-{region_y}-objects.jpg", {
+    // Build Leaflet's zoom placeholder at runtime so the WebUI template renderer
+    // does not consume it as a server-side scalar token.
+    var zoomToken = String.fromCharCode(123) + "z}";
+    var tiles = new WCTileLayer($.wc.maps.config.tile_url + "/map-" + zoomToken + "-{region_x}-{region_y}-objects.jpg", {
         crs: L.CRS.Simple,
         minZoom: MIN_ZOOM_LEVEL,
         maxZoom: MAX_ZOOM_LEVEL,
@@ -273,7 +277,7 @@ function gotoWCURL(x, y, lmap)
 
         var local_x = Math.round((x - int_x) * regionSize) + ((int_x - locx) * regionSize);
         var local_y = Math.round((y - int_y) * regionSize) + ((int_y - locy) * regionSize);
-        var url = "hop://" + $.wc.maps.config.wc_base_url + '/' + encodeURIComponent(wcRegionName.regionName) + "/" + local_x + "/" + local_y + "/50";
+        var url = $.wc.maps.config.hop_base + '/' + encodeURIComponent(wcRegionName.regionName) + "/" + local_x + "/" + local_y + "/50";
 
         var debugInfo = '';
         if (wcDebugMap) {

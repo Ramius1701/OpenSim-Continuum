@@ -52,7 +52,12 @@ namespace OpenSim.Continuum.WebUI
         {
             _accounts = accounts;
             _adminLevel = Math.Clamp(section.GetInt("AdminUserLevel", 200), 1, 255);
-            _hopBase = section.GetString("HopURLBase", "hop://").Trim();
+            string hopBase = section.GetString("HopURLBase", string.Empty).Trim();
+            if (!Uri.TryCreate(hopBase, UriKind.Absolute, out Uri hopURI)
+                || (hopURI.Scheme != "hop" && hopURI.Scheme != "secondlife")
+                || string.IsNullOrWhiteSpace(hopURI.Host))
+                throw new InvalidOperationException("ContinuumWebUI HopURLBase must be a hop:// or secondlife:// URI with the externally reachable grid authority");
+            _hopBase = hopBase.TrimEnd('/');
             _textureBase = section.GetString("TextureURL", string.Empty).TrimEnd('/');
             _publicBase = section.GetString("PublicURL", string.Empty).TrimEnd('/');
             _mapBase = section.GetString("MapServiceURL", _publicBase).TrimEnd('/');
@@ -73,6 +78,13 @@ namespace OpenSim.Continuum.WebUI
         }
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
+
+        internal GridRegion GetMapRegion(int gridX, int gridY)
+        {
+            if (_grid == null || gridX < 0 || gridY < 0 || gridX > 8_000_000 || gridY > 8_000_000)
+                return null;
+            return Safe(() => _grid.GetRegionByPosition(UUID.Zero, checked(gridX * 256), checked(gridY * 256)));
+        }
 
         internal string ResolvePage(string relative)
         {
@@ -98,6 +110,7 @@ namespace OpenSim.Continuum.WebUI
             AddCommonLabels(vars);
             vars["MainServerURL"] = _publicBase;
             vars["WorldMapServiceURL"] = _mapBase;
+            vars["HopURLBase"] = _hopBase;
             string key = page.ToLowerInvariant();
             if (key is "index.html" or "home.html" or "welcomescreen/index.html" or "welcomescreen/gridstatus.html")
                 AddGridStatus(vars);
