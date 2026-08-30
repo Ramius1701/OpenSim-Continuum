@@ -34,6 +34,12 @@ namespace ContinuumSearch.Service
             SearchRegion region = SnapshotCrawler.ParseRegion(document.DocumentElement);
             store.ReplaceRegion(region);
             store.ReplaceRegion(region); // repeat collection must be idempotent
+            Require(!SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("127.0.0.1"))
+                && !SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("10.0.0.1"))
+                && !SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("fc00::1"))
+                && !SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("::ffff:192.168.1.10"))
+                && SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("2001:4860:4860::8888")),
+                "snapshot public-address policy");
 
             ArrayList places = store.FindPlaces(Request("Welcome", 0x07000000));
             Require(places.Count == 1 && ((Hashtable)places[0])["name"].ToString() == "Continuum Plaza" &&

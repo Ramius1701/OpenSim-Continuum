@@ -89,6 +89,8 @@ namespace ContinuumSearch.Service
             bool success = false;
             try
             {
+                if (!ValidHost(host.Host))
+                    throw new InvalidDataException("Snapshot host no longer resolves to an allowed address");
                 Uri collector = new UriBuilder(Uri.UriSchemeHttp, host.Host, host.Port, "/") { Query = "method=collector" }.Uri;
                 using HttpResponseMessage response = await m_http.GetAsync(collector, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
@@ -157,14 +159,20 @@ namespace ContinuumSearch.Service
             }
             catch { return false; }
         }
-        private static bool IsPublic(IPAddress address)
+        internal static bool IsPublic(IPAddress address)
         {
+            if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
             if (IPAddress.IsLoopback(address)) return false;
             byte[] b = address.GetAddressBytes();
             if (address.AddressFamily == AddressFamily.InterNetwork)
-                return !(b[0] == 10 || b[0] == 127 || (b[0] == 169 && b[1] == 254) ||
-                    (b[0] == 172 && b[1] >= 16 && b[1] <= 31) || (b[0] == 192 && b[1] == 168));
-            return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.Equals(IPAddress.IPv6Loopback));
+                return !(b[0] == 0 || b[0] == 10 || b[0] == 127 || b[0] >= 224
+                    || (b[0] == 100 && b[1] >= 64 && b[1] <= 127)
+                    || (b[0] == 169 && b[1] == 254)
+                    || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                    || (b[0] == 192 && b[1] == 168));
+            return !(address.Equals(IPAddress.IPv6Any) || address.Equals(IPAddress.IPv6None)
+                || address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast
+                || (b.Length == 16 && (b[0] & 0xfe) == 0xfc));
         }
         private static string Node(XmlElement parent, string name) => parent?.SelectSingleNode(name)?.InnerText?.Trim() ?? String.Empty;
         private static string Required(XmlElement parent, string name) { string value = Node(parent, name); if (!Guid.TryParse(value, out Guid id) || id == Guid.Empty) throw new InvalidDataException(name + " UUID is invalid"); return value; }
