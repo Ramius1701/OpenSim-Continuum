@@ -380,9 +380,10 @@ namespace OpenSim.Continuum.WebUI
 
         private void AddRegions(Dictionary<string, object> vars, string search)
         {
+            search = Trimmed(search, 128);
             List<GridRegion> regions = string.IsNullOrWhiteSpace(search)
                 ? Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000))
-                : Safe(() => _grid?.GetRegionsByName(UUID.Zero, search.Trim(), 100));
+                : Safe(() => _grid?.GetRegionsByName(UUID.Zero, search, 100));
             regions ??= new List<GridRegion>();
             var rows = regions.Select(RegionRow).ToList();
             vars["RegionList"] = rows;
@@ -769,7 +770,7 @@ namespace OpenSim.Continuum.WebUI
         private void AddUserSearch(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
             UserAccount currentUser)
         {
-            string search = Value(parameters, "username").Trim();
+            string search = Trimmed(Value(parameters, "username"), 128);
             List<UserAccount> accounts = search.Length < 2
                 ? new List<UserAccount>()
                 : Safe(() => _accounts.GetUserAccounts(UUID.Zero, search)) ?? new List<UserAccount>();
@@ -821,7 +822,7 @@ namespace OpenSim.Continuum.WebUI
         private void AddEvents(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
             UserAccount currentUser)
         {
-            string text = Value(parameters, "text");
+            string text = Trimmed(Value(parameters, "text"), 128);
             string categoryValue = Value(parameters, "category");
             int category = EventCategory(categoryValue);
             string timeframeValue = Value(parameters, "timeframe");
@@ -900,7 +901,7 @@ namespace OpenSim.Continuum.WebUI
             if (maturityFlags == 0) maturityFlags = 5;
             Hashtable response = Search("dir_classified_query", new Hashtable
             {
-                ["text"] = Value(parameters, "text"), ["flags"] = maturityFlags.ToString(CultureInfo.InvariantCulture),
+                ["text"] = Trimmed(Value(parameters, "text"), 128), ["flags"] = maturityFlags.ToString(CultureInfo.InvariantCulture),
                 ["category"] = Value(parameters, "category"), ["query_start"] = "0"
             });
             var rows = new List<Dictionary<string, object>>();
@@ -941,8 +942,8 @@ namespace OpenSim.Continuum.WebUI
         private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
             UserAccount currentUser)
         {
-            string text = Value(parameters, "q").Trim();
-            string tab = Value(parameters, "tab").Trim().ToLowerInvariant();
+            string text = Trimmed(Value(parameters, "q"), 128);
+            string tab = Trimmed(Value(parameters, "tab"), 16).ToLowerInvariant();
             if (tab is not ("popular" or "featured" or "discover")) tab = "popular";
             int.TryParse(Value(parameters, "cat"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int category);
             string maturity = currentUser == null ? "general" : Value(parameters, "m");
@@ -1037,7 +1038,7 @@ namespace OpenSim.Continuum.WebUI
         private void AddAdminTransactions(Dictionary<string, object> vars, UserAccount administrator,
             IReadOnlyDictionary<string, string> parameters)
         {
-            string search = Value(parameters, "user_name").Trim();
+            string search = Trimmed(Value(parameters, "user_name"), 128);
             string normalized = search.Replace('.', ' ');
             int separator = normalized.IndexOf(' ');
             UserAccount account = IsAdmin(administrator) && separator > 0 && separator < normalized.Length - 1
@@ -1379,7 +1380,7 @@ namespace OpenSim.Continuum.WebUI
             Dictionary<UUID, bool> permissions = account == null || _experiences == null
                 ? new Dictionary<UUID, bool>()
                 : Safe(() => _experiences.FetchExperiencePermissions(account.PrincipalID)) ?? new Dictionary<UUID, bool>();
-            string search = parameters.TryGetValue("q", out string query) ? query.Trim() : string.Empty;
+            string search = parameters.TryGetValue("q", out string query) ? Trimmed(query, 128) : string.Empty;
             if (_experiences != null)
             {
                 if (!string.IsNullOrEmpty(search)) experiences = Safe(() => _experiences.FindExperiencesByName(search)) ?? Array.Empty<ExperienceInfo>();
@@ -1507,6 +1508,11 @@ namespace OpenSim.Continuum.WebUI
         private static string AccountType(UserAccount account) => account.UserLevel >= 200 ? "Administrator" : account.UserLevel < 0 ? "Disabled" : "Resident";
         private static string H(string value) => WebUtility.HtmlEncode(value ?? string.Empty);
         private static string Value(IReadOnlyDictionary<string, string> values, string key) => values.TryGetValue(key, out string value) ? value ?? string.Empty : string.Empty;
+        private static string Trimmed(string value, int maximum)
+        {
+            string result = (value ?? string.Empty).Trim();
+            return result.Length <= maximum ? result : result.Substring(0, maximum);
+        }
         private static bool ValidName(string value) => value.Length is >= 1 and <= 31 && Regex.IsMatch(value, "^[A-Za-z][A-Za-z0-9'-]*$");
         private static bool ValidEmail(string value) => value.Length is > 2 and <= 254
             && System.Net.Mail.MailAddress.TryCreate(value, out System.Net.Mail.MailAddress address)
