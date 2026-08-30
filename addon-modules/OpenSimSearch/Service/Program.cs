@@ -17,7 +17,7 @@ namespace ContinuumSearch.Service
             {
                 if (args.Length > 0 && args[0] == "self-test")
                 {
-                    if (args.Length == 2)
+                    if (args.Length >= 2 && !String.IsNullOrWhiteSpace(args[1]))
                         return SearchAcceptanceSuite.Run("SQLite", "Data Source=" + args[1] + ";Version=3;");
                     return SearchAcceptanceSuite.Run(
                         Environment.GetEnvironmentVariable("CONTINUUM_SEARCH_STORAGE_PROVIDER"),

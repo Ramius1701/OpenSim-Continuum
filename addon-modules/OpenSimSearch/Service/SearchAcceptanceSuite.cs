@@ -34,6 +34,16 @@ namespace ContinuumSearch.Service
             SearchRegion region = SnapshotCrawler.ParseRegion(document.DocumentElement);
             store.ReplaceRegion(region);
             store.ReplaceRegion(region); // repeat collection must be idempotent
+            XmlDocument hostileDocument = (XmlDocument)document.Clone();
+            hostileDocument.SelectSingleNode("/region/info/name").InnerText = new String('R', 300);
+            hostileDocument.SelectSingleNode("/region/data/parcel/infouuid").InnerText = "not-a-uuid";
+            hostileDocument.SelectSingleNode("/region/data/parcel/description").InnerText = new String('D', 20000);
+            hostileDocument.SelectSingleNode("/region/data/parcel/area").InnerText = "-1";
+            hostileDocument.SelectSingleNode("/region/data/parcel/dwell").InnerText = "NaN";
+            SearchRegion normalized = SnapshotCrawler.ParseRegion(hostileDocument.DocumentElement);
+            Require(normalized.Name.Length == 255 && normalized.Parcels[0].InfoID == normalized.Parcels[0].ID
+                && normalized.Parcels[0].Description.Length == 16000 && normalized.Parcels[0].Area == 0
+                && normalized.Parcels[0].Dwell == 0, "snapshot field normalization");
             Require(!SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("127.0.0.1"))
                 && !SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("10.0.0.1"))
                 && !SnapshotCrawler.IsPublic(System.Net.IPAddress.Parse("fc00::1"))

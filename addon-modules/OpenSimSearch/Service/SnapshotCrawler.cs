@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -105,7 +106,9 @@ namespace ContinuumSearch.Service
                 document.Load(reader);
                 if (Int32.TryParse(Node(document.DocumentElement, "expire"), out int requested))
                     interval = Math.Clamp(requested, 60, 86400);
-                foreach (XmlElement region in document.SelectNodes("/regiondata/region").OfType<XmlElement>())
+                List<XmlElement> regions = document.SelectNodes("/regiondata/region").OfType<XmlElement>().ToList();
+                if (regions.Count > 4096) throw new InvalidDataException("Snapshot contains too many regions");
+                foreach (XmlElement region in regions)
                     m_store.ReplaceRegion(ParseRegion(region));
                 success = true;
             }
@@ -119,32 +122,39 @@ namespace ContinuumSearch.Service
             XmlElement data = element.SelectSingleNode("data") as XmlElement ?? throw new InvalidDataException("Region data is missing");
             SearchRegion region = new()
             {
-                ID = Required(info, "uuid"), Name = Node(info, "name"), Handle = Node(info, "handle"), Url = Node(info, "url"),
+                ID = Required(info, "uuid"), Name = Limited(Node(info, "name"), 255),
+                Handle = Limited(Node(info, "handle"), 32), Url = Limited(Node(info, "url"), 1024),
                 Maturity = Maturity(element.GetAttribute("category"))
             };
             XmlElement estate = data.SelectSingleNode("estate") as XmlElement;
-            region.OwnerID = Node(estate, "uuid"); region.OwnerName = Node(estate, "name");
-            int parentEstate = Integer(Node(estate, "id"));
+            region.OwnerID = OptionalUuid(Node(estate, "uuid")); region.OwnerName = Limited(Node(estate, "name"), 255);
+            int parentEstate = NonNegativeInteger(Node(estate, "id"));
 
-            foreach (XmlElement item in data.SelectNodes("parcel").OfType<XmlElement>())
+            List<XmlElement> parcels = data.SelectNodes("parcel").OfType<XmlElement>().ToList();
+            if (parcels.Count > 8192) throw new InvalidDataException("Region snapshot contains too many parcels");
+            foreach (XmlElement item in parcels)
             {
                 SearchParcel parcel = new()
                 {
-                    ID = Required(item, "uuid"), InfoID = Node(item, "infouuid"), Name = Node(item, "name"),
-                    Description = Node(item, "description"), Landing = Node(item, "location"), SnapshotID = Node(item, "image"),
-                    Category = Integer(item.GetAttribute("category")), Area = Integer(Node(item, "area")),
-                    SalePrice = Integer(item.GetAttribute("salesprice")), ParentEstate = parentEstate,
-                    Dwell = Real(Node(item, "dwell")),
+                    ID = Required(item, "uuid"), InfoID = OptionalUuid(Node(item, "infouuid")),
+                    Name = Limited(Node(item, "name"), 255), Description = Limited(Node(item, "description"), 16000),
+                    Landing = Limited(Node(item, "location"), 255), SnapshotID = OptionalUuid(Node(item, "image")),
+                    Category = NonNegativeInteger(item.GetAttribute("category")), Area = NonNegativeInteger(Node(item, "area")),
+                    SalePrice = NonNegativeInteger(item.GetAttribute("salesprice")), ParentEstate = parentEstate,
+                    Dwell = NonNegativeReal(Node(item, "dwell")),
                     ForSale = Boolean(item.GetAttribute("forsale")), ShowInSearch = Boolean(item.GetAttribute("showinsearch"))
                 };
                 if (String.IsNullOrEmpty(parcel.InfoID)) parcel.InfoID = parcel.ID;
                 region.Parcels.Add(parcel);
             }
-            foreach (XmlElement item in data.SelectNodes("object").OfType<XmlElement>())
+            List<XmlElement> objects = data.SelectNodes("object").OfType<XmlElement>().ToList();
+            if (objects.Count > 50000) throw new InvalidDataException("Region snapshot contains too many objects");
+            foreach (XmlElement item in objects)
                 region.Objects.Add(new SearchObject
                 {
-                    ID = Required(item, "uuid"), ParcelID = Node(item, "parceluuid"), Name = Node(item, "title"),
-                    Description = Node(item, "description"), Location = Node(item, "location")
+                    ID = Required(item, "uuid"), ParcelID = OptionalUuid(Node(item, "parceluuid")),
+                    Name = Limited(Node(item, "title"), 255), Description = Limited(Node(item, "description"), 16000),
+                    Location = Limited(Node(item, "location"), 255)
                 });
             return region;
         }
@@ -175,9 +185,11 @@ namespace ContinuumSearch.Service
                 || (b.Length == 16 && (b[0] & 0xfe) == 0xfc));
         }
         private static string Node(XmlElement parent, string name) => parent?.SelectSingleNode(name)?.InnerText?.Trim() ?? String.Empty;
-        private static string Required(XmlElement parent, string name) { string value = Node(parent, name); if (!Guid.TryParse(value, out Guid id) || id == Guid.Empty) throw new InvalidDataException(name + " UUID is invalid"); return value; }
-        private static int Integer(string value) => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : 0;
-        private static double Real(string value) => Double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) ? parsed : 0;
+        private static string Required(XmlElement parent, string name) { string value = Node(parent, name); if (!Guid.TryParse(value, out Guid id) || id == Guid.Empty) throw new InvalidDataException(name + " UUID is invalid"); return id.ToString(); }
+        private static string OptionalUuid(string value) => Guid.TryParse(value, out Guid id) ? id.ToString() : String.Empty;
+        private static string Limited(string value, int maximum) => value.Length <= maximum ? value : value.Substring(0, maximum);
+        private static int NonNegativeInteger(string value) => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? Math.Max(0, parsed) : 0;
+        private static double NonNegativeReal(string value) => Double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) && Double.IsFinite(parsed) ? Math.Max(0, parsed) : 0;
         private static bool Boolean(string value) => bool.TryParse(value, out bool parsed) && parsed;
         private static int Maturity(string value) => value.Equals("Adult", StringComparison.OrdinalIgnoreCase) ? 2 : value.Equals("Mature", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         public void Dispose() { Stop(); m_timer.Dispose(); m_http.Dispose(); }
