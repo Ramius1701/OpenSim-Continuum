@@ -929,8 +929,12 @@ namespace OpenSim.Continuum.WebUI
             {
                 foreach (Hashtable summary in data.OfType<Hashtable>().Take(100))
                 {
-                    Hashtable detailsResponse = Search("parcel_info_query", new Hashtable { ["parcel_id"] = Text(summary, "parcel_id") });
-                    Hashtable detail = (detailsResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault();
+                    Hashtable detail = summary;
+                    if (!detail.ContainsKey("region_name") || !detail.ContainsKey("description"))
+                    {
+                        Hashtable detailsResponse = Search("parcel_info_query", new Hashtable { ["parcel_id"] = Text(summary, "parcel_id") });
+                        detail = (detailsResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault();
+                    }
                     if (detail == null) continue;
                     string regionName = Text(detail, "region_name");
                     ParseLanding(Text(detail, "landing_point"), out int x, out int y, out int z);

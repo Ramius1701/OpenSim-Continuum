@@ -135,52 +135,48 @@ namespace ContinuumSearch.Service
             int flags = Number(request, "flags");
             int category = Number(request, "category");
             int offset = Offset(request);
-            string where = "show_in_search=1 AND (LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))";
+            string where = "p.show_in_search=1 AND (LOWER(p.name) LIKE LOWER(@search) OR LOWER(p.description) LIKE LOWER(@search))";
             List<(string, object)> args = new() { ("@search", search) };
-            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category)); }
-            where += MaturityWhere(flags, args);
-            string order = (flags & 1024) != 0 ? "dwell DESC,name" : "name";
-            return Query("SELECT info_id,name,for_sale,dwell FROM continuum_search_parcels WHERE " + where +
-                " ORDER BY " + order + " LIMIT 101 OFFSET @offset", args, ("@offset", offset), reader => new Hashtable
-                {
-                    ["parcel_id"] = Value(reader, 0), ["name"] = Value(reader, 1),
-                    ["for_sale"] = Bool(reader, 2), ["auction"] = false, ["dwell"] = Double(reader, 3)
-                });
+            if (category > 0) { where += " AND p.category=@category"; args.Add(("@category", category)); }
+            where += MaturityWhere(flags, args, "p.maturity");
+            string order = (flags & 1024) != 0 ? "p.dwell DESC,p.name" : "p.name";
+            return Query(ParcelDetailSelect + " WHERE " + where + " ORDER BY " + order +
+                " LIMIT 101 OFFSET @offset", args, ("@offset", offset), ParcelDetail);
         }
 
         internal ArrayList FindPopular(Hashtable request)
         {
             int flags = Number(request, "flags");
             List<(string, object)> args = new();
-            string where = "show_in_search=1" + MaturityWhere(flags, args);
-            return Query("SELECT info_id,name,dwell FROM continuum_search_parcels WHERE " + where +
-                " ORDER BY dwell DESC,name LIMIT 101", args, null, reader => new Hashtable
-                {
-                    ["parcel_id"] = Value(reader, 0), ["name"] = Value(reader, 1), ["dwell"] = Double(reader, 2)
-                });
+            string where = "p.show_in_search=1" + MaturityWhere(flags, args, "p.maturity");
+            return Query(ParcelDetailSelect + " WHERE " + where +
+                " ORDER BY p.dwell DESC,p.name LIMIT 101", args, null, ParcelDetail);
         }
 
         internal ArrayList GetParcel(Hashtable request)
         {
             string id = Text(request, "parcel_id").Trim();
             if (!Guid.TryParse(id, out Guid parsed) || parsed == Guid.Empty) return new ArrayList();
-            return Query(
-                "SELECT p.info_id,p.parcel_id,p.name,p.description,p.category,p.landing,p.area,p.sale_price," +
-                "p.for_sale,p.dwell,p.maturity,p.snapshot_id,r.region_id,r.name,r.region_handle " +
-                "FROM continuum_search_parcels p JOIN continuum_search_regions r ON r.region_id=p.region_id " +
-                "WHERE p.info_id=@id AND p.show_in_search=1 LIMIT 1",
-                new List<(string, object)> { ("@id", parsed.ToString()) }, null, reader => new Hashtable
-                {
-                    ["parcel_id"] = Value(reader, 0), ["parcel_uuid"] = Value(reader, 1),
-                    ["name"] = Value(reader, 2), ["description"] = Value(reader, 3),
-                    ["category"] = Int(reader, 4), ["landing_point"] = Value(reader, 5),
-                    ["area"] = Int(reader, 6), ["sale_price"] = Int(reader, 7),
-                    ["for_sale"] = Bool(reader, 8), ["dwell"] = Double(reader, 9),
-                    ["maturity"] = Int(reader, 10), ["snapshot_id"] = Value(reader, 11),
-                    ["region_id"] = Value(reader, 12), ["region_name"] = Value(reader, 13),
-                    ["region_handle"] = Value(reader, 14)
-                });
+            return Query(ParcelDetailSelect + " WHERE p.info_id=@id AND p.show_in_search=1 LIMIT 1",
+                new List<(string, object)> { ("@id", parsed.ToString()) }, null, ParcelDetail);
         }
+
+        private const string ParcelDetailSelect =
+            "SELECT p.info_id,p.parcel_id,p.name,p.description,p.category,p.landing,p.area,p.sale_price," +
+            "p.for_sale,p.dwell,p.maturity,p.snapshot_id,r.region_id,r.name,r.region_handle " +
+            "FROM continuum_search_parcels p JOIN continuum_search_regions r ON r.region_id=p.region_id";
+
+        private static Hashtable ParcelDetail(DbDataReader reader) => new()
+        {
+            ["parcel_id"] = Value(reader, 0), ["parcel_uuid"] = Value(reader, 1),
+            ["name"] = Value(reader, 2), ["description"] = Value(reader, 3),
+            ["category"] = Int(reader, 4), ["landing_point"] = Value(reader, 5),
+            ["area"] = Int(reader, 6), ["sale_price"] = Int(reader, 7),
+            ["for_sale"] = Bool(reader, 8), ["auction"] = false, ["dwell"] = Double(reader, 9),
+            ["maturity"] = Int(reader, 10), ["snapshot_id"] = Value(reader, 11),
+            ["region_id"] = Value(reader, 12), ["region_name"] = Value(reader, 13),
+            ["region_handle"] = Value(reader, 14)
+        };
 
         internal ArrayList GetRegionParcels(Hashtable request)
         {
@@ -410,7 +406,7 @@ namespace ContinuumSearch.Service
             return rows;
         }
 
-        private string MaturityWhere(int flags, List<(string, object)> args)
+        private string MaturityWhere(int flags, List<(string, object)> args, string column = "maturity")
         {
             List<int> levels = new();
             if ((flags & 0x01000000) != 0) levels.Add(0);
@@ -419,7 +415,7 @@ namespace ContinuumSearch.Service
             if (levels.Count == 0) return String.Empty;
             string[] parameters = new string[levels.Count];
             for (int i = 0; i < levels.Count; ++i) { parameters[i] = "@maturity" + i; args.Add((parameters[i], levels[i])); }
-            return " AND maturity IN (" + String.Join(',', parameters) + ")";
+            return " AND " + column + " IN (" + String.Join(',', parameters) + ")";
         }
 
         private string EventMaturityWhere(int flags, List<(string, object)> args)

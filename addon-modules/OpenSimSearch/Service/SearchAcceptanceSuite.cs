@@ -36,9 +36,13 @@ namespace ContinuumSearch.Service
             store.ReplaceRegion(region); // repeat collection must be idempotent
 
             ArrayList places = store.FindPlaces(Request("Welcome", 0x07000000));
-            Require(places.Count == 1 && ((Hashtable)places[0])["name"].ToString() == "Continuum Plaza", "places query");
+            Require(places.Count == 1 && ((Hashtable)places[0])["name"].ToString() == "Continuum Plaza" &&
+                ((Hashtable)places[0])["region_name"].ToString() == "Welcome Test" &&
+                ((Hashtable)places[0])["description"].ToString() == "Welcome shopping and events",
+                "enriched places query");
             ArrayList popular = store.FindPopular(Request(String.Empty, 0x07000000));
-            Require(popular.Count == 1, "popular query");
+            Require(popular.Count == 1 && ((Hashtable)popular[0])["region_name"].ToString() == "Welcome Test",
+                "enriched popular query");
             ArrayList parcel = store.GetParcel(new Hashtable { ["parcel_id"] = "44444444-4444-4444-4444-444444444444" });
             Require(parcel.Count == 1 && ((Hashtable)parcel[0])["region_name"].ToString() == "Welcome Test" &&
                 ((Hashtable)parcel[0])["snapshot_id"].ToString() == "55555555-5555-5555-5555-555555555555",
