@@ -686,13 +686,16 @@ namespace OpenSim.Continuum.WebUI
             if (account == null) return;
             GridUserInfo gridUser = Safe(() => _gridUsers?.GetGridUserInfo(account.PrincipalID.ToString()));
             GridRegion home = gridUser == null ? null : Safe(() => _grid?.GetRegionByUUID(UUID.Zero, gridUser.HomeRegionID));
+            var profile = new UserProfileProperties { UserId = account.PrincipalID };
+            string profileResult = string.Empty;
+            bool profileFound = Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref profileResult)) ?? false;
             vars["UserName"] = H(account.FormattedName);
             vars["UserType"] = H(AccountType(account));
             vars["AccountType"] = "Account type";
             vars["UserHomeRegion"] = H(home?.RegionName ?? "Not set");
             vars["UserLastLogin"] = gridUser?.Login.ToString("u", CultureInfo.InvariantCulture) ?? "Unknown";
             vars["UserBorn"] = DateTimeOffset.FromUnixTimeSeconds(account.Created).UtcDateTime.ToString("d", CultureInfo.InvariantCulture);
-            vars["UserPictureURL"] = Texture(UUID.Zero, "static/icons/no_avatar.jpg");
+            vars["UserPictureURL"] = Texture(profileFound ? profile.ImageId : UUID.Zero, "static/icons/no_avatar.jpg");
             Hashtable statement = EconomyStatement(account.PrincipalID, null, 1);
             vars["UserBalance"] = statement != null && statement.ContainsKey("balance") ? statement["balance"] : "Unavailable";
             AddGroups(vars, account);
