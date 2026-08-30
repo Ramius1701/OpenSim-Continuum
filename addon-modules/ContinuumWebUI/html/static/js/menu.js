@@ -18,6 +18,11 @@ $(function(){
 				}); */
 
 				break;
+				{ChildrenMenuItemsArrayBegin}
+			case "{ChildMenuItemID}":
+				main_content.load("{ChildMenuItemLocation}" + window.location.search, hideLoading);
+				break;
+				{ChildrenMenuItemsArrayEnd}
 				{MenuItemsArrayEnd}
 			default:
 				// hide loading bar if there is no selected section
@@ -42,6 +47,11 @@ $(function(){
 				}); */
 
 				break;
+				{ChildrenMenuItemsArrayBegin}
+			case "{ChildMenuItemID}":
+				main_content.load("{ChildMenuItemLocation}" + window.location.search, hideLoading);
+				break;
+				{ChildrenMenuItemsArrayEnd}
 				{MenuItemsArrayEnd}
 			default:
 				//hide loading bar if there is no selected section
@@ -77,6 +87,11 @@ function loadcontent(pageid, params=''){
 			case "{MenuItemID}":
 	    	main_content.load("{MenuItemLocation}" + params + window.location.search);
 				break;
+			{ChildrenMenuItemsArrayBegin}
+			case "{ChildMenuItemID}":
+				main_content.load("{ChildMenuItemLocation}" + params + window.location.search);
+				break;
+			{ChildrenMenuItemsArrayEnd}
 		{MenuItemsArrayEnd}
 		default:
 			break;

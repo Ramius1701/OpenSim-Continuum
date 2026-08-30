@@ -246,6 +246,8 @@ namespace OpenSim.Continuum.WebUI
 
         private Dictionary<string, object> DefaultVariables(UserAccount currentUser)
         {
+            bool authenticated = currentUser != null;
+            bool administrator = _integration.IsAdmin(currentUser);
             var menus = new List<Dictionary<string, object>>
             {
                 Menu("home", "Home", "home.html"),
@@ -256,6 +258,22 @@ namespace OpenSim.Continuum.WebUI
                 Menu("experiences", "Experiences", "experiences.html"),
                 Menu("user_search", "Residents", "user_search.html"),
                 Menu("region_search", "Regions", "region_search.html"),
+                MenuGroup("account-tools", "Account", "userhome.html", authenticated, new[]
+                {
+                    Child("userhome", "Dashboard", "userhome.html"), Child("profile_edit", "Edit profile", "user/profile_edit.html"),
+                    Child("user-email", "Change email", "user/email.html"), Child("user-password", "Change password", "user/password.html"),
+                    Child("friends", "Friends", "friends.html"), Child("groups", "Groups", "groups.html"),
+                    Child("user-region_manager", "My regions", "user/region_manager.html"), Child("user-estate_manager", "My estates", "user/estate_manager.html"),
+                    Child("user-classifieds", "My classifieds", "user/classifieds.html"), Child("user-events", "My events", "user/events.html"),
+                    Child("user-transactions", "My transactions", "user/transactions.html")
+                }),
+                MenuGroup("administration", "Administration", "admin/statistics.html", administrator, new[]
+                {
+                    Child("admin-statistics", "Grid statistics", "admin/statistics.html"), Child("online_users", "Online users", "online_users.html"),
+                    Child("admin-region_manager", "Grid regions", "admin/region_manager.html"), Child("admin-estate_manager", "Grid estates", "admin/estate_manager.html"),
+                    Child("admin-transactions", "Grid transactions", "admin/transactions.html"), Child("admin-user_manager", "Resident administration", "admin/user_manager.html"),
+                    Child("abuse_manager", "Abuse reports", "abuse_manager.html")
+                }),
                 Menu("login", "Log in", "login.html"),
                 Menu("register", "Sign up", "register.html"),
                 Menu("userhome", "Account", "userhome.html", false),
@@ -331,6 +349,22 @@ namespace OpenSim.Continuum.WebUI
             ["HasChildren"] = false,
             ["HasNoChildren"] = true,
             ["ChildrenMenuItems"] = new List<Dictionary<string, object>>()
+        };
+
+        private static Dictionary<string, object> MenuGroup(string id, string title, string location, bool show,
+            IEnumerable<Dictionary<string, object>> children) => new()
+        {
+            ["MenuItemID"] = id, ["MenuItemTitle"] = title, ["MenuItemTitleHelp"] = title,
+            ["MenuItemLocation"] = location, ["ShowInMenu"] = show,
+            ["HasChildren"] = true, ["HasNoChildren"] = false,
+            ["ChildrenMenuItems"] = children.ToList()
+        };
+
+        private static Dictionary<string, object> Child(string id, string title, string location) => new()
+        {
+            ["ChildMenuItemID"] = id, ["ChildMenuItemTitle"] = title,
+            ["ChildMenuItemTitleHelp"] = title, ["ChildMenuItemLocation"] = location,
+            ["ChildShowInMenu"] = true
         };
 
         private List<Dictionary<string, object>> GalleryImages()
