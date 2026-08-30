@@ -27,8 +27,8 @@ MoreInfoText     More Info
     <tbody>
       {UsersOnlineListArrayBegin}
         <tr>
-          <td class="online_users_left"><a target="_blank" class='agentinfo' href="webprofile/?userid={UserID}">{UserName}</a></td>
-          <td class="online_users_right"><a target="_blank" class='regioninfo' href="regionprofile/?regionid={UserRegionID}">{UserRegion}</a></td>
+          <td class="online_users_left"><a href="#" onclick="loadmodalcontent('webprofile-modal_profile', 'userid={UserID}'); return false;">{UserName}</a></td>
+          <td class="online_users_right"><a href="#" onclick="loadmodalcontent('regionprofile-modal_profile', 'regionid={UserRegionID}'); return false;">{UserRegion}</a></td>
         </tr>
       {UsersOnlineListArrayEnd}
 
@@ -42,6 +42,5 @@ MoreInfoText     More Info
       "order": [[ 0, "asc" ]]
     });
 
-    $(".agentinfo, .regioninfo").colorbox({iframe:true, width:"990px", height:"440px"});
   });
 </script>

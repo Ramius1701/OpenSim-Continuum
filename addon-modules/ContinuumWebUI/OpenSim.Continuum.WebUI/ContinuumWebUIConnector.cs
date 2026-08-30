@@ -247,7 +247,7 @@ namespace OpenSim.Continuum.WebUI
             response.ContentType = MimeType(relative);
             response.AddHeader("X-Content-Type-Options", "nosniff");
             response.AddHeader("Referrer-Policy", "same-origin");
-            response.AddHeader("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-ancestors 'self'");
+            response.AddHeader("Content-Security-Policy", _integration.ContentSecurityPolicy);
             response.RawBuffer = request.HttpMethod == "HEAD" ? Array.Empty<byte>() : content;
         }
 

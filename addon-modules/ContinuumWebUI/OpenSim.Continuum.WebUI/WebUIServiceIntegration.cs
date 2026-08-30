@@ -79,6 +79,21 @@ namespace OpenSim.Continuum.WebUI
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
 
+        internal string ContentSecurityPolicy
+        {
+            get
+            {
+                var imageSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "'self'", "data:" };
+                foreach (string source in new[] { _textureBase, _mapBase })
+                    if (Uri.TryCreate(source, UriKind.Absolute, out Uri uri)
+                        && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                        imageSources.Add(uri.GetLeftPart(UriPartial.Authority));
+                return "default-src 'self'; img-src " + string.Join(' ', imageSources)
+                    + "; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; "
+                    + "connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
+            }
+        }
+
         internal GridRegion GetMapRegion(int gridX, int gridY)
         {
             if (_grid == null || gridX < 0 || gridY < 0 || gridX > 8_000_000 || gridY > 8_000_000)
