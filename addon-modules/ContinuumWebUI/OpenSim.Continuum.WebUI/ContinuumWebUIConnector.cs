@@ -82,7 +82,7 @@ namespace OpenSim.Continuum.WebUI
             "admin/estate_edit.html", "admin/factory_reset.html", "admin/gridsettings_manager.html",
             "admin/news_add.html", "admin/news_edit.html", "admin/news_manager.html",
             "admin/page_manager.html", "admin/purchases.html", "admin/region_edit.html",
-            "admin/settings_manager.html", "admin/sim_console.html", "admin/user_register.html",
+            "admin/settings_manager.html", "admin/sim_console.html",
             "admin/welcomescreen_manager.html", "user/contact.html", "user/deleteaccount.html",
             "user/edit_event.html", "user/estate_edit.html", "user/partnership.html",
             "user/purchases.html", "user/region_edit.html", "user/update_user.html"
