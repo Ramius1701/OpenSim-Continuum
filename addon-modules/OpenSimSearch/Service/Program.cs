@@ -34,6 +34,8 @@ namespace ContinuumSearch.Service
                     database.GetString("StorageProvider", String.Empty),
                     database.GetString("ConnectionString", String.Empty));
                 store.EnsureSchema();
+                if (!store.HasClassifiedsTable())
+                    Console.Error.WriteLine("ContinuumSearch warning: the configured database does not contain the profile classifieds table; classified search is unavailable.");
 
                 MainConsole.Instance = new LocalConsole("ContinuumSearch ");
                 uint port = checked((uint)service.GetInt("Port", 8010));
@@ -93,7 +95,11 @@ namespace ContinuumSearch.Service
         private XmlRpcResponse ClassifiedInfo(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.GetClassified(Args(request)));
         private XmlRpcResponse Health(XmlRpcRequest request, IPEndPoint remote) => Reply(new ArrayList
         {
-            new Hashtable { ["service"] = "ContinuumSearch.Service", ["provider"] = m_store.Provider }
+            new Hashtable
+            {
+                ["service"] = "ContinuumSearch.Service", ["provider"] = m_store.Provider,
+                ["classifiedsAvailable"] = m_store.HasClassifiedsTable()
+            }
         });
 
         private static Hashtable Args(XmlRpcRequest request) =>

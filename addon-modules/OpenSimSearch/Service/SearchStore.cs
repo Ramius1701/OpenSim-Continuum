@@ -128,6 +128,18 @@ namespace ContinuumSearch.Service
                 e.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase)) { }
         }
 
+        internal bool HasClassifiedsTable()
+        {
+            try
+            {
+                using DbConnection connection = OpenConnection();
+                using DbCommand command = Command(connection, "SELECT 1 FROM classifieds WHERE 1=0");
+                command.ExecuteScalar();
+                return true;
+            }
+            catch (DbException) { return false; }
+        }
+
         internal ArrayList FindPlaces(Hashtable request)
         {
             string search = SearchPattern(Text(request, "text"));
