@@ -654,9 +654,7 @@ namespace OpenSim.Continuum.WebUI
                     {
                         ["UserName"] = H(account.FormattedName), ["UserID"] = account.PrincipalID.ToString(),
                         ["UserRegion"] = H(region?.RegionName ?? "Unknown"),
-                        ["UserRegionID"] = info.LastRegionID.ToString(),
-                        ["UserLocation"] = H(info.LastPosition.ToString()),
-                        ["HopUrl"] = region == null ? string.Empty : Hop(region, info.LastPosition)
+                        ["UserRegionID"] = info.LastRegionID.ToString()
                     });
                 }
             }

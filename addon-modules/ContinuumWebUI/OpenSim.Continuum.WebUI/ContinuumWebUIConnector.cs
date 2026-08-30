@@ -164,7 +164,9 @@ namespace OpenSim.Continuum.WebUI
                 WriteError(response, HttpStatusCode.Unauthorized, "Authentication required");
                 return;
             }
-            if (relative.StartsWith("admin/", StringComparison.OrdinalIgnoreCase) && !_integration.IsAdmin(currentUser))
+            bool administratorPage = relative.StartsWith("admin/", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("online_users.html", StringComparison.OrdinalIgnoreCase);
+            if (administratorPage && !_integration.IsAdmin(currentUser))
             {
                 WriteError(response, HttpStatusCode.Forbidden, "Administrator access required");
                 return;
@@ -233,7 +235,6 @@ namespace OpenSim.Continuum.WebUI
                 Menu("events", "Events", "events.html"),
                 Menu("classifieds", "Classifieds", "classifieds.html"),
                 Menu("experiences", "Experiences", "experiences.html"),
-                Menu("online_users", "Online users", "online_users.html"),
                 Menu("user_search", "Residents", "user_search.html"),
                 Menu("region_search", "Regions", "region_search.html"),
                 Menu("login", "Log in", "login.html"),
@@ -252,6 +253,7 @@ namespace OpenSim.Continuum.WebUI
                 Menu("admin-region_manager", "Grid regions", "admin/region_manager.html", false),
                 Menu("admin-estate_manager", "Grid estates", "admin/estate_manager.html", false),
                 Menu("admin-statistics", "Grid statistics", "admin/statistics.html", false),
+                Menu("online_users", "Online users", "online_users.html", false),
                 Menu("admin-transactions", "Grid transactions", "admin/transactions.html", false),
                 Menu("admin-user_manager", "Resident administration", "admin/user_manager.html", false),
                 Menu("abuse_manager", "Abuse reports", "abuse_manager.html", false),

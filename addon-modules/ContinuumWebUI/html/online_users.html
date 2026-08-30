@@ -14,13 +14,13 @@ MoreInfoText     More Info
 
 <div id="fullPage">
   <h2>{SystemName}: {OnlineUsersText}</h2>
+  <p>This operational view is restricted to grid administrators.</p>
 
   <table id="online_users_list">
     <thead class="listhead">
       <tr>
         <th class="online_users_left"><p>{UserNameText}</p></th>
         <th class="online_users_right"><p>{RegionNameText}</p></th>
-        <th class="online_users_left" style="padding-left:10px;"><p>{OnlineLocationText}</p></th>
       </tr>
     </thead>
 
@@ -29,7 +29,6 @@ MoreInfoText     More Info
         <tr>
           <td class="online_users_left"><a target="_blank" class='agentinfo' href="webprofile/?userid={UserID}">{UserName}</a></td>
           <td class="online_users_right"><a target="_blank" class='regioninfo' href="regionprofile/?regionid={UserRegionID}">{UserRegion}</a></td>
-          <td class="online_users_left" style="padding-left:10px;">{UserLocation}</a></td>
         </tr>
       {UsersOnlineListArrayEnd}
 
