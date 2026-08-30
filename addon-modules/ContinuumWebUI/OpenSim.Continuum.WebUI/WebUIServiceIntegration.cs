@@ -1042,12 +1042,22 @@ namespace OpenSim.Continuum.WebUI
                 DateTimeStyles.AssumeLocal, out DateTime parsedEnd) ? parsedEnd.ToUniversalTime().AddDays(1) : null;
             Hashtable statement = EconomyStatement(account.PrincipalID, before, 500);
             if (statement?["history"] is not ArrayList history) return rows;
-            foreach (Hashtable item in history.OfType<Hashtable>())
+            List<Hashtable> visibleHistory = history.OfType<Hashtable>().Where(item =>
             {
-                if (start.HasValue && DateTime.TryParse(Text(item, "createdUtc"), CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal, out DateTime created) && created.ToUniversalTime() < start.Value) continue;
+                return !start.HasValue || !DateTime.TryParse(Text(item, "createdUtc"), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal, out DateTime created) || created.ToUniversalTime() >= start.Value;
+            }).ToList();
+            List<string> counterpartyIDs = visibleHistory.Select(item => Text(item, "counterpartyID"))
+                .Where(value => UUID.TryParse(value, out UUID id) && id != UUID.Zero)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            List<UserAccount> counterparties = counterpartyIDs.Count == 0 ? new List<UserAccount>()
+                : Safe(() => _accounts.GetUserAccounts(UUID.Zero, counterpartyIDs)) ?? new List<UserAccount>();
+            Dictionary<UUID, UserAccount> accountsByID = counterparties.GroupBy(item => item.PrincipalID)
+                .ToDictionary(group => group.Key, group => group.First());
+            foreach (Hashtable item in visibleHistory)
+            {
                 UUID.TryParse(Text(item, "counterpartyID"), out UUID counterpartyID);
-                UserAccount counterparty = counterpartyID == UUID.Zero ? null : Safe(() => _accounts.GetUserAccount(UUID.Zero, counterpartyID));
+                accountsByID.TryGetValue(counterpartyID, out UserAccount counterparty);
                 long.TryParse(Text(item, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount);
                 rows.Add(new Dictionary<string, object>
                 {
