@@ -1,5 +1,10 @@
 <!-- Modal user profile data-->
 
+{IfProfileHiddenBegin}
+<div class="modal-body"><p>This resident has not published a web profile.</p></div>
+{IfProfileHiddenEnd}
+{IfProfileVisibleBegin}
+
 
   <div class="modal-header" style="color:#8cbdf3;">
     <h2 class="modal-title">{UserName}</h2>
@@ -101,3 +106,4 @@
     </div>
 
   </div>
+{IfProfileVisibleEnd}

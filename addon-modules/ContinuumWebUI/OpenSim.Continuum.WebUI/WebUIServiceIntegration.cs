@@ -128,9 +128,9 @@ namespace OpenSim.Continuum.WebUI
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
                 AddProfile(vars, AccountFromParameter(parameters, currentUser), currentUser);
             if (key == "user/profile_edit.html") AddEditableProfile(vars, currentUser);
-            if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser));
-            if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser));
-            if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser));
+            if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser), currentUser);
+            if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser), currentUser);
+            if (key == "webprofile/modal_groups.html") AddPublicGroups(vars, AccountFromParameter(parameters, currentUser), currentUser);
             if (key == "regionprofile/modal_profile.html") AddRegionProfile(vars, parameters, currentUser);
             if (key == "regionprofile/modal_parcels.html") AddRegionParcels(vars, parameters);
             if (key == "user/friends.html") AddFriends(vars, currentUser);
@@ -1021,7 +1021,12 @@ namespace OpenSim.Continuum.WebUI
             var profile = new UserProfileProperties { UserId = account.PrincipalID };
             string result = string.Empty;
             bool found = Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result)) ?? false;
-            bool canSeeOnline = viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer));
+            bool canViewProfile = viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer))
+                || !found || profile.PublishProfile;
+            vars["ProfileVisible"] = canViewProfile;
+            vars["ProfileHidden"] = !canViewProfile;
+            bool canSeeOnline = canViewProfile && viewer != null
+                && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer));
             bool canSeeLocation = canSeeOnline;
             if (!canSeeOnline && viewer != null && _friends != null)
             {
@@ -1039,19 +1044,20 @@ namespace OpenSim.Continuum.WebUI
             GridRegion region = isOnline && canSeeLocation
                 ? Safe(() => _grid?.GetRegionByUUID(UUID.Zero, gridUser.LastRegionID))
                 : null;
-            UserAccount partner = found && profile.PartnerId != UUID.Zero ? Safe(() => _accounts.GetUserAccount(UUID.Zero, profile.PartnerId)) : null;
+            UserAccount partner = canViewProfile && found && profile.PartnerId != UUID.Zero
+                ? Safe(() => _accounts.GetUserAccount(UUID.Zero, profile.PartnerId)) : null;
             vars["UserName"] = H(account.FormattedName);
             vars["UserType"] = H(AccountType(account));
             vars["UserBorn"] = DateTimeOffset.FromUnixTimeSeconds(account.Created).UtcDateTime.ToString("d", CultureInfo.InvariantCulture);
             vars["UserPartner"] = H(partner?.FormattedName ?? "None");
-            vars["UserAboutMe"] = H(found ? profile.AboutText : string.Empty);
-            vars["UserPictureURL"] = Texture(found ? profile.ImageId : UUID.Zero, "static/icons/no_avatar.jpg");
+            vars["UserAboutMe"] = H(canViewProfile && found ? profile.AboutText : string.Empty);
+            vars["UserPictureURL"] = Texture(canViewProfile && found ? profile.ImageId : UUID.Zero, "static/icons/no_avatar.jpg");
             vars["IsOnline"] = isOnline ? "Yes" : "No";
             vars["UserStatusVisible"] = canSeeOnline;
             vars["UserStatusHidden"] = !canSeeOnline;
             vars["UserIsOnline"] = isOnline && canSeeLocation;
             vars["OnlineLocation"] = H(region?.RegionName ?? string.Empty);
-            AddGroups(vars, account);
+            AddGroups(vars, canViewProfile ? account : null);
             if (vars.TryGetValue("Groups", out object value) && value is List<Dictionary<string, object>> groups)
             {
                 groups.RemoveAll(group => !String.Equals(group["GroupProfileListed"]?.ToString(), "Yes", StringComparison.Ordinal));
@@ -1179,9 +1185,10 @@ namespace OpenSim.Continuum.WebUI
             vars["GroupsJoined"] = rows.Count;
         }
 
-        private void AddPublicGroups(Dictionary<string, object> vars, UserAccount account)
+        private void AddPublicGroups(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
         {
-            AddGroups(vars, account);
+            bool visible = CanViewPublishedProfile(account, viewer);
+            AddGroups(vars, visible ? account : null);
             if (vars.TryGetValue("Groups", out object value) && value is List<Dictionary<string, object>> rows)
             {
                 rows.RemoveAll(row => !String.Equals(row["GroupProfileListed"]?.ToString(), "Yes", StringComparison.Ordinal));
@@ -1192,10 +1199,11 @@ namespace OpenSim.Continuum.WebUI
             if (account != null) { vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString(); }
         }
 
-        private void AddPicks(Dictionary<string, object> vars, UserAccount account)
+        private void AddPicks(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
         {
             var rows = new List<Dictionary<string, object>>();
-            if (account != null && _profiles != null && Safe(() => _profiles.AvatarPicksRequest(account.PrincipalID)) is OSDArray picks)
+            if (CanViewPublishedProfile(account, viewer) && account != null && _profiles != null
+                && Safe(() => _profiles.AvatarPicksRequest(account.PrincipalID)) is OSDArray picks)
             {
                 foreach (OSD value in picks.Take(100))
                 {
@@ -1221,9 +1229,9 @@ namespace OpenSim.Continuum.WebUI
             }
         }
 
-        private void AddOwnedRegions(Dictionary<string, object> vars, UserAccount account)
+        private void AddOwnedRegions(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
         {
-            List<GridRegion> regions = account == null ? new() :
+            List<GridRegion> regions = account == null || !CanViewPublishedProfile(account, viewer) ? new() :
                 (Safe(() => _grid?.GetOnlineRegions(UUID.Zero, 0, 0, 10000)) ?? new())
                     .Where(region => region.EstateOwner == account.PrincipalID).ToList();
             var rows = regions.Select(region =>
@@ -1234,6 +1242,17 @@ namespace OpenSim.Continuum.WebUI
             }).ToList();
             vars["RegionList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             if (account != null) { vars["UserName"] = H(account.FormattedName); vars["UserID"] = account.PrincipalID.ToString(); }
+        }
+
+        private bool CanViewPublishedProfile(UserAccount account, UserAccount viewer)
+        {
+            if (account == null) return false;
+            if (viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer))) return true;
+            if (_profiles == null) return true;
+            var profile = new UserProfileProperties { UserId = account.PrincipalID };
+            string result = string.Empty;
+            bool found = Safe(() => _profiles.AvatarPropertiesRequest(ref profile, ref result));
+            return !found || profile.PublishProfile;
         }
 
         private string PickHop(UserProfilePick pick)

@@ -1,5 +1,10 @@
 <!-- User Profile -->
 
+{IfProfileHiddenBegin}
+<div class="container"><p>This resident has not published a web profile.</p></div>
+{IfProfileHiddenEnd}
+{IfProfileVisibleBegin}
+
 <div class="container">
   <div class="row justify-content-center">
     <h2>{UserProfileFor} {UserName}</h2>
@@ -88,3 +93,4 @@
     });
   });
 </script>
+{IfProfileVisibleEnd}
