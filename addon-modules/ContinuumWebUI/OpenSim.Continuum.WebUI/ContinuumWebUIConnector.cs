@@ -211,8 +211,9 @@ namespace OpenSim.Continuum.WebUI
                     if (key != null) parameters[key] = form[key];
                 if (_integration.HandlePost(relative, parameters, currentUser, out string message))
                 {
-                    WriteText(response, HttpStatusCode.OK,
-                        WebUIServiceIntegration.IsSuccessfulMutation(message) ? message : "!" + message);
+                    string responseMessage = WebUIServiceIntegration.IsSuccessfulMutation(message) ? message
+                        : WebUIServiceIntegration.IsWarningMutation(message) ? "~" + message : "!" + message;
+                    WriteText(response, HttpStatusCode.OK, responseMessage);
                     return;
                 }
             }

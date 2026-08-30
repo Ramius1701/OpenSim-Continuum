@@ -104,6 +104,8 @@ function submitupdate(formname, parms="", menuid="", currentEvent=null) {
   	if (msg.substring(0, 1) == '!') {
       var emsg = msg.slice(1);
       MsgError(emsg, 4000, 0);
+    } else if (msg.substring(0, 1) == '~') {
+      MsgWarning(msg.slice(1), 5000, 0);
     } else {
       MsgSuccess(msg, 3000,0);
       if (menuid != "") {

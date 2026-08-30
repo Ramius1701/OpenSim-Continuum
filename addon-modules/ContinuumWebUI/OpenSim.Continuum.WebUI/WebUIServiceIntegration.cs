@@ -102,6 +102,9 @@ namespace OpenSim.Continuum.WebUI
             "Account created successfully" or "Password updated" or "Email address updated"
             or "Abuse report updated" or "User account updated" or "Profile updated";
 
+        internal static bool IsWarningMutation(string message) => message is
+            "Profile saved, but interests could not be updated";
+
         internal string ContentSecurityPolicy
         {
             get
@@ -1215,7 +1218,7 @@ namespace OpenSim.Continuum.WebUI
             profile.ImageId = image; profile.FirstLifeImageId = firstLifeImage;
             profile.PublishProfile = form.ContainsKey("publish"); profile.PublishMature = form.ContainsKey("mature");
             if (!Safe(() => _profiles.AvatarPropertiesUpdate(ref profile, ref result)))
-            { message = "Profile update failed: " + H(result); return true; }
+            { message = "Profile update failed"; return true; }
             profile.WantToText = wants; profile.SkillsText = skills; profile.Language = language;
             Int32.TryParse(Value(form, "wantmask"), NumberStyles.Integer, CultureInfo.InvariantCulture, out profile.WantToMask);
             Int32.TryParse(Value(form, "skillsmask"), NumberStyles.Integer, CultureInfo.InvariantCulture, out profile.SkillsMask);
