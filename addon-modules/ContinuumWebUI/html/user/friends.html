@@ -33,13 +33,19 @@
               <span class="regionlink">{FriendRegion}</span>
             </a>
             {IfCanSeeLocationEnd}
-            {IfCannotSeeLocationBegin}<span>{FriendRegion}</span>{IfCannotSeeLocationEnd}
+            {IfCannotSeeLocationBegin}
+            <span>{FriendRegion}</span>
+            {IfCannotSeeLocationEnd}
           </td>
           <td>
-            {IfCanSeeLocationBegin}<a class="regionslurl" href="{HopUrl}">
+            {IfCanSeeLocationBegin}
+            <a class="regionslurl" href="{HopUrl}">
               {FriendLocation}
-            </a>{IfCanSeeLocationEnd}
-            {IfCannotSeeLocationBegin}<span>{FriendLocation}</span>{IfCannotSeeLocationEnd}
+            </a>
+            {IfCanSeeLocationEnd}
+            {IfCannotSeeLocationBegin}
+            <span>{FriendLocation}</span>
+            {IfCannotSeeLocationEnd}
           </td>
         </tr>
       {UserFriendsListArrayEnd}

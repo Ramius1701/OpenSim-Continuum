@@ -21,7 +21,9 @@
         <th>{UserNameText}</th>
         <th class="no-sort">Picture</th>
         <th>Account type</th>
-        {IfCanEditBegin}<th class="no-sort">Administration</th>{IfCanEditEnd}
+        {IfCanEditBegin}
+        <th class="no-sort">Administration</th>
+        {IfCanEditEnd}
       </tr>
     </thead>
     <tbody>
@@ -43,7 +45,9 @@
   </table>
   {IfHaveDataEnd}
 
-  {IfNoDataBegin}<p class="info">{NoDetailsText}</p>{IfNoDataEnd}
+  {IfNoDataBegin}
+  <p class="info">{NoDetailsText}</p>
+  {IfNoDataEnd}
 </div>
 
 <script>
