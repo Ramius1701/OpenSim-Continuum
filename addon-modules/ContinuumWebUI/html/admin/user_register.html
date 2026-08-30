@@ -4,7 +4,7 @@
 <div class="container">
   <h2>{RegistrationText}</h2>
   <div class="row w-100 justify-content-center">
-    <form style="width:85%;" id="register_form" action="{SubmitURL}" method="post">
+    <form style="width:85%;" id="admin-register_form" action="{SubmitURL}" method="post">
       <div class="col-12 text-left">
 
         <div class="row mb-1">
@@ -24,7 +24,7 @@
             {AvatarPasswordText}*
           </div>
           <div class="col-5">
-            <input class="form-control" id="AvatarPassword" maxlength="15" name="AvatarPassword" size="30" type="password" />
+            <input class="form-control" id="AvatarPassword" minlength="8" maxlength="128" name="AvatarPassword" size="30" type="password" autocomplete="new-password" />
           </div>
           <div class="col help-block">
             <small class="form-text text-light">Your login password</small>
@@ -36,7 +36,7 @@
             {AvatarPasswordConfirmationText}*
           </div>
           <div class="col-5">
-            <input class="form-control" id="AvatarPassword2" maxlength="15" name="AvatarPassword2" size="30" type="password" />
+            <input class="form-control" id="AvatarPassword2" minlength="8" maxlength="128" name="AvatarPassword2" size="30" type="password" autocomplete="new-password" />
           </div>
           <div class="col"></div>
         </div>
@@ -126,7 +126,7 @@
         <div class="row mb-1">
           <div class="col-3">{UserEmailText}*</div>
           <div class="col-5">
-            <input class="form-control" id="UserEmail" maxlength="40" name="UserEmail" size="40" type="text" value="" />
+            <input class="form-control" id="UserEmail" maxlength="254" name="UserEmail" size="40" type="email" autocomplete="email" value="" />
           </div>
           <div class="col help-block">
             <small class="form-text text-light">For password recovery only</small>
@@ -250,4 +250,3 @@
 
   </script>
 </div>
-

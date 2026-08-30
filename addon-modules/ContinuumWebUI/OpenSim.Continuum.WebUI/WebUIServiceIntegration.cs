@@ -165,6 +165,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "online_users.html") AddOnlineUsers(vars);
             if (key == "user_search.html") AddUserSearch(vars, parameters, currentUser);
             if (key == "register.html") AddRegistration(vars);
+            if (key == "admin/user_register.html") AddRegistration(vars, true);
             if (key is "userhome.html" or "user/userhome.html") AddUserHome(vars, currentUser);
             if (key == "user/transactions.html") AddTransactions(vars, currentUser, parameters);
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
@@ -212,6 +213,9 @@ namespace OpenSim.Continuum.WebUI
             switch (page.ToLowerInvariant())
             {
                 case "register.html": return Register(form, out message);
+                case "admin/user_register.html":
+                    if (!IsAdmin(currentUser)) { message = "Administrator access required"; return true; }
+                    return Register(form, out message, true);
                 case "user/password.html": return ChangePassword(form, currentUser, out message);
                 case "user/email.html": return ChangeEmail(form, currentUser, out message);
                 case "user/profile_edit.html": return UpdateProfile(form, currentUser, out message);
@@ -222,12 +226,26 @@ namespace OpenSim.Continuum.WebUI
             }
         }
 
-        private void AddRegistration(Dictionary<string, object> vars)
+        private void AddRegistration(Dictionary<string, object> vars, bool administrator = false)
         {
-            vars["Registrations"] = _allowRegistration;
-            vars["NoRegistrations"] = !_allowRegistration;
-            vars["SubmitURL"] = "register.html";
+            vars["Registrations"] = administrator || _allowRegistration;
+            vars["NoRegistrations"] = !administrator && !_allowRegistration;
+            vars["SubmitURL"] = administrator ? "admin/user_register.html" : "register.html";
             vars["AvatarName"] = string.Empty;
+            vars["RegistrationText"] = administrator ? "Create resident" : "Create an account";
+            vars["AvatarNameText"] = "Avatar name";
+            vars["AvatarPasswordText"] = "Password";
+            vars["AvatarPasswordConfirmationText"] = "Confirm password";
+            vars["AvatarScopeText"] = "Scope ID";
+            vars["FirstNameText"] = "First name";
+            vars["LastNameText"] = "Last name";
+            vars["UserCityText"] = "City";
+            vars["UserDOBText"] = "Date of birth";
+            vars["UserEmailText"] = "Email";
+            vars["UserHomeRegionText"] = "Home region";
+            vars["UserTypeText"] = "Account type";
+            vars["TermsOfServiceText"] = "Terms of service";
+            vars["Accept"] = "Accept";
             vars["ToSMessage"] = "By creating an account, you agree to this grid's terms of service.";
             vars["TermsOfServiceAccept"] = "I accept the terms of service";
             vars["Months"] = Enumerable.Range(1, 12).Select(n => Option(n.ToString("00", CultureInfo.InvariantCulture))).ToList();
@@ -241,10 +259,10 @@ namespace OpenSim.Continuum.WebUI
                 .Select(r => new Dictionary<string, object> { ["RegionUUID"] = r.RegionID.ToString(), ["RegionName"] = H(r.RegionName) }).ToList();
         }
 
-        private bool Register(IReadOnlyDictionary<string, string> form, out string message)
+        private bool Register(IReadOnlyDictionary<string, string> form, out string message, bool administrator = false)
         {
             message = string.Empty;
-            if (!_allowRegistration) { message = "Registration is disabled"; return true; }
+            if (!_allowRegistration && !administrator) { message = "Registration is disabled"; return true; }
             string avatarName = Value(form, "AvatarName").Trim();
             string first = Value(form, "FirstName").Trim();
             string last = Value(form, "LastName").Trim();

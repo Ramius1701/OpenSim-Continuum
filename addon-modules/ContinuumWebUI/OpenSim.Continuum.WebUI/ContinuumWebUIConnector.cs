@@ -290,6 +290,7 @@ namespace OpenSim.Continuum.WebUI
                     Child("admin-statistics", "Grid statistics", "admin/statistics.html"), Child("online_users", "Online users", "online_users.html"),
                     Child("admin-region_manager", "Grid regions", "admin/region_manager.html"), Child("admin-estate_manager", "Grid estates", "admin/estate_manager.html"),
                     Child("admin-transactions", "Grid transactions", "admin/transactions.html"), Child("admin-user_manager", "Resident administration", "admin/user_manager.html"),
+                    Child("admin-user-register", "Create resident", "admin/user_register.html"),
                     Child("abuse_manager", "Abuse reports", "abuse_manager.html")
                 }),
                 Menu("login", "Log in", "login.html", false),
