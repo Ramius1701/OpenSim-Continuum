@@ -1,15 +1,20 @@
 <div class="col98" id="experiences">
-  <h2>Experiences</h2>
+  <h2>{ExperiencesTitle}</h2>
   <form action="experiences.html" method="get">
     <input name="q" value="{ExperienceSearch}" placeholder="Search experiences" maxlength="128" />
     <button class="btn btn-info" type="submit">Search</button>
   </form>
   {IfHaveDataBegin}
   <table class="table-compact table-hover display" width="100%">
-    <thead><tr><th>Name</th><th>Description</th><th>Maturity</th><th>Owner</th></tr></thead>
+    <thead><tr><th>Logo</th><th>Name</th><th>Description</th><th>Maturity</th><th>Owner</th><th>Permission</th><th>Status</th><th>Destination</th></tr></thead>
     <tbody>
       {ExperiencesArrayBegin}
-      <tr data-experience-id="{ExperienceID}"><td>{ExperienceName}</td><td>{ExperienceDescription}</td><td>{ExperienceMaturity}</td><td>{ExperienceOwner}</td></tr>
+      <tr data-experience-id="{ExperienceID}">
+        <td><img src="{ExperienceLogoURL}" alt="{ExperienceName}" height="48"></td>
+        <td>{ExperienceName}</td><td>{ExperienceDescription}</td><td>{ExperienceMaturity}</td><td>{ExperienceOwner}</td>
+        <td>{ExperiencePermission}</td><td>{ExperienceStatus}</td>
+        <td>{IfHasDestinationBegin}<a href="{ExperienceDestination}" title="Open experience destination">Visit</a>{IfHasDestinationEnd}</td>
+      </tr>
       {ExperiencesArrayEnd}
     </tbody>
   </table>

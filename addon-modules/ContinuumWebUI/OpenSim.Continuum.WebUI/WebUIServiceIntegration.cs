@@ -1174,6 +1174,9 @@ namespace OpenSim.Continuum.WebUI
         {
             var rows = new List<Dictionary<string, object>>();
             ExperienceInfo[] experiences = Array.Empty<ExperienceInfo>();
+            Dictionary<UUID, bool> permissions = account == null || _experiences == null
+                ? new Dictionary<UUID, bool>()
+                : Safe(() => _experiences.FetchExperiencePermissions(account.PrincipalID)) ?? new Dictionary<UUID, bool>();
             string search = parameters.TryGetValue("q", out string query) ? query.Trim() : string.Empty;
             if (_experiences != null)
             {
@@ -1185,16 +1188,39 @@ namespace OpenSim.Continuum.WebUI
                 }
             }
             foreach (ExperienceInfo experience in experiences)
+            {
+                UserAccount owner = experience.owner_id == UUID.Zero ? null
+                    : Safe(() => _accounts.GetUserAccount(UUID.Zero, experience.owner_id));
+                string permission = permissions.TryGetValue(experience.public_id, out bool allowed)
+                    ? allowed ? "Allowed" : "Blocked"
+                    : account != null && experience.owner_id == account.PrincipalID ? "Owned" : "Not granted";
+                ExperienceFlags flags = (ExperienceFlags)experience.properties;
+                string status = (flags & ExperienceFlags.Suspended) != 0 ? "Suspended"
+                    : (flags & ExperienceFlags.Disabled) != 0 ? "Disabled"
+                    : (flags & ExperienceFlags.Private) != 0 ? "Private"
+                    : (flags & ExperienceFlags.Grid) != 0 ? "Grid" : "Active";
+                string destination = SafeExperienceUrl(experience.slurl);
                 rows.Add(new Dictionary<string, object>
                 {
                     ["ExperienceID"] = experience.public_id.ToString(), ["ExperienceName"] = H(experience.name),
-                    ["ExperienceDescription"] = H(experience.description), ["ExperienceMaturity"] = experience.maturity,
-                    ["ExperienceOwner"] = experience.owner_id.ToString()
+                    ["ExperienceDescription"] = H(experience.description), ["ExperienceMaturity"] = H(MaturityName(experience.maturity.ToString(CultureInfo.InvariantCulture))),
+                    ["ExperienceOwner"] = H(owner?.FormattedName ?? experience.owner_id.ToString()),
+                    ["ExperiencePermission"] = permission, ["ExperienceStatus"] = status,
+                    ["ExperienceLogoURL"] = Texture(experience.logo, "static/icons/no_picture.jpg"),
+                    ["ExperienceDestination"] = destination, ["HasDestination"] = destination.Length > 0
                 });
+            }
             vars["Experiences"] = rows;
             vars["HaveData"] = rows.Count > 0;
             vars["NoData"] = rows.Count == 0;
             vars["ExperienceSearch"] = H(search);
+            vars["ExperiencesTitle"] = search.Length == 0 && account != null ? "My experiences" : "Experience search";
+        }
+
+        private static string SafeExperienceUrl(string value)
+        {
+            if (!Uri.TryCreate((value ?? string.Empty).Trim(), UriKind.Absolute, out Uri uri)) return string.Empty;
+            return uri.Scheme is "http" or "https" or "hop" or "secondlife" ? H(uri.AbsoluteUri) : string.Empty;
         }
 
         private void AddAbuseList(Dictionary<string, object> vars, UserAccount admin,
