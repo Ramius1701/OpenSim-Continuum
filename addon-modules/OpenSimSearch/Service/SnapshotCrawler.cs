@@ -33,7 +33,8 @@ namespace ContinuumSearch.Service
             m_http = new HttpClient(new SocketsHttpHandler
             {
                 AllowAutoRedirect = false,
-                ConnectTimeout = TimeSpan.FromSeconds(Math.Clamp(config.GetInt("ConnectTimeoutSeconds", 10), 2, 60))
+                ConnectTimeout = TimeSpan.FromSeconds(Math.Clamp(config.GetInt("ConnectTimeoutSeconds", 10), 2, 60)),
+                ConnectCallback = ConnectAllowed
             }) { Timeout = TimeSpan.FromSeconds(Math.Clamp(config.GetInt("RequestTimeoutSeconds", 30), 5, 120)) };
             m_timer = new Timer(_ => _ = Poll(), null, Timeout.Infinite, Timeout.Infinite);
         }
@@ -169,6 +170,31 @@ namespace ContinuumSearch.Service
             }
             catch { return false; }
         }
+
+        private async ValueTask<Stream> ConnectAllowed(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+        {
+            IPAddress[] addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken)
+                .ConfigureAwait(false);
+            Exception lastError = null;
+            foreach (IPAddress address in addresses.Where(item => m_allowPrivateHosts || IsPublic(item)))
+            {
+                var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+                try
+                {
+                    await socket.ConnectAsync(new IPEndPoint(address, context.DnsEndPoint.Port), cancellationToken)
+                        .ConfigureAwait(false);
+                    return new NetworkStream(socket, true);
+                }
+                catch (Exception e) when (e is SocketException or OperationCanceledException)
+                {
+                    lastError = e;
+                    socket.Dispose();
+                    if (e is OperationCanceledException) throw;
+                }
+            }
+            throw new HttpRequestException("Snapshot host has no reachable allowed address", lastError);
+        }
+
         internal static bool IsPublic(IPAddress address)
         {
             if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
