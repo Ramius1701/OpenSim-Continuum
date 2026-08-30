@@ -16,8 +16,9 @@
 [Database]
     ;; Supported: SQLite, MySQL, PostgreSQL.
     StorageProvider = "SQLite"
-    ;; Use the OpenSim database so profile classifieds are searchable too.
-    ConnectionString = "Data Source=OpenSim.db;Version=3;"
+    ;; Use the profile database so the authoritative classifieds table is
+    ;; searchable too. This is the official SQLite standalone default.
+    ConnectionString = "Data Source=userprofiles.db;Version=3;"
 
     ;; MySQL example (use the same database that contains profile classifieds):
     ; StorageProvider = "MySQL"

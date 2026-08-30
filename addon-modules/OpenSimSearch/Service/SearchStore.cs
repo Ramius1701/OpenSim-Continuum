@@ -286,7 +286,7 @@ namespace ContinuumSearch.Service
                     ["classifiedid"] = Value(reader, 0), ["name"] = Value(reader, 1), ["classifiedflags"] = Int(reader, 2),
                     ["creation_date"] = Long(reader, 3), ["expiration_date"] = Long(reader, 4), ["priceforlisting"] = Int(reader, 5),
                     ["classifieduuid"] = Value(reader, 0), ["creatoruuid"] = Value(reader, 6), ["category"] = Int(reader, 7),
-                    ["description"] = Value(reader, 8), ["parceluuid"] = Value(reader, 9), ["parentestate"] = Int(reader, 10),
+                    ["description"] = Value(reader, 8), ["parceluuid"] = Value(reader, 9), ["parentestate"] = Value(reader, 10),
                     ["snapshotuuid"] = Value(reader, 11), ["simname"] = Value(reader, 12), ["posglobal"] = Value(reader, 13),
                     ["parcelname"] = Value(reader, 14), ["creationdate"] = Long(reader, 3), ["expirationdate"] = Long(reader, 4)
                 });
