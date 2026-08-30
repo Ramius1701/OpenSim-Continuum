@@ -281,8 +281,8 @@ namespace OpenSim.Continuum.WebUI
                     Child("admin-transactions", "Grid transactions", "admin/transactions.html"), Child("admin-user_manager", "Resident administration", "admin/user_manager.html"),
                     Child("abuse_manager", "Abuse reports", "abuse_manager.html")
                 }),
-                Menu("login", "Log in", "login.html"),
-                Menu("register", "Sign up", "register.html"),
+                Menu("login", "Log in", "login.html", false),
+                Menu("register", "Sign up", "register.html", false),
                 Menu("userhome", "Account", "userhome.html", false),
                 Menu("profile_edit", "Edit profile", "user/profile_edit.html", false),
                 Menu("user-email", "Change email", "user/email.html", false),

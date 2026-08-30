@@ -96,22 +96,12 @@
                   <ul class="member-actions" id="member-actions">
                     {IsNotAuthenticatedBegin}
                     <li id="login" title="Log onto WebUI"><a href="#" class="login btn-white btn-xsmall" >Log in</a></li>
-                    <li id="forgot_pass" title="Reset password">
-                      <a class="forgotpass" href="#">
-                        <img src="/static/images/reset_password.png"  title="Reset password"/>
-                      </a>
-                    </li>
                     <li id="register" title="Register"><a href="#" class="btn-white btn-small">Sign up</a></li>
                     {IsNotAuthenticatedEnd}
 
                     {IsAuthenticatedBegin}
-                      <li id="userhome" title="Account dashboard"><a href="#" class="btn-white btn-small">Account</a></li>
-                      <li id="friends" title="Friends"><a href="#" class="btn-white btn-small">Friends</a></li>
                       <li id="logout" title="Log out of WebUI"><a href="#" class="btn-white btn-small">Logout</a></li>
                     {IsAuthenticatedEnd}
-                    {IsAdminAuthenticatedBegin}
-                      <li id="abuse_manager" title="Abuse reports"><a href="#" class="btn-white btn-small">Administration</a></li>
-                    {IsAdminAuthenticatedEnd}
                   </ul>
                 </div>
               </div>
