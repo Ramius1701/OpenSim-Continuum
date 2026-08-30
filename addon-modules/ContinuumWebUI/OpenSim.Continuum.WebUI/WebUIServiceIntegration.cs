@@ -874,7 +874,9 @@ namespace OpenSim.Continuum.WebUI
             }
             vars["EventList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["EventsText"] = "Events"; vars["AddEventText"] = "Add event"; vars["SearchText"] = "Search";
-            vars["CategoryType"] = SelectOptions(new[] { "All", "Discussion", "Sports", "Live Music", "Commercial" }, Value(parameters, "category"));
+            vars["CategoryType"] = SelectOptions(new[] { "All", "Discussion", "Sports", "Live Music", "Commercial",
+                "Nightlife/Entertainment", "Games/Contests", "Pageants", "Education", "Arts and Culture", "Miscellaneous" },
+                Value(parameters, "category"));
             vars["TimeFrame"] = SelectOptions(new[] { "Today", "Tomorrow", "This week" }, Value(parameters, "timeframe"));
             vars["PG_checked"] = (maturityFlags & 0x01000000) != 0 ? "checked" : string.Empty;
             vars["MA_checked"] = (maturityFlags & 0x02000000) != 0 ? "checked" : string.Empty;
@@ -884,12 +886,16 @@ namespace OpenSim.Continuum.WebUI
         private static int EventCategory(string value) => value.Trim().ToLowerInvariant() switch
         {
             "discussion" => 18, "sports" => 19, "live music" => 20, "commercial" => 22,
+            "nightlife/entertainment" => 23, "games/contests" => 24, "pageants" => 25,
+            "education" => 26, "arts and culture" => 27, "miscellaneous" => 28,
             _ => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed) ? parsed : 0
         };
 
         private static string EventCategoryName(string value) => EventCategory(value) switch
         {
-            18 => "Discussion", 19 => "Sports", 20 => "Live Music", 22 => "Commercial", _ => "General"
+            18 => "Discussion", 19 => "Sports", 20 => "Live Music", 22 => "Commercial",
+            23 => "Nightlife/Entertainment", 24 => "Games/Contests", 25 => "Pageants", 26 => "Education",
+            27 => "Arts and Culture", 28 => "Miscellaneous", _ => "General"
         };
 
         private void AddClassifieds(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
@@ -905,7 +911,8 @@ namespace OpenSim.Continuum.WebUI
             Hashtable response = Search("dir_classified_query", new Hashtable
             {
                 ["text"] = Trimmed(Value(parameters, "text"), 128), ["flags"] = maturityFlags.ToString(CultureInfo.InvariantCulture),
-                ["category"] = Value(parameters, "category"), ["query_start"] = "0"
+                ["category"] = ClassifiedCategory(Value(parameters, "category")).ToString(CultureInfo.InvariantCulture),
+                ["query_start"] = "0"
             });
             var rows = new List<Dictionary<string, object>>();
             if (response?["data"] is ArrayList data)
@@ -941,6 +948,14 @@ namespace OpenSim.Continuum.WebUI
             vars["MA_checked"] = (maturityFlags & 10) != 0 ? "checked" : string.Empty;
             vars["AO_checked"] = (maturityFlags & 64) != 0 ? "checked" : string.Empty;
         }
+
+        private static int ClassifiedCategory(string value) => value.Trim().ToLowerInvariant() switch
+        {
+            "shopping" => 1, "land rental" => 2, "property rental" => 3, "special attraction" => 4,
+            "new products" => 5, "employment" => 6, "wanted" => 7, "service" => 8, "personal" => 9,
+            _ => Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
+                ? Math.Clamp(parsed, 0, 9) : 0
+        };
 
         private void AddDestinations(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
             UserAccount currentUser)
