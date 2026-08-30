@@ -722,12 +722,12 @@ namespace OpenSim.Continuum.WebUI
                 {
                     DirectoryLocation(Text(item, "globalposition", Text(item, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(item, "simname");
-                    long.TryParse(Text(item, "dateUTC"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long timestamp);
+                    bool hasDate = TryEventDateUtc(item, item, out DateTime date);
                     int.TryParse(Text(item, "eventflags"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int flags);
                     rows.Add(new Dictionary<string, object>
                     {
                         ["EventID"] = H(Text(item, "event_id")),
-                        ["EventDateUTC"] = timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.InvariantCulture) : H(Text(item, "date")),
+                        ["EventDateUTC"] = hasDate ? date.ToString("yyyy-MM-dd HH:mm 'UTC'", CultureInfo.InvariantCulture) : H(Text(item, "date")),
                         ["SimName"] = H(simName), ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z),
                         ["Name"] = H(Text(item, "name")), ["Description"] = H(Text(item, "description")),
                         ["Category"] = H(EventCategoryName(Text(item, "category"))),
@@ -854,16 +854,16 @@ namespace OpenSim.Continuum.WebUI
                         Hashtable detailResponse = Search("event_info_query", new Hashtable { ["eventID"] = Text(summary, "event_id") });
                         detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
                     }
-                    DateTime.TryParse(Text(detail, "date"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTime date);
+                    bool hasDate = TryEventDateUtc(detail, summary, out DateTime date);
                     DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
                     {
-                        ["EventDateTimeUTC"] = date.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
-                        ["EventDateTime"] = date == default ? H(Text(summary, "date")) : date.Day.ToString(CultureInfo.InvariantCulture),
-                        ["EventHourTime"] = date == default ? string.Empty : date.ToString("MMM", CultureInfo.InvariantCulture),
-                        ["EventMinuteTime"] = date == default ? string.Empty : date.Year.ToString(CultureInfo.InvariantCulture),
-                        ["EventTime"] = date == default ? string.Empty : date.ToString("t", CultureInfo.InvariantCulture),
+                        ["EventDateTimeUTC"] = hasDate ? date.ToString("o", CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventDateTime"] = hasDate ? date.Day.ToString(CultureInfo.InvariantCulture) : H(Text(summary, "date")),
+                        ["EventHourTime"] = hasDate ? date.ToString("MMM", CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventMinuteTime"] = hasDate ? date.Year.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                        ["EventTime"] = hasDate ? date.ToString("HH:mm 'UTC'", CultureInfo.InvariantCulture) : string.Empty,
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
                         ["Category"] = H(EventCategoryName(Text(detail, "category"))), ["CategoryImage"] = "static/icons/event.png",
                         ["SimName"] = H(simName), ["Maturity"] = H(Text(detail, "eventflags")),
@@ -1143,6 +1143,29 @@ namespace OpenSim.Continuum.WebUI
         private static string Text(Hashtable values, string key, string fallback = "") => values != null && values.ContainsKey(key) && values[key] != null ? values[key].ToString() : fallback;
         private static string UnixDate(string value) => long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds)
             ? DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime.ToString("d", CultureInfo.InvariantCulture) : H(value);
+
+        private static bool TryEventDateUtc(Hashtable detail, Hashtable summary, out DateTime date)
+        {
+            date = default;
+            string value = Text(detail, "dateUTC", Text(detail, "unix_time",
+                Text(summary, "dateUTC", Text(summary, "unix_time"))));
+            if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long seconds))
+            {
+                try
+                {
+                    date = DateTimeOffset.FromUnixTimeSeconds(seconds).UtcDateTime;
+                    return true;
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    // Fall through for older Search services that only return a formatted date.
+                }
+            }
+
+            value = Text(detail, "date", Text(summary, "date"));
+            return DateTime.TryParse(value, CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out date);
+        }
 
         private void AddProfile(Dictionary<string, object> vars, UserAccount account, UserAccount viewer)
         {
