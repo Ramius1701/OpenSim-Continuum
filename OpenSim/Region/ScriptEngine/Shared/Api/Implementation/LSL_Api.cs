@@ -19616,9 +19616,15 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
         public void llGodLikeRezObject(string inventory, LSL_Vector pos)
         {
-            if (!World.Permissions.IsGod(m_host.OwnerID))
+            if (!World.TryGetScenePresence(m_host.OwnerID, out ScenePresence scenePresence))
             {
-                Error("llGodLikeRezObject", "Script owner must have god permissions");
+                Error("llGodLikeRezObject", "Script owner is not in the region");
+                return;
+            }
+
+            if (scenePresence.GodController.GodLevel < 100)
+            {
+                Error("llGodLikeRezObject", "Script owner is not in god mode");
                 return;
             }
 
