@@ -87,11 +87,13 @@ namespace ContinuumEconomy.Service
 
         internal void Register(BaseHttpServer server)
         {
-            // Firestorm and Cool VL Viewer append currency.php to the helper
-            // URI advertised by SimulatorFeatures.  Keep the root XML-RPC
-            // endpoint for region-module traffic and expose the same handlers
-            // at the viewer-compatible path.
+            // Firestorm and Cool VL Viewer append these legacy path names to
+            // the helper URI advertised by SimulatorFeatures. Keep the root
+            // XML-RPC endpoint for region-module traffic and expose the same
+            // current Continuum handlers at the viewer-compatible paths.
             server.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", (request, response) =>
+                server.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response)));
+            server.AddSimpleStreamHandler(new SimpleStreamHandler("/landtool.php", (request, response) =>
                 server.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response)));
             server.AddXmlRPCHandler("ContinuumHealth", Health);
             server.AddXmlRPCHandler("ClientLogin", Login);
@@ -425,8 +427,25 @@ namespace ContinuumEconomy.Service
         {
             Hashtable p = Parameters(request);
             if (!LandRequest(p, out Guid agent, out long currencyBuy, out string error)) return Failure(error);
-            return Reply(new Hashtable { { "success", m_backend.Ledger.GetAvailableBalance(agent) >= currencyBuy },
-                { "billableArea", ParseInt(p, "billableArea") }, { "currencyBuy", ViewerBalance(currencyBuy) } });
+            double rawEstimatedCost = currencyBuy * m_estimatedCostPerUnit * 100d;
+            int estimatedCost = rawEstimatedCost >= Int32.MaxValue
+                ? Int32.MaxValue
+                : (int)Math.Round(rawEstimatedCost, MidpointRounding.AwayFromZero);
+
+            // A successful preflight means the request was authenticated and
+            // understood.  The viewer uses currencyBuy and its current balance
+            // to decide whether currency must be obtained before ParcelBuy.
+            return Reply(new Hashtable
+            {
+                { "success", true },
+                { "membership", new Hashtable
+                    { { "upgrade", false }, { "action", String.Empty }, { "levels", new ArrayList() } } },
+                { "landUse", new Hashtable { { "upgrade", false }, { "action", String.Empty } } },
+                { "currency", new Hashtable
+                    { { "estimatedCost", estimatedCost }, { "currencyBuy", ViewerBalance(currencyBuy) } } },
+                { "confirm", Guid.NewGuid().ToString() },
+                { "billableArea", ParseInt(p, "billableArea") }
+            });
         }
 
         private XmlRpcResponse BuyLandPrep(XmlRpcRequest request, IPEndPoint remote)
