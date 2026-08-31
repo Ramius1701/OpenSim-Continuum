@@ -196,7 +196,8 @@ namespace ContinuumEconomy.Service
                     ["transactionType"] = row.TransactionType,
                     ["description"] = row.Description ?? String.Empty,
                     ["createdUtc"] = row.CreatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
-                    ["succeeded"] = row.Succeeded
+                    ["succeeded"] = row.Succeeded,
+                    ["failureReason"] = row.FailureReason ?? String.Empty
                 });
             }
             return Reply(new Hashtable

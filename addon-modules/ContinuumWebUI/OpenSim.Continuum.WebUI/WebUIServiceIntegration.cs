@@ -1085,6 +1085,7 @@ namespace OpenSim.Continuum.WebUI
             vars["TransactionDateText"] = "Date"; vars["TransactionFromAgentText"] = "From";
             vars["TransactionToAgentText"] = "To"; vars["TransactionDetailText"] = "Description";
             vars["TransactionAmountText"] = "Amount"; vars["TransactionBalanceText"] = "Resulting balance";
+            vars["TransactionStatusText"] = "Status";
         }
 
         private void AddAdminTransactions(Dictionary<string, object> vars, UserAccount administrator,
@@ -1102,7 +1103,7 @@ namespace OpenSim.Continuum.WebUI
             vars["Search"] = "Search"; vars["TransactionDateText"] = "Date";
             vars["TransactionFromAgentText"] = "From"; vars["TransactionToAgentText"] = "To";
             vars["TransactionDetailText"] = "Description"; vars["TransactionAmountText"] = "Amount";
-            vars["TransactionBalanceText"] = "Resulting balance";
+            vars["TransactionBalanceText"] = "Resulting balance"; vars["TransactionStatusText"] = "Status";
         }
 
         private List<Dictionary<string, object>> TransactionRows(UserAccount account,
@@ -1133,13 +1134,19 @@ namespace OpenSim.Continuum.WebUI
                 UUID.TryParse(Text(item, "counterpartyID"), out UUID counterpartyID);
                 accountsByID.TryGetValue(counterpartyID, out UserAccount counterparty);
                 long.TryParse(Text(item, "amount"), NumberStyles.Integer, CultureInfo.InvariantCulture, out long amount);
+                string succeededValue = Text(item, "succeeded", "true");
+                bool succeeded = !succeededValue.Equals("false", StringComparison.OrdinalIgnoreCase)
+                    && succeededValue != "0";
+                string description = Text(item, "description");
+                string failure = Text(item, "failureReason");
+                if (!succeeded && failure.Length > 0) description += " — " + failure;
                 rows.Add(new Dictionary<string, object>
                 {
                     ["Date"] = H(Text(item, "createdUtc")),
                     ["FromAgent"] = H(amount >= 0 ? counterparty?.FormattedName ?? "System" : account.FormattedName),
                     ["ToAgent"] = H(amount >= 0 ? account.FormattedName : counterparty?.FormattedName ?? "System"),
-                    ["Description"] = H(Text(item, "description")), ["Amount"] = amount,
-                    ["ToBalance"] = H(Text(item, "balance"))
+                    ["Description"] = H(description), ["Amount"] = amount,
+                    ["ToBalance"] = H(Text(item, "balance")), ["Status"] = succeeded ? "Completed" : "Failed"
                 });
             }
             return rows;
