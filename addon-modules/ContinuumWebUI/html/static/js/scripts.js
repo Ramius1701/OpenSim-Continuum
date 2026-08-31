@@ -137,7 +137,18 @@ function submitpagesearch(formname, destdiv, currentEvent=null) {
       var emsg = data.slice(1);
       MsgError(emsg, 4000, 0);
     } else {
-      $("#" + destdiv).empty().append(data);
+      var parsed = $($.parseHTML(data, document, true));
+      var scripts = parsed.filter("script").add(parsed.find("script")).remove();
+      var replacement = parsed.filter("#" + destdiv).add(parsed.find("#" + destdiv)).first();
+      var target = $("#" + destdiv).first();
+      if (replacement.length) {
+        target.empty().append(replacement.contents());
+        scripts.each(function() {
+          $.globalEval(this.text || this.textContent || this.innerHTML || "");
+        });
+      } else {
+        MsgError("The WebUI search returned an invalid page fragment", 4000, 0);
+      }
     }
   }).fail(function() { MsgError("The WebUI request failed", 4000, 0); });
 
