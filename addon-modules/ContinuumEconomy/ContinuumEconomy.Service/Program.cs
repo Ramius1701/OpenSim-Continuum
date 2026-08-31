@@ -87,6 +87,12 @@ namespace ContinuumEconomy.Service
 
         internal void Register(BaseHttpServer server)
         {
+            // Firestorm and Cool VL Viewer append currency.php to the helper
+            // URI advertised by SimulatorFeatures.  Keep the root XML-RPC
+            // endpoint for region-module traffic and expose the same handlers
+            // at the viewer-compatible path.
+            server.AddSimpleStreamHandler(new SimpleStreamHandler("/currency.php", (request, response) =>
+                server.HandleXmlRpcRequests((OSHttpRequest)request, (OSHttpResponse)response)));
             server.AddXmlRPCHandler("ContinuumHealth", Health);
             server.AddXmlRPCHandler("ClientLogin", Login);
             server.AddXmlRPCHandler("ClientLogout", Logout);

@@ -420,6 +420,11 @@ namespace OpenSim.Modules.ContinuumEconomy
         public void RegionLoaded(Scene scene)
         {
             if (!m_enabled) return;
+
+            ISimulatorFeaturesModule features = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
+            if (features != null && !features.OpenSimExtraFeatureContains("currency-base-uri"))
+                features.AddOpenSimExtraFeature("currency-base-uri", Util.AppendEndSlash(m_moneyServURL));
+
             m_log.InfoFormat("[CONTINUUM ECONOMY MODULE] region loaded {0}", scene.RegionInfo.RegionID.ToString());
         }
 

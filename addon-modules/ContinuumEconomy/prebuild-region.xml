@@ -8,6 +8,7 @@
   <Reference name="Mono.Security" />
   <Reference name="Nini" />
   <Reference name="OpenMetaverse" />
+  <Reference name="OpenMetaverse.StructuredData" />
   <Reference name="OpenMetaverseTypes" />
   <Reference name="XMLRPC" />
   <Reference name="OpenSim.Data" />
