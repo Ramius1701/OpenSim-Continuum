@@ -1238,7 +1238,7 @@ namespace OpenSim.Continuum.WebUI
             string result = string.Empty;
             bool found = Safe(() => _profiles?.AvatarPropertiesRequest(ref profile, ref result)) ?? false;
             bool canViewProfile = viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer))
-                || !found || profile.PublishProfile;
+                || found && profile.PublishProfile;
             vars["ProfileVisible"] = canViewProfile;
             vars["ProfileHidden"] = !canViewProfile;
             bool canSeeOnline = canViewProfile && viewer != null
@@ -1480,11 +1480,11 @@ namespace OpenSim.Continuum.WebUI
         {
             if (account == null) return false;
             if (viewer != null && (viewer.PrincipalID == account.PrincipalID || IsAdmin(viewer))) return true;
-            if (_profiles == null) return true;
+            if (_profiles == null) return false;
             var profile = new UserProfileProperties { UserId = account.PrincipalID };
             string result = string.Empty;
             bool found = Safe(() => _profiles.AvatarPropertiesRequest(ref profile, ref result));
-            return !found || profile.PublishProfile;
+            return found && profile.PublishProfile;
         }
 
         private string PickHop(UserProfilePick pick)
