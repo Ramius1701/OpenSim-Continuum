@@ -1,24 +1,22 @@
 # OpenSimSearch
 
-Continuum includes the OpenSim-side `OpenSimSearch` compatibility module. It
-translates viewer directory requests for places, popular places, land, events,
-classifieds, event/classified details, and map items to the established
-OpenSimSearch XML-RPC protocol.
+Continuum includes both the OpenSim-side `OpenSimSearch` compatibility module
+and the native `ContinuumSearch.Service`. The module translates viewer
+directory requests for places, popular places, land, events, classifieds,
+event/classified details, and map items to the established OpenSimSearch
+XML-RPC protocol. The service supplies that protocol from an authenticated,
+bounded DataSnapshot crawler and a provider-neutral index.
 
 ## Deployment boundary
 
-The tracked addon is a search client, not a complete search service. It requires
-an independently deployed endpoint configured by `[Search] SearchURL`.
-Continuum does not include the historical donor's PHP crawler and MySQL schema:
-that repository has no declared software license and its service accepts
-unauthenticated simulator registration, polls public DataSnapshot endpoints,
-depends on cron, and supports only MySQL. It is therefore unsuitable for direct
-production inclusion.
-
-The future authenticated index, moderation, and administration service belongs
-to the deferred OpenSim-Grid-Interface phase. Until that service is available,
-operators may use a compatible external OpenSimSearch provider at their own
-trust boundary.
+The simulator module requires an endpoint configured by `[Search] SearchURL`.
+For a self-contained Continuum deployment, point it at
+`ContinuumSearch.Service`; a compatible external OpenSimSearch endpoint remains
+optional. The historical donor's unlicensed PHP crawler and MySQL-only schema
+are not bundled. Continuum's replacement owns its schema, supports SQLite,
+MySQL/MariaDB and PostgreSQL, validates registration secrets and snapshot URLs,
+bounds input and results, and performs crawling without cron. The integrated
+WebUI consumes the same service rather than maintaining a second index.
 
 ## Simulator configuration
 
@@ -65,4 +63,7 @@ Test all of the following against the exact deployed backend:
 - concurrency saturation without simulator client-event stalls;
 - Hypergrid inclusion/exclusion policy and foreign destination validation.
 
-Compilation alone does not certify an external search backend.
+The SQLite parser, replacement, places, popular, parcel, land, events and event
+details acceptance contracts pass locally. Provider-specific deployment and
+real-viewer behavior remain runtime gates; compilation or an isolated
+self-test does not certify a production search deployment.

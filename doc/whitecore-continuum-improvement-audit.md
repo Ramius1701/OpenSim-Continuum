@@ -41,7 +41,7 @@ The goals are:
 | P2 | On-demand regions | experimental feature | Operational feature, not SL parity; redesign around modern process supervision and Robust registration. |
 | P2 | Object cache persistence | obsolete or unsuitable | WhiteCore implementation disables itself and uses per-user files; modern viewer caches and current interest management need profiling first. |
 | P2 | Banned-viewer enforcement | obsolete or unsuitable | User-agent blocking is easy to evade and creates interoperability/support risk. Prefer capability and protocol validation. |
-| P2 | WebUI and Web APIs | optional separate application | Deferred portal phase. Requirements are useful; direct integration into Robust is unsuitable. |
+| P2 | WebUI and Web APIs | optional Robust connector | Implemented as ContinuumWebUI with retained WhiteCore presentation assets and native OpenSim service adapters; direct WhiteCore persistence internals remain unsuitable. |
 
 ## Detailed candidates
 

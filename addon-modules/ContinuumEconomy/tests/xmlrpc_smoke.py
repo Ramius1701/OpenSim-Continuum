@@ -9,6 +9,8 @@ secret = os.environ.get("CONTINUUM_ECONOMY_TEST_SECRET")
 if not secret or len(secret) < 32:
     raise SystemExit("Set CONTINUUM_ECONOMY_TEST_SECRET to the test service's 32+ character shared secret")
 service = xmlrpc.client.ServerProxy(url, allow_none=True)
+currency_service = xmlrpc.client.ServerProxy(url.rstrip("/") + "/currency.php", allow_none=True)
+land_service = xmlrpc.client.ServerProxy(url.rstrip("/") + "/landtool.php", allow_none=True)
 buyer, seller = uuid.uuid4(), uuid.uuid4()
 buyer_session, buyer_secure = uuid.uuid4(), uuid.uuid4()
 seller_session, seller_secure = uuid.uuid4(), uuid.uuid4()
@@ -43,21 +45,26 @@ conflict["amount"] = 26
 assert service.TransferMoney(conflict)["success"] is False
 assert balance(buyer, buyer_session, buyer_secure)["clientBalance"] == buyer_start - 25
 assert balance(seller, seller_session, seller_secure)["clientBalance"] == seller_start + 25
-quote = service.getCurrencyQuote({"agentId": str(buyer),
+quote = currency_service.getCurrencyQuote({"agentId": str(buyer),
     "secureSessionId": str(buyer_secure), "currencyBuy": 10})
 assert quote["success"] is True and quote["currency"]["currencyBuy"] == 10
 currency_purchase = {"agentId": str(buyer), "secureSessionId": str(buyer_secure),
     "currencyBuy": 10, "confirm": quote["confirm"]}
-assert service.buyCurrency(currency_purchase)["success"] is True
-assert service.buyCurrency(currency_purchase)["result"] == "Replayed"
+assert currency_service.buyCurrency(currency_purchase)["success"] is True
+assert currency_service.buyCurrency(currency_purchase)["result"] == "Replayed"
 land = {"agentId": str(buyer), "secureSessionId": str(buyer_secure),
     "billableArea": 512, "currencyBuy": 10}
-preflight = service.preflightBuyLandPrep(land)
+preflight = land_service.preflightBuyLandPrep(land)
 assert preflight["success"] is True and preflight["billableArea"] == 512
-assert service.buyLandPrep(land)["success"] is True
+assert preflight["membership"] == {"upgrade": False, "action": "", "levels": []}
+assert preflight["landUse"] == {"upgrade": False, "action": ""}
+assert preflight["currency"]["currencyBuy"] == 10
+assert preflight["currency"]["estimatedCost"] == 10
+uuid.UUID(preflight["confirm"])
+assert land_service.buyLandPrep(land)["success"] is True
 bad_land = dict(land)
 bad_land["secureSessionId"] = str(uuid.uuid4())
-assert service.preflightBuyLandPrep(bad_land)["success"] is False
+assert land_service.preflightBuyLandPrep(bad_land)["success"] is False
 purchase_id = uuid.uuid4()
 authorization = {"continuumSecret": secret, "purchaseID": str(purchase_id),
     "buyerID": str(buyer), "buyerSessionID": str(buyer_session),

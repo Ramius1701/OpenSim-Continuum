@@ -25,7 +25,7 @@
 |---|---|---|
 | Avatar picker / people | Official OpenSim CAPS present | Retain official implementation; reconcile aliases and Display Names through the authenticated identity service rather than OpenSimSearch PHP. |
 | Map region-name search | Official OpenSim module present | Already present; do not duplicate. |
-| Places and popular places | Continuum OpenSimSearch client present | Protocol-compatible with lickx/Tranquillity; requires a trusted external backend. |
+| Places and popular places | Continuum OpenSimSearch client and ContinuumSearch service present | Protocol-compatible with lickx/Tranquillity; the bundled authenticated service is the preferred backend. |
 | Land sales and rentals | Client present | Retain with exact flag, price, area, maturity and paging tests. |
 | Events and event details | Client present | Retain; the production service must own lifecycle, moderation, timezone and expiry. |
 | Classifieds and details | Client present | Retain; verify maturity, paging, removal and fee-state consistency. |
@@ -33,7 +33,7 @@
 | Direct places query | WhiteCore behavior not separately implemented by the addon | Determine viewer reachability on current Firestorm; port only if the existing official/addon paths do not answer it. |
 | Event notifications | WhiteCore supports add/remove subscriptions | Genuinely missing from this addon lineage; service/data ownership and viewer delivery must be designed before porting. |
 | Grid directory/index service | Missing from Continuum | Required for a self-contained grid search product; implement during OpenSim-Grid-Interface service phase. |
-| Integrated WebUI search | Deferred | Port WhiteCore's actual `region_search`/`user_search` UI behavior and fill gaps with OpenSim-Grid-Interface. Do not create a second index. |
+| Integrated WebUI search | Present | ContinuumWebUI exposes the WhiteCore-led region/user search workflows and consumes ContinuumSearch rather than creating a second index. |
 
 ## Donor disposition
 

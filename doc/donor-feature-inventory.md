@@ -20,7 +20,7 @@ The initial recommendations in this document are retained as the evidence availa
 | Recovered operational addons | Gloebit, HoloPhysicsGuard, MoneyServer, Search, Tide and Weather are packaged as optional components. GroupAutoInvite, RegionCurrency and OpenSimMarketplace are also included and disabled by default where applicable. |
 | Warp3D sprites | Integrated behind opt-in renderer settings for visual/performance testing. |
 | ubODE tuning | Kept on `codex/testing-ubode-tuning`; it is not part of the default production candidate. |
-| WhiteCore WebUI and OpenSim-Grid-Interface | Deliberately deferred until the OpenSim simulator/service/addon candidate completes testing. No portal code is included here. |
+| WhiteCore WebUI and OpenSim-Grid-Interface | Implemented as the optional ContinuumWebUI Robust connector, retaining the WhiteCore templates/assets and using native OpenSim service adapters; live deployment acceptance remains. |
 | opensim-lickx archive | Added as an audit donor/reference for its optional Lickx script API, OpenSimMutelist, DTL/NSL-derived currency tree and historical OpenSimSearch helpers. No code selected yet. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
