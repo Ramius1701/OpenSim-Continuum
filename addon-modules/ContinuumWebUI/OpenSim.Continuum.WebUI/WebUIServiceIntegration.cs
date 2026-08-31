@@ -72,6 +72,13 @@ namespace OpenSim.Continuum.WebUI
             _searchUrl = section.GetString("SearchServiceURL", string.Empty).Trim();
             _economyUrl = section.GetString("EconomyServiceURL", string.Empty).Trim();
             _economySecret = section.GetString("EconomySharedSecret", string.Empty);
+            ValidateServiceEndpoint(_searchUrl, "SearchServiceURL");
+            ValidateServiceEndpoint(_economyUrl, "EconomyServiceURL");
+            if (string.IsNullOrEmpty(_economyUrl) != string.IsNullOrEmpty(_economySecret))
+                throw new InvalidOperationException("ContinuumWebUI EconomyServiceURL and EconomySharedSecret must be configured together");
+            if (_economyUrl.Length > 0 && (_economySecret.Length < 32
+                || _economySecret.StartsWith("CHANGE-THIS", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("ContinuumWebUI EconomySharedSecret must match a unique ContinuumEconomy secret containing at least 32 characters");
             _rpcTimeoutMs = Math.Clamp(section.GetInt("ServiceTimeoutMilliseconds", 5000), 500, 30000);
             _gridStatusCacheLifetime = TimeSpan.FromSeconds(Math.Clamp(section.GetInt("GridStatusCacheSeconds", 30), 5, 300));
             _grid = Load<IGridService>(config, section, "GridService", "OpenSim.Services.GridService.dll:GridService");
@@ -82,6 +89,15 @@ namespace OpenSim.Continuum.WebUI
             _experiences = Load<IExperienceService>(config, section, "ExperienceService", "OpenSim.Services.ExperienceService.dll:ExperienceService");
             _groups = Load<IGroupsService>(config, section, "GroupsService", "OpenSim.Addons.Groups.dll:GroupsService");
             _estates = Load<IEstateDataService>(config, section, "EstateDataService", "OpenSim.Services.EstateService.dll:EstateDataService");
+        }
+
+        private static void ValidateServiceEndpoint(string value, string key)
+        {
+            if (value.Length == 0) return;
+            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri uri)
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+                || string.IsNullOrWhiteSpace(uri.Host))
+                throw new InvalidOperationException("ContinuumWebUI " + key + " must be an absolute HTTP or HTTPS URL");
         }
 
         internal bool IsAdmin(UserAccount account) => account != null && account.UserLevel >= _adminLevel;
