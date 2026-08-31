@@ -81,6 +81,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         public bool m_ScriptDebug;
         public bool m_ScriptDebugSaveSource;
         public bool m_ScriptDebugSaveIL;
+        public bool m_StrictStateMigrationVersion;
         public Scene m_Scene;
         private IConfigSource m_ConfigSource;
         private IConfig m_Config;
@@ -216,6 +217,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             m_ScriptDebug = m_Config.GetBoolean("ScriptDebug", false);
             m_ScriptDebugSaveSource = m_Config.GetBoolean("ScriptDebugSaveSource", false);
             m_ScriptDebugSaveIL = m_Config.GetBoolean("ScriptDebugSaveIL", false);
+            m_StrictStateMigrationVersion = m_Config.GetBoolean("StrictStateMigrationVersion", false);
 
             m_StackSize = m_Config.GetInt("ScriptStackSize", 2048) << 10;
             m_HeapSize = m_Config.GetInt("ScriptHeapSize", 1024) << 10;

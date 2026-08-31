@@ -1143,10 +1143,22 @@ namespace OpenSim.Region.ScriptEngine.Yengine
         private void MigrateInEventHandler(Stream stream)
         {
             int mv = stream.ReadByte();
-            if(mv != migrationVersion)
-                throw new Exception("incoming migration version " + mv + " but accept only " + migrationVersion);
-
             stream.ReadByte();  // ignored
+
+            bool versionMismatch = mv != migrationVersion;
+            if(versionMismatch)
+            {
+                if(m_Engine.m_StrictStateMigrationVersion)
+                    throw new Exception("incoming migration version " + mv + " but accept only " + migrationVersion);
+
+                // The migration stream tags its values, so a version change does not
+                // necessarily make an otherwise valid saved state unreadable.  Try the
+                // donor's best-effort restore before the caller falls back to recompiling
+                // and resetting the script.
+                m_log.WarnFormat(
+                    "[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
+                    m_ItemID, mv, migrationVersion);
+            }
 
             /*
              * Restore script variables and stack and other state from stream.
@@ -1162,6 +1174,11 @@ namespace OpenSim.Region.ScriptEngine.Yengine
                 //m_RunOnePhase = "MigrateInEventHandler finished";
                 //CheckRunLockInvariants(true);
             }
+
+            if(versionMismatch)
+                m_log.InfoFormat(
+                    "[YEngine]: state snapshot for {0} restored despite migration version mismatch (incoming={1}, current={2})",
+                    m_ItemID, mv, migrationVersion);
         }
     }
 }
