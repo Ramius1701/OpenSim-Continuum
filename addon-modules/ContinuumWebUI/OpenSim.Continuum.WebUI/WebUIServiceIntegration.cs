@@ -903,6 +903,8 @@ namespace OpenSim.Continuum.WebUI
                         detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
                     }
                     bool hasDate = TryEventDateUtc(detail, summary, out DateTime date);
+                    int eventMaturity = MaturityLevel(Text(detail, "eventflags", Text(summary, "eventflags")));
+                    if (!AllowsMaturity(maturityFlags, eventMaturity)) continue;
                     DateTime displayDate = hasDate ? EventDisplayDate(date) : default;
                     DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
@@ -915,7 +917,7 @@ namespace OpenSim.Continuum.WebUI
                         ["EventTime"] = hasDate ? displayDate.ToString("HH:mm 'SLT'", CultureInfo.InvariantCulture) : string.Empty,
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
                         ["Category"] = H(EventCategoryName(Text(detail, "category"))), ["CategoryImage"] = "static/icons/event.png",
-                        ["SimName"] = H(simName), ["Maturity"] = MaturityName(Text(detail, "eventflags")),
+                        ["SimName"] = H(simName), ["Maturity"] = MaturityName(eventMaturity),
                         ["CoverCharge"] = H(Text(detail, "coveramount")), ["DurationText"] = H(Text(detail, "duration")),
                         ["EventHop"] = string.IsNullOrWhiteSpace(simName) ? string.Empty : Hop(simName, x, y, z)
                     });
@@ -975,6 +977,9 @@ namespace OpenSim.Continuum.WebUI
                         Hashtable detailResponse = Search("classifieds_info_query", new Hashtable { ["classifiedID"] = Text(summary, "classifiedid") });
                         detail = (detailResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault() ?? summary;
                     }
+                    int classifiedMaturity = ClassifiedMaturityLevel(Text(detail, "classifiedflags",
+                        Text(summary, "classifiedflags")));
+                    if (!AllowsClassifiedMaturity(maturityFlags, classifiedMaturity)) continue;
                     DirectoryLocation(Text(detail, "posglobal"), out int x, out int y, out int z);
                     string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
@@ -982,7 +987,7 @@ namespace OpenSim.Continuum.WebUI
                         ["Name"] = H(Text(detail, "name")), ["Description"] = H(Text(detail, "description")),
                         ["CreationDate"] = UnixDate(Text(detail, "creationdate", Text(summary, "creation_date"))),
                         ["ExpirationDate"] = UnixDate(Text(detail, "expirationdate", Text(summary, "expiration_date"))),
-                        ["Maturity"] = H(Text(detail, "classifiedflags", Text(summary, "classifiedflags"))),
+                        ["Maturity"] = MaturityName(classifiedMaturity),
                         ["PriceForListing"] = H(Text(detail, "priceforlisting", Text(summary, "priceforlisting"))),
                         ["ClassifiedImage"] = Texture(UUID.TryParse(Text(detail, "snapshotuuid"), out UUID image) ? image : UUID.Zero,
                             "static/icons/no_picture.jpg"),
@@ -1034,13 +1039,15 @@ namespace OpenSim.Continuum.WebUI
                         detail = (detailsResponse?["data"] as ArrayList)?.OfType<Hashtable>().FirstOrDefault();
                     }
                     if (detail == null) continue;
+                    int destinationMaturity = MaturityLevel(Text(detail, "maturity"));
+                    if (!AllowsMaturity(flags, destinationMaturity)) continue;
                     string regionName = Text(detail, "region_name");
                     ParseLanding(Text(detail, "landing_point"), out int x, out int y, out int z);
                     rows.Add(new Dictionary<string, object>
                     {
                         ["DestinationName"] = H(Text(detail, "name")), ["DestinationDescription"] = H(Text(detail, "description")),
                         ["DestinationRegion"] = H(regionName), ["DestinationCategory"] = H(CategoryName(Text(detail, "category"))),
-                        ["DestinationMaturity"] = H(MaturityName(Text(detail, "maturity"))), ["DestinationDwell"] = H(Text(detail, "dwell")),
+                        ["DestinationMaturity"] = MaturityName(destinationMaturity), ["DestinationDwell"] = H(Text(detail, "dwell")),
                         ["DestinationArea"] = H(Text(detail, "area")), ["DestinationPrice"] = H(Text(detail, "sale_price")),
                         ["DestinationForSale"] = String.Equals(Text(detail, "for_sale"), "True", StringComparison.OrdinalIgnoreCase) ? "For sale" : string.Empty,
                         ["DestinationImage"] = Texture(UUID.TryParse(Text(detail, "snapshot_id"), out UUID image) ? image : UUID.Zero, "static/icons/no_picture.jpg"),
@@ -1050,6 +1057,8 @@ namespace OpenSim.Continuum.WebUI
             }
             vars["Destinations"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["DestinationSearch"] = H(text); vars["DestinationTab"] = H(tab);
+            vars["DestinationMaturity"] = H(maturity);
+            AddMaturitySelection(vars, "DestinationMaturity", maturity);
         }
 
         private static int MaturityFlags(string maturity) => maturity.Trim().ToLowerInvariant() switch
@@ -1057,8 +1066,41 @@ namespace OpenSim.Continuum.WebUI
             "general" or "pg" => 0x01000000,
             "mature" => 0x02000000,
             "adult" => 0x04000000,
-            _ => 0x01000000 | 0x02000000 | 0x04000000
+            _ => 0x01000000 | 0x02000000
         };
+
+        private static bool AllowsMaturity(int flags, int maturity) => maturity switch
+        {
+            1 => (flags & 0x02000000) != 0,
+            2 => (flags & 0x04000000) != 0,
+            _ => (flags & 0x01000000) != 0
+        };
+
+        private static bool AllowsClassifiedMaturity(int flags, int maturity) => maturity switch
+        {
+            1 => (flags & 10) != 0,
+            2 => (flags & 64) != 0,
+            _ => (flags & 5) != 0
+        };
+
+        private static int MaturityLevel(string value) => Int32.TryParse(value, NumberStyles.Integer,
+            CultureInfo.InvariantCulture, out int parsed) ? Math.Clamp(parsed, 0, 2) : 0;
+
+        private static int ClassifiedMaturityLevel(string value)
+        {
+            if (!Int32.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int flags)) return 0;
+            if ((flags & 64) != 0) return 2;
+            return (flags & 8) != 0 ? 1 : 0;
+        }
+
+        private static void AddMaturitySelection(Dictionary<string, object> vars, string prefix, string maturity)
+        {
+            string selected = (maturity ?? string.Empty).Trim().ToLowerInvariant();
+            vars[prefix + "Default"] = selected.Length == 0 ? "selected" : string.Empty;
+            vars[prefix + "General"] = selected is "general" or "pg" ? "selected" : string.Empty;
+            vars[prefix + "Mature"] = selected == "mature" ? "selected" : string.Empty;
+            vars[prefix + "Adult"] = selected == "adult" ? "selected" : string.Empty;
+        }
 
         private static void ParseLanding(string value, out int x, out int y, out int z)
         {
@@ -1090,7 +1132,8 @@ namespace OpenSim.Continuum.WebUI
             "11" => "Shopping", "14" => "Rental", _ => "Other"
         };
 
-        private static string MaturityName(string value) => value switch { "1" => "Mature", "2" => "Adult", _ => "General" };
+        private static string MaturityName(string value) => MaturityName(MaturityLevel(value));
+        private static string MaturityName(int value) => value switch { 1 => "Mature", 2 => "Adult", _ => "General" };
 
         private void AddTransactions(Dictionary<string, object> vars, UserAccount account, IReadOnlyDictionary<string, string> parameters)
         {
@@ -1503,6 +1546,8 @@ namespace OpenSim.Continuum.WebUI
                 ? new Dictionary<UUID, bool>()
                 : Safe(() => _experiences.FetchExperiencePermissions(account.PrincipalID)) ?? new Dictionary<UUID, bool>();
             string search = parameters.TryGetValue("q", out string query) ? Trimmed(query, 128) : string.Empty;
+            string maturity = account == null ? "general" : Value(parameters, "m");
+            int maturityFlags = MaturityFlags(maturity);
             if (_experiences != null)
             {
                 if (!string.IsNullOrEmpty(search)) experiences = Safe(() => _experiences.FindExperiencesByName(search)) ?? Array.Empty<ExperienceInfo>();
@@ -1519,8 +1564,10 @@ namespace OpenSim.Continuum.WebUI
                 bool related = account != null && (experience.owner_id == account.PrincipalID
                     || permissions.ContainsKey(experience.public_id));
                 if ((flags & ExperienceFlags.Private) != 0 && !related && !administrator) return false;
-                return ((flags & (ExperienceFlags.Suspended | ExperienceFlags.Disabled)) == 0)
-                    || related || administrator;
+                if ((flags & (ExperienceFlags.Suspended | ExperienceFlags.Disabled)) != 0
+                    && !related && !administrator) return false;
+                return related || administrator || AllowsMaturity(maturityFlags,
+                    Math.Clamp(experience.maturity, 0, 2));
             }).Take(100).ToList();
             List<string> ownerIDs = visibleExperiences.Select(experience => experience.owner_id)
                 .Where(id => id != UUID.Zero).Distinct().Select(id => id.ToString()).ToList();
@@ -1554,6 +1601,8 @@ namespace OpenSim.Continuum.WebUI
             vars["HaveData"] = rows.Count > 0;
             vars["NoData"] = rows.Count == 0;
             vars["ExperienceSearch"] = H(search);
+            vars["ExperienceMaturity"] = H(maturity);
+            AddMaturitySelection(vars, "ExperienceMaturity", maturity);
             vars["ExperiencesTitle"] = search.Length == 0 && account != null ? "My experiences" : "Experience search";
         }
 

@@ -9,11 +9,11 @@
     </select>
     <select class="form-control mr-2" name="m">
       {IsAuthenticatedBegin}
-      <option value="">Any maturity</option>
+      <option value="" {DestinationMaturityDefault}>General and Mature</option>
       {IsAuthenticatedEnd}
-      <option value="general">General</option>
+      <option value="general" {DestinationMaturityGeneral}>General</option>
       {IsAuthenticatedBegin}
-      <option value="mature">Mature</option><option value="adult">Adult</option>
+      <option value="mature" {DestinationMaturityMature}>Mature</option><option value="adult" {DestinationMaturityAdult}>Adult</option>
       {IsAuthenticatedEnd}
     </select>
     <button class="btn btn-info" type="submit">Search</button>

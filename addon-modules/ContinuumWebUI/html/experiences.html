@@ -2,6 +2,11 @@
   <h2>{ExperiencesTitle}</h2>
   <form action="experiences.html" method="get">
     <input name="q" value="{ExperienceSearch}" placeholder="Search experiences" maxlength="128" />
+    <select name="m">
+      {IsAuthenticatedBegin}<option value="" {ExperienceMaturityDefault}>General and Mature</option>{IsAuthenticatedEnd}
+      <option value="general" {ExperienceMaturityGeneral}>General</option>
+      {IsAuthenticatedBegin}<option value="mature" {ExperienceMaturityMature}>Mature</option><option value="adult" {ExperienceMaturityAdult}>Adult</option>{IsAuthenticatedEnd}
+    </select>
     <button class="btn btn-info" type="submit">Search</button>
   </form>
   {IfHaveDataBegin}
