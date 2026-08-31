@@ -37,6 +37,28 @@ namespace OpenSim.Region.ClientStack.Linden
         private readonly Dictionary<string, Timer> m_UploaderTimers = new Dictionary<string, Timer>();
         private readonly object m_LifecycleLock = new object();
 
+        // Values and English labels used by current Firestorm and Cool VL
+        // viewers.  AbuseCategories is optional in the viewer, but publishing
+        // it keeps the report form synchronized with the server instead of
+        // relying on a viewer's potentially stale built-in list.
+        private static readonly (int Category, string Description)[] m_AbuseCategories =
+        {
+            (31, "Age > Age play"),
+            (35, "Assault > Shooting, pushing, or shoving another Resident in a Safe Area"),
+            (39, "Disclosure > Real world information"),
+            (43, "Disturbing the peace > Excessive scripted objects"),
+            (44, "Disturbing the peace > Object littering"),
+            (45, "Disturbing the peace > Repetitive spam"),
+            (50, "Fraud > L$ or USD $"),
+            (55, "Harassment > Targeted behavior intended to disrupt"),
+            (57, "Indecency > Broadly offensive content or conduct"),
+            (59, "Indecency > Inappropriate avatar name"),
+            (60, "Indecency > Inappropriate content or conduct for Region Rating"),
+            (61, "Intolerance"),
+            (63, "Land > Encroachment > Objects or textures"),
+            (67, "Skill Gaming Policy Violation")
+        };
+
         public string Name => "AbuseReportsModule";
         public Type ReplaceableInterface => null;
 
@@ -181,6 +203,12 @@ namespace OpenSim.Region.ClientStack.Linden
 
         private void RegisterCaps(UUID agentID, Caps caps)
         {
+            caps.RegisterSimpleHandler(
+                "AbuseCategories",
+                new SimpleStreamHandler(
+                    "/CAPS/" + UUID.Random(),
+                    (request, response) => SendAbuseCategories(response)));
+
             IRequestHandler sendUserReportHandler = new RestStreamHandler(
                 "POST",
                 "/CAPS/" + UUID.Random(),
@@ -202,6 +230,26 @@ namespace OpenSim.Region.ClientStack.Linden
             caps.RegisterHandler(
                 "SendUserReportWithScreenshot",
                 sendUserReportWithScreenshotHandler);
+        }
+
+        private static void SendAbuseCategories(IOSHttpResponse response)
+        {
+            OSDArray categories = new OSDArray(m_AbuseCategories.Length);
+            foreach ((int category, string description) in m_AbuseCategories)
+            {
+                categories.Add(new OSDMap
+                {
+                    ["category"] = category,
+                    ["description_localized"] = description
+                });
+            }
+
+            response.ContentType = "application/llsd+xml";
+            response.RawBuffer = OSDParser.SerializeLLSDXmlBytes(new OSDMap
+            {
+                ["categories"] = categories
+            });
+            response.StatusCode = 200;
         }
 
         private void OnClientClosed(UUID agentID, Scene scene)
