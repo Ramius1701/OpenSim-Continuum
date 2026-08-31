@@ -1,0 +1,47 @@
+; Add this connector to the Robust [ServiceList] on the public HTTPS port:
+; ContinuumWebUIConnector = "${Const|PublicPort}/OpenSim.Continuum.WebUI.dll:ContinuumWebUIConnector"
+;
+; Copy this section into Robust.ini/Robust.HG.ini or a file loaded from
+; Robust's ConfigDirectory. Replace every example authority and secret.
+
+[ContinuumWebUI]
+    Enabled = false
+    MountPath = /webui
+    SystemName = OpenSim Continuum
+
+    ; These are local Robust service implementations. They retain provider
+    ; neutrality through each service's configured MySQL/PostgreSQL/SQLite data plugin.
+    UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
+    AuthenticationService = OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService
+    GridService = OpenSim.Services.GridService.dll:GridService
+    GridUserService = OpenSim.Services.UserAccountService.dll:GridUserService
+    FriendsService = OpenSim.Services.FriendsService.dll:FriendsService
+    UserProfilesService = OpenSim.Services.UserProfilesService.dll:UserProfilesService
+    AbuseReportsService = OpenSim.Services.AbuseReportsService.dll:AbuseReportsService
+    ExperienceService = OpenSim.Services.ExperienceService.dll:ExperienceService
+    GroupsService = OpenSim.Addons.Groups.dll:GroupsService
+    EstateDataService = OpenSim.Services.EstateService.dll:EstateDataService
+
+    ; Public browser and viewer-facing authorities. Use the externally
+    ; reachable HTTPS names; do not publish Robust's private service port.
+    PublicURL = https://grid.example.com/webui
+    HopURLBase = hop://grid.example.com
+    MapServiceURL = https://grid.example.com:8002
+    TextureURL = https://grid.example.com:8002/assets
+
+    ; Optional Continuum services. Search conventionally listens on 8010 and
+    ; ContinuumEconomy on 8009; change these when deployed elsewhere.
+    SearchServiceURL = http://127.0.0.1:8010
+    EconomyServiceURL = http://127.0.0.1:8009
+    EconomySharedSecret = CHANGE-THIS-TO-THE-SAME-UNIQUE-32-CHARACTER-SECRET
+    ServiceTimeoutMilliseconds = 5000
+
+    AllowRegistration = false
+    MinimumRegistrationAge = 16
+    AdminUserLevel = 200
+    SessionLifetimeSeconds = 3600
+    LoginAttemptsPerWindow = 10
+    LoginAttemptWindowSeconds = 300
+    RegistrationAttemptsPerWindow = 3
+    RegistrationAttemptWindowSeconds = 3600
+    GridStatusCacheSeconds = 30
