@@ -1,0 +1,10 @@
+[Migration]
+BatchSize = 250
+
+[SourceAssetData]
+StorageProvider = "OpenSim.Data.PGSQL.dll"
+ConnectionString = "Server=127.0.0.1;Port=5432;Database=opensim;User Id=opensim;Password=replace-me;SSL Mode=Prefer"
+
+[DestinationAssetData]
+StorageProvider = "OpenSim.Data.SQLite.dll"
+ConnectionString = "URI=file:RegionalAssets.db"

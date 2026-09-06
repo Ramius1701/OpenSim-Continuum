@@ -74,14 +74,24 @@ namespace OpenSim.Services.Connectors
             Initialise(source);
         }
 
+        public AssetServicesConnector(IConfigSource source, string configName)
+        {
+            InitialiseFromSection(source, configName);
+        }
+
         public virtual void Initialise(IConfigSource source)
+        {
+            InitialiseFromSection(source, "AssetService");
+        }
+
+        private void InitialiseFromSection(IConfigSource source, string configName)
         {
             IConfig netconfig = source.Configs["Network"];
 
-            IConfig assetConfig = source.Configs["AssetService"];
+            IConfig assetConfig = source.Configs[configName];
             if (assetConfig == null)
             {
-                m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
+                m_log.ErrorFormat("[ASSET CONNECTOR]: {0} missing from OpenSim.ini", configName);
                 throw new Exception("Asset connector init error");
             }
 
@@ -105,7 +115,7 @@ namespace OpenSim.Services.Connectors
             }
 
             m_ServerURI = m_GridAssetsURL.URI;
-            Initialise(source, "AssetService");
+            base.Initialise(source, configName);
         }
 
         private int m_maxAssetRequestConcurrency = 8;

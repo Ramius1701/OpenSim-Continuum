@@ -1,0 +1,46 @@
+; OpenSim Continuum distributed-region profile
+;
+; Copy this file to config/DistributedRegion.ini. Files in config/ are loaded
+; after the selected GridCommon.ini, so these regional-storage settings take
+; precedence without editing OpenSim.ini or the standard grid templates. It
+; keeps grid authority in Robust, stores scene state and asset bytes beside
+; the region, and mirrors permanent assets to the grid so inventory and region
+; crossings remain safe.
+
+[Modules]
+    AssetServices = "RegionAssetConnector"
+
+[DatabaseService]
+    ; Scene, terrain, parcel and object state owned by this simulator.
+    StorageProvider = "OpenSim.Data.SQLite.dll"
+    ConnectionString = "URI=file:RegionStore.db;UseUTF16Encoding=True"
+
+[AssetService]
+    ; RegionAssetConnector retains normal OpenSim and Hypergrid behavior while
+    ; delegating local-grid assets to Continuum's regional store/fallback pair.
+    LocalGridAssetService = "OpenSim.Services.Connectors.dll:RegionalAssetServicesConnector"
+    HypergridAssetService = "OpenSim.Services.Connectors.dll:HGAssetServiceConnector"
+    ; Replace with the Continuum grid's public Robust asset endpoint.
+    AssetServerURI = "http://grid.example.org:8003"
+
+    ; Use the same service authentication required by the grid operator.
+    ; AuthType = "BasicHttpAuthentication"
+    ; HttpAuthUsername = "region-service-account"
+    ; HttpAuthPassword = "replace-me"
+
+[RegionalAssetService]
+    LocalServiceModule = "OpenSim.Services.AssetService.dll:AssetService"
+    LocalServiceSection = "RegionalAssetService"
+    StorageProvider = "OpenSim.Data.SQLite.dll"
+    ConnectionString = "URI=file:RegionalAssets.db"
+
+    GridServiceModule = "OpenSim.Services.Connectors.dll:AssetServicesConnector"
+    GridServiceSection = "AssetService"
+
+    ; Safety defaults for the first production phase.  Local bytes are primary,
+    ; while permanent assets are mirrored centrally for inventory and travel.
+    MirrorPermanentAssetsToGrid = true
+    RequireGridMirror = true
+    CacheGridAssetsLocally = true
+    ; Removing a regional copy must not erase a grid-authoritative asset.
+    DeleteFromGrid = false

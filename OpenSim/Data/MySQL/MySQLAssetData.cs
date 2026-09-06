@@ -301,7 +301,7 @@ namespace OpenSim.Data.MySQL
                     dbcon.Open();
 
                     using (MySqlCommand cmd = new(
-                            "SELECT name,description,assetType,temporary,id,asset_flags,CreatorID FROM assets LIMIT ?start, ?count",
+                            "SELECT name,description,assetType,temporary,id,asset_flags,CreatorID FROM assets ORDER BY id LIMIT ?start, ?count",
                             dbcon))
                     {
                         cmd.Parameters.AddWithValue("?start", start);

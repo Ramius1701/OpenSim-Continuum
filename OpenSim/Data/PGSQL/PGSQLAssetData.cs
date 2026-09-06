@@ -287,7 +287,7 @@ namespace OpenSim.Data.PGSQL
             using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
             {
                 cmd.Parameters.Add(m_database.CreateParameter("start", start));
-                cmd.Parameters.Add(m_database.CreateParameter("stop", start + count - 1));
+                cmd.Parameters.Add(m_database.CreateParameter("stop", count));
                 conn.Open();
                 using (NpgsqlDataReader reader = cmd.ExecuteReader())
                 {
