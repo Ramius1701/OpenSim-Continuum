@@ -27,6 +27,7 @@
 	<link type="text/css" rel="stylesheet" href="static/css/slick-theme.css?v=20190901">
 	<link type="text/css" rel="stylesheet" href="static/css/queries.css?v=20190901">
 	<link type="text/css" rel="stylesheet" href="static/css/user.css?v=20220701" />
+	<link type="text/css" rel="stylesheet" href="static/css/continuum-dark.css?v=20260906-5" />
 
 </head>
 <body>
@@ -57,9 +58,8 @@
 									<li class="dropdown" id="{MenuItemID}" alt="{MenuItemTitle}" title="{MenuItemTitleHelp}">
 										<a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" 
 											 aria-haspopup="true" aria-expanded="false">{MenuItemTitle}
-											<span class="caret"></span>
-										</a>
-										<ul class="dropdown-menu" id="submenu">
+									</a>
+									<ul class="dropdown-menu">
 											{ChildrenMenuItemsArrayBegin}
 												{IfChildShowInMenuBegin}
 													<li id="{ChildMenuItemID}" alt="{ChildMenuItemTitle}" title="{ChildMenuItemTitleHelp}">
@@ -127,7 +127,7 @@
 												<li id="{MenuItemID}" class="active" alt="{MenuItemTitle}" title="{MenuItemTitleHelp}">
 													{MenuItemTitle}
 													{IfHasChildrenBegin}
-														<ul id="submenu">
+												<ul class="submenu">
 															{ChildrenMenuItemsArrayBegin}
 																{IfChildShowInMenuBegin}
 																	<li id="{ChildMenuItemID}" alt="{ChildMenuItemTitle}" 
@@ -185,7 +185,7 @@
 
 	<script src="static/js/slick.min.js?v=20190901"></script>
 	<script src="static/js/scripts.js?v=20200601"></script>
-	<script src="static/js/usermenu.js?v=20190910"></script>
+	<script src="static/js/usermenu.js?v=20260906-2"></script>
 
 	<script>
 		function tooltip() {$('#container *').tooltip({showURL: false});};

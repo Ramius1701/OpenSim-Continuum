@@ -166,8 +166,10 @@ namespace OpenSim.Framework.Servers
             }
             else
             {
-                // FIXME: This should be done through an interface rather than casting.
-                m_consoleAppender.Console = (ConsoleBase)m_console;
+                // MockConsole is used by unattended service deployments and does
+                // not derive from ConsoleBase.  Leave the appender detached in
+                // that case so it writes to redirected stdout without crashing.
+                m_consoleAppender.Console = m_console as ConsoleBase;
 
                 // If there is no threshold set then the threshold is effectively everything.
                 if (m_consoleAppender.Threshold is null)

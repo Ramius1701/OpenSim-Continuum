@@ -1,0 +1,67 @@
+<!-- Unified viewer web search. SearchURL supplies q from Firestorm's [QUERY]. -->
+<section class="container-fluid py-4" id="continuum-web-search">
+  <div class="text-center mb-4">
+    <h2>Search Continuum</h2>
+    <p>Find residents, regions, destinations, events, and classifieds across the grid.</p>
+  </div>
+  <form method="get" action="./" class="form-inline justify-content-center mb-4">
+    <input type="hidden" name="page" value="search">
+    <input class="form-control form-control-lg mr-2" style="min-width:65%" type="search" name="q" maxlength="128" value="{WebSearchQuery}" placeholder="What are you looking for?" autofocus>
+    <button class="btn btn-info btn-lg" type="submit">Search</button>
+  </form>
+
+  {IfWebSearchIdleBegin}
+  <p class="text-center text-muted">Enter a name, place, event, or keyword to begin.</p>
+  {IfWebSearchIdleEnd}
+
+  {IfWebSearchReadyBegin}
+  {IfHaveWebSearchResultsBegin}
+  <h3>Residents</h3>
+  <div class="row mb-3">
+    {WebSearchResidentsArrayBegin}
+    <article class="col-md-4 mb-2"><div class="card bg-dark text-light h-100"><div class="card-body">
+      <h4 class="h5">{UserName}</h4><p>{UserType}</p>
+      <a href="#" onclick="loadmodalcontent('webprofile-modal_profile', 'userid={UserID}'); return false;">View profile</a>
+    </div></div></article>
+    {WebSearchResidentsArrayEnd}
+  </div>
+
+  <h3>Regions</h3>
+  <div class="row mb-3">
+    {WebSearchRegionsArrayBegin}
+    <article class="col-md-4 mb-2"><div class="card bg-dark text-light h-100"><div class="card-body">
+      <h4 class="h5">{RegionName}</h4><p>Online at {RegionLocX}, {RegionLocY}</p><a href="{HopUrl}">Teleport</a>
+    </div></div></article>
+    {WebSearchRegionsArrayEnd}
+  </div>
+
+  <h3>Places and destinations</h3>
+  <div class="row mb-3">
+    {WebSearchDestinationsArrayBegin}
+    <article class="col-md-4 mb-2"><div class="card bg-dark text-light h-100">
+      <img class="card-img-top" style="height:140px;object-fit:cover" src="{DestinationImage}" alt="{DestinationName}">
+      <div class="card-body"><h4 class="h5">{DestinationName}</h4><p>{DestinationDescription}</p><a href="{DestinationHop}">Teleport</a></div>
+    </div></article>
+    {WebSearchDestinationsArrayEnd}
+  </div>
+
+  <h3>Events</h3>
+  <ul class="list-unstyled mb-3">
+    {WebSearchEventsArrayBegin}
+    <li><a href="{EventHop}">{Name}</a> — {Description} ({SimName})</li>
+    {WebSearchEventsArrayEnd}
+  </ul>
+
+  <h3>Classifieds</h3>
+  <ul class="list-unstyled mb-3">
+    {WebSearchClassifiedsArrayBegin}
+    <li><a href="{ClassifiedHop}">{Name}</a> — {Description} ({ClassifiedRegion})</li>
+    {WebSearchClassifiedsArrayEnd}
+  </ul>
+  {IfHaveWebSearchResultsEnd}
+
+  {IfNoWebSearchResultsBegin}
+  <p>No results matched “{WebSearchQuery}”.</p>
+  {IfNoWebSearchResultsEnd}
+  {IfWebSearchReadyEnd}
+</section>

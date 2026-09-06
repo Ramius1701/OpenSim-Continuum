@@ -5,8 +5,42 @@ $(function(){
 	var loading = $("#loading");
 	var main_content = $("#main_content");
 
+	// The inherited templates mix Bootstrap generations and dynamically render
+	// menu items. Own dropdown state here so it behaves consistently in desktop
+	// browsers and viewer-embedded Chromium.
+	var dropdownToggles = $("#topmenu > li.dropdown > .dropdown-toggle");
+	dropdownToggles.on("click.continuum", function(event){
+		event.preventDefault();
+		event.stopPropagation();
+		var parent = $(this).parent();
+		var opening = !parent.hasClass("show");
+		$("#topmenu > li.dropdown.show").removeClass("show")
+			.children(".dropdown-menu").removeClass("show");
+		$("#topmenu > li.dropdown > .dropdown-toggle").attr("aria-expanded", "false");
+		if (opening) {
+			parent.addClass("show");
+			parent.children(".dropdown-menu").addClass("show");
+			$(this).attr("aria-expanded", "true");
+		}
+	});
+	$(document).on("click.continuumDropdown", function(){
+		$("#topmenu > li.dropdown.show").removeClass("show")
+			.children(".dropdown-menu").removeClass("show");
+		dropdownToggles.attr("aria-expanded", "false");
+	});
+	$("#topmenu > li.dropdown > .dropdown-menu > li").on("click.continuumItem", function(event){
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		var pageId = this.id;
+		$(this).closest("li.dropdown").removeClass("show")
+			.children(".dropdown-menu").removeClass("show");
+		dropdownToggles.attr("aria-expanded", "false");
+		showLoading();
+		loadcontent(pageId);
+	});
+
 	// Main menu click events
-	topmenu.click(function(event){
+	topmenu.not('.dropdown').click(function(event){
 		showLoading();
 		switch(this.id){
 			{MenuItemsArrayBegin}

@@ -178,6 +178,7 @@ namespace OpenSim.Continuum.WebUI
             if (key == "events/events.html") AddEvents(vars, parameters, currentUser);
             if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters, currentUser);
             if (key == "destinations.html") AddDestinations(vars, parameters, currentUser);
+            if (key == "search.html") AddWebSearch(vars, parameters, currentUser);
             if (key == "online_users.html") AddOnlineUsers(vars);
             if (key == "user_search.html") AddUserSearch(vars, parameters, currentUser);
             if (key == "register.html") AddRegistration(vars);
@@ -1055,14 +1056,102 @@ namespace OpenSim.Continuum.WebUI
                     });
                 }
             }
+
+            // A new grid commonly has no parcels explicitly marked "Show in
+            // Search" yet.  The destination guide must still be useful, so
+            // fall back to online regions without pretending that unpublished
+            // parcels are directory listings.  Published parcel results always
+            // take precedence once the search crawler has any.
+            if (rows.Count == 0 && _grid != null)
+            {
+                List<GridRegion> regions = text.Length == 0
+                    ? Safe(() => _grid.GetOnlineRegions(UUID.Zero, 0, 0, 10000))
+                    : Safe(() => _grid.GetRegionsByName(UUID.Zero, text, 100));
+
+                foreach (GridRegion region in (regions ?? new List<GridRegion>()).Take(100))
+                {
+                    int regionMaturity = Math.Clamp(region.Maturity, 0, 2);
+                    if (!AllowsMaturity(flags, regionMaturity)) continue;
+
+                    rows.Add(new Dictionary<string, object>
+                    {
+                        ["DestinationName"] = H(region.RegionName),
+                        ["DestinationDescription"] = "Visit this online region.",
+                        ["DestinationRegion"] = H(region.RegionName),
+                        ["DestinationCategory"] = "Region",
+                        ["DestinationMaturity"] = MaturityName(regionMaturity),
+                        ["DestinationDwell"] = "0",
+                        ["DestinationArea"] = (region.RegionSizeX * region.RegionSizeY).ToString(CultureInfo.InvariantCulture),
+                        ["DestinationPrice"] = "0",
+                        ["DestinationForSale"] = string.Empty,
+                        ["DestinationImage"] = Texture(region.TerrainImage, "static/icons/no_picture.jpg"),
+                        ["DestinationHop"] = Hop(region.RegionName, region.RegionSizeX / 2, region.RegionSizeY / 2, 25)
+                    });
+                }
+            }
             vars["Destinations"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["DestinationSearch"] = H(text); vars["DestinationTab"] = H(tab);
             vars["DestinationMaturity"] = H(maturity);
             AddMaturitySelection(vars, "DestinationMaturity", maturity);
         }
 
+        private void AddWebSearch(Dictionary<string, object> vars, IReadOnlyDictionary<string, string> parameters,
+            UserAccount currentUser)
+        {
+            string query = Trimmed(Value(parameters, "q"), 128);
+            vars["WebSearchQuery"] = H(query);
+            vars["WebSearchIdle"] = query.Length == 0;
+            vars["WebSearchReady"] = query.Length > 0;
+            if (query.Length == 0)
+            {
+                vars["WebSearchResidents"] = new List<Dictionary<string, object>>();
+                vars["WebSearchRegions"] = new List<Dictionary<string, object>>();
+                vars["WebSearchDestinations"] = new List<Dictionary<string, object>>();
+                vars["WebSearchEvents"] = new List<Dictionary<string, object>>();
+                vars["WebSearchClassifieds"] = new List<Dictionary<string, object>>();
+                vars["HaveWebSearchResults"] = false;
+                vars["NoWebSearchResults"] = false;
+                return;
+            }
+
+            var forwarded = new Dictionary<string, string>(parameters, StringComparer.OrdinalIgnoreCase)
+            {
+                ["q"] = query,
+                ["username"] = query,
+                ["regionname"] = query,
+                ["text"] = query
+            };
+
+            var residents = new Dictionary<string, object>();
+            var regions = new Dictionary<string, object>();
+            var destinations = new Dictionary<string, object>();
+            var events = new Dictionary<string, object>();
+            var classifieds = new Dictionary<string, object>();
+            AddUserSearch(residents, forwarded, currentUser);
+            AddRegions(regions, query);
+            AddDestinations(destinations, forwarded, currentUser);
+            AddEvents(events, forwarded, currentUser);
+            AddClassifieds(classifieds, forwarded, currentUser);
+
+            vars["WebSearchResidents"] = residents.TryGetValue("UsersList", out object residentRows) ? residentRows : new List<Dictionary<string, object>>();
+            vars["WebSearchRegions"] = regions.TryGetValue("RegionsList", out object regionRows) ? regionRows : new List<Dictionary<string, object>>();
+            vars["WebSearchDestinations"] = destinations.TryGetValue("Destinations", out object destinationRows) ? destinationRows : new List<Dictionary<string, object>>();
+            vars["WebSearchEvents"] = events.TryGetValue("EventList", out object eventRows) ? eventRows : new List<Dictionary<string, object>>();
+            vars["WebSearchClassifieds"] = classifieds.TryGetValue("ClassifiedList", out object classifiedRows) ? classifiedRows : new List<Dictionary<string, object>>();
+            int count = CountRows(vars["WebSearchResidents"]) + CountRows(vars["WebSearchRegions"])
+                + CountRows(vars["WebSearchDestinations"]) + CountRows(vars["WebSearchEvents"])
+                + CountRows(vars["WebSearchClassifieds"]);
+            vars["HaveWebSearchResults"] = count > 0;
+            vars["NoWebSearchResults"] = count == 0;
+        }
+
+        private static int CountRows(object value) => value is ICollection collection ? collection.Count : 0;
+
         private static int MaturityFlags(string maturity) => maturity.Trim().ToLowerInvariant() switch
         {
+            "13" => 0x01000000,
+            "21" => 0x01000000 | 0x02000000,
+            "42" => 0x01000000 | 0x02000000 | 0x04000000,
             "general" or "pg" => 0x01000000,
             "mature" => 0x02000000,
             "adult" => 0x04000000,
@@ -1716,8 +1805,23 @@ namespace OpenSim.Continuum.WebUI
             if (plugin.Length == 0) return null;
             try
             {
-                T service = ServerUtils.LoadPlugin<T>(plugin, new object[] { config });
-                return service ?? ServerUtils.LoadPlugin<T>(plugin, new object[] { config, key });
+                if (string.Equals(key, "UserProfilesService", StringComparison.Ordinal))
+                    return ServerUtils.LoadPlugin<T>(plugin, new object[] { config, key });
+
+                try
+                {
+                    T service = ServerUtils.LoadPlugin<T>(plugin, new object[] { config });
+                    if (service != null)
+                        return service;
+                }
+                catch (MissingMethodException)
+                {
+                    // Some ROBUST services, including UserProfilesService,
+                    // require their configuration section name as a second
+                    // constructor argument.
+                }
+
+                return ServerUtils.LoadPlugin<T>(plugin, new object[] { config, key });
             }
             catch (Exception e) { Log.WarnFormat("[CONTINUUM WEBUI]: Optional {0} unavailable: {1}", key, e.Message); return null; }
         }

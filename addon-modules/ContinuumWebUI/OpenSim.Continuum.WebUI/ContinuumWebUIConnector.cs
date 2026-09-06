@@ -269,6 +269,7 @@ namespace OpenSim.Continuum.WebUI
             var menus = new List<Dictionary<string, object>>
             {
                 Menu("home", "Home", "home.html"),
+                Menu("search", "Search", "search.html"),
                 Menu("world_map", "World map", "world_map.html"),
                 Menu("destinations", "Destinations", "destinations.html"),
                 Menu("events", "Events", "events.html"),
