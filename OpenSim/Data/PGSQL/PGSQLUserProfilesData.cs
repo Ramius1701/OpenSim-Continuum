@@ -140,6 +140,7 @@ namespace OpenSim.Data.PGSQL
                             parceluuid = :ParcelId, parentestate = :ParentEstate, snapshotuuid = :SnapshotId,
                             simname = :SimName, posglobal = :GlobalPos, parcelname = :ParcelName, classifiedflags = :Flags,
                             priceforlisting = :ListingPrice
+                        WHERE classifieduuid = :ClassifiedId
                         RETURNING * )
                       INSERT INTO classifieds (classifieduuid,creatoruuid,creationdate,expirationdate,category,name,
                             description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname,classifiedflags,
@@ -413,6 +414,7 @@ namespace OpenSim.Data.PGSQL
                             name = :Name, description = :Desc, snapshotuuid = :SnapshotId, ""user"" = :User,
                             originalname = :Original, simname = :SimName, posglobal = :GlobalPos,
                             sortorder = :SortOrder, enabled = :Enabled
+                        WHERE pickuuid = :PickId
                         RETURNING * )
                       INSERT INTO userpicks (pickuuid,creatoruuid,toppick,parceluuid,name,description,
                             snapshotuuid,""user"",originalname,simname,posglobal,sortorder,enabled)
@@ -449,7 +451,7 @@ namespace OpenSim.Data.PGSQL
             }
             catch (Exception e)
             {
-                m_log.Error("[PROFILES_DATA]: UpdateAvatarNotes exception ", e);
+                m_log.Error("[PROFILES_DATA]: UpdatePicksRecord exception ", e);
                 return false;
             }
 
@@ -545,12 +547,14 @@ namespace OpenSim.Data.PGSQL
                 remove = false;
 
                 query = @"WITH upsert AS (
-                          UPDATE usernotes SET notes = :Notes, useruuid = :UserId, targetuuid = :TargetId RETURNING * )
-                          INSERT INTO usernotes (notes,useruuid,targetuuid)
-                          SELECT :Notes,:UserId,:TargetId
-                            WHERE NOT EXISTS (
-                              SELECT * FROM upsert
-                            )";
+                UPDATE usernotes SET notes = :Notes
+                WHERE useruuid = :UserId AND targetuuid = :TargetId
+                RETURNING * )
+                INSERT INTO usernotes (notes,useruuid,targetuuid)
+                SELECT :Notes,:UserId,:TargetId
+                    WHERE NOT EXISTS (
+                    SELECT * FROM upsert
+                    )";
             }
 
             try

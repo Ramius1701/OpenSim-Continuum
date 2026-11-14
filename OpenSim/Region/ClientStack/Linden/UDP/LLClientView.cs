@@ -5620,7 +5620,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         };
                         OSDArray sides = new();
                         OSDArray sidesdata = new();
-                   
+
                         foreach (Primitive.RenderMaterials.RenderMaterialOverrideEntry ovr in sop.Shape.RenderMaterials.overrides)
                         {
                             sides.Add(ovr.te_index);
@@ -5638,6 +5638,11 @@ namespace OpenSim.Region.ClientStack.LindenUDP
                         inner = $"{{'id':i{sop.LocalId},'od':[],'te':[]}}";
 
                     byte[] innerB = Util.UTF8NBGetbytes(inner);
+                    // all sides of an object travel in one GenericStreamingMessage and cannot be split (the viewer clears
+                    // the sides that are missing). Above ~1400 bytes the datagram gets IP-fragmented; many home routers
+                    // drop fragments, the viewer never acks, and the reliable packet is resent over and over with stale data.
+                    if (innerB.Length + 11 > 1400)
+                        m_log.Warn($"[LLCLIENTVIEW]: material override for {sop.Name} ({sop.UUID}) is {innerB.Length + 11} bytes, the packet will be fragmented");
                     if (innerB.Length > UDPPacketBuffer.BUFFER_SIZE - 16)
                     {
                         m_log.Debug($"[LLCLIENTVIEW]: GenericStreamingMessage packet too large ({innerB.Length})");
@@ -5684,6 +5689,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
 
             #endregion
         }
+
 
         static private readonly byte[] GenericStreamingMessageHeader = new byte[] {
                 Helpers.MSG_RELIABLE,
@@ -5753,7 +5759,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             List<SceneObjectGroup> kills = new();
 
             EntityBase[] entities = m_scene.Entities.GetEntities();
-            foreach (EntityBase e in entities.AsSpan())
+            foreach (EntityBase e in entities)
             {
                 if (!IsActive)
                     return;

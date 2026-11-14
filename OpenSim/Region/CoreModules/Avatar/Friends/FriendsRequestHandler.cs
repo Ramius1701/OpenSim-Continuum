@@ -54,7 +54,6 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
         public FriendsRequestHandler(FriendsModule fmodule)
                 : base("POST", "/friends", new BasicDosProtectorOptions()
                                             {
-                                                AllowXForwardedFor = true,
                                                 ForgetTimeSpan = TimeSpan.FromMinutes(2),
                                                 MaxRequestsInTimeframe = 20,
                                                 ReportingName = "FRIENDSDOSPROTECTOR",
@@ -79,6 +78,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends
             {
                 httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
+            }
+
+            if(httpRequest.Headers["X-SecondLife-Shard"] != null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.NotAcceptable;
             }
 
             httpResponse.KeepAlive = false;

@@ -276,9 +276,9 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                 if (isLocal)
                     ApplyCanonicalLocalServiceURLs(agentCircuit);
 
-                if (agentCircuit.ServiceURLs.ContainsKey("HomeURI"))
+                if (agentCircuit.ServiceURLs.TryGetValue("HomeURI", out object HomeURIobj))
                 {
-                    string userAgentDriver = agentCircuit.ServiceURLs["HomeURI"].ToString();
+                    string userAgentDriver = HomeURIobj.ToString();
                     IUserAgentService connector;
 
                     if (m_thisGridInfo.IsLocalHome(userAgentDriver) == 1 && m_UAS != null)
@@ -541,7 +541,7 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                 m_log.DebugFormat("[HG ENTITY TRANSFER MODULE]: Unable to locate agent's gateway information");
                 return false;
             }
-            if (!aCircuit.ServiceURLs.ContainsKey("HomeURI"))
+            if (!aCircuit.ServiceURLs.TryGetValue("HomeURI", out object HomeURIobj))
             {
                 if (notsame)
                     client.SendAlertMessage("TeleportHome: Agent home not set");
@@ -550,7 +550,7 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
                 return false;
             }
 
-            string homeURI = aCircuit.ServiceURLs["HomeURI"].ToString();
+            string homeURI = HomeURIobj.ToString();
 
             IUserAgentService userAgentService = new UserAgentServiceConnector(homeURI);
             Vector3 position = Vector3.UnitY, lookAt = Vector3.UnitY;

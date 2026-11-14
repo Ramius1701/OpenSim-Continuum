@@ -712,6 +712,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int OBJECT_DAMAGE_TYPE = 52;
         public const int OBJECT_PERMS = 53;
         public const int OBJECT_PERMS_COMBINED = 54;
+        public const int OBJECT_LOCKED = 55;
+        public const int OBJECT_VOLUME_DETECT = 56;
 
 
         // Pathfinding types
