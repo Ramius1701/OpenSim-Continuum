@@ -38,7 +38,7 @@ using OpenSim.Data;
 
 namespace OpenSim.Data.MySQL
 {
-    public class MySQLEstateStore : IEstateDataStore
+    public class MySQLEstateStore : IEstateDataStore, IEstateSettingsUpdater
     {
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -248,6 +248,14 @@ namespace OpenSim.Data.MySQL
                 }
                 dbcon.Close();
             }
+        }
+
+        public bool SupportsEstateSettingsUpdate => true;
+        public bool TryUpdateEstateSettings(EstateSettings expected, EstateSettings updated)
+        {
+            using var connection = new MySqlConnection(new MySqlConnectionStringBuilder(m_connectionString) { UseAffectedRows = false }.ConnectionString);
+            connection.Open();
+            return EstateSettingsUpdateCommand.Execute(connection, expected, updated, "mysql");
         }
 
         public void StoreEstateSettings(EstateSettings es)

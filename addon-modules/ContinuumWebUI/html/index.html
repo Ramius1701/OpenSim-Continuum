@@ -23,7 +23,7 @@
 
   <link type="text/css" rel="stylesheet" href="static/css/queries.css?v=20190901">
   <link type="text/css" rel="stylesheet" href="static/css/style.css?v=20190904">
-  <link type="text/css" rel="stylesheet" href="static/css/continuum-dark.css?v=20260906-6">
+  <link type="text/css" rel="stylesheet" href="static/css/continuum-dark.css?v=20261022-1">
 
 </head>
 
@@ -78,7 +78,9 @@
 				<ul class="navbar-nav continuum-member-actions" id="member-actions">
                     {IsNotAuthenticatedBegin}
 					<li id="login" class="nav-item"><a href="#" class="nav-link">Log in</a></li>
-					<li id="register" class="nav-item"><a href="#" class="btn btn-primary btn-sm">Sign up</a></li>
+					{IfPortalRegistrationEnabledBegin}
+                    <li id="register" class="nav-item"><a href="#" class="btn btn-primary btn-sm">Sign up</a></li>
+                    {IfPortalRegistrationEnabledEnd}
                     {IsNotAuthenticatedEnd}
                     {IsAuthenticatedBegin}
 					<li id="logout" class="nav-item"><a href="#" class="btn btn-outline-light btn-sm">Log out</a></li>

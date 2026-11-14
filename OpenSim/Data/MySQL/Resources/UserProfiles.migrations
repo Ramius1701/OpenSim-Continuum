@@ -84,3 +84,40 @@ CREATE TABLE IF NOT EXISTS `usersettings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 commit;
+
+:VERSION 6
+
+# opensim-lickx 6614599b7506 profile Unicode migration, adapted to utf8mb4
+# for supplementary characters and extended to the usersettings email field.
+ALTER TABLE classifieds CONVERT TO CHARACTER SET utf8mb4;
+ALTER TABLE usernotes CONVERT TO CHARACTER SET utf8mb4;
+ALTER TABLE userpicks CONVERT TO CHARACTER SET utf8mb4;
+ALTER TABLE userprofile CONVERT TO CHARACTER SET utf8mb4;
+ALTER TABLE userdata CONVERT TO CHARACTER SET utf8mb4;
+ALTER TABLE usersettings CONVERT TO CHARACTER SET utf8mb4;
+
+commit;
+
+:VERSION 7
+
+BEGIN;
+
+# Private resident contact JSON is committed as a single bounded record.
+ALTER TABLE userdata MODIFY COLUMN `DataVal` TEXT;
+
+COMMIT;
+
+:VERSION 8
+
+BEGIN;
+
+CREATE TABLE continuum_partnership_proposals (
+    proposalid varchar(36) NOT NULL PRIMARY KEY,
+    sender varchar(36) NOT NULL UNIQUE,
+    recipient varchar(36) NOT NULL,
+    message text NOT NULL,
+    expires bigint NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX continuum_partnership_recipient ON continuum_partnership_proposals(recipient,expires);
+
+COMMIT;

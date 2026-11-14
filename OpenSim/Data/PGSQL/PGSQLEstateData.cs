@@ -38,7 +38,7 @@ using NpgsqlTypes;
 
 namespace OpenSim.Data.PGSQL
 {
-    public class PGSQLEstateStore : IEstateDataStore
+    public class PGSQLEstateStore : IEstateDataStore, IEstateSettingsUpdater
     {
         private const string _migrationStore = "EstateStore";
 
@@ -249,6 +249,14 @@ namespace OpenSim.Data.PGSQL
         /// Stores the estate settings.
         /// </summary>
         /// <param name="es">estate settings</param>
+        public bool SupportsEstateSettingsUpdate => true;
+        public bool TryUpdateEstateSettings(EstateSettings expected, EstateSettings updated)
+        {
+            using var connection = new NpgsqlConnection(m_connectionString);
+            connection.Open();
+            return EstateSettingsUpdateCommand.Execute(connection, expected, updated, "postgres");
+        }
+
         public void StoreEstateSettings(EstateSettings es)
         {
             List<string> names = new List<string>(FieldList);

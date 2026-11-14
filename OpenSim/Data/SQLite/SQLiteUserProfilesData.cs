@@ -39,8 +39,16 @@ using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Data.SQLite
 {
-    public class SQLiteUserProfilesData: IProfilesData
+    public class SQLiteUserProfilesData: IProfilesData, IUserPartnershipData
     {
+        public PartnershipProposal[] GetPartnershipProposals(UUID actor)
+        {
+            lock (m_connection) return PartnershipCommands.Read(m_connection, actor);
+        }
+        public string ChangePartnership(UUID actor, UUID other, UUID proposal, string action, string message)
+        {
+            lock (m_connection) return PartnershipCommands.Change(m_connection, "sqlite", actor, other, proposal, action, message);
+        }
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -124,9 +132,10 @@ namespace OpenSim.Data.SQLite
         }
         public bool UpdateClassifiedRecord(UserClassifiedAdd ad, ref string result)
         {
+            // An edit must not replace its creator, paid price or lifetime.
             string query = string.Empty;
 
-            query += "INSERT OR REPLACE INTO classifieds (";
+            query += "INSERT INTO classifieds (";
             query += "`classifieduuid`,";
             query += "`creatoruuid`,";
             query += "`creationdate`,";
@@ -157,7 +166,11 @@ namespace OpenSim.Data.SQLite
             query += ":GlobalPos,";
             query += ":ParcelName,";
             query += ":Flags,";
-            query += ":ListingPrice ) ";
+            query += ":ListingPrice ) ON CONFLICT(classifieduuid) DO UPDATE SET ";
+            query += "category=excluded.category,name=excluded.name,description=excluded.description,";
+            query += "parceluuid=excluded.parceluuid,parentestate=excluded.parentestate,snapshotuuid=excluded.snapshotuuid,";
+            query += "simname=excluded.simname,posglobal=excluded.posglobal,parcelname=excluded.parcelname,classifiedflags=excluded.classifiedflags ";
+            query += "WHERE classifieds.creatoruuid=excluded.creatoruuid";
 
             if(string.IsNullOrEmpty(ad.ParcelName))
                 ad.ParcelName = "Unknown";
@@ -206,7 +219,8 @@ namespace OpenSim.Data.SQLite
                     cmd.Parameters.AddWithValue(":Flags", ad.Flags.ToString());
                     cmd.Parameters.AddWithValue(":ListingPrice", ad.Price.ToString ());
 
-                    cmd.ExecuteNonQuery();
+                    if (cmd.ExecuteNonQuery() == 0)
+                    { result = "Classified belongs to another resident"; return false; }
                 }
             }
             catch (Exception e)
@@ -223,7 +237,7 @@ namespace OpenSim.Data.SQLite
             string query = string.Empty;
 
             query += "DELETE FROM classifieds WHERE ";
-            query += "classifieduuid = :ClasifiedId";
+            query += "classifieduuid = :ClassifiedId";
 
             try
             {
@@ -271,7 +285,7 @@ namespace OpenSim.Data.SQLite
                             ad.ParentEstate = Convert.ToInt32(reader["parentestate"]);
                             ad.Flags = (byte) Convert.ToUInt32(reader["classifiedflags"]);
                             ad.Category = Convert.ToInt32(reader["category"]);
-                            ad.Price = Convert.ToInt16(reader["priceforlisting"]);
+                            ad.Price = Convert.ToInt32(reader["priceforlisting"]);
                             ad.Name = reader["name"].ToString();
                             ad.Description = reader["description"].ToString();
                             ad.SimName = reader["simname"].ToString();

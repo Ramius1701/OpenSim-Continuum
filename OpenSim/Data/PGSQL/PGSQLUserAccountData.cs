@@ -36,10 +36,16 @@ using System.Reflection;
 
 namespace OpenSim.Data.PGSQL
 {
-    public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IUserAccountData
+    public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IUserAccountData, IUserAccountArchiveData
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+
+        public bool TryArchiveAccount(UUID principal)
+        {
+            using var connection = new NpgsqlConnection(m_ConnectionString); connection.Open();
+            return UserAccountArchiveCommand.Execute(connection, m_Realm, principal, true);
+        }
 
         public PGSQLUserAccountData(string connectionString, string realm) :
             base(connectionString, realm, "UserAccount")
@@ -298,14 +304,14 @@ namespace OpenSim.Data.PGSQL
             {
                 if (words.Length == 1)
                 {
-                    sql = String.Format(@"select * from {0} where (""ScopeID""=:ScopeID or ""ScopeID""=:UUIDZero) and (LOWER(""FirstName"" COLLATE ""en_US.utf8"") like LOWER(:search) or LOWER(""LastName"" COLLATE ""en_US.utf8"") like LOWER(:search) or LOWER(""DisplayName"" COLLATE ""en_US.utf8"") like LOWER(:search))", m_Realm);
+                    sql = String.Format(@"select * from {0} where (""ScopeID""=:ScopeID or ""ScopeID""=:UUIDZero) and (""FirstName"" ILIKE :search or ""LastName"" ILIKE :search or ""DisplayName"" ILIKE :search)", m_Realm);
                     cmd.Parameters.Add(m_database.CreateParameter("ScopeID", scopeID));
                     cmd.Parameters.Add (m_database.CreateParameter("UUIDZero", UUID.Zero));
                     cmd.Parameters.Add(m_database.CreateParameter("search", "%" + words[0] + "%"));
                 }
                 else
                 {
-                    sql = String.Format(@"select * from {0} where (""ScopeID""=:ScopeID or ""ScopeID""=:UUIDZero) and (LOWER(""FirstName"" COLLATE ""en_US.utf8"") like LOWER(:searchFirst) and LOWER(""LastName"" COLLATE ""en_US.utf8"") like LOWER(:searchLast) or LOWER(""DisplayName"" COLLATE ""en_US.utf8"") like LOWER(:searchDisplay))", m_Realm);
+                    sql = String.Format(@"select * from {0} where (""ScopeID""=:ScopeID or ""ScopeID""=:UUIDZero) and (""FirstName"" ILIKE :searchFirst and ""LastName"" ILIKE :searchLast or ""DisplayName"" ILIKE :searchDisplay)", m_Realm);
                     cmd.Parameters.Add(m_database.CreateParameter("searchFirst", "%" + words[0] + "%"));
                     cmd.Parameters.Add(m_database.CreateParameter("searchLast", "%" + words[1] + "%"));
                     cmd.Parameters.Add(m_database.CreateParameter("searchDisplay", "%" + query + "%"));

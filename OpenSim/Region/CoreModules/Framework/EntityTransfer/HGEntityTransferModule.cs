@@ -829,6 +829,8 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 
         public override bool HandleIncomingAttachments(ScenePresence sp, List<SceneObjectGroup> attachments)
         {
+            if (sp.IsDeleted)
+                return false;
             UUID OwnerID = sp.UUID;
             if (m_sceneRegionInfo.EstateSettings.IsBanned(OwnerID))
             {
@@ -842,6 +844,15 @@ namespace OpenSim.Region.CoreModules.Framework.EntityTransfer
 
             // foreign user
             AgentCircuitData aCircuit = m_scene.AuthenticateHandler.GetAgentCircuitData(OwnerID);
+            if (aCircuit != null && (aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0
+                && (aCircuit.ServiceURLs == null || !aCircuit.ServiceURLs.TryGetValue("AssetServerURI", out object assetURL)
+                    || string.IsNullOrWhiteSpace(assetURL?.ToString())))
+            {
+                // lickx: a visitor without an asset service may enter without
+                // attachments, but must not remain stuck waiting for their data.
+                sp.GotAttachmentsData = true;
+                return true;
+            }
             if (aCircuit != null)
             {
                 if ((aCircuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) == 0)

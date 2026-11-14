@@ -40,7 +40,8 @@ namespace ContinuumSearch.Service
                 MainConsole.Instance = new LocalConsole("ContinuumSearch ");
                 uint port = checked((uint)service.GetInt("Port", 8010));
                 BaseHttpServer server = new(port);
-                SearchRpc rpc = new(store);
+                SearchRpc rpc = new(store, service.GetString("WebUIWriteSecret", String.Empty),
+                    SearchRpc.ClassifiedPayments(service), service.GetInt("MinimumClassifiedPrice", 50), service.GetString("EventNotificationSecret", ""));
                 rpc.Register(server);
                 using SnapshotCrawler crawler = new(store, service);
                 server.AddSimpleStreamHandler(new SimpleStreamHandler(
@@ -63,10 +64,22 @@ namespace ContinuumSearch.Service
         }
     }
 
-    internal sealed class SearchRpc
+    internal sealed partial class SearchRpc
     {
         private readonly SearchStore m_store;
-        internal SearchRpc(SearchStore store) { m_store = store; }
+        private readonly string m_writeSecret;
+        internal SearchRpc(SearchStore store, string writeSecret = "", Func<Guid, Guid, int, Hashtable> classifiedCharge = null, int minimumClassifiedPrice = 50, string notificationSecret = "")
+        {
+            m_notificationSecret = notificationSecret ?? "";
+            if (m_notificationSecret.Length > 0 && (m_notificationSecret.Length < 32 || m_notificationSecret.Length > 256
+                || m_notificationSecret.StartsWith("CHANGE", StringComparison.OrdinalIgnoreCase) || m_notificationSecret == writeSecret))
+                throw new InvalidOperationException("EventNotificationSecret requires a distinct 32–256 character secret");
+            m_store = store; m_writeSecret = writeSecret;
+            if (minimumClassifiedPrice < 1) throw new InvalidOperationException("MinimumClassifiedPrice must be positive");
+            m_classifiedCharge = classifiedCharge; m_classifiedMinimum = minimumClassifiedPrice;
+            if (writeSecret.Length > 0 && (writeSecret.Length < 32 || writeSecret.StartsWith("CHANGE", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("WebUIWriteSecret must be a unique secret of at least 32 characters");
+        }
 
         internal void Register(BaseHttpServer server)
         {
@@ -81,6 +94,31 @@ namespace ContinuumSearch.Service
             server.AddXmlRPCHandler("event_info_query", EventInfo);
             server.AddXmlRPCHandler("classifieds_info_query", ClassifiedInfo);
             server.AddXmlRPCHandler("continuum_search_health", Health);
+            if (m_notificationSecret.Length > 0) server.AddXmlRPCHandler("continuum_event_notifications", Notifications);
+            if (m_writeSecret.Length > 0) server.AddXmlRPCHandler("continuum_event_write", EventWrite);
+            if (m_writeSecret.Length > 0) server.AddXmlRPCHandler("continuum_classified_manage", ClassifiedManage);
+        }
+
+        private bool WriteAuthorized(Hashtable input)
+        {
+            string supplied = input["writeSecret"]?.ToString() ?? String.Empty;
+            return m_writeSecret.Length > 0 && supplied.Length <= 1024
+                && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(m_writeSecret), System.Text.Encoding.UTF8.GetBytes(supplied));
+        }
+
+        internal XmlRpcResponse EventWrite(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable input = Args(request);
+            byte[] expected = System.Text.Encoding.UTF8.GetBytes(m_writeSecret);
+            string supplied = input["writeSecret"]?.ToString() ?? String.Empty;
+            if (expected.Length == 0 || supplied.Length > 1024
+                || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(expected, System.Text.Encoding.UTF8.GetBytes(supplied)))
+                return new XmlRpcResponse { Value = new Hashtable { ["success"] = false, ["errorMessage"] = "Not authorized" } };
+            try { return Reply(new ArrayList { new Hashtable { ["event_id"] = m_store.ChangeEvent(input) } }); }
+            catch (ArgumentException e)
+            { return new XmlRpcResponse { Value = new Hashtable { ["success"] = false, ["errorMessage"] = e.Message } }; }
+            catch (Exception)
+            { return new XmlRpcResponse { Value = new Hashtable { ["success"] = false, ["errorMessage"] = "Event storage is unavailable. Retry the same form before creating another event" } }; }
         }
 
         private XmlRpcResponse Places(XmlRpcRequest request, IPEndPoint remote) => Invoke(() => m_store.FindPlaces(Args(request)));

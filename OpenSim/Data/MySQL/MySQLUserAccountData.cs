@@ -35,8 +35,14 @@ using MySql.Data.MySqlClient;
 
 namespace OpenSim.Data.MySQL
 {
-    public class MySqlUserAccountData : MySQLGenericTableHandler<UserAccountData>, IUserAccountData
+    public class MySqlUserAccountData : MySQLGenericTableHandler<UserAccountData>, IUserAccountData, IUserAccountArchiveData
     {
+        public bool TryArchiveAccount(UUID principal)
+        {
+            using var connection = new MySqlConnection(m_connectionString); connection.Open();
+            return UserAccountArchiveCommand.Execute(connection, m_Realm, principal, false);
+        }
+
         public MySqlUserAccountData(string connectionString, string realm)
                 : base(connectionString, realm, "UserAccount")
         {

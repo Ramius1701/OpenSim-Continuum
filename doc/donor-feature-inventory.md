@@ -1,8 +1,51 @@
 # Donor feature audit and integration disposition
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 Date: 2026-08-01  
 Audit base: `247b9182c1ca0f11743de06a2808f003bc8e2a90` (`baseline/opensim-dev-2026-08-01`)  
 Scope: checkpoint 1 records the clean-baseline audit. The integration status below records the subsequent implementation candidate on `codex/complete-opensim-feature-set`.
+
+## WhiteCore implementation complete — 2026-10-24
+
+The remaining selected WebUI workflows are now implemented through native
+services, explicit archival and private-data contracts, and native host control
+rooms/consoles. The prior 11 blocked routes have working workflows; configuration
+and runtime acceptance remain opt-in and pending. Purchase pages show currency
+credits with no cash-payment claim, as explicitly chosen by the user. The final
+implementation table, limits and passing validation are at the top of
+`whitecore-continuum-improvement-audit.md`. No next donor was started.
+
+## Historical selected-source closure — 2026-10-24
+
+The recorded WhiteCore feature catalog now has final existing-equivalent, native
+implementation or explicit-exclusion dispositions. Auction grid-portal integration
+and durable event reminders are implemented; native SimulatorFeatures hover/copy
+gaps were corrected. Full Release and focused acceptance checks pass. The final
+source ledger is at the top of `whitecore-continuum-improvement-audit.md`.
+
+This closes the selected-source reconciliation lane. It does not declare full
+WebUI delivery, all SL feature parity, runtime certification or the 11 blocked
+legacy paths complete. Those requirements remain tracked. No next donor was
+started in this pass.
+
+## Historical WhiteCore boundary — 2026-10-24
+
+WhiteCore remains active; it is not certified source-complete. See the current
+matrix at the top of `whitecore-continuum-improvement-audit.md` for delivered native
+families, remaining service comparisons, the selected regional auction versus
+missing grid-wide integration, and every blocked portal route. WebUI product
+modernization and donor-source reconciliation must have separate visible status;
+a legacy filename or a donor stub is not another completed/unfinished port by
+itself. Older checkpoint tables below remain historical evidence.
 
 ## Integration checkpoint
 
@@ -20,8 +63,9 @@ The initial recommendations in this document are retained as the evidence availa
 | Recovered operational addons | Gloebit, HoloPhysicsGuard, MoneyServer, Search, Tide and Weather are packaged as optional components. GroupAutoInvite, RegionCurrency and OpenSimMarketplace are also included and disabled by default where applicable. |
 | Warp3D sprites | Integrated behind opt-in renderer settings for visual/performance testing. |
 | ubODE tuning | Kept on `codex/testing-ubode-tuning`; it is not part of the default production candidate. |
-| WhiteCore WebUI and OpenSim-Grid-Interface | Implemented as the optional ContinuumWebUI Robust connector, retaining the WhiteCore templates/assets and using native OpenSim service adapters; live deployment acceptance remains. |
-| opensim-lickx archive | Added as an audit donor/reference for its optional Lickx script API, OpenSimMutelist, DTL/NSL-derived currency tree and historical OpenSimSearch helpers. No code selected yet. |
+| WhiteCore WebUI and OpenSim-Grid-Interface | Needed selected ports and native workflow adapters implemented on 2026-10-24, including the former 11 blocked routes, auctions, reminders and viewer fixes. Native host editors/consoles retain their own authority; closure is archival and purchase pages show currency credits without cash claims. Final implementations and passing checks are in `whitecore-continuum-improvement-audit.md`; deployed/provider acceptance remains in the handoff. |
+| opensim-lickx archive | Implementation reconciliation complete, including IMAP object mail. All reviewed core/addon candidates have a port, existing-equivalent or explicit-exclusion disposition; see section 14. Runtime acceptance remains queued in the test handoff. |
+| Mobius | Pinned feature-branch reconciliation complete. Existing/newer equivalents retained; alternatives without demonstrated benefit excluded. No additional source port selected. Scope and final evidence are in section 13; runtime acceptance remains separate. |
 | Branded profiles, forced defaults, curated grid endpoints and destructive updater behavior | Excluded as obsolete or unsuitable for a production OpenSim distribution. |
 
 The latest complete Release solution build completed successfully with zero warnings and zero errors. The untouched baseline's four known CS9193 warnings were corrected without changing the quaternion calculations. Compilation does not replace the runtime, viewer, Robust, database, Hypergrid, security, migration and performance acceptance work in `doc/donor-feature-test-handoff.md`.
@@ -268,6 +312,173 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 - **Tests required:** protocol comparison against Tranquillity and current viewers; no code tests until provenance is resolved.
 - **Recommendation:** retain as required provenance and behavioral comparison. Use Tranquillity's traceable enhancement commits for integration while preserving Mobius attribution.
 
+#### Inactive-donor continuation — 2026-10-21
+
+Mobius is now the selected donor following completion of lickx implementation.
+Use the Git objects already preserved under `mobius-current/master` at
+`7b69b4d545b03cc909afced09b1a5431f4412349`; do not modify the metadata-less
+`S:\Github\mobius-master` archive. The pinned history ends in README changes
+dated September 2024; the latest substantive inspected changes are from July
+2020. This is a frozen-source review, not a claim about live repository status.
+Tranquillity, upstream and other donor reviews remain paused.
+
+Operator precedence rule (2026-10-21): current Continuum/upstream and newer
+Tranquillity implementations take precedence over historical Mobius code.
+Reading the preserved Tranquillity checkpoint for this comparison is lineage
+verification, not resumption of its separate port queue. Mobius-only file or
+setting names are not evidence of a functional gap. Select older behavior only
+after demonstrating that the newer implementations lack the required behavior;
+preserve newer interfaces, fixes and constant values.
+
+Additional operator selection rule: a change must provide a concrete benefit
+to Continuum. Historical feature parity or a different configuration/command
+name alone does not justify a port. Record the benefit and the newer-code gap
+before selecting source changes.
+
+Newer comparison checkpoint: preserved Tranquillity
+`1d276209d4159e4cb70b416c9aa32994ea19f776` (September 2026), read without
+modifying that checkout. No live upstream-status claim is made.
+
+Opening evidence: `CHANGES.md`, the 56 commits attributed to Stolen Ruby, and
+the concrete diffs listed below. This author-filtered list is a starting index,
+not a complete inventory of all custom work or merged upstream changes.
+
+| Slice / original commit | Current Continuum comparison and disposition |
+|---|---|
+| Display Names `20f50f7502`, HG batching `924deef165` and subsequent fixes | Existing Mobius-to-Tranquillity lineage; retain the selected implementation. Reconcile remaining original follow-ups against `parity-display-names.md` before closing this family. |
+| Abuse Reports `8687793883` | Already integrated with additional providers/moderation. Retain original attribution and the existing `parity-abuse-reports.md` runtime gates. |
+| Estate LandStat event queue, parcel/URL/memory fields `84f90c236a`; engine fallback `db667866f2` | Current `LLClientView.SendLandStatReply` already emits event-queue fields including ParcelName/PublicURLs; EstateManagementModule collects URL/script statistics. Verify memory accounting and fallback semantics against the complete donor diff before closing; do not duplicate the protocol path. |
+| In-world terrain commands `2f3718f28a` | TerrainModule already registers fill/elevate/lower/load-texture commands through IRegionConsole. Compare permissions, argument validation and handler lifecycle before closing this family. |
+| Map startup and in-world regeneration `7214561d14` | Candidate gap: no `OnlyGenerateMapTilesIfMissing` setting or IRegionConsole map command found in Scene/WorldMapModule. Existing server `generate map` is present. Adapt any selected startup suppression to current asynchronous registration/load ordering; donor lookup dereferences a possibly missing grid record and uses zero scope. Do not copy it verbatim. |
+| Parcel details `3d524e2865`, `ade4f70d67` | Landing point/routing/object return behaviors already exist, but donor selectors 128/129/130 differ from current 9/11/67. In particular donor `PARCEL_DETAILS_OBJECT_RETURN=130` conflicts with current setter constant 67. Compatibility remains open; do not replace current constant values. |
+| `osTriggerSoundAtPos` `aedb95b0d7` | API, interface and runtime stub already exist. Verify implementation semantics before closing. |
+| TOS `34a1601a2a`, RSA login `6f52286f34` | Current LLLoginService explicitly carries TOS and RSA paths. Compare follow-ups and existing authentication gates; no duplicate login service. |
+| Hardware/IP bans `2cb7636fb1`, console/config follow-ups `dc10eb5493`, `7ea452ea12` | Open comparison: service authority, authentication, persistence, console permissions and available providers must be established before selecting code. |
+| Port range / MATCHING `1fccfa46df` | MATCHING parsing already exists in RegionInfo. Range allocation and failure behavior still need comparison. |
+| Region restart `684182e830`, LSLSyntax `5acc4e32f7`, ViewerAsset `54453548df`, external avatar picker `d440af67d2` | Open comparison against current native capabilities, restart sequencing and network policy. Donor removal of native implementations is not automatically appropriate. |
+| MySQL groups migration `5b956863fc` | Open schema comparison; apply only if the same defect remains in current migrations. |
+| Branding, solution renames, old VS tooling and removed web submodules | Historical/deployment material; no automatic replacement of current build tooling, native services or branding. Independently evaluate any substantive addon behavior. |
+
+Licensing: the pinned root LICENSE includes a customization caveat as well as
+BSD terms. The inspected WorldMapModule has a complete BSD header. Check each
+selected file and dependency individually; do not generalize one header to the
+entire donor. The metadata-less archive provenance restriction above continues
+to apply to material that cannot be tied to a licensed Git revision.
+
+Status: initial review in progress; no Mobius implementation-completion claim.
+Next work is to finish the finite custom-change inventory and resolve the map,
+parcel and remaining service/capability rows. Queue manual checks in the existing
+handoff as candidates are selected.
+
+Newer-code follow-up dispositions:
+
+- **Estate statistics: superseded; no port.** Current Continuum and the pinned
+  Tranquillity LLClientView emit the event-queue parcel/URL fields. Continuum's
+  EstateManagementModule consumes execution time, memory and URL statistics
+  through the current reporting path. Retain that path rather than reintroduce
+  the donor `GetObjectScriptsBytesUsed` API.
+- **XEngine fallback: obsolete; no port.** `db667866f2` changes the old XEngine
+  and its test mock. Current YEngine exposes `GetScriptsMemory`, as does newer
+  Tranquillity. Do not restore an obsolete engine interface to carry its fix.
+- **MySQL groups engine: already fixed; no port.** `5b956863fc` changes the
+  initial groups table from MyISAM to InnoDB. Both current Continuum and the
+  pinned Tranquillity migration already specify InnoDB. No schema change or
+  additional migration is justified by this donor patch.
+- **Parcel selectors: retain current interface; no constant replacement.**
+  Current `llGetParcelDetails` reads landing point, routing and object return
+  through 9/11/67. The old 128/129/130 values are not a reason to replace working
+  current semantics. An additional compatibility surface would require a
+  demonstrated requirement; it is not selected by this audit.
+- **Map settings/console: unselected historical difference.** Exact donor
+  settings/command names were not found in either current Continuum or the
+  pinned Tranquillity search. This establishes a textual difference only.
+  Compare the existing map lifecycle and operator controls before deciding
+  whether any behavior is needed; no older map code is authorized merely by
+  absence of its name.
+
+Further behavior comparison (supersedes the name-only map search above):
+
+- **Map startup:** newer Tranquillity already carries the behavior under
+  `OnlyGenerateIfMissing`, not Mobius's `OnlyGenerateMapTilesIfMissing`.
+  Its Scene checks the existing grid record before rendering. Continuum has
+  newer background generation with startup delay, occupancy deferral and
+  configurable refresh, plus the server `generate map` command. Retain these
+  current controls. No old synchronous startup implementation is selected.
+  Skipping regeneration for an existing tile remains an unselected operational
+  enhancement, requiring an actual need and adaptation to asynchronous startup,
+  scoped lookup and missing grid records before it can benefit Continuum.
+- **Syntax and assets: superseded; no port.** Both current Continuum and newer
+  Tranquillity implement LSLSyntax through SimulatorFeaturesModule and
+  ViewerAsset through GetAssetsModule. Mobius's separate modules and removal
+  of native implementations offer no demonstrated benefit over these paths.
+- **Avatar picker: retain native capability; no old proxy selected.** Both
+  implementations use AvatarPickerSearchModule/IPeople. Continuum additionally
+  handles shared-region removal and close explicitly. The old external proxy
+  is not needed to preserve the working native search capability.
+- **Restart notifications: retain current implementation; no old API port.**
+  Current RestartModule sends the native viewer countdown and cancellation,
+  retaining its alert-array interface. Newer Tranquillity uses a seconds-based
+  interface. Do not change current callers merely to reproduce an older donor
+  signature, sound asset or schedule implementation. Existing worktree changes
+  in RestartModule were not modified by this review.
+- **Listener ranges: unselected deployment feature.** Mobius's range code
+  scans active TCP listeners before binding, excludes the upper bound and can
+  leave no listener when the range is exhausted. The scan cannot reserve a
+  port. Both newer configurations retain an explicit HTTP listener port;
+  Continuum also already accepts MATCHING for region ports. No demonstrated
+  benefit justifies importing the older allocation logic.
+- **Access control: do not replace current service boundaries.** Continuum
+  already reads configured MAC/ID0 restrictions at login and gatekeeper and
+  exposes the newer optional IBansService gatekeeper integration, also present
+  in Tranquillity. Mobius's separate MySQL-only ban tables/console are a distinct
+  management feature, not proof that current checks are absent. That provider's
+  inspected SQL uses bound values; it is not rejected as SQL injection. No
+  parallel service/schema is selected without a demonstrated management need,
+  clear ownership of local/HG enforcement and supported-provider requirements.
+
+No source changes were selected in this continuation: the inspected older
+replacements do not establish a benefit over the retained implementations.
+The final review below closes the remaining feature-branch dispositions.
+
+#### Final reconciliation — 2026-10-21
+
+**Complete for the pinned Mobius feature branch; no additional source port
+selected.** Earlier open/initial findings above are superseded by these final
+decisions. This closes the review queue, not deployment certification.
+
+Coverage: every non-merge first-parent commit from Display Names introduction
+`20f50f7502` through pinned tip `7b69b4d545` was indexed without an author
+filter, including README/changelog commits under alternate author spellings.
+The six first-parent merges (`706eaf86bf`, `1f7df92fc3`, `de8da8c5fb`,
+`83cea8165f`, `920914ec3c`, `da7ceb1ce7`) are excluded as bulk ports of older
+upstream/branch aggregates under newer-code precedence. This is not a
+line-by-line certification of every ancestral OpenSim commit; pre-Mobius base
+history is not a new backlog of old upstream patches.
+
+| Final slice / commit | Decision and evidence |
+|---|---|
+| HG timeout `76275fe5f0`, catch/debug cleanup `da7a71b8ae`, `1e80350819` | Retain current connector: five-second default, configurable 1–30 seconds, bounded IDs/response bytes and requested-ID validation. No old request/catch implementation needed. |
+| Missing GridUser name refresh `e4f0d9ad7e` | Retain current account/UUI-based path. UserManagement resolves authoritative local accounts first, skips null GridUser entries and refreshes cached foreign users by HomeURL without requiring a fresh GridUser row. Do not restore the old update_name overload or fabricate rows for name lookup. Runtime fallback remains in the handoff. |
+| TOS `34a1601a2a` | Already retained in Continuum: handler passes agree_to_tos, login compares/persists TOSDate, and MySQL/SQLite/PostgreSQL account migrations carry the field. No duplicate port. Absence from newer Tranquillity does not justify removing a retained feature. |
+| RSA `6f52286f34`, schema correction `55a67ede2b` | Already retained in handlers, authentication provider/connectors/interfaces and login flow. All three auth schemas contain rsaOnly/rsaKey defaults. The old correction relaxes MySQL nullability; no demonstrated benefit justifies changing the current NOT NULL/default contract. Keep runtime authentication/migration gates. |
+| Resident welcome trimming `0200155663` | Exclude cosmetic replacement. Current Continuum and pinned Tranquillity use firstName plus lastName; no functional requirement justifies hiding the account surname. |
+| Restart correction `db7387ae31` | Superseded by retained current alert-array scheduler/help/native notification. No old seconds-loop replacement. |
+| LandStat debug removal `9454e0ccf6` | Already absent from current reply; no port. |
+| Terrain console `2f3718f28a` | Existing commands retained. Current RegionConsole dispatcher requires estate owner/manager or god; full server-console forwarding is god-only. No duplicate handlers. |
+| Positional sound `aedb95b0d7` | Existing API resolves the sound asset, handles absent module/invalid UUID and passes the supplied position to TriggerSound. No older replacement needed. |
+| NoobDash/OSAWS/jOpenSim submodule history | Exclude removed deployment wiring. Pinned tip has no .gitmodules; missing external working trees are not licensed source supplied by this checkpoint. Retain native services/WebUI. |
+| Version/readme/splash/changelog, solution rename, .gitignore, old VS tooling, example endpoints | Exclude historical/deployment changes. Retain feature attribution without importing branding, obsolete tooling or grid endpoints. |
+
+The root license customization caveat prevents assuming every historical asset
+has the same license. No new source/assets were copied. The metadata-less donor
+archive remains untouched and is not a port source.
+
+No beneficial missing change was established. Map suppression, parallel access
+management, old external proxies and listener ranges are **not selected**,
+rather than deferred implementation obligations. Reopen for a demonstrated
+Continuum need. No live configuration, schema or deployment changed. Retained
+feature runtime gates remain in the existing test handoff.
+
 ### 14. opensim-lickx archival candidates
 
 - **Donor and checkpoint:** user-preserved last available copy at `S:\Github\opensim-lickx`, archival commit `6614599b7506b63861763e6cae5eefde861f8749`; the project is no longer on GitHub and the archive has no configured remote or earlier Git history.
@@ -280,6 +491,74 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 - **Licensing and provenance:** the OpenSim tree declares BSD-3-Clause. `opensim.currency-lickx` separately declares MIT and credits DTL/NSL. Preserve both lineages. Embedded certificate files, PHP helpers and every other addon asset require separate provenance/security review; archival commit identity is not original upstream provenance.
 - **Tests required:** compare APIs and schemas with current Continuum; build each candidate separately; test script permissions and viewer privacy, mute persistence/crossings, MoneyServer migration and all supported database boundaries, helper authentication, search privacy/paging/deletion, Windows paths, Robust restart and Hypergrid inputs.
 - **Recommendation:** retain the narrow Lickx API port and native Continuum mute-list implementation; use currency only as a MoneyServer parity reference; quarantine bundled certificates and historical PHP search/economy helpers unless independently secured and justified.
+
+#### Frozen-donor continuation — 2026-10-21
+
+Work on active Tranquillity/upstream donors is paused while this donor is being
+reconciled. Do not move to another inactive donor until the open lickx rows have
+an explicit implementation or exclusion disposition. Live certification is
+tracked separately in the existing test handoff.
+
+The archive remains unchanged at `6614599b7506b63861763e6cae5eefde861f8749`.
+Its `OpenSim/` tree contains 1,543 files. Only three core paths are additions
+against the original Continuum baseline: the Lickx API, interface and stub.
+However, 152 shared core files have different blob IDs; file-presence checks
+alone miss those changes. Matching historical upstream blobs over January–March
+2026 found 1,486 exact matches at `4f8147696a6330bd0e48541f1b6f3ede2c2f8647`
+(29 January). That gives a manageable 57-file comparison including the three
+API additions. This is comparison evidence, not a claim that the archival
+donor has recoverable original commit ancestry.
+
+| Donor slice | Current disposition |
+|---|---|
+| `Lickx_Api`, `ILickx_Api`, `Lickx_Stub` | Already ported under donor names; retain. Broader lifecycle/privacy checks remain in the handoff. |
+| OAR `--tenant` parser, object filtering and help | Ported this batch. Unlike the donor's silent fallback, malformed/zero UUIDs fail before archive content is written. An explicit estate-owner UUID still filters to that owner's objects. Existing permission filters apply as that tenant. This remains a region archive, including terrain, parcels and settings, not a tenant-isolated backup. |
+| IAR foreign `CreatorData` retention and `--nocreators` | Ported this batch. Existing `--creators` remains accepted; explicit `--nocreators` wins. Donor `--home` fallback behavior is retained. |
+| `llGetEnv`: `region_rating`, `grid`, `mailname`, `objectmail_hostname` | Ported this batch; mailbox aliases return empty when email is unavailable. |
+| `PAYMENT_INFO_ON_FILE` / `PAYMENT_INFO_USED` | Ported with donor values 1 / 2. `CLICK_ACTION_IGNORE` was already present. |
+| `PRIM_NORMAL` negative X/Y offsets | Ported donor range `[-1, 1]`; regression verifies values reaching the material provider. |
+| MySQL profile migration v6 | Ported donor Unicode conversion, adapted from `utf8` to `utf8mb4` and extended to `usersettings`. Exact-version MySQL/MariaDB clean/upgrade tests remain pending; no live database was migrated. |
+| Generated map tile directory | Equivalent `MapTilesDirectory` support is already implemented in Warp3D and WorldMap. Do not add a competing output directory implementation. |
+| Chat configuration lookup | Donor correction to `[Chat]` is already present. |
+| Email IMAP object transport and `[Email]` configuration | Compatible adaptation implemented, disabled by default. Uses bundled MailKit with bounded background APPEND/polling, exact single-recipient routing, bounded partial MIME reads, backpressure, UIDVALIDITY checks and UIDPLUS per-message acknowledgement only after local queue admission. Retains local delivery, SMTP and `[SMTP]` configuration; optional `[Email]` takes precedence. Replaces the donor's synchronous substring search and whole-inbox expunge. Fake-store, actual-module and loopback IMAP protocol regressions cover routing, limits, retries and lifecycle. Queues/deduplication are memory-only; live TLS/server and two-simulator acceptance remain in the handoff. |
+| Group attachment active-group update / title refresh | Reconciled in both native and XML-RPC modules. Apply attachment group changes only when the authoritative active membership agrees, and only to the resident's live root attachments. Do not restart deliberately stopped scripts. Refresh the active group after a title-role change; do not activate an unrelated group or a missing membership. |
+| HG friend notifications | Ported UUID-only recipient semantics and per-friend service resolution, adapted to batch by resolved endpoint. Deduplicate recipients, reject malformed identities/endpoints and limit returned online IDs to those requested. Do not assume the first friend's endpoint applies to all friends sharing a home-grid string. |
+| HG creator identity/cache repair | Local creator metadata now requires an authoritative account with matching name and UUID in both local-URL/empty-host paths. Retain Continuum's existing shorter 1,800-second account/60-second negative-cache policy rather than the donor's 1–2-hour/10-minute values. |
+| HG staged attachment loading/name refresh | Keep current ownership checks, gather-before-attach path and `ScenePresence` restart-generation debounce. Donor per-object script creation bypasses the selected root-agent restart sequencing; fake group-title name refresh sleeps five seconds and conflicts with authoritative DisplayName updates. Those replacements are excluded. Ported the narrow missing-asset-URI completion guard so a visitor allowed without attachments is not left waiting for attachment data. Do not use donor `LoggedIn()` calls merely to cache a new HG friend: that would report a login that did not occur. |
+| Presence/GridUser `UseCache` controls | Ported opt-out, default true. Caches are per service instance rather than donor/global static state, and GridUser reads the setting outside its one-time console-registration block. No-cache paths bypass both cache reads and writes. |
+| PGSQL ILIKE changes | Ported grid-user, group, region and account case-insensitive queries. Group and grid-user values are bound parameters; account queries retain DisplayName and ScopeID filtering while dropping the hardcoded `en_US.utf8` collation that is not portable to Windows clusters. Unicode case folding follows the selected database locale; this is not a collation-independent Unicode-search promise. |
+| Profile lifecycle/null fixes | Already present: user management resolves during RegionLoaded, missing dependencies disable profiles, client removal uses TryGetScenePresence, pick limits guard null results, and asynchronous request locks exit in finally blocks. Retain current split local/HG request queues. |
+| Archive default-user | Ported the two missing parcel fallback assignments to `m_defaultUser`, matching object fallback and the explicit import option. |
+| Remaining scripting behavior | Existing `llRequestAgentData` covers payment data; `llGetRegionTimeOfDay` is already exposed with current EEP semantics; `[Chat]` lookup is already corrected. Retain standard `llGetTimeOfDay` rather than replacing its legacy cycle with parcel EEP/86,400-second behavior. Retain offline-local inventory delivery via authoritative accounts; do not authorize foreign offline recipients solely from a cached GridUser record. Exclude the donor's invented `slurl.opensim.local` offer URL default in favor of current inventory offer formatting. |
+| Forced land defaults, terrain UUIDs, grid-god defaults, IP-only home-grid blocking, viewer-regex bans and `take_copy_restricted` | Excluded as deployment policy replacements: retain configured parcel/estate rules and standard copy/transfer permissions rather than adding an owner/friend-only override to otherwise copyable content. |
+| Presence public `login` re-enablement, unbounded map queues and relaxed outbound filters | Excluded; retain current authentication, queue limits and outbound network policy. |
+| Integer parser, movement/attachment physics, deletion provenance and SIGTERM | Retain current implementations. Donor `int.Parse` replacement loses numeric-prefix behavior; movement thresholds and attachment-frame changes are unverified physics experiments, not demonstrated fixes; root-only CHANGED_POSITION drops child-script events; overwriting LastOwnerID before deletion changes provenance. Unguarded PosixSignalRegistration in simulator/Robust construction is not Windows-compatible; portable process supervision remains separate operational work. |
+| OpenSimMutelist/PHP mute helper | Native grid-wide mute services are already selected; historical direct-database PHP helper remains excluded as documented in `parity-social-services.md`. |
+| MoneyServer/currency and PHP economy helper | Reconciled to separately selected MoneyServer Compatibility: ClientLogin/Logout, balance/history, cancel/transfer/force/charge/banker/script operations and quote/buy are present. Simulator callbacks retain OnMoneyTransfered/UpdateBalance/UserAlert only; public balance/mint/transfer callbacks, self-asserted WebLogin/history sessions and prototype no-debit land preparation remain deliberately unregistered. Native `/currency.php` and `/landtool.php` service adapters cover viewer helper flows. Retain existing atomic MySQL transactions, bounded requests and session/source validation. Bundled `server_cert.p12`/`SineWaveCert.pfx`, database configuration, Gloebit/Podex PHP payment addons and grid endpoints are excluded deployment assets. Protocol parity is not legacy-database runtime certification. |
+| Gloebit | All 11 donor C# paths exist: seven match after line-ending normalization; four differ for current balance-error handling, explicit datastore connections, HTTP/version negotiation placement and initialization failure handling. Retain the current optional addon and its LGPL notices; do not merge it into the BSD core or ContinuumEconomy. No new Gloebit code is selected and no external payment calls were made. |
+| OpenSimSearch/PHP crawler and helper assets/configuration | Places/popular/land/events/classifieds/details/map adapters are already present with lifecycle and transport bounds. ContinuumSearch replaces register/parser/query PHP plus cron/purge/schema files with authenticated bounded snapshot ingestion and a provider-neutral directory service. Do not add duplicate direct-SQL helpers or import databaseinfo credentials. Extra mutelist SQL/readme, search cron/schema/readme/purge, helper index/robots and example economy configuration are deployment/history assets, not missing server features. Preserve existing source/license inventory and pending viewer/provider gates in `parity-search.md`. |
+
+Automated evidence for this batch is in `tests/Continuum.Lickx.Tests`, which
+generates actual OAR streams and checks unfiltered/tenant/estate-owner selection,
+permission filtering and bad filters; round-trips foreign IAR creator data;
+checks environment keys, payment constants and material-provider offsets.
+The reconciliation pass additionally tests per-instance cache isolation and
+cache opt-out through actual service constructors, local creator UUID validation,
+both group title backends and HG UUID/endpoint grouping. Actual PostgreSQL
+providers passed quoted-input, directory-privacy and scoped-name tests in the
+dedicated `continuum_lickx_20261021_160426` database on loopback port 9543.
+That database contains disposable fixtures only and is retained for inspection.
+Full Release build passed with zero warnings/errors. No deployed grid binaries
+or existing grid schemas were changed.
+
+**Reconciliation status: implementation complete (2026-10-21).** IMAP was the
+last selected implementation gap. The previously open candidate families now have
+explicit ports, existing equivalents or exclusions above. This is not a claim
+of full lickx runtime parity: IMAP implementation is complete but awaits live
+mail-server acceptance, the excluded experimental/policy changes are not implemented, and all queued
+database/viewer acceptance remains in the test handoff. Do not silently turn
+these dispositions into a production-certification claim or move to another
+donor without the operator's direction.
 
 ### 15. SL-compatible parcel prim accounting
 
@@ -304,3 +583,36 @@ its divergent architecture makes wholesale OpenSim ports unsuitable.
 2. Produce protocol/data-flow maps for Display Names, aliases, and Experiences, including trust boundaries and MySQL migrations.
 3. Trace RegionWeb and each recovered addon to its original repository/license and enumerate assets separately from code.
 4. Convert each viable item into its own audit checkpoint with exact diff boundaries and test plan. No implementation should be ported until that item's audit is accepted.
+
+## 2026-10-22 WhiteCore WebUI continuation checkpoint
+
+WhiteCore remains the active donor; earlier direct-module-port exclusions do not
+exclude the integrated native-service WebUI implementation. News, recovery,
+region-owner events and paid classified management are implemented in source.
+The classified batch includes durable fee/publication recovery and viewer/provider
+corrections that preserve paid metadata and ownership. Sixteen legacy page paths
+remain blocked; grid-wide auction WebUI and other parity gaps remain open.
+Use `parity-webui.md` for the current workflow inventory and limitations, and the
+existing handoff for runtime tests. No donor switch or live deployment occurred.
+
+
+### 2026-10-24 portal presentation checkpoint
+
+WhiteCore remains the active donor. Welcome content/announcement, portal support
+instructions/gallery visibility and fixed-route public navigation visibility now
+have persistent admin workflows. Three manager paths are unblocked; **13 legacy
+paths remain blocked**. This does not complete grid configuration, real-world
+resident address editing, arbitrary page customization or full WebUI parity.
+See `doc/parity-webui.md` for the precise implemented scope and remaining gaps;
+browser/viewer acceptance remains in `doc/donor-feature-test-handoff.md`.
+
+
+### 2026-10-24 native estate checkpoint
+
+Resident/admin estate editing now supports name, reference price, public access,
+voice and direct teleport through native service/provider conditional updates.
+SQLite estate membership lookup and explicit-ban insertion were corrected during
+persistence testing. **11 legacy WebUI routes remain blocked.** Simulator reload
+is still required; native region lifecycle management and live estate propagation
+remain outstanding. Ownership transfer and access-override editing are not part
+of this bounded editor. See `doc/parity-webui.md` and the existing runtime handoff.

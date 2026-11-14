@@ -1035,7 +1035,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 {
                     if (parcel.GroupID.IsZero())
                     {
-                        parcel.OwnerID = m_rootScene.RegionInfo.EstateSettings.EstateOwner;
+                        parcel.OwnerID = m_defaultUser;
                         parcel.IsGroupOwned = false;
                     }
                     else
@@ -1047,7 +1047,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver
                 else
                 {
                     if (!ResolveUserUuid(scene, parcel.OwnerID))
-                        parcel.OwnerID = m_rootScene.RegionInfo.EstateSettings.EstateOwner;
+                        parcel.OwnerID = m_defaultUser;
                 }
 
                 List<LandAccessEntry> accessList = new();

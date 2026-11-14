@@ -44,10 +44,14 @@ namespace OpenSim.Services.UserAccountService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static bool m_Initialized;
+        protected bool m_useCache = true;
 
         public GridUserService(IConfigSource config) : base(config)
         {
             m_log.Debug("[GRID USER SERVICE]: Starting user grid service");
+
+            // Read for every instance, independently of console registration.
+            m_useCache = config.Configs["GridUserService"]?.GetBoolean("UseCache", true) ?? true;
 
             if (!m_Initialized)
             {
@@ -126,19 +130,21 @@ namespace OpenSim.Services.UserAccountService
             MainConsole.Instance.Output("Users online: {0}", onlineRecentlyCount);
         }
 
-        private static ExpiringCacheOS<string, GridUserData> cache = new ExpiringCacheOS<string, GridUserData>(100000);
+        private readonly ExpiringCacheOS<string, GridUserData> cache = new ExpiringCacheOS<string, GridUserData>(100000);
         private GridUserData GetGridUserData(string userID)
         {
             if (userID.Length > 36)
                 userID = userID.Substring(0, 36);
 
-            if (cache.TryGetValue(userID, out GridUserData d))
+            GridUserData d;
+            if (m_useCache && cache.TryGetValue(userID, out d))
                return d;
 
             GridUserData[] ds = m_Database.GetAll(userID);
             if (ds == null || ds.Length == 0)
             {
-                cache.Add(userID, null, 300000);
+                if (m_useCache)
+                    cache.Add(userID, null, 300000);
                 return null;
             }
 
@@ -168,7 +174,8 @@ namespace OpenSim.Services.UserAccountService
                 }
                 catch { }
             }
-            cache.Add(userID, d, 300000);
+            if (m_useCache)
+                cache.Add(userID, d, 300000);
             return d;
         }
 
@@ -249,7 +256,7 @@ namespace OpenSim.Services.UserAccountService
             d.Data["Login"] = Util.UnixTimeSinceEpoch().ToString();
 
             m_Database.Store(d);
-            if (userID.Length >= 36)
+            if (m_useCache && userID.Length >= 36)
                 cache.Add(userID.Substring(0, 36), d, 300000);
 
             return ToInfo(d);
@@ -275,7 +282,7 @@ namespace OpenSim.Services.UserAccountService
 
             if(m_Database.Store(d))
             {
-                if (userID.Length >= 36)
+                if (m_useCache && userID.Length >= 36)
                     cache.Add(userID.Substring(0, 36), d, 300000);
                 return true;
             }
@@ -298,7 +305,7 @@ namespace OpenSim.Services.UserAccountService
 
             if(m_Database.Store(d))
             {
-                if (userID.Length >= 36)
+                if (m_useCache && userID.Length >= 36)
                     cache.Add(userID.Substring(0, 36), d, 300000);
                 return true;
             }
@@ -323,7 +330,7 @@ namespace OpenSim.Services.UserAccountService
 
             if(m_Database.Store(d))
             {
-                if (userID.Length >= 36)
+                if (m_useCache && userID.Length >= 36)
                     cache.Add(userID.Substring(0, 36), d, 300000);
                 return true;
             }

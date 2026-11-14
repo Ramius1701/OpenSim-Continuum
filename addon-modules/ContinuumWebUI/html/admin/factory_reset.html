@@ -1,41 +1,10 @@
-<!-- Reset menues and grid settings to default -->
-
-{IsAdminAuthenticatedBegin}
-<div id="content">
-  <div id="ContentHeaderCenter"><h1>{FactoryReset}</h1></div>
-  <div id="loginscreen_manager">
-
-    <h3>{ResetMenuText}</h3>
-    <p class="message">{ResetMenuInfoText}</p>
-    <form id="reset_menu_form" action="admin/factory_reset.html" method="post">
-          <div class="row w-100 mt-3">
-          <input type="hidden" name="ResetMenu" value="true">
-
-          <div class="col pull-right">
-            <button class="btn-danger pull-right" style="width:200px;" onclick="submitupdate('reset_menu_form', 'resetmenu=true');">
-              {Reset}
-            </button>
-          </div>
-          <div class="col-1"></div>
-        </div>
-
-    </form>
-
-    <div class="div20"></div>
-
-    <h3>{ResetSettingsText}</h3>
-    <p class="message">{ResetSettingsInfoText}</p>
-    <form id="reset_settings_form" action="admin/factory_reset.html" method="post">
-        <div class="row w-100 mt-3">
-          <div class="col pull-right">
-            <button class="btn-danger pull-right" style="width:200px;" onclick="submitupdate('reset_settings_form', 'resetsettings=true');">
-              {Reset}
-            </button>
-          </div>
-          <div class="col-1"></div>
-        </div>
-    </form>
-  </div>
-</div>
-
-{IsAdminAuthenticatedEnd}
+<section class="portal-workspace" aria-labelledby="reset-title">
+<p class="portal-eyebrow">Grid administration</p><h1 id="reset-title">Restore portal defaults</h1>
+<p>Restore the portal presentation or public navigation to the built-in defaults. News, accounts, regions, estates, service configuration and money are unaffected.</p>
+<form id="portal_reset_form" action="admin/factory_reset.html" method="post" class="portal-editor">
+<input type="hidden" name="revision" value="{PortalRevision}">
+<label for="reset-scope">Settings to restore</label>
+<select class="form-control" id="reset-scope" name="action"><option value="navigation">Public navigation</option><option value="presentation">Welcome content, announcement, support instructions and slideshow</option></select>
+<label><input type="checkbox" name="confirm" value="true" required> I understand the selected portal customizations will be replaced.</label>
+<div class="portal-actions"><button type="button" class="btn btn-danger" onclick="submitupdate('portal_reset_form', '', 'admin-portal-reset');">Restore defaults</button></div>
+</form></section>

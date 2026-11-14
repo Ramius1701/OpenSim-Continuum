@@ -1,73 +1,21 @@
-<!-- NewsManager -->
-
-<style>
-  .page-link {background-color: transparent !important;}
-</style>
-
-{IsNotAdminAuthenticatedBegin}
-  <meta http-equiv="REFRESH" content="0;url={SystemURL}">
-{IsNotAdminAuthenticatedEnd}
-
-{IsAdminAuthenticatedBegin}
-<div class="col98">
-  <h2>{SystemName}: {NewsManager}</h2>
-
-  <div class="row w-100 mb-3">
-    <div class="col"></div>
-    <div class="col-4 pull-right">
-      <button id="add_news" onClick="loadusercontent('admin-news_add');">{AddNewsItem}</button>
-    </div>
+<section class="portal-workspace" aria-labelledby="news-heading">
+  <header class="portal-page-heading"><div><p class="portal-eyebrow">Grid administration · Communications</p><h1 id="news-heading">News management</h1><p>{NewsCount} articles, including drafts.</p></div>
+    <button type="button" class="btn btn-primary" onclick="loadusercontent('admin-news_add');">Create article</button></header>
+  <div class="portal-card-grid">
+    {NewsRowsArrayBegin}
+    <article class="portal-card"><span class="portal-badge">{NewsState}</span><h2>{NewsTitle}</h2><p class="portal-date">{NewsDate}</p><p class="portal-news-preview">{NewsText}</p>
+      <div class="portal-actions"><button type="button" class="btn btn-outline-light" onclick="loadusercontent('admin-news_edit', 'newsid={NewsID}');">Edit article</button>
+        <form id="delete-news-{NewsID}" action="admin/news_manager.html" method="post"><input type="hidden" name="newsid" value="{NewsID}"><input type="hidden" name="revision" value="{NewsRevision}"><input type="hidden" name="action" value="delete">
+          <button type="button" class="btn btn-outline-danger" onclick="if(window.confirm('Permanently delete this article?')) submitupdate('delete-news-{NewsID}', '', 'admin-news_manager');">Delete</button></form>
+      </div></article>
+    {NewsRowsArrayEnd}
   </div>
-
-  <div class="row w-100">
-    <div class="col">
-      <table class="table-compact table-hover" id="news_manager_list" class="display">
-        <thead>
-          <tr class="tablehead">
-            <th>{NewsTitleText}</th>
-            <th>{NewsDateText}</th>
-            <th></th>
-            <th class="no-sort" style="width:80px;"></th>
-            <th class="no-sort" style="width:80px;"></th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {NewsArrayBegin}
-          <tr onclick="loadusercontent('admin-news_edit', 'newsid={NewsID}');">
-            <td>{NewsTitle}</td>
-            <td>{NewsDate}</td>
-            <td>{NewsText}</td>
-            <td class="text-centered">
-              <a href="#" title="{EditText}">
-                <i class="fa fa-edit fa-lg"></i>
-              </a>
-            </td>
-            <td class="text-center">
-              <a title="{DeleteNewsItem}" href="#" onclick="loadusercontent('admin-news_manager', 'delete={NewsID}');">
-                <i class="fa fa-trash fa-red fa-lg"></i>
-              </a>
-            </td>
-          </tr>
-          {NewsArrayEnd}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<script>
-  $(function() {
-    $('#news_manager_list').dataTable( {
-   	  "order": [[ 0, "asc" ]],
-      "aoColumnDefs": [{"bSortable":false,"aTargets":["no-sort"]}],
-      "fixedHeader": {
-        header: true,
-       //footer: true
-      },
-    });
-});
-</script>
-
-{IsAdminAuthenticatedEnd}
-
+  <nav class="portal-actions" aria-label="News pages">
+    {IfNewsHasPreviousBegin}
+    <button type="button" class="btn btn-outline-light" onclick="loadusercontent('admin-news_manager', 'newsoffset={NewsPreviousOffset}');">Previous</button>
+    {IfNewsHasPreviousEnd}
+    {IfNewsHasNextBegin}
+    <button type="button" class="btn btn-outline-light" onclick="loadusercontent('admin-news_manager', 'newsoffset={NewsNextOffset}');">Next</button>
+    {IfNewsHasNextEnd}
+  </nav>
+</section>

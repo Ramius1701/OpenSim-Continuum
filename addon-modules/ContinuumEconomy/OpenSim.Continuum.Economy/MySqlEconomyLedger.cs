@@ -9,7 +9,7 @@ using MySql.Data.MySqlClient;
 namespace OpenSim.Continuum.Economy
 {
     // Independently implemented from DTL/NSL protocol and WhiteCore behavior references.
-    public sealed class MySqlEconomyLedger : IEconomyLedger
+    public sealed class MySqlEconomyLedger : IEconomyLedger, ICurrencyCreditHistory
     {
         private readonly string m_connectionString;
 
@@ -287,6 +287,11 @@ namespace OpenSim.Continuum.Economy
             }
         }
 
+        public IReadOnlyList<LedgerHistoryEntry> GetCurrencyCredits(Guid account, DateTime? beforeUtc, Guid beforeID, int limit)
+        {
+            using var connection = new MySqlConnection(m_connectionString); MySqlValue.Open(connection);
+            return CurrencyCreditHistoryQuery.Read(connection, "mysql", account, beforeUtc, beforeID, limit);
+        }
         public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit)
         {
             if (accountID == Guid.Empty)

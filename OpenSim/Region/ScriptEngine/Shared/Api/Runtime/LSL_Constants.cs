@@ -810,6 +810,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
         public const int CLICK_ACTION_DISABLED = 8;
         public const int CLICK_ACTION_IGNORE = 9;
 
+        // Archived opensim-lickx 6614599b7506; llRequestAgentData payment flags.
+        public const int PAYMENT_INFO_ON_FILE = 1;
+        public const int PAYMENT_INFO_USED = 2;
+
         // constants for the llDetectedTouch* functions
         public const int TOUCH_INVALID_FACE = -1;
         public static readonly vector TOUCH_INVALID_TEXCOORD = new vector(-1.0, -1.0, 0.0);

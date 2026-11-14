@@ -503,27 +503,20 @@ namespace OpenSim.Framework.Console
 
         public XmlElement GetXml(XmlDocument doc)
         {
-            CommandInfo help = (CommandInfo)((Dictionary<string, object>)tree["help"])[String.Empty];
-            ((Dictionary<string, object>)tree["help"]).Remove(string.Empty);
-            if (((Dictionary<string, object>)tree["help"]).Count == 0)
-                tree.Remove("help");
-
-            CommandInfo quit = (CommandInfo)((Dictionary<string, object>)tree["quit"])[String.Empty];
-            ((Dictionary<string, object>)tree["quit"]).Remove(string.Empty);
-            if (((Dictionary<string, object>)tree["quit"]).Count == 0)
-                tree.Remove("quit");
-
+            // Publishing console help must not remove entries from the live command tree:
+            // concurrent REST console handshakes otherwise race on help/quit.
+            var published = new Dictionary<string, object>(tree);
+            foreach (string name in new[] { "help", "quit" })
+            {
+                if (published.TryGetValue(name, out object value) && value is Dictionary<string, object> children)
+                {
+                    var visible = new Dictionary<string, object>(children);
+                    visible.Remove(String.Empty);
+                    if (visible.Count == 0) published.Remove(name); else published[name] = visible;
+                }
+            }
             XmlElement root = doc.CreateElement("", "HelpTree", "");
-
-            ProcessTreeLevel(tree, root, doc);
-
-            if (!tree.ContainsKey("help"))
-                tree["help"] = (object) new Dictionary<string, object>();
-            ((Dictionary<string, object>)tree["help"])[String.Empty] = help;
-
-            if (!tree.ContainsKey("quit"))
-                tree["quit"] = (object) new Dictionary<string, object>();
-            ((Dictionary<string, object>)tree["quit"])[String.Empty] = quit;
+            ProcessTreeLevel(published, root, doc);
 
             return root;
         }

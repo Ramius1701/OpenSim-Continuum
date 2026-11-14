@@ -1,139 +1,39 @@
+<section class="portal-workspace" aria-labelledby="event-heading">
+<p class="portal-eyebrow">My account · Events</p><h1 id="event-heading">Manage an event</h1>
+<p>Publish a free event in a region you own. Dates and times below use UTC. Posting does not collect admission fees.</p>
 
-<div class="container-fluid">
-<!-- <div class="col98">  -->
-<!--     <div class="col-md-8 offset-md-2"> -->
+{IfEventWritesUnavailableBegin}
+<p role="status">Event management is not available. Contact your grid team.</p>
+{IfEventWritesUnavailableEnd}
 
-  <h2>{AddEventText}</h2>
-<!--  <div id="info_message" class="error_message"></div>
-  <div id="error_message" class="error">{ErrorMessage}</div>
--->
-  <div class="col-12">
-  <form id="add_event_form" action="events/add_event.html" method="post">
-<!--    <div id="add_event" class="col-xs-12 col-sm-10 col-sm-offset-1 text-left">  -->
-<!--   <div class="col-md-8 offset-md-2x"> -->
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventNameText}</div>
-          <div class="form-group col">
-            <input class="form-control" id="eventName" name="eventName" size="60" type="text" />
-          </div>
-          <div class="col-2"></div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventDateText}</div>
-          <div class="form-group col-3">
-            <div class="input-group" style="width:180px;">
-              <input class="form-control" type="text" name="eventDate" id="eventDate" value="{EventDate}" />
-              <div class="input-group-append">
-                <span class="input-group-text">
-                  <i class="fa fa-calendar fa-lg" id="eventCalendar" style="height:24px;"></i>
-                </span>
-              </div>
-            </div>
-          </div>
+{IfEventWritesAvailableBegin}
 
-          <div class="col-5 pull-right">
-            <div class="form-group row">
-              <label for="eventTime" class="col-form-label mr-2">{EventTimeText}</label>
-              <select class="custom-select form-control" style="width:140px;" id="eventTime" name="eventTime">
-                {EventTimesArrayBegin}
-                  <option value="{Index}" {selected}>{Value}</option>
-                {EventTimesArrayEnd}
-              </select>
-              <small class="form-text text-light ml-2">{EventTimeInfoText}</small>
-            </div>
-          </div>
-        </div>
+<form id="event-form" action="{EventFormAction}" method="post" class="portal-editor">
+<input type="hidden" name="action" value="create"><input type="hidden" name="eventid" value="{EventID}">
+<input type="hidden" name="revision" value="{EventRevision}"><input type="hidden" name="requestid" value="{EventRequestID}">
+<label for="event-title">Title</label><input class="form-control" id="event-title" name="name" value="{EventTitle}" required maxlength="255">
+<label for="event-description">Description</label><textarea class="form-control" id="event-description" name="description" required maxlength="8192" rows="6">{EventDescription}</textarea>
+<label for="event-start">Start time (UTC)</label><input class="form-control" id="event-start" type="datetime-local" name="start" value="{EventStart}" required>
+<label for="event-duration">Duration in minutes</label><input class="form-control" id="event-duration" type="number" name="duration" value="{EventMinutes}" min="10" max="1440" required>
+<label for="event-region">Your region</label><select class="form-control" id="event-region" name="regionid" required>
 
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventDurationText}</div>
-          <div class="form-group col-3">
-            <div class="input-group" style="width:180px">
-              <select class="custom-select form-control" id="eventDuration" name="eventDuration">
-                {EventDurationsArrayBegin}
-                  <option value="{Index}" {selected}>{Value}</option>
-                {EventDurationsArrayEnd}
-              </select>
-            </div>
-          </div>
-          <div class="form-group col"></div>
-        </div>
+{EventRegionsArrayBegin}
+<option value="{RegionID}" {RegionSelected}>{RegionName}</option>
+{EventRegionsArrayEnd}
+</select>
+<p>Only your indexed regions are available. Other parcel and group permissions are not yet supported.</p>
+<label for="event-x">Landing X</label><input class="form-control" id="event-x" name="x" type="number" step="any" min="0" value="{EventX}" required>
+<label for="event-y">Landing Y</label><input class="form-control" id="event-y" name="y" type="number" step="any" min="0" value="{EventY}" required>
+<label for="event-z">Landing height</label><input class="form-control" id="event-z" name="z" type="number" step="any" min="0" max="65535" value="{EventZ}" required>
+<label for="event-category">Category</label><select class="form-control" id="event-category" name="category">
+<option value="0">General</option><option value="18">Discussion</option><option value="19">Sports</option><option value="20">Live music</option><option value="22">Commercial</option><option value="23">Nightlife</option><option value="24">Games</option><option value="25">Pageants</option><option value="26">Education</option><option value="27">Arts and culture</option><option value="28">Charity and support</option><option value="29">Miscellaneous</option></select>
+<label for="event-maturity">Maturity</label><select class="form-control" id="event-maturity" name="eventflags"><option value="0">General</option><option value="1">Moderate</option><option value="2">Adult</option></select>
+<div class="portal-actions"><button type="button" class="btn btn-primary" onclick="submitupdate('event-form', '', 'user-events');">Save event</button>
+<button type="button" class="btn btn-outline-light" onclick="loadusercontent('user-events');">Cancel</button></div></form>
 
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventLocationText}</div>
-          <div class="form-group col-4">
-            <select class="custom-select form-control" id="eventLocation" name="eventLocation">
-              {EventLocationsArrayBegin}
-                <option {disabled} value="{Index}">{Value}</option>
-              {EventLocationsArrayEnd}
-            </select>
-          </div>
-          <div class="form-group col"></div>
-        </div>
+<script>$('#event-category').val('{EventCategoryValue}');$('#event-maturity').val('{EventMaturityValue}');</script>
 
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventCategoryText}</div>
-          <div class="form-group col-3">
-            <div class="input-group" style="width:240px;">
-              <select class="custom-select form-control"  id="eventCategory" name="eventCategory">
-                {EventCategoriesArrayBegin}
-                  <option {selected} value="{Index}">{Value}</option>
-                {EventCategoriesArrayEnd}
-              </select>
-            </div>
-          </div>
+{IfEventWritesAvailableEnd}
 
-          <div class="col-4 pull-right">
-            <div class="form-row">
-              <label for="eventCoverCharge" class="col-form-label mr-2">{EventCoverChargeText}</label>
-              <input class="form-control" id="eventCoverCharge" style="width:80px;" name="eventCoverCharge" type="text" value="{EventCoverCharge}" />
-            </div>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group col-2 text-right">{EventDescriptionText}</div>
-          <div class="form-group col" style="height:auto;">
-            <textarea class="form-control" id="eventDescription" name="eventDescription" cols="70" rows="5"></textarea>
-          </div>
-          <div class="col-2"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="col-2"></div>
-          <div class="col">
-            <div class="pull-right">
-              <a class="btn btn-sm btn-success mr-3" style="width:100px;" onclick="loadusercontent('user-events');">{Cancel}</a>
-              <a class="btn btn-sm btn-warning" style="width:100px;" 
-                  onclick="submitupdate('add_event_form', 'additem=true');">
-                {Submit}
-              </a>
-            </div>
-          </div>
-          <div class="col-2"></div>
-        </div>
-
-  </form>
-</div>
-</div>
-
-<script>
-  /* date picker */
-  $(function() {
-    $("#eventDate").datepicker({
-      orientation: "bottom left",
-      defaultDate: "+1d",
-      changeMonth: true,
-      numberOfMonths: 3,
-      onClose: function( selectedDate ) {
-        $( "#eventDate" ).datepicker( "option", "minDate", selectedDate );
-      }
-    });
-  });
-
-  $('#eventCalendar').on('click',function(){
-    $('#eventDate').datepicker("show");
-  });
-
-</script>
-
+</section>

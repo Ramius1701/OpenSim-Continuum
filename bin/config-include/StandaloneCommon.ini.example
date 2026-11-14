@@ -151,6 +151,11 @@
     ;LibraryName = "My World's Library"
 
 [LoginService]
+    ; Optional persistent viewer event reminders from ContinuumSearch.
+    ; HTTPS required except loopback; use a dedicated key matching Search/region configuration.
+    ; EventNotificationURL = https://search.example.org/
+    ; EventNotificationSecret =
+    ; EventNotificationTimeoutMs = 3000
     WelcomeMessage = "Welcome, Avatar!"
 
     SRV_HomeURI = "${Hypergrid|HomeURI}"

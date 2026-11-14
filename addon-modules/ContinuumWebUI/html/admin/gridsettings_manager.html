@@ -1,69 +1,23 @@
-<!-- Grid settings -->
-
-<div class="container-fluid">
-  <h2>{SystemName}: {GridSettingsManager}</h2>
-
-  <form class="form-inline" id="gridsettings_manager_form" action="admin/gridsettings_manager.html" method="post">
-    <div class="row w-100">
-      <div class="col-md-8 offset-md-2">
-
-        <div class="form-group mb-1">
-          <label for="Gridname" class="col-4 col-form-label text-right mr-2">{GridnameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="Gridname" require="true" name="Gridname" type="text" size="40" maxlength="40" value="{Gridname}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="Gridnick" class="col-4 col-form-label text-right mr-2">{GridnickText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="Gridnick" require="true" name="Gridnick" type="text" size="40" maxlength="40" value="{Gridnick}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="WelcomeMessage" class="col-4 col-form-label text-right mr-2">{WelcomeMessageText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="WelcomeMessage" require="true" name="WelcomeMessage" type="text" size="120" maxlength="120" value="{WelcomeMessage}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="GovernorName" class="col-4 col-form-label text-right mr-2">{GovernorNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="Gridnick" require="true" name="GovernorName" type="text" size="40" maxlength="40" value="{GovernorName}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="MainlandEstateName" class="col-4 col-form-label text-right mr-2">{MainlandEstateNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="MainlandEstateName" require="true" name="MainlandEstateName" type="text" size="40" maxlength="40" value="{MainlandEstateName}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="RealEstateOwnerName" class="col-4 col-form-label text-right mr-2">{RealEstateOwnerNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="RealEstateOwnerName" require="true" name="RealEstateOwnerName" type="text" size="40" maxlength="40" value="{RealEstateOwnerName}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="SystemEstateName" class="col-4 col-form-label text-right mr-2">{SystemEstateNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="SystemEstateName" require="true" name="SystemEstateName" type="text" size="40" maxlength="40" value="{SystemEstateName}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="BankerName" class="col-4 col-form-label text-right mr-2">{BankerNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="BankerName" require="true" name="BankerName" type="text" size="40" maxlength="40" value="{BankerName}">
-        </div>
-
-        <div class="form-group mb-1">
-          <label for="MarketPlaceOwnerName" class="col-4 col-form-label text-right mr-2">{MarketPlaceOwnerNameText}</label>
-          <input class="form-control" style="width:300px;" minlength="3" id="MarketPlaceOwnerName" require="true" name="MarketPlaceOwnerName" type="text" size="40" maxlength="40" value="{MarketPlaceOwnerName}">
-        </div>
-
-        <div class="row w-100 mt-3">
-          <div class="col pull-right">
-            <button class="btn-success" onclick="gohome();">{Cancel}</button>
-            <button class="btn-info pull-right" style="width:200px;" onclick="submitupdate('gridsettings_manager_form', 'update=true');">
-              {Save}
-            </button>
-          </div>
-          <div class="col-1"></div>
-        </div>
-
-      </div>
-    </div>
-  </form>
-  
-</div>
+<section class="portal-workspace" aria-labelledby="grid-settings-title">
+<p class="portal-eyebrow">Grid administration</p><h1 id="grid-settings-title">Grid identity and login</h1>
+{IfGridConfigurationDisabledBegin}
+<p>Native configuration editing is disabled. The operator can enable it by selecting the loaded ROBUST INI in GridConfigurationPath.</p>
+{IfGridConfigurationDisabledEnd}
+{IfGridConfigurationEnabledBegin}
+<p>These fields update the configured native ROBUST INI and create a backup beside it. Running services retain their current values until ROBUST restarts. Included files or other hosts may override these values; verify the effective configuration after restarting.</p>
+{IfGridConfigurationRemoteWelcomeBegin}
+<p class="alert alert-warning">LoginService.MessageUrl is configured. Its downloaded welcome message takes precedence over the text below.</p>
+{IfGridConfigurationRemoteWelcomeEnd}
+<form id="grid_configuration_form" action="admin/gridsettings_manager.html" method="post" class="portal-editor">
+<input type="hidden" name="action" value="save"><input type="hidden" name="revision" value="{GridConfigurationRevision}">
+<label for="grid-name">Grid name and portal title</label><input class="form-control" id="grid-name" name="gridName" required maxlength="128" value="{GridConfigurationName}">
+<label for="grid-nick">Short grid name</label><input class="form-control" id="grid-nick" name="gridNick" required maxlength="64" value="{GridConfigurationNick}">
+<label for="grid-welcome">Login welcome message</label><input class="form-control" id="grid-welcome" name="welcome" required maxlength="2000" value="{GridConfigurationWelcome}">
+<p>Use &lt;USERNAME&gt; for the resident name and a literal backslash followed by n for a line break. Quotes and configuration substitutions are unsupported.</p>
+<label><input type="checkbox" name="confirm" value="true" required> I understand that I must arrange a ROBUST restart and verify the effective settings.</label>
+<button type="button" class="btn btn-primary" onclick="submitupdate('grid_configuration_form', '', 'admin-grid-settings');">Save configuration</button>
+</form>
+{IfGridConfigurationEnabledEnd}
+<p>Manage actual native accounts and estate names using their existing service-backed administration pages. WhiteCore's separate system-account label aliases are not native OpenSim account assignments.</p>
+<div class="portal-actions"><a href="index.html?page=admin-user_manager">Resident administration</a><a href="index.html?page=admin-estate_manager">Estate administration</a></div>
+</section>

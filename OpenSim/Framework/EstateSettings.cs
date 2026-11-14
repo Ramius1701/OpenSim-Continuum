@@ -434,7 +434,9 @@ namespace OpenSim.Framework
         {
             if (ban is null)
                 return;
-            if (!IsBanned(ban.BannedUserID, 32) && (l_EstateBans.Count < (int)Constants.EstateAccessLimits.EstateBans)) //Ignore age-based bans
+            // Explicit ban storage must not depend on age/payment access policy.
+            if (!l_EstateBans.Exists(existing => existing.BannedUserID == ban.BannedUserID)
+                && l_EstateBans.Count < (int)Constants.EstateAccessLimits.EstateBans)
                 l_EstateBans.Add(ban);
         }
 
@@ -672,4 +674,40 @@ namespace OpenSim.Framework
             }
         }
     }
+
+    /// <summary>Optional atomic, narrow update capability for trusted native service callers.</summary>
+    public interface IEstateSettingsUpdater
+    {
+        bool SupportsEstateSettingsUpdate { get; }
+        bool TryUpdateEstateSettings(EstateSettings expected, EstateSettings updated);
+    }
+
+    public static class EstateSettingsEdit
+    {
+        public static object[] Values(EstateSettings settings) => new object[]
+        {
+            settings.EstateName ?? "", settings.PricePerMeter, settings.PublicAccess,
+            settings.AllowVoice, settings.AllowDirectTeleport
+        };
+
+        public static string Token(EstateSettings settings)
+        {
+            var fields = new List<string> { settings.EstateID.ToString(System.Globalization.CultureInfo.InvariantCulture), settings.EstateOwner.ToString() };
+            foreach (object value in Values(settings))
+                fields.Add(System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(System.Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture))));
+            return System.Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(string.Join("|", fields))));
+        }
+
+        public static void Validate(EstateSettings expected, EstateSettings updated)
+        {
+            if (expected == null || updated == null || expected.EstateID == 0 || expected.EstateID > int.MaxValue
+                || expected.EstateID != updated.EstateID || expected.EstateOwner != updated.EstateOwner)
+                throw new System.ArgumentException("Choose an existing estate; ownership transfers require a separate native workflow");
+            string name = updated.EstateName;
+            if (string.IsNullOrWhiteSpace(name) || name.Length > 64 || name != name.Trim()
+                || System.Linq.Enumerable.Any(name, char.IsControl) || updated.PricePerMeter < 0 || updated.PricePerMeter > 1000000)
+                throw new System.ArgumentException("Use an estate name of 1–64 characters and a reference price from 0 to 1,000,000");
+        }
+    }
+
 }

@@ -596,7 +596,7 @@ namespace OpenSim.Framework.Console
         {
             try
             {
-                string uri = "/ReadResponses/" + id.ToString() + "/";
+                string uri = "/ReadResponses/" + id.ToString();
 
                 m_Server.RemovePollServiceHTTPHandler("", uri);
             }

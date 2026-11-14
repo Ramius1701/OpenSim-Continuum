@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="../../bin/OpenSim*.dll" />
+    <Reference Include="../../bin/OpenMetaverse*.dll" />
+    <Reference Include="../../bin/log4net.dll" />
+    <Reference Include="../../bin/Nini.dll" />
+    <Reference Include="../../bin/Npgsql.dll" />
+    <Reference Include="../../bin/MailKit.dll" />
+    <Reference Include="../../bin/MimeKit.dll" />
+    <Reference Include="../../bin/SmartThreadPool.dll" />
+    <Content Include="../../bin/*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

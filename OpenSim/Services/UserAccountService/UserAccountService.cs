@@ -41,7 +41,7 @@ using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Services.UserAccountService
 {
-    public class UserAccountService : UserAccountServiceBase, IUserAccountService
+    public class UserAccountService : UserAccountServiceBase, IUserAccountService, IUserAccountArchiveService
     {
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private static UserAccountService m_RootInstance;
@@ -321,6 +321,10 @@ namespace OpenSim.Services.UserAccountService
         public void InvalidateCache(UUID userID)
         {
         }
+
+        public bool SupportsAccountArchive => m_Database is IUserAccountArchiveData;
+        public bool TryArchiveAccount(UUID principal) => principal != UUID.Zero
+            && m_Database is IUserAccountArchiveData storage && storage.TryArchiveAccount(principal);
 
         public bool StoreUserAccount(UserAccount data)
         {

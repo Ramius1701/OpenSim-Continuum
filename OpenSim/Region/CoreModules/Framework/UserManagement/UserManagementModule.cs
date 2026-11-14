@@ -1324,6 +1324,10 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
             {
                 if (m_thisGridInfo.IsLocalGrid(homeuri.URL) == 1) // local
                 {
+                    // lickx creator validation, tightened to match UUID as well as name.
+                    UserAccount account = m_userAccountService?.GetUserAccount(UUID.Zero, firstname, lastname);
+                    if (account == null || account.PrincipalID != id)
+                        return;
                     oldUser.FirstName = firstname;
                     oldUser.LastName = lastname;
                     oldUser.IsLocal = true;
@@ -1342,6 +1346,9 @@ namespace OpenSim.Region.CoreModules.Framework.UserManagement
             {
                 if (string.IsNullOrEmpty(homeuri.Host)) // take this as local
                 {
+                    UserAccount account = m_userAccountService?.GetUserAccount(UUID.Zero, firstname, lastname);
+                    if (account == null || account.PrincipalID != id)
+                        return;
                     oldUser.FirstName = firstname;
                     oldUser.LastName = lastname;
                     oldUser.IsLocal = true;

@@ -824,6 +824,20 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
             UUID agentID = GetRequestingAgentID(remoteClient);
             m_groupData.SetAgentActiveGroup(agentID, agentID, groupID);
 
+            // lickx attachment group synchronization, without restarting stopped scripts.
+            GroupMembershipData active = m_groupData.GetAgentActiveMembership(agentID, agentID);
+            if ((active?.GroupID ?? UUID.Zero) == groupID && remoteClient.Scene is Scene scene
+                && scene.TryGetScenePresence(agentID, out ScenePresence sp) && !sp.IsChildAgent)
+            {
+                foreach (SceneObjectGroup attachment in sp.GetAttachments())
+                {
+                    if (attachment.OwnerID != agentID || attachment.IsDeleted)
+                        continue;
+                    attachment.SetGroup(groupID, remoteClient);
+                    attachment.ScheduleGroupForFullUpdate();
+                }
+            }
+
             // llClientView does this
             SendAgentGroupDataUpdate(remoteClient, true);
         }
@@ -1122,9 +1136,10 @@ namespace OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups
 
             m_groupData.SetAgentActiveGroupRole(GetRequestingAgentID(remoteClient), GetRequestingAgentID(remoteClient), groupID, titleRoleID);
 
-            // TODO: Not sure what all is needed here, but if the active group role change is for the group
-            // the client currently has set active, then we need to do a scene presence update too
-            // if (m_groupData.GetAgentActiveMembership(GetRequestingAgentID(remoteClient)).GroupID == GroupID)
+            UUID agentID = GetRequestingAgentID(remoteClient);
+            GroupMembershipData active = m_groupData.GetAgentActiveMembership(agentID, agentID);
+            if (active != null && active.GroupID == groupID)
+                m_groupData.SetAgentActiveGroup(agentID, agentID, groupID);
 
             SendDataUpdate(remoteClient, true);
         }

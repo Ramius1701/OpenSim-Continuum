@@ -218,6 +218,13 @@ namespace OpenSim.Services.Interfaces
 
     };
 
+    // Local-only conditional archive capability. Retains identity and related records.
+    public interface IUserAccountArchiveService
+    {
+        bool SupportsAccountArchive { get; }
+        bool TryArchiveAccount(UUID principal);
+    }
+
     public interface IUserAccountService
     {
         UserAccount GetUserAccount(UUID scopeID, UUID userID);

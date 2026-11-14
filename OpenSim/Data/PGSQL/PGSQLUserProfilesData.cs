@@ -37,8 +37,18 @@ using Npgsql;
 
 namespace OpenSim.Data.PGSQL
 {
-    public class UserProfilesData : IProfilesData
+    public class UserProfilesData : IProfilesData, IUserPartnershipData
     {
+        public PartnershipProposal[] GetPartnershipProposals(UUID actor)
+        {
+            using var connection = new NpgsqlConnection(ConnectionString); connection.Open();
+            return PartnershipCommands.Read(connection, actor);
+        }
+        public string ChangePartnership(UUID actor, UUID other, UUID proposal, string action, string message)
+        {
+            using var connection = new NpgsqlConnection(ConnectionString); connection.Open();
+            return PartnershipCommands.Change(connection, "postgres", actor, other, proposal, action, message);
+        }
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected PGSQLManager m_database;
@@ -133,23 +143,16 @@ namespace OpenSim.Data.PGSQL
         {
             string query = string.Empty;
 
-            query = @"WITH upsert AS (
-                        UPDATE classifieds SET
-                            classifieduuid = :ClassifiedId, creatoruuid = :CreatorId, creationdate = :CreatedDate,
-                            expirationdate = :ExpirationDate,category =:Category, name = :Name, description = :Description,
-                            parceluuid = :ParcelId, parentestate = :ParentEstate, snapshotuuid = :SnapshotId,
-                            simname = :SimName, posglobal = :GlobalPos, parcelname = :ParcelName, classifiedflags = :Flags,
-                            priceforlisting = :ListingPrice
-                        WHERE classifieduuid = :ClassifiedId
-                        RETURNING * )
-                      INSERT INTO classifieds (classifieduuid,creatoruuid,creationdate,expirationdate,category,name,
-                            description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname,classifiedflags,
-                            priceforlisting)
-                      SELECT
-                            :ClassifiedId,:CreatorId,:CreatedDate,:ExpirationDate,:Category,:Name,:Description,
-                            :ParcelId,:ParentEstate,:SnapshotId,:SimName,:GlobalPos,:ParcelName,:Flags,:ListingPrice
-                      WHERE NOT EXISTS (
-                        SELECT * FROM upsert )";
+            // Content edits retain paid creation/expiration dates and listing price.
+            query = @"INSERT INTO classifieds(classifieduuid,creatoruuid,creationdate,expirationdate,category,name,
+                        description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname,classifiedflags,priceforlisting)
+                      VALUES(:ClassifiedId,:CreatorId,:CreatedDate,:ExpirationDate,:Category,:Name,:Description,
+                        :ParcelId,:ParentEstate,:SnapshotId,:SimName,:GlobalPos,:ParcelName,:Flags,:ListingPrice)
+                      ON CONFLICT(classifieduuid) DO UPDATE SET category=EXCLUDED.category,name=EXCLUDED.name,
+                        description=EXCLUDED.description,parceluuid=EXCLUDED.parceluuid,parentestate=EXCLUDED.parentestate,
+                        snapshotuuid=EXCLUDED.snapshotuuid,simname=EXCLUDED.simname,posglobal=EXCLUDED.posglobal,
+                        parcelname=EXCLUDED.parcelname,classifiedflags=EXCLUDED.classifiedflags
+                      WHERE classifieds.creatoruuid=EXCLUDED.creatoruuid";
 
             if (string.IsNullOrEmpty(ad.ParcelName))
                 ad.ParcelName = "Unknown";
@@ -201,7 +204,8 @@ namespace OpenSim.Data.PGSQL
                         cmd.Parameters.Add(m_database.CreateParameter("Flags", (int)Convert.ToInt32(ad.Flags)));
                         cmd.Parameters.Add(m_database.CreateParameter("ListingPrice", (int)Convert.ToInt32(ad.Price)));
 
-                        cmd.ExecuteNonQuery();
+                        if (cmd.ExecuteNonQuery() == 0)
+                        { result = "Classified belongs to another resident"; return false; }
                     }
                 }
             }
@@ -271,7 +275,7 @@ namespace OpenSim.Data.PGSQL
                                 ad.ParentEstate = Convert.ToInt32(reader["parentestate"]);
                                 ad.Flags = (byte)Convert.ToInt16(reader["classifiedflags"]);
                                 ad.Category = Convert.ToInt32(reader["category"]);
-                                ad.Price = Convert.ToInt16(reader["priceforlisting"]);
+                                ad.Price = Convert.ToInt32(reader["priceforlisting"]);
                                 ad.Name = reader["name"].ToString();
                                 ad.Description = reader["description"].ToString();
                                 ad.SimName = reader["simname"].ToString();

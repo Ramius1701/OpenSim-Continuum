@@ -1,0 +1,74 @@
+<section class="portal-workspace" aria-labelledby="auctions-heading">
+<p class="portal-eyebrow">Land and places</p><h1 id="auctions-heading">Land auctions</h1>
+<p>Browse the grid's configured auction regions. Bids reserve the full amount; outbid reservations are released. Auctions transfer land, not parcel objects.</p>
+<p>To bid or manage an auction, log in here and use your viewer to visit that region. Your live viewer session authorizes the reservation. After a lost reply, reload before retrying the same bid.</p>
+{IfAuctionsDisabledBegin}
+<p role="status">Grid auction endpoints have not been configured. Contact your grid operator for availability.</p>
+{IfAuctionsDisabledEnd}
+{IfAuctionLoggedOutBegin}
+<a href="?page=login" onclick="loadcontent('login');return false;">Log in to manage bids</a>
+{IfAuctionLoggedOutEnd}
+{AuctionRegionsArrayBegin}
+<section class="portal-workspace" aria-label="{AuctionRegionName}">
+<h2>{AuctionRegionName}</h2>
+{IfAuctionUnavailableBegin}
+<p role="status">This region's auction service is unavailable. Existing reservations may still be active; refresh after service recovery.</p>
+{IfAuctionUnavailableEnd}
+{IfAuctionNeedsViewerBegin}
+<p>Visit this region in your viewer to enable bid and seller controls.</p>
+{IfAuctionNeedsViewerEnd}
+{IfAuctionRegionEmptyBegin}
+<p>No auctions to show in this region.</p>
+{IfAuctionRegionEmptyEnd}
+{IfAuctionCanStartBegin}
+<form id="auction-start-{AuctionRegionID}" action="auctions.html" method="post" class="portal-editor">
+<input type="hidden" name="region" value="{AuctionRegionID}"><input type="hidden" name="action" value="start">
+<label for="auction-parcel-{AuctionRegionID}">Your eligible parcel</label>
+<select class="form-control" name="parcel" id="auction-parcel-{AuctionRegionID}" required>
+{AuctionParcelsArrayBegin}
+<option value="{AuctionParcelID}">{AuctionParcelName}</option>
+{AuctionParcelsArrayEnd}
+</select>
+<p>Duration: {AuctionHours} hours. Minimum bid: {AuctionMinimum}. These terms are fixed when the auction opens.</p>
+<button type="button" class="btn btn-primary" onclick="submitupdate('auction-start-{AuctionRegionID}', '', 'auctions');">Open auction</button>
+</form>
+{IfAuctionCanStartEnd}
+{AuctionRowsArrayBegin}
+<article class="portal-workspace"><h3>{AuctionName}</h3>
+<p>#{AuctionID} · {AuctionArea} m² · {AuctionState}<br>Ends {AuctionEnds}. High bid: {AuctionHigh}.</p>
+{IfAuctionOwnHighBegin}
+<p>You hold the high bid.</p>
+{IfAuctionOwnHighEnd}
+{IfAuctionHasPendingBegin}
+<p role="status">Your authorization for {AuctionPendingAmount} is pending. Retry that exact amount; do not create a different bid.</p>
+{IfAuctionHasPendingEnd}
+{IfAuctionCanBidBegin}
+<form id="auction-bid-{AuctionRegionID}-{AuctionID}" action="auctions.html" method="post" class="portal-editor">
+<input type="hidden" name="region" value="{AuctionRegionID}"><input type="hidden" name="auction" value="{AuctionID}"><input type="hidden" name="action" value="bid">
+<label for="auction-amount-{AuctionRegionID}-{AuctionID}">Bid amount (minimum {AuctionNextBid})</label>
+<input class="form-control" id="auction-amount-{AuctionRegionID}-{AuctionID}" type="number" name="amount" min="{AuctionNextBid}" max="2147483647" step="1" required>
+<label class="portal-check"><input type="checkbox" name="confirm" value="yes" required> I confirm reserving the full bid amount, including when replacing my own bid.</label>
+<button type="button" class="btn btn-primary" onclick="submitupdate('auction-bid-{AuctionRegionID}-{AuctionID}', '', 'auctions');">Reserve bid</button>
+</form>
+{IfAuctionCanBidEnd}
+{IfAuctionCanCancelBegin}
+<form id="auction-cancel-{AuctionRegionID}-{AuctionID}" action="auctions.html" method="post">
+<input type="hidden" name="region" value="{AuctionRegionID}"><input type="hidden" name="auction" value="{AuctionID}"><input type="hidden" name="action" value="cancel">
+<button type="button" class="btn btn-outline-light" onclick="submitupdate('auction-cancel-{AuctionRegionID}-{AuctionID}', '', 'auctions');">Cancel auction and release bids</button>
+</form>
+{IfAuctionCanCancelEnd}
+</article>
+{AuctionRowsArrayEnd}
+{IfAuctionMoreItemsBegin}
+<a href="?page=auctions&amp;auctionregion={AuctionRegionID}&amp;auctionitems={AuctionNextItems}" onclick="loadcontent('auctions', 'auctionregion={AuctionRegionID}&amp;auctionitems={AuctionNextItems}');return false;">More auctions in this region</a>
+{IfAuctionMoreItemsEnd}
+</section>
+{AuctionRegionsArrayEnd}
+<div class="portal-actions">
+{IfAuctionHasPreviousBegin}
+<a href="?page=auctions&amp;auctionoffset={AuctionPrevious}" onclick="loadcontent('auctions', 'auctionoffset={AuctionPrevious}');return false;">Previous regions</a>
+{IfAuctionHasPreviousEnd}
+{IfAuctionHasNextBegin}
+<a href="?page=auctions&amp;auctionoffset={AuctionNext}" onclick="loadcontent('auctions', 'auctionoffset={AuctionNext}');return false;">More regions</a>
+{IfAuctionHasNextEnd}
+</div></section>

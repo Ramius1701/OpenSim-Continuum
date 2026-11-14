@@ -246,11 +246,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         {
             lock (staticLock)
             {
-                // Check XMLRPCRequests
-                try { m_XmlRequest[m_ScriptEngines[0]].CheckXMLRPCRequests(); } catch {}
-
                 foreach (IScriptEngine s in m_ScriptEngines)
                 {
+                    // Tranquillity 3bba0e510a: XML-RPC modules are per-region.
+                    try { m_XmlRequest[s].CheckXMLRPCRequests(); } catch {}
+
                     // Check HttpRequests
                     try { m_HttpRequest[s].CheckHttpRequests(); } catch { }
 

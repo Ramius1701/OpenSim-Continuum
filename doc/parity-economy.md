@@ -1,5 +1,15 @@
 # Economy donor-parity audit
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 ## Product boundary
 
 Continuum has two deliberately separate economy products:
@@ -39,7 +49,7 @@ region.
 | Viewer balance and payments | Established DTL/NSL protocol, substantially hardened | Separately implemented | Both require the same viewer matrix; no shared authority. |
 | Object, land and script payments | Present | Present with authorization/capture holds | Preserve compatibility behavior; prefer Continuum's delivery-safe hold model for the new product. |
 | Upload, group creation and classified fees | Compatibility hooks present | Reservation-aware hooks present | Verify success-only charging and replay behavior. |
-| Resident transaction history | Legacy endpoints retained only where authenticated/safe | Bounded immutable ledger history | Retain; expose through authenticated UI later. |
+| Resident transaction history | Legacy endpoints retained only where authenticated/safe | Bounded immutable ledger history with authenticated resident/admin WebUI statements | Retain; certify live authorization and provider behavior. |
 | MySQL/MariaDB | Required legacy backend | Required provider | Certify the actual production server/version. |
 | PostgreSQL and SQLite | Not part of the preserved legacy product | Independent providers present | Required for ContinuumEconomy; provider parity is a release gate. |
 | Currency purchase limits | Legacy quote/buy behavior, disabled by default | Daily/weekly/monthly limits present, disabled by default | Keep purchases opt-in and test limits/replay. Real-money settlement is out of ledger scope. |
@@ -47,13 +57,13 @@ region.
 | Group balances and accounting | No complete WhiteCore-equivalent group ledger | Typed group accounts, transfers, bounded history and permission-checked viewer Summary/Details/Transactions are present | Certify the implemented authority and history in live group workflows before adding scheduled policy. |
 | Recurring directory/group charges | Partial core fee hooks, not WhiteCore scheduling | Deliberately excluded from the beta candidate | A scheduler cannot safely infer fee ownership, group liability allocation or job authority. Reconsider only after live group-account certification and an explicit operator policy. |
 | Group dividends/liabilities | Missing in the donor compatibility service | Deliberately excluded from the beta candidate | These are policy/accounting products rather than a viewer-protocol requirement. Never infer liability or dividend recipients from resident balances or unverified membership data. |
-| Purchase history and administrator reporting | Legacy history exists | Ledger/history exists, dedicated UI absent | WhiteCore WebUI/API phase should consume authenticated Continuum APIs, never database tables directly. |
+| Purchase history and administrator reporting | Legacy history exists | Authenticated resident/admin ledger statements and paginated type-5010 currency-credit history exist | User selected virtual currency credits because no real-money provider is connected. These pages make no cash-settlement or receipt claim. |
 | RegionCurrency | Deprecated compatibility portal | Not a backend | Keep disabled beside RegionWeb and exclude from new deployments. |
 | PayPal donations/region billing | Not ledger responsibility | Not ledger responsibility | Treat donations and future invoices as external accounting events; no automatic minting without an explicit audited operation. |
 
-## WhiteCore behavior worth adapting
+## Historical WhiteCore candidate list
 
-The highest-value remaining WhiteCore findings are:
+The opening candidate list was the following. Group accounts/history, stipends and bounded statements now have native implementations; scheduled policy exclusions and real-money purchase-history gaps retain their recorded dispositions. This list is not a new port queue:
 
 1. separate group accounts and group transaction history;
 2. auditable group fees, land fees and object fees;

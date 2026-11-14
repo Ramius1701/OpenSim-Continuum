@@ -40,7 +40,7 @@ using OpenSim.Framework;
 
 namespace OpenSim.Services.ProfilesService
 {
-    public class UserProfilesService: UserProfilesServiceBase, IUserProfilesService
+    public class UserProfilesService: UserProfilesServiceBase, IUserProfilesService, IUserContactService, IUserPartnershipService
     {
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -248,12 +248,62 @@ namespace OpenSim.Services.ProfilesService
         #region UserData
         public bool RequestUserAppData(ref UserAppData prop, ref string result)
         {
+            if (IsPrivateContactTag(prop.TagId)) { result = "Private data is unavailable on profile RPC"; return false; }
             return ProfilesData.GetUserAppData(ref prop, ref result);
         }
 
         public bool SetUserAppData(UserAppData prop, ref string result)
         {
+            if (IsPrivateContactTag(prop.TagId)) { result = "Private data is unavailable on profile RPC"; return false; }
             return true;
+        }
+
+        public bool SupportsPartnerships => ProfilesData is IUserPartnershipData;
+        public PartnershipProposal[] GetPartnershipProposals(UUID actor)
+        {
+            if (ProfilesData is not IUserPartnershipData storage) throw new InvalidOperationException("Partnership storage is unavailable");
+            return storage.GetPartnershipProposals(actor);
+        }
+        public string ChangePartnership(UUID actor, UUID other, UUID proposal, string action, string message)
+        {
+            if (ProfilesData is not IUserPartnershipData storage) throw new InvalidOperationException("Partnership storage is unavailable");
+            foreach (UUID id in new[] { actor, other })
+            {
+                if (id == UUID.Zero) throw new ArgumentException("A local account is required");
+                var profile = new UserProfileProperties { UserId = id }; string result = "";
+                if (!ProfilesData.GetAvatarProperties(ref profile, ref result)) throw new InvalidOperationException("Native profile storage is unavailable");
+            }
+            return storage.ChangePartnership(actor, other, proposal, action, message);
+        }
+
+        private const string ContactTag = "continuum.private.contact.v1";
+        private static bool IsPrivateContactTag(string tag) => tag != null &&
+            (System.Linq.Enumerable.Any(tag, c => c < 0x20 || c > 0x7e)
+                || tag.Trim().StartsWith("continuum.private.", StringComparison.OrdinalIgnoreCase));
+        public UserContactInfo GetContact(UUID user)
+        {
+            if (user == UUID.Zero) throw new ArgumentException("A local account is required");
+            var record = new UserAppData { UserId = user.ToString(), TagId = ContactTag, DataKey = "contact" };
+            string result = "";
+            if (!ProfilesData.GetUserAppData(ref record, ref result)) throw new InvalidOperationException("Contact storage is unavailable");
+            if (String.IsNullOrEmpty(record.DataVal)) return new UserContactInfo();
+            if (record.DataVal.Length > 8192) throw new InvalidOperationException("Contact storage is invalid");
+            try
+            {
+                var contact = System.Text.Json.JsonSerializer.Deserialize<UserContactInfo>(record.DataVal);
+                if (contact == null) throw new ArgumentException();
+                contact.Validate(); return contact;
+            }
+            catch (Exception e) when (e is System.Text.Json.JsonException || e is ArgumentException)
+            { throw new InvalidOperationException("Contact storage is invalid"); }
+        }
+        public bool StoreContact(UUID user, UserContactInfo contact)
+        {
+            if (user == UUID.Zero || contact == null) throw new ArgumentException("A local account and contact record are required");
+            contact.Validate();
+            string result = "";
+            return ProfilesData.SetUserAppData(new UserAppData { UserId = user.ToString(), TagId = ContactTag,
+                DataKey = "contact", DataVal = System.Text.Json.JsonSerializer.Serialize(contact) }, ref result);
         }
         #endregion UserData
     }

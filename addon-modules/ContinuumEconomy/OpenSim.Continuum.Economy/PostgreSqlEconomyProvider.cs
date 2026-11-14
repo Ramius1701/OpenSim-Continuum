@@ -26,7 +26,7 @@ namespace OpenSim.Continuum.Economy
         internal static void Add(NpgsqlCommand q, string n, object v) => q.Parameters.AddWithValue(n, v ?? DBNull.Value);
     }
 
-    public sealed class PostgreSqlEconomyLedger : IEconomyLedger
+    public sealed class PostgreSqlEconomyLedger : IEconomyLedger, ICurrencyCreditHistory
     {
         private readonly PostgreSqlEconomyStore s;
         public PostgreSqlEconomyLedger(string cs) { s = new(cs); }
@@ -66,6 +66,11 @@ namespace OpenSim.Continuum.Economy
             if (r.Kind == LedgerAdjustmentKind.Credit) { if (r.MaximumBalance > 0 && (b > r.MaximumBalance || r.Amount > r.MaximumBalance - b)) failure = "Maximum balance exceeded"; DateTime now = DateTime.UtcNow, day = now.Date, week = now.Date.AddDays(-(((int)now.DayOfWeek + 6) % 7)), month = new(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc); if (failure.Length == 0 && Exceeds(c, t, r.AccountID, r.TransactionType, day, r.DailyCreditLimit, r.Amount)) failure = "Daily credit limit exceeded"; if (failure.Length == 0 && Exceeds(c, t, r.AccountID, r.TransactionType, week, r.WeeklyCreditLimit, r.Amount)) failure = "Weekly credit limit exceeded"; if (failure.Length == 0 && Exceeds(c, t, r.AccountID, r.TransactionType, month, r.MonthlyCreditLimit, r.Amount)) failure = "Monthly credit limit exceeded"; }
             int status = failure.Length == 0 ? 1 : r.Kind == LedgerAdjustmentKind.Debit ? 2 : 3; if (status == 1) { try { checked { b += r.Kind == LedgerAdjustmentKind.Credit ? r.Amount : -r.Amount; } } catch (OverflowException) { t.Rollback(); return AR(r.OperationID, LedgerResultCode.InvalidRequest, b, "The adjustment exceeds the supported balance range"); } Set(c, t, r.AccountID, b); }
             InsertAdjust(c, t, r, h, status, b, failure); t.Commit(); LedgerResultCode code = status == 1 ? LedgerResultCode.Committed : status == 2 ? LedgerResultCode.InsufficientFunds : LedgerResultCode.InvalidRequest; return AR(r.OperationID, code, b, status == 1 ? "Adjustment committed" : failure);
+        }
+        public IReadOnlyList<LedgerHistoryEntry> GetCurrencyCredits(Guid account, DateTime? beforeUtc, Guid beforeID, int limit)
+        {
+            lock (s.SyncRoot)
+            using (var connection = s.Open()) return CurrencyCreditHistoryQuery.Read(connection, "postgres", account, beforeUtc, beforeID, limit);
         }
         public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid id, DateTime? before, int limit)
         {

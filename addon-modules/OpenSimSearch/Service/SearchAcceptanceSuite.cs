@@ -93,6 +93,9 @@ namespace ContinuumSearch.Service
             Require(store.FindOwnerEvents(new Hashtable { ["creatoruuid"] = "not-a-uuid" }).Count == 0,
                 "invalid owner events query");
             Require(store.GetEvent(new Hashtable { ["eventID"] = "900001" }).Count == 1, "event details query");
+            CheckEventManagement(store);
+            store.CheckClassifiedManagement();
+            CheckEventNotifications(store);
             Console.WriteLine("PASS: DataSnapshot parse and idempotent region replacement");
             Console.WriteLine("PASS: places, popular, parcel details, region parcels, land, events, owner events and event-details query contracts");
             Console.WriteLine("ContinuumSearch {0} acceptance self-test passed.", store.Provider);
@@ -103,6 +106,94 @@ namespace ContinuumSearch.Service
         {
             ["text"] = text, ["flags"] = flags.ToString(), ["category"] = "0", ["query_start"] = "0"
         };
+        private static void CheckEventNotifications(SearchStore store)
+        {
+            Guid actor = Guid.NewGuid(), other = Guid.NewGuid();
+            long future = DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeSeconds();
+            store.SaveEvent(new SearchEvent { ID = 900101, OwnerID = actor.ToString(), CreatorID = actor.ToString(), Name = "Reminder event",
+                Description = "Persistent reminder", DateUtc = future, Duration = 60, Category = 18, SimName = "Welcome Test", ParcelID = Guid.Empty.ToString(), GlobalPosition = "256100,256120,30" });
+            var request = new Hashtable { ["actor"] = actor.ToString(), ["action"] = "add", ["event"] = "900101" };
+            Require(store.EventNotifications(request).Count == 1 && store.EventNotifications(request).Count == 1, "idempotent notification subscription");
+            request["actor"] = other.ToString(); request["action"] = "list";
+            Require(store.EventNotifications(request).Count == 0, "notification subscriber isolation");
+            string secret = new('n', 48);
+            var rpc = new SearchRpc(store, notificationSecret: secret);
+            var wire = new Nwc.XmlRpc.XmlRpcRequest("continuum_event_notifications", new ArrayList { request });
+            Require(!Convert.ToBoolean(((Hashtable)rpc.Notifications(wire, null).Value)["success"]), "notification private authentication");
+            request["notificationSecret"] = secret; request["actor"] = actor.ToString();
+            var reply = (Hashtable)rpc.Notifications(wire, null).Value;
+            Require(Convert.ToBoolean(reply["success"]) && ((ArrayList)reply["data"]).Count == 1, "authenticated notification read");
+            var row = (Hashtable)((ArrayList)reply["data"])[0];
+            Require(row["event_date_ut"].ToString() == future.ToString() && row["event_name"].ToString() == "Reminder event", "viewer reminder fields");
+            request["action"] = "remove";
+            Require(store.EventNotifications(request).Count == 0 && store.EventNotifications(request).Count == 0, "idempotent notification removal");
+            request["action"] = "add"; request["event"] = "2147483647";
+            bool rejected = false; try { store.EventNotifications(request); } catch (ArgumentException) { rejected = true; }
+            Require(rejected, "missing event notification rejected");
+            var capped = Guid.NewGuid();
+            request = new Hashtable { ["actor"] = capped.ToString(), ["action"] = "add" };
+            for (int i = 0; i <= 100; i++)
+            {
+                store.SaveEvent(new SearchEvent { ID = 900200 + i, OwnerID = actor.ToString(), CreatorID = actor.ToString(), Name = "Limit event " + i,
+                    Description = "Notification limit fixture", DateUtc = future, Duration = 60, Category = 18, SimName = "Welcome Test", ParcelID = Guid.Empty.ToString(), GlobalPosition = "256100,256120,30" });
+                request["event"] = (900200 + i).ToString();
+                if (i < 100) store.EventNotifications(request);
+            }
+            bool full = false; try { store.EventNotifications(request); } catch (ArgumentException) { full = true; }
+            request["event"] = "900200";
+            Require(full && store.EventNotifications(request).Count == 100, "notification cap and duplicate-at-cap behavior");
+            Console.WriteLine("PASS: durable event reminder subscriptions, idempotence, subscriber isolation, authenticated service and viewer timestamp fields");
+        }
+
+        private static void CheckEventManagement(SearchStore store)
+        {
+            string owner = "22222222-2222-2222-2222-222222222222";
+            Hashtable form = new()
+            {
+                ["actor"] = owner, ["action"] = "create", ["requestID"] = Guid.NewGuid().ToString(),
+                ["regionID"] = "11111111-1111-1111-1111-111111111111", ["name"] = "Resident event",
+                ["description"] = "<script>plain text</script>", ["category"] = "18", ["duration"] = "60",
+                ["dateUTC"] = DateTimeOffset.UtcNow.AddDays(2).ToUnixTimeSeconds().ToString(),
+                ["eventflags"] = "0", ["x"] = "100", ["y"] = "120", ["z"] = "30"
+            };
+            int id = store.ChangeEvent(form);
+            Require(id > 0 && store.ChangeEvent(form) == id, "event duplicate submission idempotency");
+            Hashtable detail = (Hashtable)store.GetEvent(new Hashtable { ["eventID"] = id.ToString() })[0];
+            Require(detail["creator"].ToString() == owner && Convert.ToInt32(detail["revision"]) == 1
+                && detail["description"].ToString() == "<script>plain text</script>"
+                && detail["globalposition"].ToString() == "256100,256120,30", "event persistence and global coordinates");
+            void Reject(string field, object value, string test)
+            {
+                object previous = form[field]; form[field] = value;
+                bool rejected = false;
+                try { store.ChangeEvent(form); } catch (ArgumentException) { rejected = true; }
+                finally { form[field] = previous; }
+                Require(rejected, test);
+            }
+            Reject("name", "Different payload", "event reused request ID rejects changed payload");
+            Reject("actor", Guid.NewGuid().ToString(), "event creation region ownership");
+            Reject("x", "NaN", "event invalid coordinates");
+            Reject("eventflags", "2", "event maturity cannot exceed region");
+            form["action"] = "update"; form["eventID"] = id.ToString(); form["revision"] = "1";
+            Reject("actor", Guid.NewGuid().ToString(), "event update ownership");
+            form["name"] = "Updated event";
+            Require(store.ChangeEvent(form) == id, "event update");
+            Reject("revision", "1", "event stale update");
+            form["action"] = "delete";
+            Reject("revision", "1", "event stale delete");
+            form["revision"] = "2";
+            Reject("actor", Guid.NewGuid().ToString(), "event delete ownership");
+            Require(store.ChangeEvent(form) == id
+                && store.GetEvent(new Hashtable { ["eventID"] = id.ToString() }).Count == 0, "event deletion");
+            string secret = new('k', 48);
+            SearchRpc rpc = new(store, secret);
+            Nwc.XmlRpc.XmlRpcRequest request = new("continuum_event_write", new ArrayList { form });
+            Require(!Convert.ToBoolean(((Hashtable)rpc.EventWrite(request, null).Value)["success"]), "event private API requires secret");
+            form["writeSecret"] = secret; form["action"] = "create"; form["requestID"] = Guid.NewGuid().ToString();
+            Require(Convert.ToBoolean(((Hashtable)rpc.EventWrite(request, null).Value)["success"]), "event authenticated API");
+            Require(!Convert.ToBoolean(((Hashtable)new SearchRpc(store).EventWrite(request, null).Value)["success"]), "event writes disabled by default");
+            Console.WriteLine("PASS: event write authentication, ownership, persistence, global coordinates, duplicate submissions, revisions and deletion");
+        }
         private static void Require(bool value, string operation)
         { if (!value) throw new InvalidOperationException("Search acceptance failed: " + operation); }
     }

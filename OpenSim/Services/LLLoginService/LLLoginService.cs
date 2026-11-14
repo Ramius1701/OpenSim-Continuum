@@ -104,12 +104,15 @@ namespace OpenSim.Services.LLLoginService
         readonly IConfig  m_LoginServerConfig;
 //        IConfig m_ClientsConfig;
 
+        private readonly EventNotificationClient m_eventNotifications;
+
         public LLLoginService(IConfigSource config, ISimulationService simService, ILibraryService libraryService)
         {
             m_LoginServerConfig = config.Configs["LoginService"];
             if (m_LoginServerConfig is null)
                 throw new Exception(string.Format("No section LoginService in config file"));
 
+            m_eventNotifications = EventNotificationClient.Configure(m_LoginServerConfig);
             string accountService = m_LoginServerConfig.GetString("UserAccountService", string.Empty);
             string gridUserService = m_LoginServerConfig.GetString("GridUserService", string.Empty);
             string agentService = m_LoginServerConfig.GetString("UserAgentService", string.Empty);
@@ -425,10 +428,12 @@ namespace OpenSim.Services.LLLoginService
                     return LLFailedLoginResponse.UserProblem;
                 }
 
-                if (account.UserLevel < m_MinLoginLevel)
+                // Negative levels denote disabled/archived identities, independently of
+                // an operator's minimum level for otherwise active accounts.
+                if (account.UserLevel < 0 || account.UserLevel < m_MinLoginLevel)
                 {
                     m_log.InfoFormat(
-                        "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: user level is {2} but minimum login level is {3}",
+                        "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: disabled account or minimum-level policy (user level {2}, minimum {3})",
                         firstName, lastName, account.UserLevel, m_MinLoginLevel);
                     return LLFailedLoginResponse.LoginBlockedProblem;
                 }
@@ -708,6 +713,8 @@ namespace OpenSim.Services.LLLoginService
                         where, startLocation, position, lookAt, gestures, processedMessage, home, clientIP,
                         m_MapTileURL, m_ProfileURL, m_OpenIDURL, m_SearchURL, m_Currency, m_DSTZone,
                         m_DestinationGuide, m_AvatarPicker, realID, m_ClassifiedFee,m_MaxAgentGroups);
+
+                response.EventNotifications = m_eventNotifications?.Get(account.PrincipalID) ?? new ArrayList();
 
                     m_log.DebugFormat("[LLOGIN SERVICE]: All clear. Sending login response to {0} {1}", firstName, lastName);
 

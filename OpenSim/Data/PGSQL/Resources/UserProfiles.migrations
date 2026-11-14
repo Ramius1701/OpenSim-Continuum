@@ -169,3 +169,27 @@ BEGIN TRANSACTION;
 ALTER TABLE userpicks ADD "gatekeeper" varchar(255) COLLATE "default";
 
 COMMIT;
+
+:VERSION 7
+
+BEGIN;
+
+# Private resident contact JSON is committed as a single bounded record.
+ALTER TABLE userdata ALTER COLUMN "DataVal" TYPE text;
+
+COMMIT;
+
+:VERSION 8
+
+BEGIN;
+
+CREATE TABLE continuum_partnership_proposals (
+    proposalid varchar(36) NOT NULL PRIMARY KEY,
+    sender varchar(36) NOT NULL UNIQUE,
+    recipient varchar(36) NOT NULL,
+    message text NOT NULL,
+    expires bigint NOT NULL
+);
+CREATE INDEX continuum_partnership_recipient ON continuum_partnership_proposals(recipient,expires);
+
+COMMIT;

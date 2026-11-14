@@ -1,5 +1,260 @@
 # WhiteCore-to-Continuum improvement audit
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
+## WhiteCore implementation closeout — 2026-10-24
+
+**The needed selected WhiteCore ports and native WebUI workflow adaptations are
+implemented in source.** This supersedes the earlier catalog-only closure, which
+left selected workflows unfinished. No next donor was started. The donor HEAD was
+reverified as `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`; newer native services remain
+authoritative. Completion is supported by implemented behavior and acceptance
+checks, not by removing a blocked-page list. Deployment acceptance remains open.
+
+| Formerly blocked workflow | Delivered implementation and authority |
+|---|---|
+| `admin/factory_reset.html` | Administrator-only, confirmed navigation/presentation reset through the existing revision/lease/atomic portal store. Independent sections preserve each other; news and native service policy are untouched. |
+| `admin/gridsettings_manager.html` | Opt-in native ROBUST INI editor for GridInfoService grid name/nick, LoginService WelcomeMessage and matching portal SystemName. Fixed operator-selected path, bounded fields, hash-based stale checks, writer lease, flushed temporary replacement and exact same-directory backup. ROBUST restart is explicitly required. Actual system accounts and estates use their existing native administration; donor-only label aliases are not substituted for account authority. |
+| `user/contact.html` | Opt-in private postal address/city/code/country save and clear, explicit operator privacy notice and consent, HTTPS account transport, authenticated local-actor binding, bounded escaped fields and a single native profile application-data JSON write. Native SQLite/MySQL/PostgreSQL providers retain storage ownership. The private namespace is refused through public application-data methods. |
+| `user/deleteaccount.html` | Opt-in, password-confirmed account closure using a conditional native `UserLevel=0` to `-2` update. Privileged, protected, online-viewer and estate-owner guards; current web token/cookie cleared and fresh account checks reject other portal sessions. The account, identity and related data are retained. |
+| `user/update_user.html` | Working account-settings navigation to native password/email/contact/closure operations replaces the broken legacy action. |
+| `user/partnership.html` | Opt-in durable private proposals, recipient accept/decline, sender withdrawal, seven-day expiry, one outgoing/20 incoming limits and exact ID/recipient/message replay binding. Native serializable transactions update both profile partners together; failure rolls back both. Either partner can dissolve the reciprocal pair. No fee, email or IM is generated. |
+| `admin/purchases.html`, `user/purchases.html` | Per the user's explicit choice, authenticated currency-credit history, with administrator lookup and a server-derived resident actor. A private native economy read returns successful positive type-5010 credit adjustments, 50 per page with stable timestamp/operation-ID cursors. No real-money provider, cash amount or settlement receipt is invented. |
+| `admin/region_edit.html`, `user/region_edit.html` | Native region-management workflow: recheck current estate ownership, show native identity/location/size/host, and open the operator-configured HTTPS RegionWeb control room for actual backed-up file editing/reloads. Native estate editing is linked directly. Administrators can also use the native host console for provisioning/restarts; OpenSim's existing create region, restart and remove-region commands remain authoritative. Posted URLs never select a host. |
+| `admin/sim_console.html` | A working administrator browser client for the existing OpenSim/ROBUST REST console replaces the donor stub. Fixed configured HTTPS hosts, independent native credentials, exact-origin CORS, bounded XML/output, no credential/session browser storage, explicit command submission and unconfirmed outcomes without automatic retry. Disconnect/navigation/time-limit cleanup is implemented. |
+
+**Correction to the earlier deletion audit:** the WhiteCore page calls
+`DeleteUser(..., archiveInformation: true, wipeFromDatabase: false)`. Its
+LocalUserAccountConnector archives by setting UserLevel to -2. That exact path
+was not a permanent deletion implementation. Continuum now supplies an explicit
+closure workflow with the same archival meaning; permanent cross-service data
+erasure is not falsely claimed or required to reproduce that donor behavior.
+
+### Native contracts, configuration and limitations
+
+- Optional local service/provider capabilities preserve third-party interface
+  compatibility. The WebUI does not query database tables directly.
+- Native profile migrations add durable proposals (SQLite v6; MySQL/PostgreSQL
+  v8). MySQL/PostgreSQL v7 widens application DataVal to TEXT for the bounded
+  private contact JSON; SQLite already has text affinity. These are source
+  migrations, exercised against disposable SQLite only, not live schemas.
+- Public profile application-data tag identifiers are restricted to printable
+  ASCII and cannot address the `continuum.private.` namespace, including trimmed
+  or case variants. This prevents MySQL collation aliases from bypassing private
+  contact protection. No contact fields are added to public profile responses.
+- `ResidentContactEnabled`, `AllowAccountClosure` and `AllowPartnerships` default
+  false. Contact collection requires `ContactPrivacyNotice`; configure every
+  service/system UUID in `AccountClosureProtectedIDs` before enabling closure.
+- `GridConfigurationPath` defaults blank. It must select the loaded native INI
+  containing the three supported sections. Included files, remote hosts or
+  LoginService.MessageUrl may override values. Saving does not update running
+  service fields. Keep secret-bearing originals/backups private.
+- Region administration delegates to the existing native per-host editor;
+  sessions and grid-admin privileges are not forwarded as estate-owner authority.
+  This is not a new central host supervisor or a shared simulator SSO session.
+- `[ContinuumWebUIConsoles]` is empty by default. Configure native REST consoles
+  and TLS, credentials and exact ConsoleAllowedOrigin on the chosen hosts.
+  Native console authority is independent of portal roles. The client expires
+  after 15 minutes; it does not replay commands after ambiguous responses.
+- Native console fixes remove the exact registered poll capability on close and
+  publish command help without temporarily removing live help/quit entries,
+  avoiding concurrent handshake races.
+- Native login rejects negative user levels even when MinLoginLevel is configured
+  negative. The closure fixture exercises the actual LLLoginService with an
+  archived account and a negative minimum, rather than merely testing a helper.
+- Native account closure prevents new logins; it is not a global active-session
+  kill, refund or data-erasure service. In-flight login/cache races remain a live
+  regression gate, alongside coordinated backup/recovery and provider execution.
+- Earlier selected auctions/reminders/SimulatorFeatures ports and explicit
+  optional-feature exclusions remain unchanged. No external money integration,
+  unselected combat/tooling/visitor/cache/viewer-ban/on-demand module was added.
+
+### Validation of the final source snapshot
+
+Full Release solution build and both acceptance harness builds passed with
+**zero warnings and zero errors**. All of the following passed after rebuilding:
+
+- Main WebUI suite: events, portal/news, estates, private contacts, native closure,
+  partnership persistence/consent/rollback, native grid configuration, region
+  authority, actual RemoteConsole protocol/cleanup/concurrent help, recovery and
+  real SQLite classified fees/restart recovery.
+- Isolated currency-credit HTTP suite: actual native SQLite ledger/RPC, filtering,
+  actor scoping, same-timestamp pagination and escaped embedded pages.
+- Browser console event-handler fixture: native request fields, credential
+  clearing, confirmation, no automatic command retry and handshake cleanup.
+- Isolated auction WebUI/HTTP and event-reminder HTTP/SQLite/login suites.
+- Auction lifecycle/real SQLite escrow and fresh disposable Search self-test.
+
+Sandbox restrictions initially prevented temporary-file replacement and loopback
+connections; authorized disposable fixtures passed outside those restrictions.
+Native HTTP listener fixtures retain separate processes as documented earlier.
+Live browser/mobile, Firestorm, MySQL/MariaDB/PostgreSQL migrations and workflows,
+TLS/CORS/proxy configuration, restart and backup recovery are still acceptance
+work in `donor-feature-test-handoff.md`. Nothing was deployed and no real user
+messages, payments, bids or console commands were executed.
+
+## Historical catalog-only closure — 2026-10-24
+
+
+**The recorded WhiteCore feature catalog is reconciled against current Continuum.**
+Pinned donor HEAD was reverified as
+`f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa`. This closes the inactive-donor source
+comparison/selected-port lane, not the larger WebUI product backlog or runtime
+certification. No new donor was started in this pass. Older "active", "implement
+next" and "not yet compared" statements below are historical checkpoints.
+
+Closure applies to the feature catalog already selected in this audit, the
+optional-feature decisions explicitly made by the operator, and the 87-controller
+WebUI disposition inventory. It does not claim that every WhiteCore source file
+has a line-for-line OpenSim equivalent, that all SL features are implemented, or
+that the remaining native-service gaps disappeared. The pinned Modules/CAPS tree
+inventory contains 320 C# files (including 106 Web and 19 service CAPS files);
+filenames and templates were not counted as working implementations.
+
+| Catalog family | Final source disposition | Concrete evidence / result |
+|---|---|---|
+| Display Names | Retain newer native implementation | DisplayNameModule and LLLoginResponse already cover lookup/login; no older donor replacement |
+| Abuse moderation and notification | Retain native service and existing notification | GetReports/UpdateReport and CAPS estate SendSystemEmail already implemented |
+| Experience service and CAPS seed publication | Retain selected newer service lineage | ExperienceModule registers native endpoints; BunchOfCaps already adds registered Experience CAPS without indiscriminately returning unrelated CAPS |
+| Task-script/notecard uploads and inventory CAPS | Existing native equivalent; no speculative transplant | Current BunchOfCaps has staged uploader URLs, temporary-handler cleanup and completion/compiler-result handling. Retain current ownership/service boundaries; viewer/restart tests remain in handoff |
+| Agent preferences | Existing native equivalent | Access, default permission masks, hover height and language/public-language fields already persist through native AgentPreferencesService. Do not copy donor god-level elevation or agent-storage architecture |
+| SimulatorFeatures | Narrow compatibility fixes implemented | Advertise supported AvatarHoverHeightEnabled for Firestorm. GetFeatures now uses the existing deep-copy path; the previous OSDMap constructor expression returned an empty map |
+| Groups / GroupMemberData / GroupAPI | Retain newer native implementation | Native membership authority, title/power compression and hexadecimal power representation take precedence over donor numeric/registry shapes. No duplicate Group API is introduced |
+| Profile/search identity and directory contracts | Retain native services; direct places equivalent confirmed | OpenSearch.OnDirPlacesQuery/DirPlacesQuery, native avatar picker/account identity and UserProfileModule remain authoritative; preserve HG/profile privacy and paid-classified metadata repairs |
+| Event reminder subscriptions | Missing behavior implemented natively | Durable authenticated Search subscriptions, viewer add/remove hooks and XML-RPC/LLSD login restoration using Firestorm event_date_ut plus ISO UTC event_date |
+| Grid economy | Retain implemented ContinuumEconomy | Existing authoritative ledger/reservations/capture/history and viewer integration replace donor-specific currency services; no older ledger or defaults substituted |
+| Selected land auctions | Regional lifecycle retained; grid-wide integration implemented | Configured native regional bridge plus paginated WebUI catalog, bids and seller controls use the same journal, viewer authority and escrow callbacks |
+| Built-in grid WebUI | Selected adapters implemented; remaining requirements explicitly transferred to product backlog | News/recovery/event/classified/portal/estate source is retained. The 11 blocked legacy paths have individual dispositions below; they are not 11 unexamined donor ports |
+| Visitor logger, object cache replacement, viewer bans, legacy tooling, combat, on-demand regions | Excluded under the operator's explicit selection | Only auctions were selected from this optional/rejected list; no alternatives were silently reintroduced |
+
+### Final implementation boundary
+
+**Auctions:** `[ContinuumWebUIAuctions]` maps region UUIDs to fixed regional URLs;
+`AuctionBridgeSecret` must match `[LandAuctions] WebUIBridgeSecret`. Endpoints are
+off when the key is blank, require native HTTPS, explicitly trusted TLS proxy or
+direct loopback HTTP, and atomically own/remove their handler. Frontend endpoint
+URLs require HTTPS except loopback, forbid credentials/query/fragment, do not
+follow redirects and bound response sizes. No URLs or actors are trusted from
+resident form fields. Four configured regions are queried per page; each regional
+catalog and its continuation page contain at most 20 listings. Up to 256 region
+mappings are supported. Pagination keeps older open auctions reachable.
+
+The simulator rechecks connected local resident authority before mutations,
+retaining the existing money module's viewer-session authorization. Owners with
+native estate authority can start/cancel eligible individually owned parcels;
+other connected local residents may bid. Grid-level admin status does not grant
+permission to cancel someone else's sale. Public results exclude bidder and
+purchase IDs; owner/high-bidder history and pending amounts are identity scoped.
+Bids require explicit full-reservation confirmation, preserve pending transaction
+IDs, and report unconfirmed outcomes rather than create another payment attempt.
+Account transport is HTTPS protected when auction endpoints are enabled; POST
+origin and per-account operation limits apply. Outages hide financial controls.
+
+**Limitations retained:** the portal does not authorize offline bids or HG/group
+bidders. Residents must use their viewer to visit the target region. This is the
+current native economy authority boundary, not complete Second Life website
+parity. Auction settlement remains the existing recoverable capture/delivery
+saga, with coordinated journal/parcel/ledger backups and operator handling of
+review states. No live bids or money transfers were performed by this work.
+
+**Event reminders:** optional `EventNotificationSecret` is configured separately
+in ContinuumSearch, simulator `[Search]` and login `[LoginService]`. It is distinct
+from the portal write key. `EventNotificationURL` requires HTTPS except loopback;
+transport has deadlines, redirect refusal and a bounded response. The Search
+service maintains `continuum_event_notifications`, limits each subscriber to 100,
+uses serializable transactions for admission, makes add/remove idempotent and
+filters removed/started events. The simulator derives the subscriber from the
+validated live local client; the login service reads only the authenticated
+account's list. Search outages yield an empty reminder list without failing
+login. Firestorm's local notifier handles timing; there is no new server IM/email
+dispatch system. All keys are blank by default. No messages were sent to users.
+
+### Validation and remaining delivery work
+
+- Full Release solution build: **0 warnings, 0 errors**.
+- Existing WebUI acceptance suite: pass (news, recovery, events, classifieds,
+  portal presentation and estates).
+- Isolated auction HTTP/WebUI fixture: pass (actual bridge handler, transport/key,
+  actor/session boundary, forms, escaping, origin, rate and outage behavior).
+- Isolated event reminder fixture: pass (actual Search HTTP + SQLite persistence,
+  subscriber isolation/restart/removal, both login formats and feature publication).
+- Auction lifecycle + real SQLite escrow + grid portal lifecycle checks: pass.
+- Fresh temporary SQLite Search self-test: pass, including authenticated reminders.
+- Text diff check: pass. Embedded WebUI archive rebuilt.
+
+Native service HTTP fixtures run in separate processes, matching the separate
+simulator/Search service roles. Recycled in-process listener fixtures showed
+transport timeouts; repeated listener teardown/replacement is not certified by
+these tests and remains a runtime regression check. Tests and production
+certification are not conflated.
+
+MySQL/PostgreSQL execution, deployed configuration, live Firestorm, browser/mobile
+layout, simulator restarts and coordinated backup recovery remain in
+`doc/donor-feature-test-handoff.md`. No deployment, live configuration or
+production schema change was performed. The newly authored behavior uses native
+Continuum services; no WhiteCore implementation was copied wholesale.
+
+**Carry-forward product work:** preserve all previously requested grid-wide WebUI
+modernization and native-service gaps: the 11 legacy path dispositions, centralized
+multi-host simulator management/reload coordination, actual account deletion,
+mutual-consent partnerships, contact-data policy/storage, real-currency purchase
+history and remaining portal customization. These are not marked implemented,
+not silently excluded, and not reasons to restart the completed source comparison.
+
+## Historical boundary before final implementation — 2026-10-24
+
+The operator has directed sustained donor reconciliation, one inactive donor at a
+time. WhiteCore is still active. The repeated WebUI implementation checkpoints
+have obscured that boundary: they are not separate requests for the operator to
+restart the work. Continue independently and consolidate results across feature
+families. Keep manual tests in the existing handoff.
+
+**Do not use the number of blocked legacy HTML routes as the donor completion
+criterion.** The 11 remaining paths include duplicate operations, donor stubs,
+service-backed gaps and larger Continuum product requirements. The full-tree
+WhiteCore audit has not been certified complete. Preserve the broader WebUI
+requirements, but track their implementation independently of donor-source review.
+
+| Work family | Current source evidence | Remaining work / boundary |
+|---|---|---|
+| Display Names | Native account persistence, DisplayNameModule and LLLoginResponse display_name fields exist | Retain newer implementation; runtime propagation/HG checks stay in the handoff |
+| Abuse moderation/notification | AbuseReportsService.GetReports/UpdateReport; CAPS estate-email SendSystemEmail path | Existing native implementation; no replacement donor service |
+| Experience service/CAPS | Current native service and ExperienceModule GetExperienceInfo/GetMetadata/ExperiencePreferences | Preserve selected newer lineage; do not reopen as a WhiteCore service transplant |
+| Upload/CAPS contracts | BunchOfCaps registers current task/notecard upload paths and two-stage upload handling | Finish bounded response/lifecycle comparison; a runtime test is not automatically a missing source port |
+| Groups/preferences/features | Current GroupsModule, AgentPreferencesModule and SimulatorFeaturesModule | Finish response-contract comparison; no wholesale donor replacement justified |
+| Profiles/search | Native profile service and bundled ContinuumSearch exist, including event/classified writes | Finish remaining identity/query/subscription comparisons; packet dispatch alone does not implement event reminders |
+| Economy | Existing ContinuumEconomy ledger, reservations/capture/history and configured purchase handling | Preserve existing native economy; real-money purchase history is distinct from virtual-currency transaction history |
+| Selected auctions | Native viewer start path, regional LandAuctionModule and recoverable escrow/settlement are implemented | Integrated grid-wide catalog/bid/management service boundary remains open; regional source is not that workflow |
+| WebUI product work | Native adapters and recent news/recovery/event/classified/portal/estate workflows | Continue as a separately visible implementation backlog; modernization is not another donor to audit |
+| Optional rejected families | Operator selected only auctions from that list | Visitor logger, object-cache replacement, viewer bans, legacy tooling, combat and on-demand regions remain excluded |
+
+### All remaining blocked WebUI paths: source-backed disposition
+
+| Path | What the pinned donor actually does | Current disposition |
+|---|---|---|
+| `admin/factory_reset.html` | Resets WebUI menus/settings through PagesMigrator/SettingsMigrator | Portal defaults/reset gap; it is not a whole-grid factory reset |
+| `admin/gridsettings_manager.html` | Changes grid identity, system accounts/estates and related settings | Native authority/integration gap; portal branding is not an equivalent |
+| `admin/region_edit.html`, `user/region_edit.html` | Reconstruct region configuration using WhiteCore simulator-management APIs | Existing RegionWeb provides per-host configuration/backups/reload, now linked from region lists; central multi-host editing remains a separate gap |
+| `admin/sim_console.html` | Contains local RunCommand and reports that the sim console is not implemented | Donor stub; do not import as a working remote-console feature. Native remote operator access remains a product integration requirement |
+| `admin/purchases.html`, `user/purchases.html` | Reads AgentPurchase real-currency purchase history, including RealAmount and purchase/update dates | Distinct economy-history adapter gap; generic transaction pages are not equivalent |
+| `user/contact.html` | Reads/writes RLAddress/RLCity/RLZip/RLCountry through WhiteCore agent storage | Native resident contact-data model/workflow gap; the new support page does not complete it |
+| `user/deleteaccount.html` | Uses donor DeleteUser after password verification and confirmation | Current IUserAccountService has no equivalent cross-service deletion contract; disabling a user is not deletion |
+| `user/partnership.html` | Reads current partner and sends a proposal message; reciprocal profile writes are commented out | Donor does not supply a complete partnership lifecycle. A mutual-consent native service and atomic paired updates would be new implementation work |
+| `user/update_user.html` | Combines password/email changes and donor deletion; template points at a legacy change_user_information action | Password/email already have native pages. Reconcile duplicate navigation separately from the missing deletion contract |
+
+Do not silently drop these product requirements, label a stub as implemented, or
+start each as a new donor port. The remaining source comparisons and selected
+auction integration must be reported together. Live browser/viewer/database
+certification remains distinct from source implementation and donor disposition.
+
 ## Scope and evidence
 
 This audit reviews `WhiteCoreSim/WhiteCore-Dev` snapshot
@@ -22,7 +277,7 @@ The goals are:
 - production-safe MySQL, Robust, Windows, and Hypergrid operation;
 - optional modules for behaviours that should not be forced into core.
 
-## Executive disposition
+## Historical opening executive disposition
 
 | Priority | Candidate | Classification | Disposition |
 |---|---|---|---|
@@ -528,3 +783,115 @@ for gaps in that WebUI. It contributes missing functionality into the WhiteCore
 portal rather than becoming a competing replacement shell. Every portal page and
 endpoint requires a WhiteCore-present / WhiteCore-incomplete / Grid-Interface
 gap-fill / genuinely-missing disposition before implementation.
+
+## Inactive-donor continuation — 2026-10-22
+
+WhiteCore is the active donor after lickx and Mobius reconciliation. The pinned
+local donor remains `f2f772770449d17cd95d2bbc3a0a3bd0cf5dd3fa` (2026-05-18).
+Current Continuum/upstream and newer Tranquillity code take precedence. A port
+must establish a concrete benefit; older feature names alone are insufficient.
+This continuation supersedes stale "implement next" recommendations above,
+without claiming the complete WhiteCore tree has been reconciled.
+
+Opening source-verified dispositions:
+
+| Candidate | Current decision / evidence |
+|---|---|
+| Display Name login | Already present: LLLoginResponse supplies display_name in both response paths. Retain current implementation and runtime gates. |
+| Abuse moderation | Already present: AbuseReportsService exposes GetReports and UpdateReport. Existing report/WebUI/provider acceptance remains; do not build another moderation service. |
+| Estate abuse notification | Already present: CAPS AbuseReportsModule checks AbuseEmailToEstateOwner/AbuseEmail and calls SendSystemEmail. Retain the current implementation and delivery-failure gates. |
+| Experience capability publication | Already present: ExperienceModule registers GetExperienceInfo, GetMetadata and ExperiencePreferences; BunchOfCaps includes the corresponding seed names. Retain selected service lineage; do not substitute WhiteCore service abstractions. |
+| Parcel auction | Not selected as a direct port. Pinned AuctionModule.ViewerStartAuction returns a blank response with request parsing commented out. Bids are appended to AuctionInfo, and AuctionEnd chooses a winner and sends an offline message; that is not evidence of a complete atomic payment/escrow/ownership lifecycle. No safe, complete auction feature is established by importing this module. |
+| Visitor logger | Not selected as a direct port. Pinned VisitorLogger performs synchronous file writes, concatenates the log path, uses TimeSpan.Minutes rather than total elapsed minutes, and has empty RemoveRegion/Close handlers despite event subscriptions. No demonstrated operational need justifies adding a parallel logger with those behaviors. |
+
+No source, live configuration or deployed binaries changed in this pass. No
+live tests were run. Continue the remaining profile/search/group/preference,
+CAPS/upload, economy/WebUI and optional-module comparisons before declaring
+WhiteCore complete. Manual requirements stay in donor-feature-test-handoff.md.
+
+### Auctions selected by operator — 2026-10-22
+
+The operator explicitly requires auctions; the earlier direct-port exclusion
+does not exclude the feature. Only auctions from the optional/excluded feature
+list are selected. Visitor logging, object-cache replacement, viewer bans,
+legacy tooling, combat and on-demand regions are not added by this work.
+
+Continuum now has an opt-in regional LandAuctionModule and durable
+LandAuctionBook, using existing ContinuumEconomy purchase reservations rather
+than WhiteCore's incomplete settlement. WhiteCore remains behavioral evidence;
+no auction source/assets were copied. Firestorm source at
+`S:\Github\phoenix-firestorm\indra\newview\llfloaterauction.cpp`,
+`onClickStartAuction`, establishes the actual UDP ViewerStartAuction request
+with agent/session IDs, parcel LocalID and SnapshotID. Continuum validates both
+identity fields before dispatch. The existing parcel AuctionID viewer metadata
+is used; older donor CAPS handlers are not substituted.
+
+Estate owners/managers may start auctions on their own individually owned land.
+Local-grid residents bid through a session-bound regional browser page, opened
+by `/93 auctions`; the page also permits start/cancel without god-mode UI.
+Only the seller with estate authority may cancel. The minimum and duration are
+fixed from configuration when the auction starts. Group/foreign bidder support,
+a grid-wide WebUI auction catalog and the external Second Life auction website
+are outside this initial regional implementation.
+
+Each bid reserves the full amount before replacing the high bid; old holds are
+released afterwards. Thus increasing one's own bid requires enough available
+funds for the full new reservation while the previous one remains held.
+Concurrent equal bids admit one winner. Seller bidding, stale ownership/shape,
+late/lower bids and ordinary sales/divide/join/deed/reclaim/abandon/force-owner
+operations on marked auction land are rejected. Script parcel-owner changes
+are blocked while marked. Auctions sell land only, not parcel objects.
+
+Atomic journal replacement records reservation/capture intent before external
+operations. Ledger purchase IDs are replayed after lost replies. A process
+lease prevents two instances from opening the same regional journal. Up to four
+active records are recovered per timer pass. End-of-auction capture pays the
+seller before a separately persisted, idempotently retried land transfer.
+This is a recovery saga, not a distributed atomic transaction: an unavailable
+parcel store can leave a paid auction in Captured until delivery recovers;
+externally replaced/corrupt parcels or journal loss require operator review.
+Unknown authorizations retain their pending ID; retry the same bid, cancel or
+allow expiry cancellation. Unresolved ledger outcomes retain holds/parcel locks
+rather than silently reallocating land or charging a fresh transaction.
+Do not manually resolve live auction holds without reconciling their journal.
+
+Persistence is a per-region JSON journal (10,000-record lifetime bound, including
+completed history) plus existing parcel storage and provider-backed economy.
+Back them up together and preserve the journal across restarts/moving a region.
+SQLite escrow is covered by automated tests; exact MySQL/MariaDB/PostgreSQL and
+live Firestorm/browser/crossing checks remain in the handoff. The feature is
+disabled by default, requires IAuctionMoneyModule (currently ContinuumEconomy),
+and has not been deployed or certified for production.
+
+## 2026-10-22 WebUI resident workflows
+
+The current native WebUI bridge now implements news management, password
+recovery, region-owner events and paid classified create/edit/delete. Classified
+publication uses durable private-service payment receipts and explicit pending
+recovery. Native profile edits preserve paid lifetime/price and reject foreign
+creator overwrites; the PostgreSQL updater is now restricted by its primary-key
+upsert. Sixteen legacy page paths and grid-wide auction WebUI remain open.
+The current detailed disposition is `parity-webui.md`, with browser/viewer/provider
+acceptance in `donor-feature-test-handoff.md`. No live deployment was performed.
+
+
+### 2026-10-24 portal presentation checkpoint
+
+WhiteCore remains the active donor. Welcome content/announcement, portal support
+instructions/gallery visibility and fixed-route public navigation visibility now
+have persistent admin workflows. Three manager paths are unblocked; **13 legacy
+paths remain blocked**. This does not complete grid configuration, real-world
+resident address editing, arbitrary page customization or full WebUI parity.
+See `doc/parity-webui.md` for the precise implemented scope and remaining gaps;
+browser/viewer acceptance remains in `doc/donor-feature-test-handoff.md`.
+
+
+### 2026-10-24 native estate checkpoint
+
+Resident/admin estate editing now supports name, reference price, public access,
+voice and direct teleport through native service/provider conditional updates.
+SQLite estate membership lookup and explicit-ban insertion were corrected during
+persistence testing. **11 legacy WebUI routes remain blocked.** Simulator reload
+is still required; native region lifecycle management and live estate propagation
+remain outstanding. Ownership transfer and access-override editing are not part
+of this bounded editor. See `doc/parity-webui.md` and the existing runtime handoff.

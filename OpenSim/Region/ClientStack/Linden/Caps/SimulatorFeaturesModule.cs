@@ -156,6 +156,8 @@ namespace OpenSim.Region.ClientStack.Linden
 
                 m_features["MaxProfilePicks"] = OSD.FromInteger(Constants.MaxProfilePicks);
 
+                // Native AgentPreferences and AvatarFactory already apply preference hover Z.
+                m_features["AvatarHoverHeightEnabled"] = true;
                 m_features["MeshRezEnabled"] = true;
                 m_features["MeshUploadEnabled"] = true;
                 m_features["MeshXferEnabled"] = true;
@@ -262,7 +264,7 @@ namespace OpenSim.Region.ClientStack.Linden
         public OSDMap GetFeatures()
         {
             lock (m_features)
-                return new OSDMap(m_features);
+                return DeepCopy();
         }
 
         private OSDMap DeepCopy()

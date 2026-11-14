@@ -769,8 +769,35 @@
     ; enabled = false
 
     ;# {enabled} {[Startup]emailmodule:DefaultEmailModule} {Enable send to objects to regions not on instance?} {true false} true
-    ;; Enable sending email to regions not on current opensimulator instance. Currently does not work
+    ;; Enable sending object email to other simulator instances through the
+    ;; explicitly configured shared IMAP inbox below. Same-instance mail stays local.
     ; enableEmailToExternalObjects = true
+
+    ;; All participating simulators must use the same internal_object_host,
+    ;; IMAP account and folder. The server must support UIDPLUS. Credentials
+    ;; are operator-supplied; none are installed or enabled automatically.
+    ;; Optional [Email] can replace [SMTP]; do not split settings across both.
+    ; IMAPEnabled = false
+    ; IMAP_SERVER_HOSTNAME = mail.example.invalid
+    ; IMAP_SERVER_PORT = 143
+    ;; StartTls (default), SslOnConnect (normally port 993), or explicit None.
+    ;; Certificate validation remains enabled. Legacy IMAP_SERVER_TLS maps to
+    ;; StartTls/None if IMAP_SERVER_SECURITY is omitted.
+    ; IMAP_SERVER_SECURITY = StartTls
+    ; IMAP_SERVER_LOGIN = ""
+    ; IMAP_SERVER_PASSWORD = ""
+    ; IMAP_FOLDER = INBOX
+    ; IMAP_PollSeconds = 5
+    ; IMAP_TimeoutMilliseconds = 10000
+    ;; Raw MIME bytes, including headers and transfer encoding.
+    ; IMAP_MaxMessageBytes = 65536
+    ; IMAP_MaxPendingSends = 128
+    ; IMAP_MaxMailboxes = 1024
+    ;; Message pages and mailboxes/sends per cycle are bounded; no SEARCH ALL.
+    ; IMAP_UidWindow = 256
+    ; IMAP_BatchSize = 8
+    ; IMAP_RetrySeconds = 15
+    ; IMAP_SendLifetimeSeconds = 3600
 
 
     ;# {enabled} {[Startup]emailmodule:DefaultEmailModule} {maximum number of emails from a object owner per hour} {} 500
@@ -1232,6 +1259,11 @@
     ; DATA_SRV_ContinuumSearch = "http://127.0.0.1:8010/search/register"
 
 [Search]
+    ;; Optional persistent event reminders; shared with Search service and login configuration.
+    ;; URL defaults to SearchURL. HTTPS required except loopback.
+    ; EventNotificationURL = https://search.example.org/
+    ; EventNotificationSecret =
+    ; EventNotificationTimeoutMs = 3000
     ;; To use ContinuumSearch.Service, also set SearchModule = OpenSimSearch in
     ;; the active architecture file's [Modules] section.
     ; SearchURL = "http://127.0.0.1:8010/"
@@ -1606,3 +1638,20 @@
     ; Include-Architecture = "config-include/StandaloneHypergrid.ini"
     ; Include-Architecture = "config-include/Grid.ini"
     ; Include-Architecture = "config-include/GridHypergrid.ini"
+
+[LandAuctions]
+    ;; Optional grid WebUI bridge. Use a distinct 32–256 character shared key.
+    ;; Endpoint: /continuum/auctions/<region UUID>. Public transport must use TLS.
+    ;; Only direct loopback HTTP or explicitly trusted TLS proxies may bypass native TLS.
+    ; WebUIBridgeSecret =
+    ; WebUIPort = 0
+    ; WebUITrustedProxyAddresses =
+    ;; Requires ContinuumEconomy; ordinary money modules cannot emulate escrow.
+    ;; Estate owners/managers may auction their own individually owned parcels.
+    ; Enabled = false
+    ; JournalDirectory = LandAuctions
+    ; DurationHours = 24
+    ; MinimumBid = 1
+    ;; Type /93 auctions in Firestorm to browse, start, bid or cancel.
+    ;; Firestorm's native ViewerStartAuction message is also supported.
+    ; ChatChannel = 93

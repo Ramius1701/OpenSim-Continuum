@@ -32,6 +32,11 @@ migration so both fresh databases and existing version 4 databases apply it once
 
 Before deploying, verify welcome/login, Firestorm inventory and profiles,
 Hypergrid travel and the PostgreSQL estate/profile operations on disposable
-databases. The unpublished Continuum partnership migration also used SQLite
-profile version 5; reconcile that migration and validate upgrades before merging
-the separate local partnership changes. No live grid was deployed or tested.
+databases. The Continuum partnership migration now uses SQLite
+profile version 6, after upstream's gatekeeper migration. No live grid was deployed or tested.
+
+Publication checks: full Release build passed with two Gloebit obsolete API
+warnings. The lickx, script completion, auction, and WebUI suites passed,
+including separate auction, event reminder, and currency credit HTTP runs.
+Fresh SQLite profile schema and v4/v5 upgrades passed; PostgreSQL integration
+and live-grid acceptance remain open.

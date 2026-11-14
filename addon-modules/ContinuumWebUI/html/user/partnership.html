@@ -1,52 +1,38 @@
-<!-- User Partnership -->
-
-
-<section class="text-center">
-
-  <div class="container">
-    <div class="row justify-content-center">
-      <h2>{UserName}:&nbsp;{PartnerProposalText}</h2>
-    </div>
-
-    <div class="container justify-content-center">
-      <div class="row">
-        <div class="col">
-          <img src="static/images/proposal.png" />
-        </div>
-
-        <div class="col-4">
-
-          <form role="form" id="partner_proposal" action="user/partner.html" method="post">
-
-            <div class="form-group mb-3">
-              <input type="text" placeholder="{PartnersName}*" required name="partnernew" />
-            </div>
-
-            <div class="form-group mb-3">
-              <textarea rows="5" cols="50" required name="partnerporposal" style="text-align:left;">{PartnerProposalText}*
-              </textarea>
-            </div>
-            <div class="div20"></div>
-
-            <div class="button-group">
-              <a class="btn btn-sm btn-success" onclick="gohome();">{CancelText}</a>
-              <a class="btn btn-sm btn-warning float-right" 
-                  onclick="submitupdate('partner_proposal', 'update=true');">
-                {SendProposalText}
-              </a>
-            </div>
-          </form>
-        </div>
-        <div class="col"></div>
-      </div>
-
-    </div>
-  </div>
+<section class="portal-workspace" aria-labelledby="partnership-title">
+<p class="portal-eyebrow">Your account</p><h1 id="partnership-title">Partnership</h1>
+{IfPartnershipDisabledBegin}
+<p>The grid operator has not enabled partnership management.</p>
+{IfPartnershipDisabledEnd}
+{IfPartnershipEnabledBegin}
+<p>Current partner: <strong>{PartnershipPartner}</strong></p>
+<p>Proposals are private and remain available on this page for seven days. Ask the other resident to open their partnership page to respond. No email or instant message is sent. Partnership names appear on native profiles after acceptance; viewers may need to refresh their cached profiles.</p>
+{IfPartnershipUnpartneredBegin}
+<form id="partnership_propose_form" action="user/partnership.html" method="post" class="portal-editor">
+<input type="hidden" name="action" value="propose"><input type="hidden" name="requestID" value="{PartnershipRequestID}">
+<label for="partnership-other">Resident's account name or UUID</label><input class="form-control" id="partnership-other" name="other" required maxlength="128">
+<label for="partnership-message">Your proposal</label><textarea class="form-control" id="partnership-message" name="message" maxlength="1000" rows="4"></textarea>
+<button type="button" class="btn btn-primary" onclick="submitupdate('partnership_propose_form', '', 'user-partnership');">Save proposal</button>
+</form>
+{IfPartnershipUnpartneredEnd}
+{IfPartnershipHasPartnerBegin}
+<form id="partnership_dissolve_form" action="user/partnership.html" method="post" class="portal-editor">
+<input type="hidden" name="action" value="dissolve"><input type="hidden" name="requestID" value="{PartnershipRequestID}"><input type="hidden" name="other" value="{PartnershipPartnerID}">
+<label><input type="checkbox" name="confirm" value="true" required> End this partnership for both residents.</label>
+<button type="button" class="btn btn-danger" onclick="submitupdate('partnership_dissolve_form', '', 'user-partnership');">End partnership</button></form>
+{IfPartnershipHasPartnerEnd}
+<h2>Received proposals</h2>
+{PartnershipIncomingArrayBegin}
+<article class="portal-editor"><h3>{ProposalName}</h3><p>{ProposalMessage}</p><p>Expires {ProposalExpiry}</p>
+<form id="partnership_accept_{ProposalID}" action="user/partnership.html" method="post">
+<input type="hidden" name="action" value="accept"><input type="hidden" name="requestID" value="{ProposalID}"><input type="hidden" name="other" value="{ProposalOtherID}">
+<label><input type="checkbox" name="confirm" value="true" required> Accept this resident as my partner.</label>
+<button type="button" class="btn btn-primary" onclick="submitupdate('partnership_accept_{ProposalID}', '', 'user-partnership');">Accept</button></form>
+<form id="partnership_decline_{ProposalID}" action="user/partnership.html" method="post"><input type="hidden" name="action" value="decline"><input type="hidden" name="requestID" value="{ProposalID}"><input type="hidden" name="other" value="{ProposalOtherID}"><button type="button" class="btn btn-outline-secondary" onclick="submitupdate('partnership_decline_{ProposalID}', '', 'user-partnership');">Decline</button></form></article>
+{PartnershipIncomingArrayEnd}
+<h2>Sent proposal</h2>
+{PartnershipOutgoingArrayBegin}
+<article class="portal-editor"><h3>{ProposalName}</h3><p>{ProposalMessage}</p><p>Expires {ProposalExpiry}</p>
+<form id="partnership_cancel_{ProposalID}" action="user/partnership.html" method="post"><input type="hidden" name="action" value="cancel"><input type="hidden" name="requestID" value="{ProposalID}"><input type="hidden" name="other" value="{ProposalOtherID}"><button type="button" class="btn btn-outline-secondary" onclick="submitupdate('partnership_cancel_{ProposalID}', '', 'user-partnership');">Withdraw proposal</button></form></article>
+{PartnershipOutgoingArrayEnd}
+{IfPartnershipEnabledEnd}
 </section>
-
-
-<script>
-  $("#partnernew").focus();
-</script>
-
-

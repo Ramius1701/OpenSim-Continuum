@@ -178,6 +178,7 @@ namespace OpenSim.Services.LLLoginService
         private ArrayList loginFlags;
         private ArrayList globalTextures;
         private ArrayList eventCategories;
+        public ArrayList EventNotifications { get; set; } = new();
         private ArrayList uiConfig;
         private ArrayList classifiedCategories;
         private ArrayList inventoryRoot;
@@ -558,7 +559,7 @@ namespace OpenSim.Services.LLLoginService
                 responseData["seed_capability"] = seedCapability;
 
                 responseData["event_categories"] = eventCategories;
-                responseData["event_notifications"] = new ArrayList(); // todo
+                responseData["event_notifications"] = EventNotifications ?? new ArrayList();
                 responseData["classified_categories"] = classifiedCategories;
                 responseData["ui-config"] = uiConfig;
 
@@ -679,7 +680,7 @@ namespace OpenSim.Services.LLLoginService
                 map["seed_capability"] = OSD.FromString(seedCapability);
 
                 map["event_categories"] = ArrayListToOSDArray(eventCategories);
-                //map["event_notifications"] = new OSDArray(); // todo
+                map["event_notifications"] = ArrayListToOSDArray(EventNotifications ?? new ArrayList());
                 map["classified_categories"] = ArrayListToOSDArray(classifiedCategories);
 
                 #region UI Config

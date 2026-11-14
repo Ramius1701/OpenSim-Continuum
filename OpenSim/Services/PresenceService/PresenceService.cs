@@ -44,9 +44,11 @@ namespace OpenSim.Services.PresenceService
         private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         protected bool m_allowDuplicatePresences = false;
+        // opensim-lickx 6614599b7506: allow authoritative reads without caching.
+        protected bool m_useCache = true;
         const int EXPIREMS = 300000;
-        static ExpiringCacheOS<UUID, PresenceData> BySessionCache = new ExpiringCacheOS<UUID, PresenceData>(60000);
-        static ExpiringCacheOS<string, PresenceData> ByUserCache = new ExpiringCacheOS<string, PresenceData>(60000);
+        readonly ExpiringCacheOS<UUID, PresenceData> BySessionCache = new ExpiringCacheOS<UUID, PresenceData>(60000);
+        readonly ExpiringCacheOS<string, PresenceData> ByUserCache = new ExpiringCacheOS<string, PresenceData>(60000);
 
         public PresenceService(IConfigSource config)
             : base(config)
@@ -57,12 +59,14 @@ namespace OpenSim.Services.PresenceService
             if (presenceConfig != null)
             {
                 m_allowDuplicatePresences = presenceConfig.GetBoolean("AllowDuplicatePresences", m_allowDuplicatePresences);
+                m_useCache = presenceConfig.GetBoolean("UseCache", true);
             }
         }
 
         public bool LoginAgent(string userID, UUID sessionID, UUID secureSessionID)
         {
-            bool inCache = ByUserCache.TryGetValue(userID, out PresenceData prevUser);
+            PresenceData prevUser = null;
+            bool inCache = m_useCache && ByUserCache.TryGetValue(userID, out prevUser);
             if (!inCache)
             {
                 PresenceData[] dataprv = m_Database.Get("UserID", userID);
@@ -90,8 +94,7 @@ namespace OpenSim.Services.PresenceService
             data.Data["SecureSessionID"] = secureSessionID.ToString();
 
             m_Database.Store(data);
-            BySessionCache.Add(sessionID, data, EXPIREMS);
-            ByUserCache.Add(userID, data, EXPIREMS);
+            CachePresence(data);
 
             string prevUserStr = "";
             if (prevUser != null)
@@ -107,7 +110,8 @@ namespace OpenSim.Services.PresenceService
 
         public bool LogoutAgent(UUID sessionID)
         {
-             bool inCache = BySessionCache.TryGetValue(sessionID, out PresenceData presence);
+             PresenceData presence = null;
+             bool inCache = m_useCache && BySessionCache.TryGetValue(sessionID, out presence);
              if(!inCache)
                 presence = m_Database.Get(sessionID);
 
@@ -152,7 +156,8 @@ namespace OpenSim.Services.PresenceService
         {
             try
             {
-                bool inCache = BySessionCache.TryGetValue(sessionID, out PresenceData presence);
+                PresenceData presence = null;
+                bool inCache = m_useCache && BySessionCache.TryGetValue(sessionID, out presence);
                 if(!inCache)
                     presence = m_Database.Get(sessionID);
 
@@ -170,8 +175,7 @@ namespace OpenSim.Services.PresenceService
                 if (success)
                 {
                     presence.RegionID = regionID;
-                    BySessionCache.Add(sessionID, presence, EXPIREMS); // lastseen seems unused
-                    ByUserCache.Add(presence.UserID, presence, EXPIREMS); // lastseen seems unused
+                    CachePresence(presence);
                 }
                 else if (inCache)
                 {
@@ -190,14 +194,14 @@ namespace OpenSim.Services.PresenceService
 
         public PresenceInfo GetAgent(UUID sessionID)
         {
-            if(!BySessionCache.TryGetValue(sessionID, out PresenceData data))
+            PresenceData data = null;
+            if(!m_useCache || !BySessionCache.TryGetValue(sessionID, out data))
                 data = m_Database.Get(sessionID);
 
             if (data == null)
                 return null;
 
-            BySessionCache.Add(sessionID, data, EXPIREMS);
-            ByUserCache.Add(data.UserID, data, EXPIREMS);
+            CachePresence(data);
 
             var ret = new PresenceInfo()
             {
@@ -213,10 +217,9 @@ namespace OpenSim.Services.PresenceService
             PresenceInfo ret;
             foreach (string userIDStr in userIDs)
             {
-                if(ByUserCache.TryGetValue(userIDStr, out PresenceData pd))
+                if(m_useCache && ByUserCache.TryGetValue(userIDStr, out PresenceData pd))
                 {
-                    ByUserCache.Add(pd.UserID, pd, EXPIREMS);
-                    BySessionCache.Add(pd.SessionID, pd, EXPIREMS);
+                    CachePresence(pd);
                     ret = new PresenceInfo()
                     {
                         UserID = pd.UserID,
@@ -230,8 +233,7 @@ namespace OpenSim.Services.PresenceService
                     if(data.Length == 0)
                         continue;
                     PresenceData d = data[0];
-                    ByUserCache.Add(d.UserID, d, EXPIREMS);
-                    BySessionCache.Add(d.SessionID, d, EXPIREMS);
+                    CachePresence(d);
                     ret = new PresenceInfo()
                     {
                         UserID = d.UserID,
@@ -244,6 +246,14 @@ namespace OpenSim.Services.PresenceService
             }
 
             return info.ToArray();
+        }
+
+        private void CachePresence(PresenceData data)
+        {
+            if (!m_useCache)
+                return;
+            BySessionCache.Add(data.SessionID, data, EXPIREMS);
+            ByUserCache.Add(data.UserID, data, EXPIREMS);
         }
 
         private PresenceData[] GetRegionAgents(UUID regionID)

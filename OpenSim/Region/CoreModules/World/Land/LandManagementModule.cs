@@ -1240,6 +1240,9 @@ namespace OpenSim.Region.CoreModules.World.Land
             if (startLandObject is null)
                 return;
 
+            if (startLandObject.LandData.AuctionID != 0)
+                return;
+
             if (!m_scene.Permissions.CanEditParcelProperties(attempting_user_id, startLandObject, GroupPowers.LandDivideJoin, true))
                 return;
 
@@ -1341,6 +1344,8 @@ namespace OpenSim.Region.CoreModules.World.Land
                     ILandObject p = GetLandObject(x, y);
                     if (p is not null)
                     {
+                        if (p.LandData.AuctionID != 0)
+                            return;
                         if (!selectedLandObjects.Contains(p))
                         {
                             selectedLandObjects.Add(p);
@@ -1692,6 +1697,8 @@ namespace OpenSim.Region.CoreModules.World.Land
                     return;
             }
 
+            if (land.LandData.AuctionID != 0)
+                return;
             land.LandData.OwnerID = ownerID;
             land.LandData.GroupID = UUID.Zero;
             land.LandData.IsGroupOwned = false;
@@ -1710,7 +1717,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     return;
             }
 
-            if (m_scene.Permissions.CanAbandonParcel(remote_client.AgentId, land))
+            if (land.LandData.AuctionID == 0 && m_scene.Permissions.CanAbandonParcel(remote_client.AgentId, land))
             {
                 land.LandData.OwnerID = m_scene.RegionInfo.EstateSettings.EstateOwner;
                 land.LandData.GroupID = UUID.Zero;
@@ -1732,7 +1739,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     return;
             }
 
-            if (m_scene.Permissions.CanReclaimParcel(remote_client.AgentId, land))
+            if (land.LandData.AuctionID == 0 && m_scene.Permissions.CanReclaimParcel(remote_client.AgentId, land))
             {
                 land.LandData.OwnerID = m_scene.RegionInfo.EstateSettings.EstateOwner;
                 land.LandData.ClaimDate = Util.UnixTimeSinceEpoch();
@@ -1769,6 +1776,8 @@ namespace OpenSim.Region.CoreModules.World.Land
                         return;
                 }
 
+                if (land.LandData.AuctionID != 0)
+                    return;
                 land.UpdateLandSold(e.agentId, e.groupId, e.groupOwned, (uint)e.transactionID, e.parcelPrice, e.parcelArea);
                 m_scene.ForEachClient(SendParcelOverlay);
                 land.SendLandUpdateToAvatars();
@@ -1796,7 +1805,7 @@ namespace OpenSim.Region.CoreModules.World.Land
 
                 bool landforsale = ((land.LandData.Flags &
                                         (uint)(ParcelFlags.ForSale | ParcelFlags.ForSaleObjects | ParcelFlags.SellParcelObjects)) != 0);
-                if ((AuthorizedID.IsZero() || AuthorizedID.Equals(e.agentId)) && e.parcelPrice >= saleprice && landforsale)
+                if (land.LandData.AuctionID == 0 && (AuthorizedID.IsZero() || AuthorizedID.Equals(e.agentId)) && e.parcelPrice >= saleprice && landforsale)
                 {
                     // TODO I don't think we have to lock it here, no?
                     //lock (e)
@@ -1817,7 +1826,7 @@ namespace OpenSim.Region.CoreModules.World.Land
                     return;
             }
 
-            if (!m_scene.Permissions.CanDeedParcel(remote_client.AgentId, land))
+            if (land.LandData.AuctionID != 0 || !m_scene.Permissions.CanDeedParcel(remote_client.AgentId, land))
                 return;
             land.DeedToGroup(groupID);
             m_scene.ForEachClient(SendParcelOverlay);

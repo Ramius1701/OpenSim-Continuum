@@ -879,6 +879,16 @@ namespace OpenSim.Region.CoreModules.Avatar.UserProfiles
             if (!UUID.TryParse(queryClassifiedID.ToString(), out UUID classifiedId))
                 return;
 
+            OSD ownership = new OSDMap { ["creatorId"] = OSD.FromUUID(remoteClient.AgentId) };
+            if (!rpc.JsonRpcRequest(ref ownership, "avatarclassifiedsrequest", serverURI, UUID.Random().ToString())
+                || ownership is not OSDMap ownerResponse || !ownerResponse.TryGetValue("result", out OSD ownedResult)
+                || ownedResult is not OSDArray ownedRecords
+                || !ownedRecords.OfType<OSDMap>().Any(row => row.ContainsKey("classifieduuid") && row["classifieduuid"].AsUUID() == classifiedId))
+            {
+                remoteClient.SendAgentAlertMessage("Unable to delete a classified that is not in your account.", false);
+                return;
+            }
+
             OSD Params = new OSDMap() {{ "classifiedId", OSD.FromUUID(classifiedId) }};
             if(!rpc.JsonRpcRequest(ref Params, "classified_delete", serverURI, UUID.Random().ToString()))
             {

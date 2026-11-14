@@ -6,6 +6,7 @@
 
 <div class="col98" id="events_page">
   <h2>{UserName}: {EventsText}</h2>
+  <a class="btn btn-primary" href="?page=event-create" onclick="loadusercontent('event-create');return false;">Create event</a>
   {IfHaveDataBegin}
   <div class="container">
     <table id="user_events_list" class="bg-darkx">
@@ -26,7 +27,7 @@
         <tr>
           <td class="text-left"><p>{EventDateUTC}</p></td>
           <td class="text-left"><p><a class="regionlink" href="{EventHop}" title="Visit {Name} in {SimName}">{SimName}</a></p></td>
-          <td class="text-left"><p><strong>{Name}</strong><br/>{Description}</p></td>
+          <td class="text-left"><p><strong>{Name}</strong> <a href="?page=event-edit&amp;eventid={EventID}" onclick="loadusercontent('event-edit', 'eventid={EventID}');return false;">Edit</a><br/>{Description}</p></td>
           <td class="text-left"><p>{Category}</p></td>
           <td class="text-centered"><p>{Maturity}</p></td>
           <td class="text-left"><p>{Duration}</p></td>

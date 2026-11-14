@@ -1,62 +1,16 @@
-<!-- user delete account -->
-<section class="text-center">
-
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col">
-        <h2>{UserName}</h2>
-      </div>
-      <div class="col-6 alert bg-danger">
-        <strong>{DeleteUserInfoText}</strong>
-      </div>
-      <div class="col"></div>
-
-    </div>
-    <hr />
-
-    <div class="container justify-content-center">
-      <div class="row">
-        <div class="col">
-          <img src="static/images/bin_delete.png" />
-        </div>
-
-        <div class="col">
-
-          <form role="form" id="delete_user" action="user/deleteaccount.html" method="post">
-            <input type="hidden" value="{UserName}" name="uname" id="uname" \>
-            <div class="form-group mb-3">
-                <input class="form-contol" type="text" placeholder="{DeleteUserNameText}*" name="username" id="username" \>
-            </div>
-
-            <div class="form-group mb-3">
-                <input class="form-contol" type="password" placeholder="{EnterPasswordText}*" required name="password" id="password"\>
-            </div>
-
-            <div class="form-group mb-3">
-              <div class="form-check form-check-inline">
-                <label class="form-check-label mr-1" for="deleteuserconf">{DeleteUserConfirmationText}</label>
-                <input class="form-check-input" id="deleteuserconf" name="deleteuserconf" type="checkbox" value="Accepted" />
-              </div>
-            </div>
-
-            <div class="div20"></div>
-
-            <div class="button-group">
-              <a class="btn btn-sm btn-success" onclick="gohome();">{CancelText}</a>
-              <a class="btn btn-sm btn-danger float-right" onclick="submitupdate('delete_user', 'delete=true');">
-                {DeleteUserText}
-              </a>
-            </div>
-          </form>
-        </div>
-        <div class="col"></div>
-      </div>
-
-    </div>
-  </div>
+<section class="portal-workspace" aria-labelledby="closure-title">
+<p class="portal-eyebrow">Your account</p><h1 id="closure-title">Close your account</h1>
+<p>Closing your account archives it and prevents new viewer and website logins. Your name, inventory, land, profile, transaction history and other records are retained. This does not erase personal data or refund balances. Contact the grid operator about data removal or reactivation.</p>
+{IfAccountClosureDisabledBegin}
+<p>Self-service closure is unavailable for this account. Contact the grid operator.</p>
+{IfAccountClosureDisabledEnd}
+{IfAccountClosureEnabledBegin}
+<p>Log out of the viewer, resolve ongoing purchases and auctions, and transfer any estates before continuing.</p>
+<form id="account_close_form" action="user/deleteaccount.html" method="post" class="portal-editor">
+<input type="hidden" name="action" value="close">
+<label for="closure-password">Current password</label><input class="form-control" id="closure-password" name="password" type="password" required maxlength="128" autocomplete="current-password">
+<label><input type="checkbox" name="confirm" value="true" required> I understand that this archives my account, prevents new logins and retains its records.</label>
+<div class="portal-actions"><button type="button" class="btn btn-danger" onclick="submitupdate('account_close_form', '', 'login');">Close my account</button></div>
+</form>
+{IfAccountClosureEnabledEnd}
 </section>
-
-
-<script>
-  $("#password").focus();
-</script>

@@ -27,7 +27,6 @@
 
 using System;
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.Scripting.HttpRequest;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api;
@@ -52,12 +51,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             if(iHttpReq == null)
                 return;
 
-            HttpRequestClass httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+            // Tranquillity 3bba0e510a: concrete CoreModules types may belong to
+            // another plugin load context. Consume the shared contract instead.
+            IHttpServiceRequest httpInfo = iHttpReq.GetNextCompletedRequest();
             while (httpInfo != null)
             {
-                //m_log.Debug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
-
-                // Deliver data to prim's remote_data handler
+                // Deliver data to the prim's http_response handler
                 //
                 // TODO: Returning null for metadata, since the lsl function
                 // only returns the byte for HTTP_BODY_TRUNCATED, which is not
@@ -79,7 +78,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                             resobj, new DetectParams[0])))
                         break;
                 }
-                httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+                httpInfo = iHttpReq.GetNextCompletedRequest();
             }
         }
     }

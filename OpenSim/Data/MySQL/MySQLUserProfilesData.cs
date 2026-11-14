@@ -36,8 +36,18 @@ using log4net;
 
 namespace OpenSim.Data.MySQL
 {
-    public class UserProfilesData: IProfilesData
+    public class UserProfilesData: IProfilesData, IUserPartnershipData
     {
+        public PartnershipProposal[] GetPartnershipProposals(UUID actor)
+        {
+            using var connection = new MySqlConnection(ConnectionString); connection.Open();
+            return PartnershipCommands.Read(connection, actor);
+        }
+        public string ChangePartnership(UUID actor, UUID other, UUID proposal, string action, string message)
+        {
+            using var connection = new MySqlConnection(ConnectionString); connection.Open();
+            return PartnershipCommands.Change(connection, "mysql", actor, other, proposal, action, message);
+        }
         static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         #region Properites
@@ -127,6 +137,7 @@ namespace OpenSim.Data.MySQL
 
         public bool UpdateClassifiedRecord(UserClassifiedAdd ad, ref string result)
         {
+             // An edit must not replace its creator, paid price or lifetime.
              const string query = 
                 "INSERT INTO classifieds ("
                 + "`classifieduuid`,"
@@ -161,16 +172,16 @@ namespace OpenSim.Data.MySQL
                 + "?Flags,"
                 + "?ListingPrice ) "
                 + "ON DUPLICATE KEY UPDATE "
-                + "category=?Category, "
-                + "expirationdate=?ExpirationDate, "
-                + "name=?Name, "
-                + "description=?Description, "
-                + "parentestate=?ParentEstate, "
-                + "posglobal=?GlobalPos, "
-                + "parcelname=?ParcelName, "
-                + "classifiedflags=?Flags, "
-                + "priceforlisting=?ListingPrice, "
-                + "snapshotuuid=?SnapshotId"
+                + "category=IF(creatoruuid=?CreatorId,?Category,category), "
+                + "name=IF(creatoruuid=?CreatorId,?Name,name), "
+                + "description=IF(creatoruuid=?CreatorId,?Description,description), "
+                + "parceluuid=IF(creatoruuid=?CreatorId,?ParcelId,parceluuid), "
+                + "parentestate=IF(creatoruuid=?CreatorId,?ParentEstate,parentestate), "
+                + "posglobal=IF(creatoruuid=?CreatorId,?GlobalPos,posglobal), "
+                + "parcelname=IF(creatoruuid=?CreatorId,?ParcelName,parcelname), "
+                + "classifiedflags=IF(creatoruuid=?CreatorId,?Flags,classifiedflags), "
+                + "snapshotuuid=IF(creatoruuid=?CreatorId,?SnapshotId,snapshotuuid), "
+                + "simname=IF(creatoruuid=?CreatorId,?SimName,simname)"
                 ;
 
             if(string.IsNullOrEmpty(ad.ParcelName))
@@ -224,6 +235,11 @@ namespace OpenSim.Data.MySQL
                         cmd.Parameters.AddWithValue("?ListingPrice", ad.Price.ToString ());
 
                         cmd.ExecuteNonQuery();
+                        // A no-op foreign-owner update can report a matched row in MySQL.
+                        using MySqlCommand owner = new MySqlCommand("SELECT creatoruuid FROM classifieds WHERE classifieduuid=?Id", dbcon);
+                        owner.Parameters.AddWithValue("?Id", ad.ClassifiedId.ToString());
+                        if (!String.Equals(owner.ExecuteScalar()?.ToString(), ad.CreatorId.ToString(), StringComparison.OrdinalIgnoreCase))
+                        { result = "Classified belongs to another resident"; return false; }
                     }
                     dbcon.Close();
                 }
@@ -289,7 +305,7 @@ namespace OpenSim.Data.MySQL
                                 ad.ParentEstate = Convert.ToInt32(reader["parentestate"]);
                                 ad.Flags = (byte)reader.GetUInt32("classifiedflags");
                                 ad.Category = Convert.ToInt32(reader["category"]);
-                                ad.Price = reader.GetInt16("priceforlisting");
+                                ad.Price = reader.GetInt32("priceforlisting");
                                 ad.Name = reader.GetString("name");
                                 ad.Description = reader.GetString("description");
                                 ad.SimName = reader.GetString("simname");

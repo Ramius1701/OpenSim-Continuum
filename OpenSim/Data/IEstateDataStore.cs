@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -117,4 +118,44 @@ namespace OpenSim.Data
         /// <returns>true if the delete succeeded, false otherwise</returns>
         bool DeleteEstate(int estateID);
     }
+
+    /// <summary>One conditional statement; never rewrites access, ban or experience lists.</summary>
+    public static class EstateSettingsUpdateCommand
+    {
+        public static bool Execute(System.Data.Common.DbConnection connection, EstateSettings expected, EstateSettings updated, string dialect)
+        {
+            EstateSettingsEdit.Validate(expected, updated);
+            string[] columns = { "EstateName", "PricePerMeter", "PublicAccess", "AllowVoice", "AllowDirectTeleport" };
+            bool postgres = dialect == "postgres";
+            if (!postgres && dialect != "mysql" && dialect != "sqlite") throw new ArgumentException("Unsupported estate provider");
+            string Quote(string column) => postgres ? "\"" + column + "\"" : "`" + column + "`";
+            using var command = connection.CreateCommand();
+            void Parameter(string name, object value)
+            {
+                var parameter = command.CreateParameter(); parameter.ParameterName = name;
+                if (value is bool flag && !postgres) value = flag ? 1 : 0;
+                parameter.Value = value; command.Parameters.Add(parameter);
+            }
+            Parameter("@id", (int)expected.EstateID);
+            Parameter("@owner", postgres ? (object)Guid.Parse(expected.EstateOwner.ToString()) : expected.EstateOwner.ToString());
+            var oldValues = EstateSettingsEdit.Values(expected); var newValues = EstateSettingsEdit.Values(updated);
+            var assignments = new List<string>(); var conditions = new List<string>();
+            conditions.Add(Quote("EstateID") + "=@id"); conditions.Add(Quote("EstateOwner") + "=@owner");
+            for (int i = 0; i < columns.Length; i++)
+            {
+                string column = Quote(columns[i]);
+                assignments.Add(column + "=@new" + i); Parameter("@new" + i, newValues[i]); Parameter("@old" + i, oldValues[i]);
+                if (i == 0)
+                {
+                    column = "COALESCE(" + column + ",'')";
+                    conditions.Add(dialect == "mysql" ? "BINARY " + column + "=BINARY @old0"
+                        : column + (postgres ? " COLLATE \"C\"" : " COLLATE BINARY") + "=@old0");
+                }
+                else conditions.Add(column + "=@old" + i);
+            }
+            command.CommandText = "UPDATE estate_settings SET " + string.Join(",", assignments) + " WHERE " + string.Join(" AND ", conditions);
+            return command.ExecuteNonQuery() == 1;
+        }
+    }
+
 }

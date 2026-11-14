@@ -1,32 +1,34 @@
-<!-- forgot password -->
-
-<section class="sign-up  text-center">
-  <div class="container">
-    <div class="row">
-      <div class="col-2">
-        <img src="static/images/reset_password.png" />
-      </div>
-      <div class="col-6">
-        <h3>{ForgotPassword}</h3>
-        <form class="signup-form" action="forgot_pass.html" id="forgotpass_form" method="POST" role="form">
-          <div class="form-input-group">
-            <i class="fa fa-user"></i>
-            <input type="text" class="" placeholder="{UserNameText}" required name="username" id="login_input">
-          </div>
-          <div class="form-input-group">
-            <i class="fa fa-envelope"></i>
-            <input type="text" class="" placeholder="{UserEmailText}" required name="UserEmail">
-          </div>
-          <button class="btn-fill sign-up-btn" onclick="submitupdate('forgotpass_form');">{Submit}</button>
-        </form>
-      </div>
-    </div>
-  </div>
+<section class="portal-workspace" aria-labelledby="recovery-heading">
+  <p class="portal-eyebrow">Account self-service</p><h1 id="recovery-heading">Get back to your world</h1>
+  {IfPasswordRecoveryDisabledBegin}
+  <p>Email recovery is not available on this grid. Contact the grid team for help recovering your account.</p>
+  {IfPasswordRecoveryDisabledEnd}
+  {IfPasswordRecoveryEnabledBegin}
+  <div id="recovery-request-panel"><p>Enter your avatar name and the email address on your account. If they match, we'll email you a link valid for 30 minutes.</p>
+    <form id="recovery-request" class="portal-editor" action="forgot_pass.html" method="post" onsubmit="submitupdate('recovery-request', '', '', event); return false;">
+      <input type="hidden" name="mode" value="request"><label for="recovery-name">Avatar name</label>
+      <input class="form-control" id="recovery-name" name="username" autocomplete="username" required maxlength="128">
+      <label for="recovery-email">Account email</label><input class="form-control" id="recovery-email" type="email" name="UserEmail" autocomplete="email" required maxlength="254">
+      <div class="portal-actions"><button class="btn btn-primary" type="submit">Email recovery link</button></div>
+    </form></div>
+  <div id="recovery-reset-panel" hidden><p>Choose a new password. The link can be used once; changing your password invalidates existing portal sessions.</p>
+    <form id="recovery-reset" class="portal-editor" action="forgot_pass.html" method="post" onsubmit="submitupdate('recovery-reset', '', 'login', event); return false;">
+      <input type="hidden" name="mode" value="reset"><input type="hidden" id="recovery-token" name="token">
+      <label for="recovery-password">New password</label><input class="form-control" id="recovery-password" type="password" name="passwordnew" autocomplete="new-password" required minlength="8" maxlength="128">
+      <label for="recovery-confirmation">Confirm new password</label><input class="form-control" id="recovery-confirmation" type="password" name="passwordconf" autocomplete="new-password" required minlength="8" maxlength="128">
+      <div class="portal-actions"><button class="btn btn-primary" type="submit">Set new password</button></div>
+    </form></div>
+  <script>
+  (function () {
+    var token = new URLSearchParams(window.location.hash.substring(1)).get('reset');
+    if (token && /^[0-9A-Fa-f]{64}$/.test(token)) {
+      document.getElementById('recovery-token').value = token;
+      document.getElementById('recovery-request-panel').hidden = true;
+      document.getElementById('recovery-reset-panel').hidden = false;
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }());
+  </script>
+  {IfPasswordRecoveryEnabledEnd}
+  <a href="?page=login" onclick="loadcontent('login'); return false;">Back to log in</a>
 </section>
-
-<script>
-  $(function() {
-    $("#login_input").focus();
-  });
-</script>
-

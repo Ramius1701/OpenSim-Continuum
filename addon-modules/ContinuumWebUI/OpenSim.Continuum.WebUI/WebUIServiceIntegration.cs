@@ -24,7 +24,7 @@ namespace OpenSim.Continuum.WebUI
     /// The adapter never queries provider tables directly, so MySQL, PostgreSQL
     /// and SQLite remain behind their existing service implementations.
     /// </summary>
-    internal sealed class WebUIServiceIntegration
+    internal sealed partial class WebUIServiceIntegration
     {
         private static readonly ILog Log = LogManager.GetLogger(typeof(WebUIServiceIntegration));
         private readonly IUserAccountService _accounts;
@@ -57,6 +57,26 @@ namespace OpenSim.Continuum.WebUI
         internal WebUIServiceIntegration(IConfigSource config, IConfig section, IUserAccountService accounts)
         {
             _accounts = accounts;
+            _contentStore = new WebUIContentStore(section.GetString("ContentStorePath", "ContinuumWebUI/content.json"));
+            _regionControlRooms = ConfigureRegionControlRooms(config);
+            _portalStore = new WebUIPortalSettingsStore(section.GetString("PortalSettingsPath", "ContinuumWebUI/portal-settings.json"));
+            _consoleEndpoints = ConfigureConsoles(config);
+            string gridConfigurationPath = section.GetString("GridConfigurationPath", "").Trim();
+            _gridConfiguration = gridConfigurationPath.Length == 0 ? null : new WebUIGridConfigurationStore(gridConfigurationPath);
+            _allowPartnerships = section.GetBoolean("AllowPartnerships", false);
+            _allowAccountClosure = section.GetBoolean("AllowAccountClosure", false);
+            _protectedClosureAccounts = new HashSet<UUID> { UUID.Zero, new UUID("11111111-1111-0000-0000-000100bba000") };
+            foreach (string raw in section.GetString("AccountClosureProtectedIDs", "").Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (!UUID.TryParse(raw.Trim(), out UUID id)) throw new InvalidOperationException("AccountClosureProtectedIDs requires comma-separated UUIDs");
+                _protectedClosureAccounts.Add(id);
+            }
+            _residentContactEnabled = section.GetBoolean("ResidentContactEnabled", false);
+            _contactPrivacyNotice = section.GetString("ContactPrivacyNotice", "").Trim();
+            if (_residentContactEnabled && (String.IsNullOrWhiteSpace(_contactPrivacyNotice) || _contactPrivacyNotice.Length > 2000))
+                throw new InvalidOperationException("ResidentContactEnabled requires a ContactPrivacyNotice of at most 2000 characters");
+            _recovery = ConfigureRecovery(section);
+            _trustedProxies = TrustedProxies(section.GetString("TrustedProxyAddresses", ""));
             _adminLevel = Math.Clamp(section.GetInt("AdminUserLevel", 200), 1, 255);
             string hopBase = section.GetString("HopURLBase", string.Empty).Trim();
             if (!Uri.TryCreate(hopBase, UriKind.Absolute, out Uri hopURI)
@@ -70,6 +90,10 @@ namespace OpenSim.Continuum.WebUI
             _allowRegistration = section.GetBoolean("AllowRegistration", true);
             _minimumRegistrationAge = Math.Clamp(section.GetInt("MinimumRegistrationAge", 16), 0, 100);
             _searchUrl = section.GetString("SearchServiceURL", string.Empty).Trim();
+            _searchWriteSecret = section.GetString("SearchWriteSecret", string.Empty);
+            if (_searchWriteSecret.Length > 0 && (_searchUrl.Length == 0 || _searchWriteSecret.Length < 32
+                || _searchWriteSecret.StartsWith("CHANGE", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("SearchWriteSecret requires SearchServiceURL and a unique secret of at least 32 characters");
             _economyUrl = section.GetString("EconomyServiceURL", string.Empty).Trim();
             _economySecret = section.GetString("EconomySharedSecret", string.Empty);
             ValidateServiceEndpoint(_searchUrl, "SearchServiceURL");
@@ -79,6 +103,8 @@ namespace OpenSim.Continuum.WebUI
             if (_economyUrl.Length > 0 && (_economySecret.Length < 32
                 || _economySecret.StartsWith("CHANGE-THIS", StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException("ContinuumWebUI EconomySharedSecret must match a unique ContinuumEconomy secret containing at least 32 characters");
+            _auctionSecret = section.GetString("AuctionBridgeSecret", "");
+            _auctionEndpoints = ConfigureAuctionEndpoints(config, _auctionSecret, _searchWriteSecret, _economySecret);
             _rpcTimeoutMs = Math.Clamp(section.GetInt("ServiceTimeoutMilliseconds", 5000), 500, 30000);
             _gridStatusCacheLifetime = TimeSpan.FromSeconds(Math.Clamp(section.GetInt("GridStatusCacheSeconds", 30), 5, 300));
             _grid = Load<IGridService>(config, section, "GridService", "OpenSim.Services.GridService.dll:GridService");
@@ -116,7 +142,17 @@ namespace OpenSim.Continuum.WebUI
 
         internal static bool IsSuccessfulMutation(string message) => message is
             "Account created successfully" or "Password updated" or "Email address updated"
-            or "Abuse report updated" or "User account updated" or "Profile updated";
+            or "Abuse report updated" or "User account updated" or "Profile updated"
+            or "Successfully saved news article" or "Successfully deleted news article"
+            or "Partnership proposal saved" or "Partnership accepted" or "Partnership dissolved"
+            or "Partnership proposal withdrawn" or "Partnership proposal declined"
+            or "Auction opened" or "Auction bid reserved" or "Auction cancellation requested"
+            or EstateSaved
+            or "Grid configuration saved; ROBUST restart required"
+            or "Successfully saved portal settings" or "Contact details updated" or "Account closed; identity and records retained"
+            or "Successfully saved event" or "Successfully deleted event"
+            or "Successfully saved classified" or "Successfully deleted classified"
+            or WebUIPasswordRecovery.NeutralResponse;
 
         internal static bool IsWarningMutation(string message) => message is
             "Profile saved, but interests could not be updated";
@@ -130,9 +166,10 @@ namespace OpenSim.Continuum.WebUI
                     if (Uri.TryCreate(source, UriKind.Absolute, out Uri uri)
                         && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                         imageSources.Add(uri.GetLeftPart(UriPartial.Authority));
+                string consoleSources = _consoleEndpoints == null ? "" : String.Join("", _consoleEndpoints.Values.Select(value => " " + new Uri(value).GetLeftPart(UriPartial.Authority)).Distinct());
                 return "default-src 'self'; img-src " + string.Join(' ', imageSources)
                     + "; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:; "
-                    + "connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
+                    + "connect-src 'self'" + consoleSources + "; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
             }
         }
 
@@ -147,6 +184,7 @@ namespace OpenSim.Continuum.WebUI
         {
             return relative.ToLowerInvariant() switch
             {
+                "userindex.html" => "index.html",
                 "world_map.html" => "world.html",
                 "events.html" => "events/events.html",
                 "classifieds.html" => "classifieds/classifieds.html",
@@ -166,14 +204,20 @@ namespace OpenSim.Continuum.WebUI
             UserAccount currentUser, Dictionary<string, object> vars)
         {
             AddCommonLabels(vars);
+            AddPortal(page.ToLowerInvariant(), currentUser, vars);
             vars["MainServerURL"] = _publicBase;
             vars["WorldMapServiceURL"] = _mapBase;
             vars["HopURLBase"] = _hopBase;
             string key = page.ToLowerInvariant();
+            vars["PasswordRecoveryEnabled"] = RecoveryEnabled;
+            vars["PasswordRecoveryDisabled"] = !RecoveryEnabled;
+            if (key is "news.html" or "news_list.html" or "admin/news_manager.html" or "admin/news_add.html" or "admin/news_edit.html")
+                AddNews(key, parameters, currentUser, vars);
             if (key is "index.html" or "home.html" or "welcomescreen/index.html" or "welcomescreen/gridstatus.html")
                 AddGridStatus(vars);
             if (key is "region_list.html" or "region_search.html")
                 AddRegions(vars, parameters.TryGetValue("regionname", out string name) ? name : string.Empty);
+            if (key == "auctions.html") AddAuctions(parameters, currentUser, vars);
             if (key == "world.html") AddWorldMap(vars);
             if (key == "events/events.html") AddEvents(vars, parameters, currentUser);
             if (key == "classifieds/classifieds.html") AddClassifieds(vars, parameters, currentUser);
@@ -187,6 +231,12 @@ namespace OpenSim.Continuum.WebUI
             if (key == "user/transactions.html") AddTransactions(vars, currentUser, parameters);
             if (key is "user/profile.html" or "webprofile/modal_profile.html")
                 AddProfile(vars, AccountFromParameter(parameters, currentUser), currentUser);
+            if (key == "admin/sim_console.html") AddConsole(currentUser, vars);
+            if (key is "admin/purchases.html" or "user/purchases.html") AddCurrencyCredits(key, parameters, currentUser, vars);
+            if (key == "admin/gridsettings_manager.html") AddGridConfiguration(currentUser, vars);
+            if (key == "user/partnership.html") AddPartnership(currentUser, vars);
+            if (key == "user/deleteaccount.html") AddAccountClosure(currentUser, vars);
+            if (key == "user/contact.html") AddContact(currentUser, vars);
             if (key == "user/profile_edit.html") AddEditableProfile(vars, currentUser);
             if (key == "webprofile/modal_picks.html") AddPicks(vars, AccountFromParameter(parameters, currentUser), currentUser);
             if (key == "webprofile/modal_regions.html") AddOwnedRegions(vars, AccountFromParameter(parameters, currentUser), currentUser);
@@ -199,10 +249,15 @@ namespace OpenSim.Continuum.WebUI
             if (key == "admin/region_manager.html") AddManagedRegions(vars, currentUser, true);
             if (key == "admin/statistics.html") AddStatistics(vars, currentUser);
             if (key == "admin/transactions.html") AddAdminTransactions(vars, currentUser, parameters);
+            if (key is "user/region_edit.html" or "admin/region_edit.html") AddRegionManagement(key, parameters, currentUser, vars);
+            if (key is "user/estate_edit.html" or "admin/estate_edit.html") AddEstateEditor(key, parameters, currentUser, vars);
             if (key == "user/estate_manager.html") AddEstates(vars, currentUser, false);
             if (key == "admin/estate_manager.html") AddEstates(vars, currentUser, true);
             if (key == "user/classifieds.html") AddOwnedClassifieds(vars, currentUser);
+            if (key == "user/classifieds.html") AddClassifiedManagement(vars, currentUser);
+            if (key is "classifieds/add_classified.html" or "user/classified_edit.html") AddClassifiedEditor(key, parameters, currentUser, vars);
             if (key == "user/events.html") AddOwnedEvents(vars, currentUser);
+            if (key is "events/add_event.html" or "user/edit_event.html") AddEventEditor(key, parameters, currentUser, vars);
             if (key == "experiences.html") AddExperiences(vars, currentUser, parameters);
             if (key == "admin/abuse_manager.html") AddAbuseList(vars, currentUser, parameters);
             if (key == "admin/abuse_report.html") AddAbuseReport(vars, currentUser, parameters);
@@ -217,6 +272,7 @@ namespace OpenSim.Continuum.WebUI
             }
             if (key == "user/password.html")
             {
+                vars["PasswordChangeNextPage"] = RecoveryEnabled ? "login" : "";
                 vars["ChangePasswordText"] = "Change password"; vars["PasswordText"] = "Current password";
                 vars["NewPasswordText"] = "New password"; vars["NewPasswordConfirmationText"] = "Confirm new password";
                 vars["CancelText"] = "Cancel";
@@ -229,11 +285,31 @@ namespace OpenSim.Continuum.WebUI
             message = string.Empty;
             switch (page.ToLowerInvariant())
             {
+                case "classifieds/add_classified.html":
+                case "user/classified_edit.html":
+                case "user/classifieds.html": return ChangeClassified(form, currentUser, out message);
+                case "events/add_event.html":
+                case "user/edit_event.html": return ChangeEvent(form, currentUser, out message);
+                case "user/estate_edit.html":
+                case "admin/estate_edit.html": return ChangeEstate(page.ToLowerInvariant(), form, currentUser, out message);
+                case "admin/welcomescreen_manager.html":
+                case "admin/settings_manager.html":
+                case "admin/page_manager.html":
+                case "admin/factory_reset.html": return ChangePortal(page.ToLowerInvariant(), form, currentUser, out message);
+                case "auctions.html": return ChangeAuction(form, currentUser, out message);
                 case "register.html": return Register(form, out message);
+                case "forgot_pass.html": return RecoverPassword(form, out message);
+                case "admin/news_manager.html":
+                case "admin/news_add.html":
+                case "admin/news_edit.html": return ChangeNews(page.ToLowerInvariant(), form, currentUser, out message);
                 case "admin/user_register.html":
                     if (!IsAdmin(currentUser)) { message = "Administrator access required"; return true; }
                     return Register(form, out message, true);
                 case "user/password.html": return ChangePassword(form, currentUser, out message);
+                case "admin/gridsettings_manager.html": return ChangeGridConfiguration(form, currentUser, out message);
+                case "user/partnership.html": return ChangePartnership(form, currentUser, out message);
+                case "user/deleteaccount.html": return CloseAccount(form, currentUser, out message);
+                case "user/contact.html": return ChangeContact(form, currentUser, out message);
                 case "user/email.html": return ChangeEmail(form, currentUser, out message);
                 case "user/profile_edit.html": return UpdateProfile(form, currentUser, out message);
                 case "admin/abuse_report.html": return UpdateAbuse(form, currentUser, out message);
@@ -647,7 +723,14 @@ namespace OpenSim.Continuum.WebUI
                 if (!administratorView) regions.RemoveAll(region => region.EstateOwner != account.PrincipalID);
             }
             List<Dictionary<string, object>> rows = regions.OrderBy(region => region.RegionName)
-                .Select(RegionRow).ToList();
+                .Select(region =>
+                {
+                    var row = RegionRow(region);
+                    string url = null;
+                    row["RegionHasControlRoom"] = _regionControlRooms != null && _regionControlRooms.TryGetValue(region.RegionID, out url);
+                    row["RegionControlRoomURL"] = H(url ?? "");
+                    return row;
+                }).ToList();
             vars["RegionList"] = rows; vars["HaveData"] = rows.Count > 0; vars["NoData"] = rows.Count == 0;
             vars["UserName"] = H(account?.FormattedName ?? string.Empty); vars["RegionsText"] = "regions";
             vars["RegionListText"] = "regions"; vars["RegionText"] = "Region";
@@ -701,7 +784,7 @@ namespace OpenSim.Continuum.WebUI
                 foreach (int id in ids.Distinct().Take(10000))
                 {
                     EstateSettings estate = Safe(() => _estates.LoadEstateSettings(id));
-                    if (estate != null) estates.Add(estate);
+                    if (estate != null && estate.EstateID == (uint)id && (administratorView || estate.EstateOwner == account.PrincipalID)) estates.Add(estate);
                 }
             }
             var rows = new List<Dictionary<string, object>>();
@@ -712,6 +795,8 @@ namespace OpenSim.Continuum.WebUI
                 int regionCount = Safe(() => _estates.GetRegions((int)estate.EstateID))?.Count ?? 0;
                 rows.Add(new Dictionary<string, object>
                 {
+                    ["EstateCanEdit"] = _estates is IEstateSettingsUpdater updater && updater.SupportsEstateSettingsUpdate,
+                    ["EstateEditPage"] = administratorView ? "admin-estate-edit" : "user-estate-edit",
                     ["EstateID"] = estate.EstateID, ["EstateName"] = H(estate.EstateName),
                     ["EstateOwner"] = H(owner?.FormattedName ?? estate.EstateOwner.ToString()),
                     ["PublicAccess"] = estate.PublicAccess ? "Yes" : "No",
@@ -745,7 +830,7 @@ namespace OpenSim.Continuum.WebUI
                         ["Description"] = H(classified.Description), ["Category"] = classified.Category,
                         ["CreationDate"] = UnixDate(classified.CreationDate.ToString(CultureInfo.InvariantCulture)),
                         ["ExpirationDate"] = UnixDate(classified.ExpirationDate.ToString(CultureInfo.InvariantCulture)),
-                        ["Maturity"] = (classified.Flags & 4) != 0 ? "Mature" : "General",
+                        ["Maturity"] = (classified.Flags & 64) != 0 ? "Adult" : (classified.Flags & 10) != 0 ? "Moderate" : "General",
                         ["PriceForListing"] = classified.Price, ["ClassifiedRegion"] = H(classified.SimName),
                         ["ClassifiedHop"] = string.IsNullOrWhiteSpace(classified.SimName) ? string.Empty : Hop(classified.SimName, x, y, z)
                     });
@@ -770,8 +855,8 @@ namespace OpenSim.Continuum.WebUI
             {
                 foreach (Hashtable item in data.OfType<Hashtable>().Take(1000))
                 {
-                    DirectoryLocation(Text(item, "globalposition", Text(item, "landing_point")), out int x, out int y, out int z);
                     string simName = Text(item, "simname");
+                    DirectoryLocation(Text(item, "globalposition", Text(item, "landing_point")), out int x, out int y, out int z, simName);
                     bool hasDate = TryEventDateUtc(item, item, out DateTime date);
                     rows.Add(new Dictionary<string, object>
                     {
@@ -907,7 +992,7 @@ namespace OpenSim.Continuum.WebUI
                     int eventMaturity = MaturityLevel(Text(detail, "eventflags", Text(summary, "eventflags")));
                     if (!AllowsMaturity(maturityFlags, eventMaturity)) continue;
                     DateTime displayDate = hasDate ? EventDisplayDate(date) : default;
-                    DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z);
+                    DirectoryLocation(Text(detail, "globalposition", Text(detail, "landing_point")), out int x, out int y, out int z, Text(detail, "simname"));
                     string simName = Text(detail, "simname");
                     rows.Add(new Dictionary<string, object>
                     {
@@ -1199,18 +1284,24 @@ namespace OpenSim.Continuum.WebUI
             z = parts.Length > 2 && Int32.TryParse(parts[2], out int pz) ? Math.Clamp(pz, 0, 10000) : 25;
         }
 
-        private static void DirectoryLocation(string value, out int x, out int y, out int z)
+        private void DirectoryLocation(string value, out int x, out int y, out int z, string regionName = "")
         {
             string[] parts = (value ?? string.Empty).Trim('<', '>', ' ').Split(',');
-            static int Coordinate(string text, bool horizontal, int fallback)
+            GridRegion region = String.IsNullOrEmpty(regionName) ? null : Safe(() => _grid?.GetRegionByName(UUID.Zero, regionName));
+            static int Coordinate(string text, bool horizontal, int fallback, int origin = 0, int size = 0)
             {
-                if (!Double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)) return fallback;
+                if (!Double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed) || !Double.IsFinite(parsed)) return fallback;
+                if (horizontal && size > 0)
+                {
+                    if (parsed >= origin && parsed < (double)origin + size) parsed -= origin;
+                    return (int)Math.Clamp(Math.Floor(parsed), 0, size - 1);
+                }
                 int result = (int)Math.Floor(parsed);
                 if (horizontal && result >= 256) result %= 256;
-                return Math.Clamp(result, 0, horizontal ? 4096 : 10000);
+                return Math.Clamp(result, 0, horizontal ? 4096 : 65535);
             }
-            x = Coordinate(parts.Length > 0 ? parts[0] : null, true, 128);
-            y = Coordinate(parts.Length > 1 ? parts[1] : null, true, 128);
+            x = Coordinate(parts.Length > 0 ? parts[0] : null, true, 128, region?.RegionLocX ?? 0, region?.RegionSizeX ?? 0);
+            y = Coordinate(parts.Length > 1 ? parts[1] : null, true, 128, region?.RegionLocY ?? 0, region?.RegionSizeY ?? 0);
             z = Coordinate(parts.Length > 2 ? parts[2] : null, false, 25);
         }
 

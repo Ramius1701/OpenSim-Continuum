@@ -55,6 +55,13 @@ namespace OpenSim.Region.Framework.Interfaces
         DISALLOWED_BY_FILTER = 2
     }
 
+    // Tranquillity 3bba0e510a: completions cross plugin assembly load contexts.
+    public interface IHttpServiceRequest : IServiceRequest
+    {
+        int Status { get; }
+        string ResponseBody { get; }
+    }
+
     public interface IHttpRequestModule
     {
         UUID MakeHttpRequest(string url, string parameters, string body);
@@ -81,7 +88,7 @@ namespace OpenSim.Region.Framework.Interfaces
         /// </summary>
         /// <param name='id'></param>
         void StopHttpRequest(uint m_localID, UUID m_itemID);
-        IServiceRequest GetNextCompletedRequest();
+        IHttpServiceRequest GetNextCompletedRequest();
         void RemoveCompletedRequest(UUID id);
         bool CheckThrottle(uint localID, UUID onerID);
         bool CheckAllowed(Uri url);

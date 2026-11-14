@@ -8,7 +8,7 @@ using System.Text;
 
 namespace OpenSim.Continuum.Economy
 {
-    public sealed class SQLiteEconomyLedger : IEconomyLedger
+    public sealed class SQLiteEconomyLedger : IEconomyLedger, ICurrencyCreditHistory
     {
         private readonly SQLiteEconomyStore m_store;
         public SQLiteEconomyLedger(string connectionString) { m_store = new(connectionString); }
@@ -143,6 +143,11 @@ namespace OpenSim.Continuum.Economy
                     status == 2 ? LedgerResultCode.InsufficientFunds : LedgerResultCode.InvalidRequest;
                 return Adjustment(request.OperationID,code,balance,status==1?"Adjustment committed":failure);
             }
+        }
+        public IReadOnlyList<LedgerHistoryEntry> GetCurrencyCredits(Guid account, DateTime? beforeUtc, Guid beforeID, int limit)
+        {
+            lock (m_store.SyncRoot)
+            using (var connection = m_store.Open()) return CurrencyCreditHistoryQuery.Read(connection, "sqlite", account, beforeUtc, beforeID, limit);
         }
         public IReadOnlyList<LedgerHistoryEntry> GetHistory(Guid accountID, DateTime? beforeUtc, int limit)
         {

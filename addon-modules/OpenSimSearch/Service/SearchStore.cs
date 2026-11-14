@@ -14,7 +14,7 @@ using System.Data.SQLite;
 
 namespace ContinuumSearch.Service
 {
-    internal sealed class SearchStore : IDisposable
+    internal sealed partial class SearchStore : IDisposable
     {
         private readonly string m_connectionString;
         private readonly Func<DbConnection> m_connectionFactory;
@@ -126,6 +126,9 @@ namespace ContinuumSearch.Service
             }
             catch (Exception e) when (e.Message.Contains("continuum_search_events", StringComparison.OrdinalIgnoreCase) ||
                 e.Message.Contains("doesn't exist", StringComparison.OrdinalIgnoreCase)) { }
+            using (var notifications = Command(connection, "CREATE TABLE IF NOT EXISTS continuum_event_notifications (actor VARCHAR(36) NOT NULL,eventid INTEGER NOT NULL,PRIMARY KEY(actor,eventid))")) notifications.ExecuteNonQuery();
+            EnsureEventManagementSchema();
+            EnsureClassifiedManagementSchema();
         }
 
         internal bool HasClassifiedsTable()
@@ -283,8 +286,9 @@ namespace ContinuumSearch.Service
             if (search == null) return new ArrayList();
             int category = Number(request, "category");
             List<(string, object)> args = new() { ("@search", search) };
-            string where = "(LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search))";
-            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category)); }
+            string where = "(LOWER(name) LIKE LOWER(@search) OR LOWER(description) LIKE LOWER(@search)) AND expirationdate>@now";
+            args.Add(("@now", DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
+            if (category > 0) { where += " AND category=@category"; args.Add(("@category", category.ToString(CultureInfo.InvariantCulture))); }
             int flags = Number(request, "flags");
             int maturity = 0;
             if ((flags & 5) != 0) maturity |= 5;
@@ -325,7 +329,7 @@ namespace ContinuumSearch.Service
         }
 
         internal ArrayList GetEvent(Hashtable request) => Query(
-            "SELECT eventid,creatoruuid,name,category,description,dateUTC,duration,covercharge,coveramount,simname,globalPos,eventflags FROM search_events WHERE eventid=@id LIMIT 1",
+            "SELECT eventid,creatoruuid,name,category,description,dateUTC,duration,covercharge,coveramount,simname,globalPos,eventflags,revision FROM search_events WHERE eventid=@id LIMIT 1",
             new List<(string, object)> { ("@id", Number(request, "eventID")) }, null, reader => new Hashtable
             {
                 ["event_id"] = Int(reader, 0), ["creator"] = Value(reader, 1), ["name"] = Value(reader, 2),
@@ -333,16 +337,20 @@ namespace ContinuumSearch.Service
                 ["date"] = DateTimeOffset.FromUnixTimeSeconds(Long(reader, 5)).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 ["dateUTC"] = Long(reader, 5), ["duration"] = Int(reader, 6), ["covercharge"] = Int(reader, 7),
                 ["coveramount"] = Int(reader, 8), ["simname"] = Value(reader, 9), ["globalposition"] = Value(reader, 10),
-                ["eventflags"] = Int(reader, 11), ["landing_point"] = Value(reader, 10)
+                ["eventflags"] = Int(reader, 11), ["landing_point"] = Value(reader, 10), ["revision"] = Int(reader, 12)
             });
 
-        internal ArrayList GetClassified(Hashtable request) => Query(
+        internal ArrayList GetClassified(Hashtable request)
+        {
+            if (!Guid.TryParse(Text(request, "classifiedID"), out Guid id) || id == Guid.Empty) return new ArrayList();
+            return Query(
             "SELECT classifieduuid,creatoruuid,creationdate,expirationdate,category,name,description,parceluuid,parentestate,snapshotuuid,simname,posglobal,parcelname,classifiedflags,priceforlisting FROM classifieds WHERE classifieduuid=@id LIMIT 1",
-            new List<(string, object)> { ("@id", Text(request, "classifiedID")) }, null, reader =>
+            new List<(string, object)> { ("@id", ProfileUUID(id)) }, null, reader =>
             {
                 string[] names = { "classifieduuid", "creatoruuid", "creationdate", "expirationdate", "category", "name", "description", "parceluuid", "parentestate", "snapshotuuid", "simname", "posglobal", "parcelname", "classifiedflags", "priceforlisting" };
                 Hashtable row = new(); for (int i = 0; i < names.Length; ++i) row[names[i]] = Value(reader, i); return row;
             });
+        }
 
         internal void SaveEvent(SearchEvent item)
         {

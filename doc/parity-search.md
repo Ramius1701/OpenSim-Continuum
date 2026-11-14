@@ -1,5 +1,15 @@
 # Search donor-parity audit
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 ## Lineage and authority
 
 - Official OpenSim Dev supplies `BasicSearchModule`, map search and the current
@@ -19,7 +29,18 @@
 - Continuum's tracked OpenSimSearch addon is a hardened viewer-side client. It
   is not a grid index or crawler.
 
-## Current comparison
+## Current completion checkpoint — 2026-10-24
+
+The older comparison rows below are historical. Direct places queries are already
+implemented in OpenSearch. Persistent viewer event reminders are now implemented:
+private authenticated add/remove/list in ContinuumSearch, native viewer request
+subscriptions and authenticated login restoration in XML-RPC and LLSD. Durable
+storage is provider-neutral SQL with subscriber bounds, idempotence and expired/
+deleted event filtering. Firestorm event_date_ut and UTC event_date are supplied.
+The service/reminder and fresh SQLite Search acceptance checks pass; deployed
+MySQL/PostgreSQL, relog and outage checks remain in the existing handoff.
+
+## Historical comparison
 
 | Search surface | Current status | Decision |
 |---|---|---|
@@ -118,3 +139,16 @@ The later OpenSim-Grid-Interface search service should:
 The simulator addon is ready for controlled compatibility testing. A complete
 self-hosted search product remains pending the authenticated directory service
 and faithful WhiteCore/OpenSim-Grid-Interface WebUI integration.
+
+## 2026-10-22 current implementation checkpoint
+
+The historical pending-directory statement above is superseded by the bundled
+ContinuumSearch service and native WebUI adapters. Viewer query contracts remain
+available; private authenticated event writes and classified create/edit/delete
+now accompany them. Classified receipts persist payment/publication intent in the
+authoritative profile database, with idempotent ContinuumEconomy capture, pending
+resume and expiry filtering. Viewer profile providers preserve paid dates/price
+when editing these records. Details and remaining limitations are maintained in
+`parity-webui.md`; browser, Firestorm and MySQL/PostgreSQL execution certification
+remain in `donor-feature-test-handoff.md`. This is source/build completion for
+those workflows, not certification of complete search/WebUI donor parity.

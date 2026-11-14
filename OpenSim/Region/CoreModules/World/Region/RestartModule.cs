@@ -55,10 +55,6 @@ namespace OpenSim.Region.CoreModules.World.Region
         protected Timer m_CountdownTimer = null;
         protected DateTime m_RestartBegin;
         protected List<int> m_Alerts;
-        protected string m_Message;
-        protected UUID m_Initiator;
-        protected bool m_Notice = false;
-        protected IDialogModule m_DialogModule = null;
         protected string m_MarkerPath = String.Empty;
         private int[] m_CurrentAlerts = null;
         protected bool m_shortCircuitDelays = false;
@@ -89,14 +85,14 @@ namespace OpenSim.Region.CoreModules.World.Region
                     false, "region restart bluebox",
                     "region restart bluebox <message> <delta seconds>+",
                     "Schedule a region restart",
-                    "Schedule a region restart after a given number of seconds.  If one delta is given then the region is restarted in delta seconds time.  A time to restart is sent to users in the region as a dismissable bluebox notice.  If multiple deltas are given then a notice is sent when we reach each delta.",
+                    "Schedule a region restart after a given number of seconds. The viewer's native restart countdown is sent at each supplied delta.",
                     HandleRegionRestart);
 
             MainConsole.Instance.Commands.AddCommand("Regions",
                     false, "region restart notice",
                     "region restart notice <message> <delta seconds>+",
                     "Schedule a region restart",
-                    "Schedule a region restart after a given number of seconds.  If one delta is given then the region is restarted in delta seconds time.  A time to restart is sent to users in the region as a transient notice.  If multiple deltas are given then a notice is sent when we reach each delta.",
+                    "Schedule a region restart after a given number of seconds. The viewer's native restart countdown is sent at each supplied delta.",
                     HandleRegionRestart);
 
             MainConsole.Instance.Commands.AddCommand("Regions",
@@ -107,7 +103,6 @@ namespace OpenSim.Region.CoreModules.World.Region
 
         public void RegionLoaded(Scene scene)
         {
-            m_DialogModule = m_Scene.RequestModuleInterface<IDialogModule>();
         }
 
         public void RemoveRegion(Scene scene)
@@ -148,9 +143,6 @@ namespace OpenSim.Region.CoreModules.World.Region
                 return;
             }
 
-            m_Message = message;
-            m_Initiator = initiator;
-            m_Notice = notice;
             m_CurrentAlerts = alerts;
             m_Alerts = new List<int>(alerts);
             m_Alerts.Sort();
@@ -194,37 +186,7 @@ namespace OpenSim.Region.CoreModules.World.Region
             m_Alerts.RemoveAt(0);
 
             if (sendOut)
-            {
-                int minutes = currentAlert / 60;
-                string currentAlertString = String.Empty;
-                if (minutes > 0)
-                {
-                    if (minutes == 1)
-                        currentAlertString += "1 minute";
-                    else
-                        currentAlertString += String.Format("{0} minutes", minutes);
-                    if ((currentAlert % 60) != 0)
-                        currentAlertString += " and ";
-                }
-                if ((currentAlert % 60) != 0)
-                {
-                    int seconds = currentAlert % 60;
-                    if (seconds == 1)
-                        currentAlertString += "1 second";
-                    else
-                        currentAlertString += String.Format("{0} seconds", seconds);
-                }
-
-                string msg = String.Format(m_Message, currentAlertString);
-
-                if (m_DialogModule != null && msg != String.Empty)
-                {
-                    if (m_Notice)
-                        m_DialogModule.SendGeneralAlert(msg);
-                    else
-                        m_DialogModule.SendNotificationToUsersInRegion(m_Initiator, "System", msg);
-                }
-            }
+                SendViewerRestartAlert(currentAlert);
 
             return currentAlert - nextAlert;
         }
@@ -291,13 +253,45 @@ namespace OpenSim.Region.CoreModules.World.Region
             {
                 m_CountdownTimer.Stop();
                 m_CountdownTimer = null;
-                if (m_DialogModule != null && message != String.Empty)
-                    m_DialogModule.SendNotificationToUsersInRegion(UUID.Zero, "System", message);
-                    //m_DialogModule.SendGeneralAlert(message);
+                SendViewerRestartCancelled();
             }
             if (m_MarkerPath != String.Empty)
                 File.Delete(Path.Combine(m_MarkerPath,
                         m_Scene.RegionInfo.RegionID.ToString()));
+        }
+
+        /// <summary>
+        /// Send the Linden viewer restart control message.  Current viewers,
+        /// including Firestorm, use this message to display the dedicated
+        /// region-restart countdown floater, play the restart sound and shake
+        /// the camera.  A normal dialog or notification cannot trigger that UI.
+        /// </summary>
+        private void SendViewerRestartAlert(int seconds)
+        {
+            string controlMessage;
+            if (seconds >= 60 && seconds % 60 == 0)
+                controlMessage = "/RESTART_X_MINUTES " + (seconds / 60);
+            else
+                controlMessage = "/RESTART_X_SECONDS " + seconds;
+
+            m_Scene.ForEachRootScenePresence(sp =>
+            {
+                if (sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent)
+                    return;
+
+                sp.ControllingClient?.SendAlertMessage(controlMessage);
+            });
+        }
+
+        private void SendViewerRestartCancelled()
+        {
+            m_Scene.ForEachRootScenePresence(sp =>
+            {
+                if (sp == null || sp.IsDeleted || sp.IsNPC || sp.IsChildAgent)
+                    return;
+
+                sp.ControllingClient?.SendAlertMessage("/Region restart cancelled.");
+            });
         }
 
         private void HandleRegionRestart(string module, string[] args)

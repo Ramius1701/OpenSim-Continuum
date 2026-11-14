@@ -1,5 +1,15 @@
 # OpenSim Continuum
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](doc/whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](doc/parity-webui.md) and [test handoff](doc/donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 OpenSim Continuum is an OpenSimulator distribution that reconciles selected fixes, services, scripting capabilities, and optional modules from the wider OpenSim ecosystem onto a clean OpenSim Dev base.
 
 The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743de06a2808f003bc8e2a90` from 2026-08-01. The repository has subsequently synchronized OpenSim upstream through `58b7b39db676a166c68d47256f50588cdf330630` while retaining the audited Continuum feature set. The `development` branch is now an **operational beta-test candidate**, not a production-certified release. Complete MySQL/MariaDB and PostgreSQL ROBUST topologies and SQLite standalone have passed clean startup, service activation, Firestorm-style login/capability creation, persistence, and restart gates. Real-viewer crossings and user workflows—including nameplates, currency purchasing, Experience panels/scripts, Abuse Reports, search, Hypergrid, and voice—remain the beta acceptance work. Do not deploy it as a production replacement. The required tests are described in [the donor feature testing handoff](doc/donor-feature-test-handoff.md), [the integration progress ledger](doc/integration-progress.md), and [the ContinuumEconomy runbook](doc/continuum-economy-production-test.md).
@@ -17,7 +27,7 @@ The clean donor-integration baseline is OpenSim Dev commit `247b9182c1ca0f11743d
 - Grid-wide Display Names, Experiences, and Abuse Reports are enabled in the Continuum grid/Robust example profiles
 - Offline IM and viewer mute lists are selected end-to-end in Standalone and Grid examples; Grid routes storage through the authenticated ROBUST private endpoint
 - Public web, economy, automatic permission grants, and experimental modules remain explicit opt-ins
-- The WhiteCore integrated WebUI portal phase is active. Continuum retains the WhiteCore HTML, static assets, page model and BSD attribution while adapting its incompatible backend boundaries to native OpenSim and Robust services.
+- The needed selected WhiteCore ports and native WebUI workflow adaptations are implemented as of 2026-10-24; deployed browser/viewer and provider acceptance remains open. Continuum retains the WhiteCore HTML, static assets, page model and BSD attribution while adapting its incompatible backend boundaries to native OpenSim and Robust services.
 - OpenSim-Grid-Interface checkpoint `ecb377d42b5a1f0ec7a969a65f48596c8e5dbe87` is the secondary portal donor used to fill demonstrated workflow gaps without replacing the WhiteCore-led shell.
 - Implemented portal workflows include secure account sessions and registration, resident profiles/picks/groups/friends/regions, directory and destination search, region and parcel profiles, Experiences, Abuse Reports, economy statements, administrator account operations, region inventories and operational statistics. Live deployment acceptance is still required.
 
@@ -79,7 +89,11 @@ The extended scripting surface is powerful and has estate/security implications.
 - ContinuumSearch supplies events, classifieds, destinations and published region parcels through provider-neutral XML-RPC contracts.
 - ContinuumEconomy can supply authenticated resident statements when its endpoint and shared secret are configured.
 - OpenSim-Grid-Interface-derived account and profile workflows fill gaps in the WhiteCore portal without introducing a separate replacement website.
-- Unsupported WhiteCore simulator creation/reset and direct-database administration controls are not exposed. Region administration remains read-only until a current authenticated OpenSim service contract can perform those mutations safely.
+- News management, password recovery, region-owner events, paid classifieds, portal presentation controls and bounded estate editing are implemented in source.
+- Optional grid-wide land auction controls retain native escrow and viewer authority; persistent event subscriptions are restored during login. Both require explicit configuration and runtime acceptance.
+- Portal reset, native grid identity/login configuration, private postal contacts, password-confirmed account archival, durable mutual-consent partnerships and native operator consoles are included with explicit configuration and authority boundaries.
+- Resident/admin currency-credit pages show completed native viewer purchase credits. No real-money provider or cash-receipt claim is included.
+- Bounded estate editing uses native conditional updates; region-management pages recheck native ownership and delegate backed-up configuration edits to independently authenticated RegionWeb control rooms. Administrators can use configured native REST consoles for host operations. Shared host SSO and a new central host supervisor are not implemented.
 
 These are independent optional components. They are not all required for a grid, and enabling multiple economy modules simultaneously is not supported unless their interaction has been explicitly designed and tested.
 

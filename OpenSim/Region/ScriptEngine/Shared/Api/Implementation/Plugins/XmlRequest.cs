@@ -52,7 +52,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
 
             if (xmlrpc != null)
             {
-                RPCRequestInfo rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                // Tranquillity 3bba0e510a: do not cast across plugin load contexts.
+                IXmlRpcRequestInfo rInfo = xmlrpc.GetNextCompletedRequest();
 
                 while (rInfo != null)
                 {
@@ -80,7 +81,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                             break;
                     }
 
-                    rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                    rInfo = xmlrpc.GetNextCompletedRequest();
                 }
 
                 SendRemoteDataRequest srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();

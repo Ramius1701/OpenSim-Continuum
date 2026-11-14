@@ -661,7 +661,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                     LoadExperienceTrustedUUIDs(experiencesConfig.GetString("TrustedObjects", string.Empty), m_scriptExperienceTrustedObjects);
                 }
 
-                IConfig smtpConfig = seConfigSource.Configs["SMTP"];
+                IConfig smtpConfig = seConfigSource.Configs["Email"] ?? seConfigSource.Configs["SMTP"];
                 if (smtpConfig != null)
                 {
                     // there's an smtp config, so load in the snooze time.
@@ -7418,6 +7418,23 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
                 case "shout_range":
                     return m_shoutdistance.ToString();
 
+                // Archived opensim-lickx 6614599b7506 compatibility keys.
+                case "region_rating":
+                    return World.RegionInfo.RegionSettings.Maturity switch
+                    {
+                        0 => "PG",
+                        1 => "MATURE",
+                        2 => "ADULT",
+                        _ => "UNKNOWN"
+                    };
+
+                case "grid":
+                    return World.SceneGridInfo?.GridName ?? string.Empty;
+
+                case "objectmail_hostname":
+                case "mailname":
+                    return m_emailModule == null ? string.Empty : m_internalObjectHost;
+
                 default:
                     return "";
             }
@@ -12497,8 +12514,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                             float repeatX = Math.Clamp((float)mnrepeat.x,-100.0f, 100.0f);
                             float repeatY = Math.Clamp((float)mnrepeat.y,-100.0f, 100.0f);
-                            float offsetX = Math.Clamp((float)mnoffset.x, 0f, 1.0f);
-                            float offsetY = Math.Clamp((float)mnoffset.y, 0f, 1.0f);
+                            // opensim-lickx 6614599b7506: negative normal-map offsets are valid.
+                            float offsetX = Math.Clamp((float)mnoffset.x, -1.0f, 1.0f);
+                            float offsetY = Math.Clamp((float)mnoffset.y, -1.0f, 1.0f);
 
                             materialChanged |= SetMaterialNormalMap(part, face, mapID, repeatX, repeatY, offsetX, offsetY, mnrot);
                             break;

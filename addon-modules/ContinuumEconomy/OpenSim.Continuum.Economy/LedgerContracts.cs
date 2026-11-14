@@ -157,6 +157,40 @@ namespace OpenSim.Continuum.Economy
         public DateTime CreatedUtc { get; set; }
     }
 
+    public interface ICurrencyCreditHistory
+    {
+        IReadOnlyList<LedgerHistoryEntry> GetCurrencyCredits(Guid account, DateTime? beforeUtc, Guid beforeID, int limit);
+    }
+    public static class CurrencyCreditHistoryQuery
+    {
+        public static IReadOnlyList<LedgerHistoryEntry> Read(System.Data.Common.DbConnection connection, string dialect, Guid account, DateTime? beforeUtc, Guid beforeID, int limit)
+        {
+            if (account == Guid.Empty || limit < 1 || limit > 101 || (beforeID != Guid.Empty && !beforeUtc.HasValue)) throw new ArgumentException("Invalid currency history cursor");
+            bool postgres = dialect == "postgres", sqlite = dialect == "sqlite";
+            if (!postgres && !sqlite && dialect != "mysql") throw new ArgumentException("Unsupported ledger provider");
+            using var query = connection.CreateCommand();
+            query.CommandText = "SELECT operation_id,actor_id,amount,reason,resulting_balance,created_utc FROM continuum_economy_adjustments "
+                + "WHERE account_id=@account AND adjustment_kind=1 AND transaction_type=5010 AND status=1 AND amount>0"
+                + (beforeUtc.HasValue ? (beforeID == Guid.Empty ? " AND created_utc<@before" : " AND (created_utc<@before OR (created_utc=@before AND operation_id<@cursor))") : "")
+                + " ORDER BY created_utc DESC,operation_id DESC LIMIT @limit";
+            void Parameter(string name, object value) { var parameter = query.CreateParameter(); parameter.ParameterName = name; parameter.Value = value; query.Parameters.Add(parameter); }
+            Parameter("@account", postgres ? (object)account : account.ToString()); Parameter("@limit", limit);
+            if (beforeUtc.HasValue) Parameter("@before", sqlite ? (object)beforeUtc.Value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture) : beforeUtc.Value.ToUniversalTime());
+            if (beforeID != Guid.Empty) Parameter("@cursor", postgres ? (object)beforeID : beforeID.ToString());
+            using var reader = query.ExecuteReader(); var rows = new List<LedgerHistoryEntry>();
+            while (reader.Read())
+            {
+                DateTime time = reader.GetValue(5) is DateTime date ? DateTime.SpecifyKind(date, DateTimeKind.Utc)
+                    : DateTime.Parse(Convert.ToString(reader.GetValue(5)), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+                rows.Add(new LedgerHistoryEntry { TransactionID = Guid.Parse(reader.GetValue(0).ToString()), AccountID = account,
+                    ActorID = Guid.Parse(reader.GetValue(1).ToString()), CounterpartyID = Guid.Parse(reader.GetValue(1).ToString()),
+                    Amount = reader.GetInt64(2), Description = reader.GetString(3), ResultingBalance = reader.GetInt64(4), CreatedUtc = time,
+                    IsCredit = true, IsAdjustment = true, Succeeded = true, TransactionType = 5010 });
+            }
+            return rows;
+        }
+    }
+
     public interface IEconomyLedger
     {
         void EnsureSchema();

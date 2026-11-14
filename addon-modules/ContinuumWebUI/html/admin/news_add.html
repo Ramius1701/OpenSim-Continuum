@@ -1,35 +1,17 @@
-<!-- Add news article -->
-
-{IsAdminAuthenticatedBegin}
-
-<h2>{SystemName}: {AddNewsText}</h2>
-<form id="add_news_form" action="admin/news_add.html" method="post">
-  <div class="row w-100">
-    <div class="col-md-8 offset-md-2">
-
-      <div class="form-group">
-        <label for="NewsTitle" class="col-3 col-form-label text-right mr-2">{NewsItemTitle}</label>
-        <input class="form-control" minlength="3" name="NewsTitle" id="NewsTitle" require="true" type="text" size="119" value="">
-      </div>
-
-      <div class="form-group">
-        <label for="NewsText" class="col-3 col-form-label text-right mr-2">{NewsItemText}</label>
-        <textarea class="form-control" name="NewsText" id="NewsText" require="true" cols="90" rows="10"></textarea>
-      </div>
-
-      <div class="row w-100 mt-3">
-        <div class="col"></div>
-        <div class="col-8 pull-right">
-          <a class="btn btn-success" onclick="loadusercontent('admin-news_manager');">{Cancel}</a>
-          <a class="btn btn-info pull-right" style="width:200px;" 
-             onclick="submitupdate('add_news_form', 'additem=true', 'admin-news_manager');">
-              {Submit}
-          </a>
-        </div>
-      </div>
-
+<section class="portal-workspace" aria-labelledby="news-heading">
+  <p class="portal-eyebrow">Grid administration · Communications</p>
+  <h1 id="news-heading">Create a news article</h1>
+  <p>Share an announcement with your community. Save a draft or publish it to the grid news feed.</p>
+  <form id="add_news_form" action="admin/news_add.html" method="post" class="portal-editor">
+    <label for="news-title">Title</label>
+    <input class="form-control" name="NewsTitle" id="news-title" required maxlength="160" autocomplete="off">
+    <label for="news-body">Article</label>
+    <textarea class="form-control" name="NewsText" id="news-body" required maxlength="8192" rows="12" aria-describedby="news-format"></textarea>
+    <p id="news-format">Plain text. Line breaks are preserved; HTML is displayed as text.</p>
+    <label class="portal-check"><input type="checkbox" name="published" value="true"> Publish to the public news feed</label>
+    <div class="portal-actions">
+      <button type="button" class="btn btn-primary" onclick="submitupdate('add_news_form', '', 'admin-news_manager');">Save article</button>
+      <button type="button" class="btn btn-outline-light" onclick="loadusercontent('admin-news_manager');">Cancel</button>
     </div>
-  </div>
-</form>
-
-{IsAdminAuthenticatedEnd}
+  </form>
+</section>

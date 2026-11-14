@@ -1,5 +1,15 @@
 # ContinuumEconomy compatibility contract
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 This checkpoint freezes the externally visible behavior that the new
 ContinuumEconomy must implement independently. The DTL/NSL-compatible
 MoneyServer is maintained separately as MoneyServer Compatibility; it is not

@@ -40,6 +40,7 @@ namespace OpenSimSearch.Modules.OpenSearch
         // Module vars
         //
         private readonly List<Scene> m_Scenes = new();
+        private EventNotificationClient m_notifications;
         private string m_SearchServer = "";
         private bool m_Enabled = true;
         private int m_RequestTimeoutMs = 5000;
@@ -88,6 +89,7 @@ namespace OpenSimSearch.Modules.OpenSearch
             if (searchUri.Scheme != Uri.UriSchemeHttps)
                 m_log.Warn("[SEARCH] SearchURL is not HTTPS; queries and results can be observed or modified in transit");
 
+            m_notifications = EventNotificationClient.Configure(searchConfig, m_SearchServer);
             m_RequestTimeoutMs = Math.Clamp(
                 searchConfig.GetInt("RequestTimeoutMs", m_RequestTimeoutMs),
                 1000,
@@ -192,6 +194,8 @@ namespace OpenSimSearch.Modules.OpenSearch
                 client.OnDirLandQuery += OnDirLandQuery;
                 client.OnDirClassifiedQuery += OnDirClassifiedQuery;
                 client.OnEventInfoRequest += OnEventInfoRequest;
+                client.OnEventNotificationAddRequest += AddEventNotification;
+                client.OnEventNotificationRemoveRequest += RemoveEventNotification;
                 client.OnClassifiedInfoRequest += OnClassifiedInfoRequest;
                 client.OnMapItemRequest += OnMapItemRequest;
             }
@@ -205,8 +209,26 @@ namespace OpenSimSearch.Modules.OpenSearch
             client.OnDirLandQuery -= OnDirLandQuery;
             client.OnDirClassifiedQuery -= OnDirClassifiedQuery;
             client.OnEventInfoRequest -= OnEventInfoRequest;
+            client.OnEventNotificationAddRequest -= AddEventNotification;
+            client.OnEventNotificationRemoveRequest -= RemoveEventNotification;
             client.OnClassifiedInfoRequest -= OnClassifiedInfoRequest;
             client.OnMapItemRequest -= OnMapItemRequest;
+        }
+
+        private void AddEventNotification(uint id, IClientAPI client) => ChangeEventNotification(id, client, true);
+        private void RemoveEventNotification(uint id, IClientAPI client) => ChangeEventNotification(id, client, false);
+        private void ChangeEventNotification(uint id, IClientAPI client, bool add)
+        {
+            if (m_notifications == null) { client.SendAgentAlertMessage("Event reminders are not configured", false); return; }
+            ExecuteSearchRequest(client, "event reminder", () =>
+            {
+                Scene[] scenes; lock (m_Scenes) { if (m_Closing) return; scenes = m_Scenes.ToArray(); }
+                bool local = scenes.Any(scene => scene.TryGetScenePresence(client.AgentId, out ScenePresence presence) && !presence.IsChildAgent
+                    && !presence.IsDeleted && !presence.IsInTransit && presence.ControllingClient == client
+                    && scene.UserAccountService.GetUserAccount(scene.RegionInfo.ScopeID, client.AgentId)?.LocalToGrid == true);
+                if (!local || !m_notifications.Change(client.AgentId, id, add))
+                    client.SendAgentAlertMessage("Event reminder could not be saved. Retry after checking the event", false);
+            });
         }
 
         private void OnDirPlacesQuery(IClientAPI remote, UUID query, string text, int flags, int category, string sim, int start) =>

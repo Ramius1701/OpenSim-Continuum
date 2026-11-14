@@ -1,5 +1,15 @@
 # OpenSimSearch
 
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
 Continuum includes both the OpenSim-side `OpenSimSearch` compatibility module
 and the native `ContinuumSearch.Service`. The module translates viewer
 directory requests for places, popular places, land, events, classifieds,

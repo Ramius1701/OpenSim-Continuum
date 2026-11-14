@@ -14,6 +14,8 @@
   <Reference name="Nini" />
   <Reference name="log4net" />
   <Reference name="XMLRPC" />
+  <Reference name="MailKit" />
+  <Reference name="MimeKit" />
   <Files>
     <Match pattern="*.cs" recurse="true"><Exclude name="obj" pattern="obj" /></Match>
     <Match buildAction="EmbeddedResource" pattern="WhiteCoreWebUI.zip" recurse="false" />

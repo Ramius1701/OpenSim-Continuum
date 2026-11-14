@@ -110,3 +110,18 @@ begin;
 ALTER TABLE `userpicks` ADD COLUMN `gatekeeper` varchar(255) not null default "";
 
 commit;
+
+:VERSION 6
+
+BEGIN;
+
+CREATE TABLE continuum_partnership_proposals (
+    proposalid varchar(36) NOT NULL PRIMARY KEY,
+    sender varchar(36) NOT NULL UNIQUE,
+    recipient varchar(36) NOT NULL,
+    message text NOT NULL,
+    expires bigint NOT NULL
+);
+CREATE INDEX continuum_partnership_recipient ON continuum_partnership_proposals(recipient,expires);
+
+COMMIT;

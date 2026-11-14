@@ -837,6 +837,21 @@ namespace OpenSim.Groups
 
             m_groupData.SetAgentActiveGroup(GetRequestingAgentIDStr(remoteClient), GetRequestingAgentIDStr(remoteClient), groupID);
 
+            // lickx attachment group synchronization, without restarting stopped scripts.
+            GroupMembershipData active = m_groupData.GetAgentActiveMembership(
+                GetRequestingAgentIDStr(remoteClient), GetRequestingAgentIDStr(remoteClient));
+            if ((active?.GroupID ?? UUID.Zero) == groupID && remoteClient.Scene is Scene scene
+                && scene.TryGetScenePresence(remoteClient.AgentId, out ScenePresence sp) && !sp.IsChildAgent)
+            {
+                foreach (SceneObjectGroup attachment in sp.GetAttachments())
+                {
+                    if (attachment.OwnerID != remoteClient.AgentId || attachment.IsDeleted)
+                        continue;
+                    attachment.SetGroup(groupID, remoteClient);
+                    attachment.ScheduleGroupForFullUpdate();
+                }
+            }
+
             // Changing active group changes title, active powers, all kinds of things
             // anyone who is in any region that can see this client, should probably be
             // updated with new group info.  At a minimum, they should get ScenePresence
@@ -1152,9 +1167,10 @@ namespace OpenSim.Groups
 
             m_groupData.SetAgentActiveGroupRole(GetRequestingAgentIDStr(remoteClient), GetRequestingAgentIDStr(remoteClient), groupID, titleRoleID);
 
-            // TODO: Not sure what all is needed here, but if the active group role change is for the group
-            // the client currently has set active, then we need to do a scene presence update too
-            // if (m_groupData.GetAgentActiveMembership(GetRequestingAgentID(remoteClient)).GroupID == GroupID)
+            GroupMembershipData active = m_groupData.GetAgentActiveMembership(
+                GetRequestingAgentIDStr(remoteClient), GetRequestingAgentIDStr(remoteClient));
+            if (active != null && active.GroupID == groupID)
+                m_groupData.SetAgentActiveGroup(GetRequestingAgentIDStr(remoteClient), GetRequestingAgentIDStr(remoteClient), groupID);
 
             SendDataUpdate(remoteClient, true);
         }

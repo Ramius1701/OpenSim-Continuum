@@ -5,6 +5,26 @@
 ; Robust's ConfigDirectory. Replace every example authority and secret.
 
 [ContinuumWebUI]
+    ; Distinct shared key matching LandAuctions.WebUIBridgeSecret on configured hosts.
+    AuctionBridgeSecret =
+    ; Portal presentation only; back up alongside the news content store.
+    PortalSettingsPath = ContinuumWebUI/portal-settings.json
+    ; Optional native ROBUST INI editor for GridInfoService identity, login welcome
+    ; and portal SystemName. Select the loaded file containing all three sections.
+    ; Saves create a same-directory backup and require ROBUST restart. HTTPS required.
+    ; Protect the file, its directory and backups: the INI may contain service secrets.
+    GridConfigurationPath =
+    ; Optional private postal contact details, stored by the native profile service.
+    ; Supply the operator's purpose/retention notice before enabling. Requires HTTPS.
+    ResidentContactEnabled = false
+    ContactPrivacyNotice =
+    ; Self-service archival sets UserLevel=-2; it does not erase data or refund money.
+    ; Viewer must be logged out; privileged accounts and estate owners cannot self-close.
+    AllowAccountClosure = false
+    ; Durable proposals, recipient consent and atomic paired profile updates. HTTPS required.
+    AllowPartnerships = false
+    ; Add every grid system/service account UUID, comma-separated, before enabling.
+    AccountClosureProtectedIDs =
     Enabled = false
     MountPath = /webui
     SystemName = OpenSim Continuum
@@ -32,6 +52,13 @@
     ; Optional Continuum services. Search conventionally listens on 8010 and
     ; ContinuumEconomy on 8009; change these when deployed elsewhere.
     SearchServiceURL = http://127.0.0.1:8010
+    ; Optional event/classified management: match ContinuumSearch WebUIWriteSecret.
+    ; Enabling writes requires HTTPS for portal accounts (direct loopback HTTP
+    ; remains available for development). Trust only the actual TLS proxy IPs.
+    ; SearchWriteSecret = ""
+    ; TrustedProxyAddresses = 127.0.0.1,::1
+    ; Configure the separate classified payment bridge in ContinuumSearch.ini,
+    ; matching the economy WebUIClassifiedSecret. Keep that money key out of WebUI.
     EconomyServiceURL = http://127.0.0.1:8009
     EconomySharedSecret = CHANGE-THIS-TO-THE-SAME-UNIQUE-32-CHARACTER-SECRET
     ServiceTimeoutMilliseconds = 5000
@@ -45,3 +72,27 @@
     RegistrationAttemptsPerWindow = 3
     RegistrationAttemptWindowSeconds = 3600
     GridStatusCacheSeconds = 30
+
+
+; Optional links to the existing simulator-side RegionWeb Estate Admin.
+; Use the public HTTPS URL for each region; multiple regions may share one host.
+; RegionWeb enforces its own estate-owner login; portal sessions are not forwarded.
+; These are navigation links, not automatic reload or arbitrary server requests.
+[ContinuumWebUIRegionControlRooms]
+    ; 11111111-2222-4333-8444-555555555555 = https://sim.example.org/regionweb/admin
+
+
+; Optional fixed regional auction endpoints; no URLs are accepted from residents.
+; HTTPS required except direct loopback HTTP. Each regional module owns its path.
+; Bidding retains native live-viewer authority in the selected region.
+[ContinuumWebUIAuctions]
+    ; 11111111-2222-4333-8444-555555555555 = https://sim.example.org/continuum/auctions/11111111-2222-4333-8444-555555555555
+
+; Optional browser client for native OpenSim/ROBUST RemoteConsole (-console=rest).
+; Configure Network.ConsoleUser/ConsolePass on each host and set its
+; ConsoleAllowedOrigin to this portal's exact HTTPS origin (no wildcard).
+; Native credentials are entered in the browser, never stored by the portal.
+; Fixed HTTPS base URLs only; loopback HTTP is available for local development.
+[ContinuumWebUIConsoles]
+    ; Simulator-West = https://sim-west.example.org/console/
+    ; ROBUST = https://robust-console.example.org/

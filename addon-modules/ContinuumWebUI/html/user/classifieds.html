@@ -1,3 +1,18 @@
+<section class="portal-workspace" aria-label="Classified management">
+{IfClassifiedServiceUnavailableBegin}
+<p role="status">Classified management is unavailable. Retry later and check any pending listing before submitting another payment.</p>
+{IfClassifiedServiceUnavailableEnd}
+
+{IfClassifiedCreationAvailableBegin}
+<a class="btn btn-primary" href="?page=classified-create" onclick="loadusercontent('classified-create');return false;">Create a paid classified</a>
+{IfClassifiedCreationAvailableEnd}
+
+
+{ClassifiedPendingArrayBegin}
+<article class="portal-card"><h2>Pending: {PendingName}</h2><p>Listing price: {PendingPrice}. Resume this request to confirm its original payment and finish publication.</p><form id="pending-{RequestID}" action="user/classifieds.html" method="post"><input type="hidden" name="action" value="resume"><input type="hidden" name="requestID" value="{RequestID}"><button type="button" class="btn btn-primary" onclick="submitupdate('pending-{RequestID}', '', 'user-classifieds');">Resume original payment and publication</button></form></article>
+{ClassifiedPendingArrayEnd}
+
+</section>
 <!-- User classifieds -->
 
 <style>
@@ -6,7 +21,9 @@
 
 <div class="col98" id="user_classifieds_page">
   <h2>{UserName} {ClassifiedsText}</h2>
-  {IfHaveDataBegin}
+
+{IfHaveDataBegin}
+
 
   <div class="container">
     <table id="user_classifieds_list">
@@ -23,23 +40,35 @@
       </thead>
 
       <tbody>
-        {ClassifiedListArrayBegin}
+
+{ClassifiedListArrayBegin}
+
         <tr>
           <td class="text-left"><p>{CreationDate}</p></td>
           <td class="text-left"><p>{Category}</p></td>
-          <td class="text-left"><p><a class="regionlink" href="{ClassifiedHop}" title="Visit {Name} in {ClassifiedRegion}">{Name}</a></p></td>
+          <td class="text-left"><p><a class="regionlink" href="{ClassifiedHop}" title="Visit {Name} in {ClassifiedRegion}">{Name}</a>
+{IfClassifiedManageAvailableBegin}
+            <a href="?page=classified-edit&amp;classifiedid={ClassifiedID}" onclick="loadusercontent('classified-edit', 'classifiedid={ClassifiedID}');return false;">Edit</a>
+{IfClassifiedManageAvailableEnd}
+          </p></td>
           <td class="text-left"><p>{Description}</p></td>
           <td class="text-centered"><p>{Maturity}</p></td>
           <td class="text-left"><p>{PriceForListing}</p></td>
           <td class="text-left"><p>{ExpirationDate}</p></td>
         </tr>
-        {ClassifiedListArrayEnd}
+
+{ClassifiedListArrayEnd}
+
       </tbody>
     </table>
   </div>
-  {IfHaveDataEnd}
 
-  {IfNoDataBegin}
+{IfHaveDataEnd}
+
+
+
+{IfNoDataBegin}
+
     <div id="error404" align="center">
       <h4 class="error404">
         No classifieds found.
@@ -48,7 +77,9 @@
         <img src="/static/images/for_sale.png" height="150"/>
       </div>
     </div>
-  {IfNoDataEnd}
+
+{IfNoDataEnd}
+
 
 </div>
 

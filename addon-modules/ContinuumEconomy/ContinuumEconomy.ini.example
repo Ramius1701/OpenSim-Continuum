@@ -1,5 +1,8 @@
 [ContinuumEconomyService]
     Port = 8009
+    ; Optional private classified charging from ContinuumSearch. Keep blank to
+    ; disable. Use a unique secret distinct from RegionSharedSecret and WebUIWriteSecret.
+    ; WebUIClassifiedSecret = ""
     DefaultBalance = 1000
     ; Enables explicitly authenticated region-originated administrative credits.
     ; Leave false unless simulator-side SendMoney/AddBankerMoney is required.

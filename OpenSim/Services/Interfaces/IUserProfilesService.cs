@@ -32,6 +32,20 @@ using OpenMetaverse.StructuredData;
 
 namespace OpenSim.Services.Interfaces
 {
+    // Trusted local service capability. Never register this data on public profile RPC.
+    public interface IUserPartnershipService
+    {
+        bool SupportsPartnerships { get; }
+        PartnershipProposal[] GetPartnershipProposals(UUID actor);
+        string ChangePartnership(UUID actor, UUID other, UUID proposal, string action, string message);
+    }
+
+    public interface IUserContactService
+    {
+        UserContactInfo GetContact(UUID user);
+        bool StoreContact(UUID user, UserContactInfo contact);
+    }
+
     public interface IUserProfilesService
     {
         #region Classifieds

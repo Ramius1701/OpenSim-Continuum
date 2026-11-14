@@ -56,6 +56,7 @@ namespace ContinuumEconomy.Service
         private readonly Guid m_systemActor;
         private readonly long m_defaultBalance;
         private readonly string m_sharedSecret;
+        private readonly string m_webClassifiedSecret;
         private readonly bool m_allowRegionCredits;
         private readonly bool m_currencyPurchaseEnabled;
         private readonly long m_dailyPurchaseLimit;
@@ -70,6 +71,10 @@ namespace ContinuumEconomy.Service
             m_backend = backend;
             m_defaultBalance = Math.Max(0, config.GetLong("DefaultBalance", 0));
             m_sharedSecret = config.GetString("RegionSharedSecret", String.Empty);
+            m_webClassifiedSecret = config.GetString("WebUIClassifiedSecret", String.Empty);
+            if (m_webClassifiedSecret.Length > 0 && (m_webClassifiedSecret.Length < 32
+                || m_webClassifiedSecret == m_sharedSecret || m_webClassifiedSecret.StartsWith("CHANGE", StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("WebUIClassifiedSecret must be a separate unique secret of at least 32 characters");
             m_allowRegionCredits = config.GetBoolean("AllowRegionCredits", false);
             m_currencyPurchaseEnabled = config.GetBoolean("CurrencyPurchaseEnabled", false);
             m_dailyPurchaseLimit = Math.Max(0, config.GetLong("DailyPurchaseLimit", 0));
@@ -110,11 +115,13 @@ namespace ContinuumEconomy.Service
             server.AddXmlRPCHandler("buyCurrency", BuyCurrency);
             server.AddXmlRPCHandler("AuthorizePurchase", AuthorizePurchase);
             server.AddXmlRPCHandler("AuthorizeCharge", AuthorizeCharge);
+            if (m_webClassifiedSecret.Length > 0) server.AddXmlRPCHandler("WebUIClassifiedCharge", WebUIClassifiedCharge);
             server.AddXmlRPCHandler("CapturePurchase", CapturePurchase);
             server.AddXmlRPCHandler("CancelPurchase", CancelPurchase);
             server.AddXmlRPCHandler("RegisterEconomyAccount", RegisterEconomyAccount);
             server.AddXmlRPCHandler("GetGroupAccount", GetGroupAccount);
             server.AddXmlRPCHandler("GetAccountStatement", GetAccountStatement);
+            server.AddXmlRPCHandler("GetCurrencyCreditHistory", GetCurrencyCreditHistory);
             server.AddXmlRPCHandler("preflightBuyLandPrep", PreflightLand);
             server.AddXmlRPCHandler("buyLandPrep", BuyLandPrep);
         }
@@ -180,6 +187,32 @@ namespace ContinuumEconomy.Service
                 { "startDate", start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
                 { "history", history }
             });
+        }
+
+        private XmlRpcResponse GetCurrencyCreditHistory(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable parameters = Parameters(request);
+            if (!Secret(parameters) || !Guid.TryParse(Text(parameters, "accountID"), out Guid account) || account == Guid.Empty
+                || m_backend.Ledger is not ICurrencyCreditHistory reader) return Failure("Currency credit history is unavailable");
+            DateTime? before = null; Guid beforeID = Guid.Empty;
+            if (Text(parameters, "beforeUtc").Length > 0)
+            {
+                if (!DateTime.TryParse(Text(parameters, "beforeUtc"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime value)
+                    || !Guid.TryParse(Text(parameters, "beforeID"), out beforeID) || beforeID == Guid.Empty) return Failure("Invalid currency credit history cursor");
+                before = value;
+            }
+            else if (Text(parameters, "beforeID").Length > 0) return Failure("Invalid currency credit history cursor");
+            var entries = reader.GetCurrencyCredits(account, before, beforeID, 51);
+            var rows = new ArrayList();
+            foreach (var entry in System.Linq.Enumerable.Take(entries, 50)) rows.Add(new Hashtable
+            {
+                ["transactionID"] = entry.TransactionID.ToString(), ["amount"] = entry.Amount.ToString(CultureInfo.InvariantCulture),
+                ["balance"] = entry.ResultingBalance.ToString(CultureInfo.InvariantCulture), ["description"] = entry.Description,
+                ["createdUtc"] = entry.CreatedUtc.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture)
+            });
+            var last = rows.Count == 0 ? null : (Hashtable)rows[rows.Count - 1];
+            return Reply(new Hashtable { ["success"] = true, ["history"] = rows, ["hasMore"] = entries.Count > 50,
+                ["beforeUtc"] = last?["createdUtc"] ?? "", ["beforeID"] = last?["transactionID"] ?? "" });
         }
 
         private XmlRpcResponse GetAccountStatement(XmlRpcRequest request, IPEndPoint remote)
@@ -406,6 +439,32 @@ namespace ContinuumEconomy.Service
                 Description = Text(p, "description")
             });
             return PurchaseReply(result);
+        }
+
+        internal XmlRpcResponse WebUIClassifiedCharge(XmlRpcRequest request, IPEndPoint remote)
+        {
+            Hashtable p = Parameters(request);
+            string supplied = Text(p, "classifiedSecret");
+            if (m_webClassifiedSecret.Length == 0 || supplied.Length > 1024
+                || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    System.Text.Encoding.UTF8.GetBytes(m_webClassifiedSecret), System.Text.Encoding.UTF8.GetBytes(supplied))
+                || !Guid.TryParse(Text(p, "buyerID"), out Guid buyer) || buyer == Guid.Empty
+                || !Guid.TryParse(Text(p, "purchaseID"), out Guid purchase) || purchase == Guid.Empty
+                || !Int32.TryParse(Text(p, "amount"), NumberStyles.None, CultureInfo.InvariantCulture, out int amount)
+                || amount <= 0)
+                return Failure("Invalid classified charge request");
+            // A separate private service authority can charge only this purpose.
+            // Existing viewer-session authorization remains unchanged.
+            // Search validates new invoice pricing; replay honors that saved quote
+            // even if the storefront minimum changes before publication recovers.
+            LedgerPurchaseResult authorized = m_backend.Purchases.Authorize(new LedgerPurchaseRequest
+            {
+                PurchaseID = purchase, BuyerID = buyer, SellerID = m_systemActor, Amount = amount,
+                TransactionType = 1103, ObjectID = purchase, Description = "Classified listing " + purchase
+            });
+            if (!authorized.Succeeded || authorized.State != LedgerPurchaseState.Authorized)
+                return PurchaseReply(authorized);
+            return PurchaseReply(m_backend.Purchases.Capture(purchase, buyer));
         }
 
         private XmlRpcResponse CapturePurchase(XmlRpcRequest request, IPEndPoint remote) =>

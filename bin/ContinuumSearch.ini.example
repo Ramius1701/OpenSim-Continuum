@@ -1,6 +1,20 @@
 [ContinuumSearchService]
+    ;; Optional private event subscription API. Distinct from WebUIWriteSecret.
+    ;; Configure the same dedicated key in simulator [Search] and Robust [LoginService].
+    EventNotificationSecret =
     ;; XML-RPC endpoint used by [Search] SearchURL in every simulator.
     Port = 8010
+    ;; Optional private resident-event writes from ContinuumWebUI. Keep this
+    ;; endpoint on a trusted network or HTTPS. Never expose this secret to HTML.
+    ;; Match [ContinuumWebUI] SearchWriteSecret; distinct from crawler/economy keys.
+    ; WebUIWriteSecret = ""
+    ;; Optional paid classified publication. URL must use HTTPS, except loopback
+    ;; HTTP for services on this host. Match the economy WebUIClassifiedSecret;
+    ;; this is separate from the portal/crawler/region secrets. Disabled when blank.
+    ; ClassifiedEconomyURL = "http://127.0.0.1:8009"
+    ; ClassifiedEconomySecret = ""
+    MinimumClassifiedPrice = 50
+    ClassifiedEconomyTimeoutMilliseconds = 5000
 
     ;; DataSnapshot regions register here through [DataSnapshot] data_services.
     RegistrationPath = "/search/register"

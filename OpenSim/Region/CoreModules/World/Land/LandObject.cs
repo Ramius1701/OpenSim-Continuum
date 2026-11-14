@@ -686,6 +686,8 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void UpdateLandSold(UUID avatarID, UUID groupID, bool groupOwned, uint AuctionID, int claimprice, int area)
         {
+            if (LandData.AuctionID != 0 && LandData.AuctionID != AuctionID)
+                return;
             LandData newData = LandData.Copy();
             newData.OwnerID = avatarID;
             newData.GroupID = groupID;
@@ -709,6 +711,8 @@ namespace OpenSim.Region.CoreModules.World.Land
 
         public void DeedToGroup(UUID groupID)
         {
+            if (LandData.AuctionID != 0)
+                return;
             LandData newData = LandData.Copy();
             newData.OwnerID = groupID;
             newData.GroupID = groupID;

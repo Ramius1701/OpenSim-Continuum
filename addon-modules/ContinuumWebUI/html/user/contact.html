@@ -1,57 +1,19 @@
-<!-- user email -->
-<section class="text-center">
-
-  <div class="container">
-    <div class="row justify-content-center">
-      <h2>{UserName}:&nbsp;{ChangeContactText}</h2>
-    </div>
-
-    <div class="container justify-content-center">
-      <div class="row">
-        <div class="col-3">
-          <img src="static/images/home.png" />
-        </div>
-
-        <div class="col">
-
-          <form role="form" id="change_contact" action="user/contact.html" method="post">
-            <div class="form-group mb-3">
-              <input type="text" class="" placeholder="{UserAddressText}" name="useraddress" size="50" maxlength="50" value="{RLAddress}">
-            </div>
-            <div class="form-group mb-3">
-              <div class="row">
-              <div class="col-8">
-                <input type="text" class="" placeholder="{UserCityText}" name="usercity" size="50" maxlength="50"   value="{RLCity}">
-              </div>
-              <div class="col-4">
-                <input type="text" class="" placeholder="{UserZipText}" name="userzip" size="15" maxlength="15" value="{RLZip}">
-              </div>
-              </div>
-            </div>
-
-
-            <div class="form-group mb-3">
-              <input type="text" class="" placeholder="{UserCountryText}" name="usercountry" size="25" maxlength="40" value="{RLCountry}">
-            </div>
-
-            <div class="div20"></div>
-            <div class="button-group">
-              <a class="btn btn-sm btn-success" onclick="gohome();">{CancelText}</a>
-              <a class="btn btn-sm btn-warning float-right" 
-                  onclick="submitupdate('change_contact', 'update=true');">
-                {UpdateContactText}
-              </a>
-            </div>
-          </form>
-        </div>
-        <div class="col-3"></div>
-      </div>
-
-    </div>
-  </div>
+<section class="portal-workspace" aria-labelledby="contact-title">
+<p class="portal-eyebrow">Your account</p><h1 id="contact-title">Contact details</h1>
+{IfContactDisabledBegin}
+<p>The grid operator has not enabled private postal contact storage.</p>
+{IfContactDisabledEnd}
+{IfContactEnabledBegin}
+<p>{ContactPrivacyNotice}</p><p>These optional details are private and do not appear on your public profile. Grid operators with database access can read them and backups may retain earlier values.</p>
+<form id="contact_form" action="user/contact.html" method="post" class="portal-editor">
+<input type="hidden" name="action" value="save">
+<label for="contact-address">Postal address</label><input class="form-control" id="contact-address" name="address" maxlength="200" value="{ContactAddress}" autocomplete="street-address">
+<label for="contact-city">City</label><input class="form-control" id="contact-city" name="city" maxlength="100" value="{ContactCity}" autocomplete="address-level2">
+<label for="contact-code">Postal code</label><input class="form-control" id="contact-code" name="postalCode" maxlength="32" value="{ContactPostalCode}" autocomplete="postal-code">
+<label for="contact-country">Country</label><input class="form-control" id="contact-country" name="country" maxlength="100" value="{ContactCountry}" autocomplete="country-name">
+<label><input type="checkbox" name="consent" value="true" required> I have read the contact-data notice and agree to store these details.</label>
+<div class="portal-actions"><button type="button" class="btn btn-primary" onclick="submitupdate('contact_form', '', 'user-contact');">Save contact details</button></div>
+</form>
+<form id="contact_clear_form" action="user/contact.html" method="post"><input type="hidden" name="action" value="clear"><button type="button" class="btn btn-outline-danger" onclick="submitupdate('contact_clear_form', '', 'user-contact');">Clear my contact details</button></form>
+{IfContactEnabledEnd}
 </section>
-
-
-<script>
-  $("#useraddress").focus();
-</script>

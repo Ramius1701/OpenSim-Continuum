@@ -97,7 +97,7 @@ namespace OpenSim.Modules.ContinuumEconomy
     }
 
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "ContinuumEconomyModule")]
-    public class ContinuumEconomyModule : IMoneyModule, IReservedMoneyModule,
+    public class ContinuumEconomyModule : IMoneyModule, IReservedMoneyModule, IAuctionMoneyModule,
         IGroupEconomyAccountModule, ISharedRegionModule
     {
         // Constant memebers
@@ -350,6 +350,7 @@ namespace OpenSim.Modules.ContinuumEconomy
                 }
 
                 scene.RegisterModuleInterface<IMoneyModule>(this);  // Eliminate conflicting modules
+                scene.RegisterModuleInterface<IAuctionMoneyModule>(this);
                 m_sceneList.Add(scene.RegionInfo.RegionHandle, scene);
 
                 scene.EventManager.OnNewClient += OnNewClient;
@@ -402,6 +403,7 @@ namespace OpenSim.Modules.ContinuumEconomy
 
                 m_sceneList.Remove(scene.RegionInfo.RegionHandle);
                 scene.UnregisterModuleInterface<IMoneyModule>(this);
+                scene.UnregisterModuleInterface<IAuctionMoneyModule>(this);
 
                 m_log.InfoFormat("[CONTINUUM ECONOMY MODULE]: RemoveRegion: {0}", scene.RegionInfo.RegionName);
             }
@@ -1868,6 +1870,47 @@ namespace OpenSim.Modules.ContinuumEconomy
             };
             Hashtable result = SendAuthenticatedRequest(p, "AuthorizePurchase", buyer);
             return result != null && result.Contains("success") && (bool)result["success"];
+        }
+
+        public AuctionPaymentResult ReserveAuction(UUID purchase, UUID buyerID, UUID seller, int amount,
+            UUID region, UUID parcel)
+        {
+            IClientAPI buyer = GetLocateClient(buyerID);
+            if (buyer == null || GetLocateScene(buyerID)?.RegionInfo.RegionID != region)
+                return AuctionPaymentResult.Unknown;
+            var parameters = new Hashtable
+            {
+                ["purchaseID"] = purchase.ToString(), ["buyerID"] = buyerID.ToString(),
+                ["buyerSessionID"] = buyer.SessionId.ToString(),
+                ["buyerSecureSessionID"] = buyer.SecureSessionId.ToString(),
+                ["sellerID"] = seller.ToString(), ["amount"] = amount,
+                ["transactionType"] = (int)TransactionType.LandSale,
+                ["objectID"] = parcel.ToString(), ["regionUUID"] = region.ToString(),
+                ["description"] = "Parcel auction bid"
+            };
+            return AuctionResult(SendAuthenticatedRequest(parameters, "AuthorizePurchase", buyer), "Authorized");
+        }
+
+        public AuctionPaymentResult CompleteAuction(UUID purchase, UUID buyer, bool capture)
+        {
+            var parameters = new Hashtable { ["purchaseID"] = purchase.ToString(), ["buyerID"] = buyer.ToString() };
+            return AuctionResult(genericCurrencyXMLRPCRequest(parameters,
+                capture ? "CapturePurchase" : "CancelPurchase"), capture ? "Captured" : "Cancelled");
+        }
+
+        private static AuctionPaymentResult AuctionResult(Hashtable result, string expectedState)
+        {
+            if (result == null) return AuctionPaymentResult.Unknown;
+            string state = result["state"]?.ToString();
+            if (expectedState == "Cancelled" && state == "InsufficientFunds")
+                return AuctionPaymentResult.Completed; // denied authorization holds no funds
+            if (result["success"] is bool success && success && state == expectedState)
+                return AuctionPaymentResult.Completed;
+            // An authoritative ledger rejection is distinct from a lost transport reply.
+            if (state == "InsufficientFunds" || result["result"]?.ToString() == "TransactionConflict"
+                || state == "Cancelled" || state == "Captured")
+                return AuctionPaymentResult.Rejected;
+            return AuctionPaymentResult.Unknown;
         }
 
         private bool CompletePurchase(UUID purchaseID, UUID buyerID, bool capture)

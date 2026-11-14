@@ -36,6 +36,10 @@
                   <a href="#" title="{ViewText}">
                     <i class="fa fa-eye"></i>
                   </a>
+<a href="?page=admin-region-edit&amp;regionid={RegionID}" onclick="event.stopPropagation();loadcontent('admin-region-edit', 'regionid={RegionID}');return false;">Manage region</a>
+{IfRegionHasControlRoomBegin}
+<a href="{RegionControlRoomURL}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">Simulator control room</a>
+{IfRegionHasControlRoomEnd}
                 </td>
               </tr>
               {RegionListArrayEnd}

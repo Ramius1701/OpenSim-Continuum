@@ -44,6 +44,25 @@ namespace OpenSim.Data
     /// <summary>
     /// An interface for connecting to the user accounts datastore
     /// </summary>
+    public interface IUserAccountArchiveData
+    {
+        bool TryArchiveAccount(UUID principal);
+    }
+    public static class UserAccountArchiveCommand
+    {
+        public static bool Execute(System.Data.Common.DbConnection connection, string realm, UUID principal, bool postgres)
+        {
+            if (principal == UUID.Zero) return false;
+            string Quote(string name) => postgres ? "\"" + name.Replace("\"", "\"\"") + "\"" : "`" + name.Replace("`", "``") + "`";
+            using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE " + Quote(postgres ? realm.ToLowerInvariant() : realm) + " SET " + Quote("UserLevel") + "=-2 WHERE "
+                + Quote("PrincipalID") + "=@id AND " + Quote("UserLevel") + "=0";
+            var parameter = command.CreateParameter(); parameter.ParameterName = "@id";
+            parameter.Value = postgres ? (object)Guid.Parse(principal.ToString()) : principal.ToString(); command.Parameters.Add(parameter);
+            return command.ExecuteNonQuery() == 1;
+        }
+    }
+
     public interface IUserAccountData
     {
         UserAccountData[] Get(string[] fields, string[] values);

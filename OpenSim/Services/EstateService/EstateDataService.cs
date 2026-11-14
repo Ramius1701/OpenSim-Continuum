@@ -38,7 +38,7 @@ using OpenSim.Framework;
 
 namespace OpenSim.Services.EstateService
 {
-    public class EstateDataService : ServiceBase, IEstateDataService
+    public class EstateDataService : ServiceBase, IEstateDataService, IEstateSettingsUpdater
     {
 //        private static readonly ILog m_log =
 //                LogManager.GetLogger(
@@ -96,6 +96,15 @@ namespace OpenSim.Services.EstateService
         public List<EstateSettings> LoadEstateSettingsAll()
         {
             return m_database.LoadEstateSettingsAll();
+        }
+
+        public bool SupportsEstateSettingsUpdate => m_database is IEstateSettingsUpdater updater && updater.SupportsEstateSettingsUpdate;
+
+        public bool TryUpdateEstateSettings(EstateSettings expected, EstateSettings updated)
+        {
+            EstateSettingsEdit.Validate(expected, updated);
+            return m_database is IEstateSettingsUpdater updater && updater.SupportsEstateSettingsUpdate
+                && updater.TryUpdateEstateSettings(expected, updated);
         }
 
         public void StoreEstateSettings(EstateSettings es)

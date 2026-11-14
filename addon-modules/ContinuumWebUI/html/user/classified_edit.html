@@ -1,0 +1,52 @@
+<section class="portal-workspace" aria-labelledby="classified-heading">
+<p class="portal-eyebrow">My account · Classifieds</p><h1 id="classified-heading">Manage a classified</h1>
+
+{IfClassifiedEditorUnavailableBegin}
+<p role="status">Classified management is unavailable. Contact your grid team.</p>
+{IfClassifiedEditorUnavailableEnd}
+
+
+{IfClassifiedEditorAvailableBegin}
+
+<form id="classified-form" action="{ClassifiedFormAction}" method="post" class="portal-editor">
+<input type="hidden" name="action" value="{ClassifiedAction}"><input type="hidden" name="classifiedID" value="{ClassifiedID}">
+<input type="hidden" name="editToken" value="{ClassifiedEditToken}"><input type="hidden" name="requestID" value="{ClassifiedRequestID}">
+<label for="classified-title">Title</label><input class="form-control" id="classified-title" name="name" value="{ClassifiedTitle}" required maxlength="63">
+<label for="classified-description">Description</label><textarea class="form-control" id="classified-description" name="description" rows="7" required maxlength="8192">{ClassifiedDescription}</textarea>
+<label for="classified-category">Category</label><select class="form-control" id="classified-category" name="category"><option value="1">Shopping</option><option value="2">Land rental</option><option value="3">Property rental</option><option value="4">Special attraction</option><option value="5">New products</option><option value="6">Employment</option><option value="7">Wanted</option><option value="8">Services</option><option value="9">Personal</option></select>
+<label for="classified-image">Image UUID (all zeros for no image)</label><input class="form-control" id="classified-image" name="snapshotID" value="{ClassifiedSnapshot}" required maxlength="36">
+
+{IfClassifiedNewBegin}
+
+<label for="classified-region">Destination region</label><select class="form-control" id="classified-region" name="regionID" required>
+{ClassifiedRegionsArrayBegin}
+<option value="{RegionID}">{RegionName}</option>
+{ClassifiedRegionsArrayEnd}
+</select>
+<label for="classified-x">Landing X</label><input class="form-control" id="classified-x" name="x" type="number" min="0" step="any" value="128" required>
+<label for="classified-y">Landing Y</label><input class="form-control" id="classified-y" name="y" type="number" min="0" step="any" value="128" required>
+<label for="classified-z">Landing height</label><input class="form-control" id="classified-z" name="z" type="number" min="0" max="65535" step="any" value="25" required>
+<label for="classified-maturity">Maturity</label><select class="form-control" id="classified-maturity" name="maturity"><option value="0">General</option><option value="1">Moderate</option><option value="2">Adult</option></select>
+<label for="classified-price">One-time listing price (grid currency)</label><input class="form-control" id="classified-price" name="price" type="number" min="{ClassifiedMinimumPrice}" max="2147483647" value="{ClassifiedPrice}" required>
+<p>The listing lasts seven days after publication and does not renew automatically. A higher price affects its search ranking. Deletion does not refund the fee.</p>
+<label class="portal-check"><input type="checkbox" name="confirmPayment" value="yes" required> I authorize the displayed one-time payment to publish this listing.</label>
+
+{IfClassifiedNewEnd}
+
+
+{IfClassifiedExistingBegin}
+<p>Listing price: {ClassifiedPrice}. Expires: {ClassifiedExpiry}. Editing these details preserves the expiry, price, maturity and destination, and requires no additional payment.</p>
+{IfClassifiedExistingEnd}
+
+<div class="portal-actions"><button type="button" class="btn btn-primary" onclick="if(document.getElementById('classified-form').reportValidity())submitupdate('classified-form', '', 'user-classifieds');">Save classified</button><button type="button" class="btn btn-outline-light" onclick="loadusercontent('user-classifieds');">Cancel</button></div>
+</form>
+
+{IfClassifiedExistingBegin}
+<form id="classified-delete" action="user/classified_edit.html" method="post"><input type="hidden" name="action" value="delete"><input type="hidden" name="classifiedID" value="{ClassifiedID}"><input type="hidden" name="editToken" value="{ClassifiedEditToken}"><button type="button" class="btn btn-outline-danger" onclick="if(confirm('Delete this classified? Its listing fee is not refunded.'))submitupdate('classified-delete', '', 'user-classifieds');">Delete classified</button></form>
+{IfClassifiedExistingEnd}
+
+<script>$('#classified-category').val('{ClassifiedCategory}');</script>
+
+{IfClassifiedEditorAvailableEnd}
+
+</section>

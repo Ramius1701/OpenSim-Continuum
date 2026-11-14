@@ -29,6 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Security;
 using System.Reflection;
+using System.Text;
 using System.Security.Cryptography.X509Certificates;
 using log4net;
 using MailKit;
@@ -110,7 +111,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         // Scenes by Region Handle
         private Dictionary<ulong, Scene> m_Scenes = new Dictionary<ulong, Scene>();
 
-        private bool m_Enabled = false;
+        private volatile bool m_Enabled = false;
+        private ImapObjectMailTransport m_imapTransport;
 
         #region ISharedRegionModule
 
@@ -127,7 +129,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
             //Load SMTP SERVER config
             try
             {
-                IConfig SMTPConfig = config.Configs["SMTP"];
+                // Retain existing [SMTP] deployments; lickx's [Email] is an optional alias.
+                IConfig SMTPConfig = config.Configs["Email"] ?? config.Configs["SMTP"];
                 if (SMTPConfig  == null)
                     return;
 
@@ -148,6 +151,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 };
 
                 m_InterObjectHostname = SMTPConfig.GetString("internal_object_host", m_InterObjectHostname);
+                if (!MailboxAddress.TryParse("object@" + m_InterObjectHostname, out MailboxAddress _))
+                    throw new ArgumentException("Invalid internal_object_host");
                 m_checkSpecName = !m_InterObjectHostname.Equals("lsl.secondlife.com");
 
                 if (m_enableEmailToSMTP)
@@ -199,6 +204,22 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     m_MaxEmailSize = 4096;
                 }
 
+                if (m_enableEmailToExternalObjects)
+                {
+                    try
+                    {
+                        if (SMTPConfig.GetBoolean("IMAPEnabled", false))
+                            m_imapTransport = new ImapObjectMailTransport(
+                                ImapObjectMailOptions.Read(SMTPConfig, m_InterObjectHostname),
+                                TryAcceptImapEmail, warning => m_log.Warn(warning));
+                    }
+                    catch (Exception e) when (e is ArgumentException || e is FormatException || e is OverflowException)
+                    {
+                        // A broken optional transport must not disable local email/SMTP.
+                        m_log.Error("[EMAIL]: IMAP object mail disabled: invalid configuration");
+                    }
+                }
+
             }
             catch (Exception e)
             {
@@ -226,6 +247,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         // It's a go!
             lock (m_Scenes)
             {
+                if (!m_Enabled)
+                    return;
                 // Claim the interface slot
                 scene.RegisterModuleInterface<IEmailModule>(this);
                 scene.RegisterModuleInterface<ISystemEmailModule>(this);
@@ -235,19 +258,36 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
             }
 
             m_log.Info("[EMAIL]: Activated DefaultEmailModule");
+            m_imapTransport?.Start();
         }
 
         public void RemoveRegion(Scene scene)
         {
             if (scene == null)
                 return;
+            List<UUID> removed = new List<UUID>();
             lock (m_Scenes)
             {
                 if (!m_Scenes.TryGetValue(scene.RegionInfo.RegionHandle, out Scene registered) ||
                     !ReferenceEquals(registered, scene))
                     return;
                 m_Scenes.Remove(scene.RegionInfo.RegionHandle);
+                UUID[] mailboxes;
+                lock (m_queuesLock) mailboxes = new List<UUID>(m_MailQueues.Keys).ToArray();
+                // Do not hold the queue lock while querying scene part indexes.
+                foreach (UUID id in mailboxes)
+                {
+                    if (scene.GetSceneObjectPart(id) == null)
+                        continue;
+                    bool elsewhere = false;
+                    foreach (Scene other in m_Scenes.Values)
+                        if (other.GetSceneObjectPart(id) != null) { elsewhere = true; break; }
+                    if (!elsewhere) removed.Add(id);
+                }
+                lock (m_queuesLock)
+                    foreach (UUID id in removed) { m_MailQueues.Remove(id); m_LastGetEmailCall.Remove(id); }
             }
+            foreach (UUID id in removed) m_imapTransport?.RemoveMailbox(id);
             scene.UnregisterModuleInterface<IEmailModule>(this);
             scene.UnregisterModuleInterface<ISystemEmailModule>(this);
         }
@@ -258,7 +298,9 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
 
         public void Close()
         {
-            m_Enabled = false;
+            lock (m_queuesLock)
+                m_Enabled = false;
+            m_imapTransport?.Dispose();
             Scene[] scenes;
             lock (m_Scenes)
                 scenes = new List<Scene>(m_Scenes.Values).ToArray();
@@ -293,6 +335,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
             {
                 lock (m_queuesLock)
                 {
+                    if (!m_Enabled)
+                        return;
                     if (!m_MailQueues.TryGetValue(objectID, out List<Email> elist))
                     {
                         m_MailQueues[objectID] = null;
@@ -314,13 +358,21 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                         //TODO external global
                     }
                 }
+                m_imapTransport?.RemoveMailbox(objectID);
             }
         }
 
         public void InsertEmail(UUID to, Email email)
         {
+            TryInsertEmail(to, email);
+        }
+
+        private bool TryInsertEmail(UUID to, Email email)
+        {
             lock (m_queuesLock)
             {
+                if (!m_Enabled || email == null)
+                    return false;
                 if (m_MailQueues.TryGetValue(to, out List<Email> elist))
                 {
                     if(elist == null)
@@ -332,12 +384,29 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                     else
                     {
                         if (elist.Count >= m_MaxQueueSize)
-                            return;
+                            return false;
                         lock (elist)
                             elist.Add(email);
                     }
                     m_LastGetEmailCall[to] = Util.GetTimeStamp() + m_QueueTimeout;
+                    return true;
                 }
+                return false;
+            }
+        }
+
+        private bool TryAcceptImapEmail(UUID objectID, Email email)
+        {
+            lock (m_Scenes)
+            {
+                // Check current ownership of the mailbox while region removal is excluded.
+                foreach (Scene scene in m_Scenes.Values)
+                {
+                    SceneObjectPart part = scene.GetSceneObjectPart(objectID);
+                    if (part != null && part.ParentGroup != null && !part.ParentGroup.IsDeleted && !part.ParentGroup.inTransit)
+                        return TryInsertEmail(objectID, email);
+                }
+                return false;
             }
         }
 
@@ -403,6 +472,10 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         /// <param name="body"></param>
         public void SendEmail(UUID objectID, UUID ownerID, string address, string subject, string body)
         {
+            if (!m_Enabled)
+                return;
+            subject ??= string.Empty;
+            body ??= string.Empty;
             //Check if address is empty or too large
             if(string.IsNullOrEmpty(address))
                 return;
@@ -443,7 +516,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 return;
             }
 
-            if ((subject.Length + body.Length) > m_MaxEmailSize)
+            if (Encoding.UTF8.GetByteCount(subject) + Encoding.UTF8.GetByteCount(body) > m_MaxEmailSize)
             {
                 m_log.Error("[EMAIL]: subject + body larger than limit of " + m_MaxEmailSize + " bytes");
                 return;
@@ -453,8 +526,9 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 return;
 
             string objectIDstr = objectID.ToString();
-            if (!address.EndsWith(m_InterObjectHostname, StringComparison.InvariantCultureIgnoreCase) &&
-                !(m_checkSpecName && address.EndsWith("lsl.secondlife.com", StringComparison.InvariantCultureIgnoreCase)))
+            string destinationHost = mailTo.Address.Substring(mailTo.Address.LastIndexOf('@') + 1);
+            if (!destinationHost.Equals(m_InterObjectHostname, StringComparison.OrdinalIgnoreCase) &&
+                !(m_checkSpecName && destinationHost.Equals("lsl.secondlife.com", StringComparison.OrdinalIgnoreCase)))
             {
                 if(!m_enableEmailToSMTP)
                     return; //smtp disabled
@@ -562,10 +636,10 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 }
 
                 // inter object email
-                int indx = address.IndexOf('@');
+                int indx = mailTo.Address.IndexOf('@');
                 if (indx < 0)
                     return;
-                if (!UUID.TryParse(address.Substring(0, indx), out UUID toID))
+                if (!UUID.TryParse(mailTo.Address.Substring(0, indx), out UUID toID) || toID.IsZero())
                     return;
 
                 Email email = new Email();
@@ -585,8 +659,8 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                 {
                     if (!m_enableEmailToExternalObjects)
                         return;
-                    // object on another region
-                    // TODO FIX
+                    if (m_imapTransport != null && !m_imapTransport.Enqueue(toID, email))
+                        m_log.Warn("[EMAIL]: IMAP object-mail outbound queue or message limit reached");
                 }
             }
         }
@@ -594,7 +668,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         public void SendSystemEmail(UUID ownerID, string address, string subject,
             string body, string sourceName, string regionName)
         {
-            if (!m_enableEmailToSMTP || string.IsNullOrWhiteSpace(address))
+            if (!m_Enabled || !m_enableEmailToSMTP || string.IsNullOrWhiteSpace(address))
                 return;
             address = address.Trim();
             if (address.Length > 320 || !MailboxAddress.TryParse(address, out MailboxAddress mailTo))
@@ -721,6 +795,13 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
         /// <returns></returns>
         public Email GetNextEmail(UUID objectID, string sender, string subject)
         {
+            lock (m_queuesLock)
+            {
+                if (!m_Enabled || !m_MailQueues.ContainsKey(objectID))
+                    return null;
+            }
+            // This only records interest. Network work occurs on the single background worker.
+            m_imapTransport?.RequestPoll(objectID);
             double now = Util.GetTimeStamp();
             double lasthour = now - 3600;
             lock (m_ownerThrottles)
@@ -813,7 +894,7 @@ namespace OpenSim.Region.CoreModules.Scripting.EmailModules
                             for (i = 0; i < queue.Count; i++)
                             {
                                 ret = queue[i];
-                                if (emptySender || sender.Equals(ret.sender, StringComparison.InvariantCultureIgnoreCase) &&
+                                if ((emptySender || sender.Equals(ret.sender, StringComparison.InvariantCultureIgnoreCase)) &&
                                    (emptySubject || subject.Equals(ret.subject, StringComparison.InvariantCultureIgnoreCase)))
                                 {
                                     if (queue.Count == 1)

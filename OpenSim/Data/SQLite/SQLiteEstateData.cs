@@ -38,7 +38,7 @@ using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Data.SQLite
 {
-    public class SQLiteEstateStore : IEstateDataStore
+    public class SQLiteEstateStore : IEstateDataStore, IEstateSettingsUpdater
     {
         private static readonly ILog m_log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -229,6 +229,13 @@ namespace OpenSim.Data.SQLite
 
                 cmd.ExecuteNonQuery();
             }
+        }
+
+        public bool SupportsEstateSettingsUpdate => true;
+        public bool TryUpdateEstateSettings(EstateSettings expected, EstateSettings updated)
+        {
+            lock (m_connection)
+                return EstateSettingsUpdateCommand.Execute(m_connection, expected, updated, "sqlite");
         }
 
         public void StoreEstateSettings(EstateSettings es)
@@ -510,7 +517,14 @@ namespace OpenSim.Data.SQLite
 
         public List<UUID> GetRegions(int estateID)
         {
-            return new List<UUID>();
+            var result = new List<UUID>();
+            using var command = m_connection.CreateCommand();
+            command.CommandText = "SELECT RegionID FROM estate_map WHERE EstateID = :EstateID";
+            command.Parameters.AddWithValue(":EstateID", estateID);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                result.Add(new UUID(reader.GetString(0)));
+            return result;
         }
 
         public bool DeleteEstate(int estateID)

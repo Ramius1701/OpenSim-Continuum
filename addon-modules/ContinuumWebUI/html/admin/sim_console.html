@@ -1,126 +1,28 @@
-<!-- params to replace
-SystemURL
-SystemName
-SimConsoleText
-UserNameText
-PasswordText
-Login
-CammandText
-Submit                   Submit
-
--->
-
-{IsAdminAuthenticatedBegin}
-<h2>{SystemName}: {SimConsoleText}</h2>
-<div id="info_message" class="error_message"></div>
-<div>
-	<form id="sim_console_login" action="admin/sim_console.html" method="post" onsubmit="
-        StartSession(this.address.value, this.user.value, this.password.value);
-        ReadResponses();
-        return false">
-        <table>
-        	<tr>
-        		<td>{SimAddressText}</td>
-        		<td colspan="2">
-        			<input name="address" type="text" value="{SystemURL}" />
-        		</td>
-        		<td><button type="submit" value="login">{Login}</button></td>
-        	</tr>
-        	<tr>
-        		<td>{UserNameText}</td>
-        		<td><input name="user" type="text" size="15" value="ConsoleUser" /></td>
-        		<td>{PasswordText}</td>
-        		<td><input name="password" type="text" size="15" value="ConsolePass" /></td>
-        	</tr>
-        </table>
-    </form>
-
-    <div id="output" style="height:15em; border:thin solid; overflow:auto;"></div>
-
-    <form id="sim_console_form" action="admin/sim_console.html" method="post"  onsubmit="
-        Command(this.command.value);
-        ReadResponses();
-        return false">
-      <input type="text" name="command" value="Enter command here" size="60"/>
-      <button type="submit" width="20" value="Send Command">{SendCommandText}</button>
-    </form>
-
-    <!-- This JavaScript code is published by Marck (c) 2010 under a -->
-    <!-- Creative Commons Attribution 3.0 Germany License            -->
-    <!-- http://creativecommons.org/licenses/by/3.0/de/              -->
-    <script>
-
-      var sessionId;
-      var hostUrl;
-
-      function StartSession(url, user, password) {
-        hostUrl = url;
-        var response = SendRequest("/StartSession/", "USER=" + user + "&PASS=" + password);
-        sessionId = response.getElementsByTagName("SessionID")[0].firstChild.nodeValue;
-      };
-
-      function ReadResponses() {
-        var response = this.SendRequest("/ReadResponses/" + sessionId + "/", '');
-        var lines = response.getElementsByTagName("Line");
-        for (var i = 0; i < lines.length; ++i) {
-          var element = document.createElement("div");
-          element.appendChild(document.createTextNode(lines[i].firstChild.nodeValue));
-          document.getElementById("output").appendChild(element);
-        };
-        document.getElementById("output").scrollTop = document.getElementById("output").scrollHeight;
-      };
-
-      function Command(cmd) {
-        void SendRequest("/SessionCommand/", "ID=" + sessionId + "&COMMAND=" + cmd);
-      };
-
-      function CloseSession() {
-        void SendRequest("/CloseSession/", "ID=" + sessionId);
-      };
-
-      function SendRequest(path, data) {
-        var request = new XMLHttpRequest();
-        request.open("POST", hostUrl + path, false);
-        request.send(data);
-        return request.responseXML;
-      };
-
-      window.onunload = CloseSession;
-
-
-
-  /* attach a submit handler to the login form */
-  $("#sim_console_login").submit(function(event) {
-
-    /* stop form from submitting normally */
-    event.preventDefault();
-    /* get some values from elements on the page: */
-    var $form = $( this ),
-        url = $form.attr( 'action' );
-    /* Send the data using post and put the results in a div */
-    $.post( url, $form.serialize(),
-      function( data ) {
-		$("#info_message").empty().append("<h3>" + data + "</h3>");
-      }
-    );
-  });
-
-  /* attach a submit handler to the command form */
-  $("#sim_console_form").submit(function(event) {
-
-    /* stop form from submitting normally */
-    event.preventDefault();
-    /* get some values from elements on the page: */
-    var $form = $( this ),
-        url = $form.attr( 'action' );
-    /* Send the data using post and put the results in a div */
-    $.post( url, $form.serialize(),
-      function( data ) {
-		$("#output").empty().append(data);
-      }
-    );
-  });
-</script>
-
-</div>
-{IsAdminAuthenticatedEnd}
+<section class="portal-workspace" id="continuum_console_workspace" aria-labelledby="console-title">
+<p class="portal-eyebrow">Grid administration</p><h1 id="console-title">Native consoles</h1>
+<p>Connect to an operator-configured native simulator or ROBUST remote console. Each host requires its own console credentials and TLS/CORS configuration. The portal does not store your console password or grant console privileges.</p>
+{IfConsoleUnconfiguredBegin}
+<p>No consoles are configured. The operator can add fixed HTTPS endpoints in ContinuumWebUIConsoles and enable the native REST console on those hosts.</p>
+{IfConsoleUnconfiguredEnd}
+{IfConsoleConfiguredBegin}
+<form id="continuum_console_connect" class="portal-editor">
+<label for="console-endpoint">Host</label><select id="console-endpoint" class="form-control" required><option value="">Choose a host</option>
+{ConsoleEndpointsArrayBegin}
+<option value="{ConsoleURL}">{ConsoleName}</option>
+{ConsoleEndpointsArrayEnd}
+</select>
+<label for="console-user">Console user</label><input id="console-user" class="form-control" required maxlength="128" autocomplete="off">
+<label for="console-password">Console password</label><input id="console-password" class="form-control" type="password" required maxlength="256" autocomplete="off">
+<button type="submit" class="btn btn-primary">Connect</button><button type="button" id="continuum_console_disconnect" class="btn btn-outline-secondary">Disconnect</button>
+</form>
+<p id="continuum_console_status" role="status" aria-live="polite">Disconnected</p>
+<pre id="continuum_console_output" tabindex="0" aria-label="Native console output" style="max-height:32rem;overflow:auto;white-space:pre-wrap;"></pre>
+<form id="continuum_console_command" class="portal-editor">
+<label for="console-command">Command or prompt response</label><input id="console-command" class="form-control" required maxlength="2048" autocomplete="off" disabled>
+<label><input id="console-command-confirm" type="checkbox" required disabled> I intend to submit this command or response to the selected host with full console authority.</label>
+<button type="submit" class="btn btn-danger" disabled>Submit to host</button>
+</form>
+<p>Commands can change configuration, stop services or delete data. A submitted command is not a completed command: inspect the output before retrying. Sessions disconnect after 15 minutes or when this page is closed.</p>
+<script src="static/js/continuum-console.js"></script>
+{IfConsoleConfiguredEnd}
+</section>

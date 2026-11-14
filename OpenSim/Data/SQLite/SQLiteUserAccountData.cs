@@ -35,8 +35,13 @@ using System.Data.SQLite;
 
 namespace OpenSim.Data.SQLite
 {
-    public class SQLiteUserAccountData : SQLiteGenericTableHandler<UserAccountData>, IUserAccountData
+    public class SQLiteUserAccountData : SQLiteGenericTableHandler<UserAccountData>, IUserAccountData, IUserAccountArchiveData
     {
+        public bool TryArchiveAccount(UUID principal)
+        {
+            lock (m_Connection) return UserAccountArchiveCommand.Execute(m_Connection, m_Realm, principal, false);
+        }
+
         public SQLiteUserAccountData(string connectionString, string realm)
                 : base(connectionString, realm, "UserAccount")
         {

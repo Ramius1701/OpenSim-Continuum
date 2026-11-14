@@ -1843,6 +1843,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
 
                     case ScriptBaseClass.PARCEL_DETAILS_OWNER:
                         arg = rules.GetStrictStringItem(idx++);
+                        if (newLand.AuctionID != 0)
+                        {
+                            OSSLShoutError("cancel the active auction before changing parcel ownership");
+                            break;
+                        }
                         if (es is not null && !es.IsEstateManagerOrOwner(m_host.OwnerID))
                         {
                             OSSLShoutError("script owner does not have permission to modify the parcel owner");

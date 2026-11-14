@@ -170,11 +170,46 @@
     HGGroupsServiceConnector = "${Const|PublicPort}/OpenSim.Addons.Groups.dll:HGGroupsServiceRobustConnector"
 
 [ContinuumWebUI]
+    ; Distinct shared key matching LandAuctions.WebUIBridgeSecret on configured hosts.
+    AuctionBridgeSecret =
+    ; Portal presentation only; back up alongside the news content store.
+    PortalSettingsPath = ContinuumWebUI/portal-settings.json
+    ; Optional native ROBUST INI editor for GridInfoService identity, login welcome
+    ; and portal SystemName. Select the loaded file containing all three sections.
+    ; Saves create a same-directory backup and require ROBUST restart. HTTPS required.
+    ; Protect the file, its directory and backups: the INI may contain service secrets.
+    GridConfigurationPath =
+    ; Optional private postal contact details, stored by the native profile service.
+    ; Supply the operator's purpose/retention notice before enabling. Requires HTTPS.
+    ResidentContactEnabled = false
+    ContactPrivacyNotice =
+    ; Self-service archival sets UserLevel=-2; it does not erase data or refund money.
+    ; Viewer must be logged out; privileged accounts and estate owners cannot self-close.
+    AllowAccountClosure = false
+    ; Durable proposals, recipient consent and atomic paired profile updates. HTTPS required.
+    AllowPartnerships = false
+    ; Add every grid system/service account UUID, comma-separated, before enabling.
+    AccountClosureProtectedIDs =
     ;; WhiteCore-derived integrated portal. The connector must also be
     ;; uncommented in [ServiceList]. Keep the portal on the public ROBUST port.
     Enabled = false
     MountPath = /webui
     SystemName = OpenSim Continuum
+    ;; Durable portal news/content, independent of service database providers.
+    ContentStorePath = ContinuumWebUI/content.json
+    ;; Email-based, single-use password recovery. Configure before enabling.
+    PasswordRecoveryEnabled = false
+    ; PasswordRecoveryURL = https://grid.example.org/webui/
+    ; PasswordRecoveryStorePath = ContinuumWebUI/recovery.json
+    ; PasswordRecoverySMTPHost = smtp.example.org
+    ; PasswordRecoverySMTPPort = 587
+    ; PasswordRecoverySMTPSecurity = StartTls
+    ; PasswordRecoveryFrom = noreply@example.org
+    ; PasswordRecoverySMTPUser =
+    ; PasswordRecoverySMTPPassword =
+    ; PasswordRecoverySMTPTimeoutMilliseconds = 10000
+    ;; Explicitly trusted reverse-proxy IPs only; otherwise X-Forwarded-For is ignored.
+    ; TrustedProxyAddresses = 127.0.0.1,::1
     UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
     AuthenticationService = OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService
     SessionLifetimeSeconds = 3600
@@ -202,6 +237,11 @@
     ;; Existing ContinuumSearch XML-RPC endpoint used for directory, parcel,
     ;; event, classified and resident-owned event queries.
     ; SearchServiceURL = http://127.0.0.1:8010
+    ;; Optional event/classified management: match ContinuumSearch WebUIWriteSecret on a private/TLS endpoint.
+    ; SearchWriteSecret = ""
+    ;; Enabling writes also requires HTTPS for portal account operations (direct
+    ;; loopback HTTP is permitted for development). Configure TrustedProxyAddresses
+    ;; when HTTPS is terminated by a reverse proxy.
     ;; Existing ContinuumEconomy service and its server-side shared secret.
     ; EconomyServiceURL = http://127.0.0.1:8009
     ; EconomySharedSecret = CHANGE-THIS-TO-THE-CONTINUUM-ECONOMY-SECRET
@@ -574,6 +614,8 @@
     ;; StorageProvider and ConnectionString inherit from [DatabaseService].
 
 [GridUserService]
+    ; Set false to bypass this service instance's cached grid-user records.
+    ; UseCache = true
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.UserAccountService.dll:GridUserService"
 
@@ -584,6 +626,8 @@
 
 
 [PresenceService]
+    ; Set false for authoritative reads when presence is changed externally.
+    ; UseCache = true
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.PresenceService.dll:PresenceService"
 
@@ -605,6 +649,11 @@
 
 
 [LoginService]
+    ; Optional persistent viewer event reminders from ContinuumSearch.
+    ; HTTPS required except loopback; use a dedicated key matching Search/region configuration.
+    ; EventNotificationURL = https://search.example.org/
+    ; EventNotificationSecret =
+    ; EventNotificationTimeoutMs = 3000
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.LLLoginService.dll:LLLoginService"
     ; for the service
@@ -985,3 +1034,27 @@
     MaxScreenshotBytes = 5242880
     MaxSummaryBytes = 4096
     MaxDetailsBytes = 65536
+
+
+; Optional links to the existing simulator-side RegionWeb Estate Admin.
+; Use the public HTTPS URL for each region; multiple regions may share one host.
+; RegionWeb enforces its own estate-owner login; portal sessions are not forwarded.
+; These are navigation links, not automatic reload or arbitrary server requests.
+[ContinuumWebUIRegionControlRooms]
+    ; 11111111-2222-4333-8444-555555555555 = https://sim.example.org/regionweb/admin
+
+
+; Optional fixed regional auction endpoints; no URLs are accepted from residents.
+; HTTPS required except direct loopback HTTP. Each regional module owns its path.
+; Bidding retains native live-viewer authority in the selected region.
+[ContinuumWebUIAuctions]
+    ; 11111111-2222-4333-8444-555555555555 = https://sim.example.org/continuum/auctions/11111111-2222-4333-8444-555555555555
+
+; Optional browser client for native OpenSim/ROBUST RemoteConsole (-console=rest).
+; Configure Network.ConsoleUser/ConsolePass on each host and set its
+; ConsoleAllowedOrigin to this portal's exact HTTPS origin (no wildcard).
+; Native credentials are entered in the browser, never stored by the portal.
+; Fixed HTTPS base URLs only; loopback HTTP is available for local development.
+[ContinuumWebUIConsoles]
+    ; Simulator-West = https://sim-west.example.org/console/
+    ; ROBUST = https://robust-console.example.org/

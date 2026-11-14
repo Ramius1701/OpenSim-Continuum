@@ -62,7 +62,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
     /// Handles new client connections
     /// Constructor takes a single Packet and authenticates everything
     /// </summary>
-    public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, IClientInventory, IStatsCollector, IClientIPEndpoint
+    public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, IClientInventory, IStatsCollector, IClientIPEndpoint, IAuctionClient
     {
         /// <value>
         /// Debug packet level.  See OpenSim.RegisterConsoleCommands() for more details.
@@ -8324,6 +8324,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             { PacketType.MultipleObjectUpdate, new(HandleMultipleObjUpdate, false) },
             { PacketType.MoneyTransferRequest, new(HandleMoneyTransferRequest, false) },
             { PacketType.ParcelBuy, new(HandleParcelBuyRequest, false) },
+            { PacketType.ViewerStartAuction, new(HandleViewerStartAuction, false) },
             { PacketType.RegionHandshakeReply, new(HandlerRegionHandshakeReply, false) },
             { PacketType.SetAlwaysRun, new(HandleSetAlwaysRun, false) },
             { PacketType.AgentAnimation, new(HandleAgentAnimation, false) },
@@ -8777,6 +8778,16 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             c.OnParcelBuyPass?.Invoke(c,
                                 c.m_agentId,
                                 ParcelBuyPass.ParcelData.LocalID);
+        }
+
+        public event Action<IClientAPI, int, UUID> OnStartAuction;
+
+        private static void HandleViewerStartAuction(LLClientView c, Packet packet)
+        {
+            var request = (ViewerStartAuctionPacket)packet;
+            if (request.AgentData.AgentID != c.AgentId || request.AgentData.SessionID != c.SessionId)
+                return;
+            c.OnStartAuction?.Invoke(c, request.ParcelData.LocalID, request.ParcelData.SnapshotID);
         }
 
         private static void HandleParcelBuyRequest(LLClientView c, Packet Pack)

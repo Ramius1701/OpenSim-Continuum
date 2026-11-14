@@ -117,6 +117,30 @@ namespace OpenSim.Framework
         public string Password = string.Empty;
     }
 
+    public sealed class PartnershipProposal
+    {
+        public UUID ID;
+        public UUID Sender;
+        public UUID Recipient;
+        public string Message = "";
+        public long Expires;
+    }
+
+    public sealed class UserContactInfo
+    {
+        public string Address { get; set; } = "";
+        public string City { get; set; } = "";
+        public string PostalCode { get; set; } = "";
+        public string Country { get; set; } = "";
+        public void Validate()
+        {
+            static bool Valid(string value, int maximum) => value != null && value.Length <= maximum
+                && !System.Linq.Enumerable.Any(value, c => Char.IsControl(c));
+            if (!Valid(Address, 200) || !Valid(City, 100) || !Valid(PostalCode, 32) || !Valid(Country, 100))
+                throw new ArgumentException("Check contact field lengths and remove control characters");
+        }
+    }
+
     public class UserAppData
     {
         public string TagId = string.Empty;

@@ -61,7 +61,8 @@ namespace OpenSim.Data.PGSQL
 
         public GridUserData[] GetAll(string userID)
         {
-            return base.Get(String.Format("\"UserID\" LIKE '{0}%'", userID));
+            // lickx case-insensitive lookup, with a bound value rather than SQL interpolation.
+            return base.Get("\"UserID\" ILIKE :userID", new Npgsql.NpgsqlParameter("userID", userID + "%"));
         }
 
     }

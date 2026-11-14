@@ -1,6 +1,30 @@
 # OpenSim Continuum integration progress
 
-Last updated: 2026-09-01
+<!-- continuum-current-status:begin -->
+> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
+> ports/native workflow adapters are implemented in source. The former 11 blocked
+> WebUI routes now have native workflows. Live/provider acceptance remains open.
+> See the [current donor audit](whitecore-continuum-improvement-audit.md),
+> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
+> Earlier dated checkpoints below retain their historical scope; they do not
+> supersede this status or certify deployment.
+<!-- continuum-current-status:end -->
+
+Last updated: 2026-11-14
+
+The [2026-11-14 donor refresh and integration](donor-refresh-2026-11-14.md)
+brought `origin/development` to OpenSim upstream `9d00a55552` in merge
+`0e8814e062`. Release and SQLite migration checks passed; live acceptance
+remains pending. The main local checkout retains its unpublished work.
+
+Current donor status (2026-10-24): the needed selected WhiteCore ports and native
+WebUI workflow adaptations are implemented. The remaining 11 blocked paths now
+have working native workflows, including explicit account archival, private
+contacts/partnerships, native configuration and console access. Purchase pages
+show currency credits without real-money settlement claims, per user direction.
+See the implementation closeout at the top of the WhiteCore audit. Deployment,
+live browser/viewer and provider acceptance remain in the handoff. No next donor
+was started automatically.
 
 Branch: protected `master`; active integration branch `development`
 
@@ -38,6 +62,131 @@ Skia/CoreJ2K and Phlox-only changes do not apply to Continuum's current
 OpenJPEG/System.Drawing and YEngine implementations. The SQLite economy suite,
 group-account contracts, scheduled stipend smoke test, viewer `/currency.php`
 and `/landtool.php` routes, and ContinuumSearch acceptance suite all passed.
+
+## Donor continuation — 2026-10-21
+
+### Historical donor order — 2026-10-21
+
+Per operator direction, finish one inactive donor at a time. The active donor
+was the preserved **opensim-lickx** archive, whose implementation reconciliation
+is now complete, including IMAP object mail. Further Tranquillity and upstream
+port work remains paused. **Mobius is the next active inactive-donor review**,
+using the preserved `mobius-current/master` checkpoint
+`7b69b4d545b03cc909afced09b1a5431f4412349`. Section
+14 of `donor-feature-inventory.md` records the finite core comparison, selected
+ports and explicit exclusions. Runtime acceptance remains in the test handoff.
+
+The opening Mobius pass traced its changelog and 56 Stolen Ruby-authored
+commits, then compared map startup, estate statistics, terrain console, parcel
+selectors and login features with current source. Several advertised features
+are already implemented. Missing map-startup suppression and in-world map
+regeneration remain candidates; legacy parcel numeric selectors conflict with
+current constants and require a compatibility decision before any port.
+This is an initial reconciliation, not donor completion. Section 13 contains
+the current evidence and remaining scope. Donor files and live services remain
+unchanged; no new source code was selected in this opening pass.
+
+Following the operator's newer-code precedence direction, comparison against
+preserved Tranquillity `1d276209d4159e4cb70b416c9aa32994ea19f776` closes the
+estate-statistics, obsolete XEngine fallback and MySQL groups-engine candidates
+without ports. Current parcel behavior/constants are retained. Historical map
+setting names remain unselected differences pending behavior comparison, not
+implementation requirements. Newer donor source takes precedence; remaining
+Mobius families must pass the same comparison before any source is selected.
+
+The next pass retains current native syntax, ViewerAsset, avatar picker and
+restart paths, and excludes the old listener-range implementation from
+selection. Behavior comparison found map suppression already in newer
+Tranquillity as `OnlyGenerateIfMissing`; the earlier exact-name search was not
+evidence of absence. Continuum's asynchronous map controls remain authoritative.
+Mobius's separate MySQL access-control manager is unselected: current login/HG
+checks and the newer IBansService boundary must not be replaced without a
+demonstrated management need. Per operator direction, every selected change
+must provide a concrete benefit to Continuum. No source code or deployed
+configuration changed in this pass; documentation whitespace checks passed.
+
+Final Mobius reconciliation (2026-10-21) is complete for the pinned feature
+branch. The final pass indexed all non-merge first-parent commits from Display
+Names introduction through the pinned tip without an author filter; older
+aggregate merges are explicitly excluded from bulk porting. Current bounded HG
+lookup/account/UUI handling covers the name follow-ups. RSA/TOS and provider
+schema fields are already retained in Continuum, even though newer Tranquillity
+does not carry all those login additions. The remaining cosmetic, old scheduler,
+debug and removed-submodule changes establish no additional benefit. No source
+port was selected. Section 13 records coverage limits and final dispositions.
+Runtime certification remains separate; manual gates stay in the handoff.
+
+The first lickx batch adds tenant-filtered OAR exports, foreign creator data
+preservation by default in IARs with an explicit opt-out, additional script
+environment keys/payment constants, negative normal-map offsets and a MySQL
+profile Unicode migration. Full Release build passes with zero warnings/errors;
+`tests/Continuum.Lickx.Tests` exercises archive contents, permission/filter
+boundaries, creator identity and script contracts. Database-version and viewer
+checks are queued in the existing handoff; no live deployment was changed.
+
+The subsequent lickx reconciliation ports Presence/GridUser cache opt-out with
+per-instance cache isolation, parameterized PostgreSQL ILIKE lookup while
+retaining account scope/display names, native/XML-RPC active-group title and
+attachment synchronization without restarting stopped scripts, UUID-only HG
+friend notification with per-endpoint grouping, authoritative local creator
+identity validation, missing-asset-service attachment completion and parcel
+`--default-user` fallback. Profile lifecycle fixes/map-directory support were
+already present. Existing currency/search/Gloebit implementations are retained;
+the historical public web-money helpers, bundled certificates and unsafe
+policy/physics/parser replacements are excluded. IMAP object-mail transport is
+now implemented as a bounded background adaptation using the bundled MailKit,
+with exact recipient routing, queue backpressure, UIDVALIDITY handling and
+UIDPLUS selective acknowledgement after local queue admission. `[SMTP]` remains
+supported; `[Email]` is an optional configuration alias. It is disabled by
+default. Section 14 records each disposition.
+
+IMAP regression coverage includes real EmailModule routing and lifecycle,
+retry/queue/size limits, sparse UIDs, mailbox changes during reads and a loopback
+IMAP protocol fixture exercising the actual MailKit adapter, bounded partial
+body fetches, APPEND and UID EXPUNGE. No live mail account or deployed grid was
+changed. Live TLS/server and two-simulator acceptance are queued in the existing
+handoff. Queues and retry deduplication are memory-only; this transport does not
+provide durable or exactly-once delivery across crashes.
+
+Final IMAP validation on 2026-10-21: full Release solution build passed with
+zero warnings/errors. The complete lickx harness passed, including the actual
+MailKit wire fixture, UIDVALIDITY/concurrent-expunge regressions and PostgreSQL
+provider checks against the isolated database listed below. `git diff --check`
+also passed.
+
+Validation: complete Release build has zero warnings/errors; expanded lickx
+behavioral checks pass for caches, creator identities, group-title boundaries,
+archive/script contracts and HG notification targets. PostgreSQL provider tests
+pass in `continuum_lickx_20261021_160426` (dedicated disposable fixtures, port
+9543), including quote/injection-shaped inputs, hidden-group filtering and
+account/display-name/region scope. Unicode case-folding remains locale-dependent.
+
+### Previously completed Tranquillity batch
+
+Ported Mike Dickson's Tranquillity commit
+`3bba0e510a0cbd4616af51759c02dca4f318042c` (6 September 2026),
+verified in the preserved `S:\Github\OpenSim-Tranquillity` repository at
+`1d276209d4159e4cb70b416c9aa32994ea19f776`. The donor's OpenSim BSD notices
+are retained. This is a narrow scripting bug fix, adapted from Tranquillity's
+`Source/` layout to Continuum's existing file layout:
+
+- Added the donor `IHttpServiceRequest` contract; the provider and consumer now
+  exchange status/body through it instead of casting to `HttpRequestClass`.
+- Removed the concrete incoming `RPCRequestInfo` cast in the XML-RPC plugin.
+- Poll XML-RPC for every script engine, rather than only the first engine.
+
+These changes avoid invalid concrete-type casts when CoreModules is loaded in
+a different assembly context. Existing request limits, transport, event payloads
+and script permissions are retained. The donor's separate outbound
+`SendRemoteDataRequest` concrete cast is still present; its cross-context path
+requires a separate follow-up and is not covered by the incoming-request fix.
+
+Validation: complete Release solution build passed with zero warnings/errors.
+The checked-in `tests/Continuum.ScriptCompletions.Tests` harness exercises actual
+HTTP and incoming XML-RPC completions from a second assembly context, validates
+event routing/identity/status/Unicode payloads and exactly-once draining, and
+checks second-region XML-RPC polling. Live deployment checks are queued in
+`donor-feature-test-handoff.md`; these binaries have not been deployed.
 
 ## Current checkpoint
 
@@ -157,12 +306,304 @@ bypassed merely because the same Experience also appears in an allowed list.
 ## Explicit boundaries
 
 - `S:\Github\Casperia` is excluded and must not be used as a donor or worktree.
-- WhiteCore WebUI presentation/workflows and the required OpenSim-Grid-Interface
-  gap integrations are implemented in ContinuumWebUI. Only deployment and
-  browser acceptance remain deferred.
+- WhiteCore-derived WebUI presentation and selected native service adapters
+  are implemented in ContinuumWebUI, but complete workflow parity is not
+  established. The 2026-10-22 audit found 23 explicitly blocked legacy page
+  paths and missing integrated grid-wide auction workflows. See parity-webui.md
+  for the 87-controller inventory and remaining implementation review.
 - Gloebit is not part of ContinuumEconomy.
 - PayPal donations, real-money settlement and future region billing are outside
   the in-world ledger and require a separate integration.
 - Cross-region balance propagation does not trust arbitrary region URLs supplied
   at login. Local viewers receive immediate updates; other regions obtain the
   authoritative value through normal balance requests.
+
+
+## WhiteCore continuation — 2026-10-22
+
+S: access restored. WhiteCore is the active donor; the existing improvement
+audit now records source-verified opening dispositions. Moderation, estate
+notification and Experience publication are already present. Auction and visitor
+logging are not selected as direct ports because the inspected implementations
+do not establish a beneficial complete replacement. No source changes selected;
+remaining WhiteCore families still require reconciliation. See
+whitecore-continuum-improvement-audit.md for evidence and scope.
+
+## Regional auctions implementation — 2026-10-22
+
+Per operator direction, auctions are the only newly selected feature from the
+WhiteCore optional/excluded list. Added the native Firestorm ViewerStartAuction
+UDP path, optional LandAuctionModule with a session-bound browser page, durable
+regional journal, escrow through ContinuumEconomy's idempotent purchase API,
+expiry/cancellation/restart recovery and parcel mutation guards. Configuration
+is disabled by default. Firestorm source was inspected; no viewer code copied.
+Real SQLite ledger and failure/replay/concurrency regressions are in
+tests/Continuum.Auctions.Tests. Deployment, other provider and viewer tests are
+queued in the existing handoff; no live grid was changed. See the WhiteCore
+audit for scope and cross-service recovery/operational limits.
+
+Validation: full Release solution build passed with zero warnings/errors.
+Continuum.Auctions.Tests passed, including actual SQLite escrow/conservation
+and concurrent/restart/replay cases. Continuum.Lickx.Tests and
+Continuum.ScriptCompletions.Tests also passed; the optional PostgreSQL lickx
+fixture was not enabled for this run. Documentation/source whitespace checks
+passed. Live Firestorm, other economy providers and deployment are not certified.
+
+## WebUI grid news checkpoint — 2026-10-22
+
+Implemented three blocked news-admin pages, public published-only feed,
+optimistic revisions, bounded atomic portal content storage and admin navigation.
+Added responsive workspace/editor styles and clearer landing onboarding. These
+are the first working completion/modernization changes, not all missing pages:
+20 legacy paths remain blocked and grid-wide auction WebUI remains open.
+ContentStorePath is documented in both Robust examples. The embedded asset
+bundle is regenerated with Build-WebUIAssets.ps1 before compilation.
+Focused WebUI build and tests pass, including anonymous HTTP route denial,
+resident/admin writes, draft privacy, stored-text escaping, actual embedded
+rendering, CRUD, stale edits, restart persistence and writer/corruption cases.
+The complete Release build passed with zero warnings/errors. No live deployment,
+browser/screenshot verification or full WebUI completion is claimed. Manual
+checks are in donor-feature-test-handoff.md; scope is in parity-webui.md.
+
+Historical repository verification note: the unrestricted Git diff check failed to
+inflate the stored baseline WebUI archive blob
+ff1d0731cd69422d5d228b83cdf199ed1a0e2e7d. The newly generated working archive
+passes reproducibility and embedded-template rendering tests. Text-only diff
+checks pass when that binary path is excluded. The corrupt Git object was not
+modified at that checkpoint. It has now been recovered as recorded below.
+New WebUI C# files and the packaging script are
+explicitly allowed through the existing addon ignore policy.
+
+## Git repair and resident recovery — 2026-10-22
+
+Recovered exact blob ff1d0731cd69422d5d228b83cdf199ed1a0e2e7d from the
+configured remote into an isolated bare repository and verified its identity
+and integrity there. Preserved the corrupt bytes in .codex-object-recovery,
+then replaced only that loose object. Full Git diff checks now pass; working
+files, branch and index were not reset. The recovery directory is ignored.
+
+Implemented email password recovery and credential-bound portal sessions,
+including bounded neutral request dispatch, durable one-use hashed tickets,
+TLS-only SMTP, secure URL fragments, request limits and trusted proxy handling.
+Updated recovery/password forms and both Robust examples; rebuilt embedded
+assets. Recovery is opt-in and requires owner-supplied mail/public-URL settings.
+19 legacy paths remain blocked. Event/classified resident writes and grid-wide
+auction WebUI remain open; no success-only forms were substituted for missing
+native write/fee APIs. No deployment, real email delivery or browser acceptance
+is claimed. See parity-webui.md and the existing test handoff for scope/limits.
+
+Validation for this recovery checkpoint: complete Release solution build passed
+with zero warnings/errors. WebUI tests passed for token lifecycle, identity
+changes, failed/ambiguous writes, real rendered forms, neutral requests,
+HTTP rate/origin/transport handling, trusted proxies, credential-bound cookies,
+normal/disabled/legacy login and the login-reset race; news regressions remain
+passing. The existing auction regression suite also passed during this work.
+Full Git diff checks pass after object repair. No real email, provider database,
+browser or live deployment result is claimed. Recovery configuration and manual
+checks are recorded in both Robust examples and the existing handoff.
+
+
+## 2026-10-22 continuation scope and resident event writes
+
+The user has authorized continuing the WhiteCore reconciliation without stopping
+for another "proceed" after each small task. Intermediate implementation/build
+milestones are progress updates, not approval gates. Continue through meaningful
+batches, keep manual acceptance in `donor-feature-test-handoff.md`, preserve newer
+Continuum behavior, compare Firestorm where relevant, and do not switch donors.
+Genuine deployment or product decisions remain separate from source work.
+
+Resident event create/edit/delete is implemented through authenticated private
+Search writes and native region-ownership checks, with durable duplicate-create
+receipts, database-assigned IDs, optimistic revisions, UTC forms and compatible
+category/maturity/global-coordinate fields. The embedded asset bundle has been
+rebuilt. Scope is currently region-owner events; broader parcel/group permissions
+and paid-classified web writes remain gaps. Current explicitly blocked legacy
+page count is 17 (earlier counts are historical). Details: `parity-webui.md`.
+No live grid configuration, schema or deployment was changed.
+
+Validation for this event batch: complete Release solution build passed with
+zero warnings/errors; fresh SQLite Search acceptance and WebUI event/news/
+password-recovery regressions passed. Browser and new provider-write checks
+remain explicitly queued in the handoff.
+
+
+## 2026-10-22 paid classified WebUI batch
+
+Completed the service, payment and portal path together: explicit paid creation,
+owner-only edit/delete, immutable price/lifetime on text edits, stale-form checks,
+public expiry filtering and owner-only pending-publication recovery. The private
+ContinuumEconomy classified handler uses a separate opt-in service authority and
+purpose/recipient restrictions; existing viewer-session handlers are preserved.
+Publication receipts survive restarts and re-use the same charge ID after a lost
+reply. This is not a distributed transaction; paid-but-pending publication is
+visible and resumable, with coordinated backups required.
+
+New create/edit/pending forms use the shared responsive portal styling and are
+embedded in the regenerated asset bundle. Source examples document the separate
+keys, HTTPS/loopback endpoint and minimum price. Current explicitly blocked
+legacy page count is 16. Full remaining parity limitations and operator browser/
+provider checks are in `parity-webui.md` and `donor-feature-test-handoff.md`.
+Source work only; the live grid was not modified.
+
+The same classified batch corrects native provider interoperability: edits retain
+paid price/lifetime/creator, foreign-creator replacements are rejected, PostgreSQL
+uses a row-targeted upsert, native price readers support Int32, SQLite deletion
+uses the correct parameter and viewer deletion checks current account ownership.
+The actual SQLite provider passes the web-to-viewer edit/read/delete checks;
+MySQL/PostgreSQL runtime execution remains queued. Enabling Search writes now
+requires secure portal account transport even when recovery is disabled, using
+the existing trusted-proxy/direct-loopback rules.
+
+
+HTTP-controller verification also corrected the success-response whitelist for
+both events and classifieds, and the legacy userindex entry now shares the main
+portal shell. Classified mutations have a per-account 30/ten-minute frontend
+limit, and backend outages suppress new-payment controls. Native PostgreSQL UUID
+and text-category parameter types are aligned with the migrated profile schema;
+its runtime gate remains open. Matching opt-in settings are documented in both
+Robust examples and the standalone WebUI/Search/economy examples.
+
+
+Pricing belongs to new invoice preparation in Search. Saved pending receipts
+retain their quoted amount across minimum-price changes; replay through the
+purpose-limited money authority cannot be stranded by a later storefront price
+change. This is covered alongside lost-reply/restart and duplicate-charge tests.
+
+Final batch verification: the complete Release solution build passed with zero
+warnings/errors. Fresh SQLite Search acceptance passed, including cancelled and
+insufficient payments, changed-minimum quote recovery, content/category checks,
+ownership and concurrent submissions. WebUI regressions passed with real SQLite
+ledger capture over private HTTP, lost-reply/store-restart publication, native
+profile interoperability, authenticated success responses, cross-origin/TLS
+rejection, account rate limits, outage controls and embedded forms. News, recovery
+and event checks also passed. `git diff --check` passed. Browser/Firestorm and
+MySQL/PostgreSQL execution remain in the handoff; no live deployment occurred.
+
+
+## Portal administration reconciliation — 2026-10-24
+
+Reconciled the pinned WhiteCore welcome, settings, page and grid-settings
+controllers. Three previously blocked manager routes now have native Continuum
+adapters: `admin/welcomescreen_manager.html`, `admin/settings_manager.html`, and
+`admin/page_manager.html`. This is a bounded presentation implementation, not a
+claim of full donor-manager parity:
+
+- Welcome heading/introduction and an optional plaintext announcement persist;
+  the announcement appears on both the portal home and viewer welcome screen.
+- Portal settings provide resident support instructions and the home gallery
+  visibility switch. Authenticated residents use the new `user/support.html`.
+- Navigation can hide/show nine supported public links. Home, login/account and
+  administration access cannot be removed through these controls. Hidden pages
+  remain reachable; authorization is enforced by the existing native adapter.
+- Fixed application routes replace arbitrary page locations and executable
+  template/CSS overrides. Custom menu ordering/labels, map-center settings and
+  browser-managed registration policy have not been implemented. Registration
+  remains governed by `AllowRegistration`; public sign-up actions honor it.
+- `admin/gridsettings_manager.html` remains blocked: grid identity, system
+  accounts/estates and operational service settings require authoritative native
+  support. Announcement text does not override measured grid availability.
+- WhiteCore `user/contact.html` stores real-world postal address information.
+  It remains blocked and is not represented as completed by the support page.
+
+`PortalSettingsPath` defaults to `ContinuumWebUI/portal-settings.json`, separate
+from news. Bounded JSON is validated on read/write; corrupt content fails closed.
+Writes acquire a process lease, reload under the lease, require the editor's
+current revision, flush and atomically replace the file. All manager POSTs check
+administrator authority and the HTTP origin. Submitted text is escaped, with
+no arbitrary markup, URL or credential fields. A global revision prevents
+conflicting updates even when administrators edit different sections.
+
+Release build and WebUI acceptance harness passed, including restart persistence,
+stale/concurrent writers, protected navigation, resident and cross-site denial,
+HTTP success handling, embedded forms, escaping and disabled controls. Embedded
+assets were rebuilt. Runtime browser/Firestorm and backup checks are queued in
+`doc/donor-feature-test-handoff.md`; no deployment or live config changes made.
+
+
+## Native estate editing and region reconciliation — 2026-10-24
+
+WhiteCore remains the active donor. Reconciled the pinned donor's resident and
+administrator estate editors and region editors against current native service
+contracts. `user/estate_edit.html` and `admin/estate_edit.html` now provide native
+estate editing from their respective estate lists. **11 legacy paths remain
+explicitly blocked**; source availability does not certify complete donor parity.
+
+Implemented estate fields: name (1–64 characters), reference price per square
+metre (0–1,000,000), public access, voice and direct teleport. The price is estate
+metadata; saving does not sell land or debit an account. Resident editing requires
+current native estate ownership; the administrator route checks configured admin
+level. Both the page and mutation adapter enforce these rules. Native owner
+identity comes from a fresh estate load, not submitted owner/actor fields. Lists
+also recheck loaded ownership instead of trusting a potentially stale owner index.
+
+The optional `IEstateSettingsUpdater` capability leaves existing service plugins
+compatible and hides write controls when unsupported. The local EstateDataService
+and SQLite/MySQL/PostgreSQL stores implement it. A single conditional statement
+matches estate ID, old owner and all five old edited values, then changes only
+those five columns. Text comparison is case-sensitive. The WebUI also checks an
+opaque form token; the database comparison closes races after the form check.
+No new schema, WebUI database queries or public estate-write endpoint is added.
+These are trusted in-process service calls, with HTTP identity/origin enforcement
+at the existing portal boundary. Remote/third-party connectors without the new
+capability remain read-only.
+
+Manager, access, group, ban and experience lists, membership, ownership, access
+override and all other settings remain intact. Ownership transfer, creation,
+deletion and membership changes are not implemented by these editors. The donor's
+`TaxFree` name predates current access-override semantics. Local Firestorm's
+`llestateinfomodel.cpp` uses `REGION_FLAGS_ALLOW_ACCESS_OVERRIDE` and sends
+`override_public_access`; the current native estate handlers' inversion must be
+reconciled separately before adding that control. It is preserved, not relabeled
+as a tax switch. No simulator settings or viewer protocol are downgraded to donor
+presets.
+
+**Runtime limitation:** these saves persist native estate settings; running
+simulators still require a native estate reload (or a controlled restart) before
+they use the changes. RegionWeb Estate Admin can reload estate data for its
+loaded regions through the Reload action on an allowed estate-scoped file.
+The form and success response state the reload requirement. An unreloaded
+simulator's later viewer save can overwrite the stored settings. Automatic reload
+fan-out from the grid portal remains outstanding; the legacy shared-token
+estate communications handler is not exposed through an arbitrary-URL browser
+proxy. Operators should verify state after reload before changing policy in-world.
+
+The region editors remain blocked. WhiteCore's controllers reconstruct simulator
+configuration, including location, size, terrain, ports and presets, and depend on
+WhiteCore region-management APIs. Native `IGridService.RegisterRegion` is region
+registration, not a replacement for durable simulator lifecycle management.
+Continuum already has authenticated per-host configuration editing, backups and
+estate reload in RegionWeb Estate Admin. Optional operator-configured HTTPS links
+from resident/admin region lists now reuse that control room. RegionWeb retains
+its independent estate-owner login; portal cookies are not forwarded. Links come
+only from the `[ContinuumWebUIRegionControlRooms]` region-UUID map, never submitted
+URLs or directory hostnames; no backend requests are made to those links. Full
+grid-wide editor integration and multi-host reload coordination are still missing.
+Changing directory entries alone would leave configuration/runtime inconsistent.
+These gaps remain selected work, not silently excluded features.
+
+Two native SQLite/estate defects found during verification were corrected:
+`GetRegions` now reads actual estate membership instead of returning an empty
+list; `EstateSettings.AddBan` deduplicates explicit entries independently of
+payment/age access policy. Previously an estate denying anonymous users could
+lose explicit bans when a provider loaded them through `AddBan`.
+
+Release build passed with zero warnings/errors. The WebUI acceptance matrix
+covers actual SQLite migration/persistence and service delegation, stale and
+concurrent writers, ownership races, unrelated policy/list preservation, region
+lookup, explicit bans, owner/admin HTTP authority, origin checks, GET non-mutation,
+unsupported services, navigation and escaped embedded forms. MySQL/PostgreSQL
+runtime and real browser/Firestorm reload checks remain in the existing handoff.
+No live deployment, grid configuration or production database changes were made.
+
+
+## WhiteCore selected-source closure — 2026-10-24
+
+Completed the recorded remaining comparisons and selected ports in one pass:
+regional auction bridge plus grid-wide WebUI discovery/bid/seller controls;
+authenticated durable event reminder subscriptions with both login formats;
+native hover-height advertisement and SimulatorFeatures copy correction.
+Retained newer upload/CAPS/group/preference/profile/search implementations.
+Full Release build and portal, auction, reminder/login, escrow and fresh SQLite
+Search acceptance checks pass. See the final matrix at the top of the WhiteCore
+audit for exact scope, limitations and the retained product/runtime backlog.
+No deployment or live operations were performed.

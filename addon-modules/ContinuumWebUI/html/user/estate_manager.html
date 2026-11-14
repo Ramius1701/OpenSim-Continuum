@@ -33,7 +33,11 @@
   	    <td class="text-centered">{TaxFree}</td>
   	    <td class="text-centered">{AllowDirectTeleport}</td>
         <td class="text-centered">{RegionCount}</td>
-        <td class="no-sort text-centered"></td>
+        <td class="text-center">
+{IfEstateCanEditBegin}
+<a class="btn btn-outline-light btn-sm" href="?page={EstateEditPage}&amp;estateid={EstateID}" onclick="loadusercontent('{EstateEditPage}', 'estateid={EstateID}');return false;">Edit</a>
+{IfEstateCanEditEnd}
+</td>
       </tr>
       {EstateListArrayEnd}
 

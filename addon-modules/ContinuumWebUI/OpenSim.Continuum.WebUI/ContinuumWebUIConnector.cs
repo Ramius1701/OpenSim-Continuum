@@ -76,17 +76,8 @@ namespace OpenSim.Continuum.WebUI
         private static readonly Assembly ThisAssembly = typeof(WhiteCoreSite).Assembly;
         private static readonly System.Lazy<Dictionary<string, byte[]>> Content = new(LoadContent, true);
         private static readonly Regex Token = new(@"\{[A-Za-z][A-Za-z0-9]*\}", RegexOptions.Compiled);
-        private static readonly HashSet<string> UnsupportedLegacyPages = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "forgot_pass.html", "classifieds/add_classified.html", "events/add_event.html",
-            "admin/estate_edit.html", "admin/factory_reset.html", "admin/gridsettings_manager.html",
-            "admin/news_add.html", "admin/news_edit.html", "admin/news_manager.html",
-            "admin/page_manager.html", "admin/purchases.html", "admin/region_edit.html",
-            "admin/settings_manager.html", "admin/sim_console.html",
-            "admin/welcomescreen_manager.html", "user/contact.html", "user/deleteaccount.html",
-            "user/edit_event.html", "user/estate_edit.html", "user/partnership.html",
-            "user/purchases.html", "user/region_edit.html", "user/update_user.html"
-        };
+        // All selected legacy routes now have native workflows or explicit configuration states.
+        private static readonly HashSet<string> UnsupportedLegacyPages = new(StringComparer.OrdinalIgnoreCase);
         private readonly string _mountPath;
         private readonly string _systemName;
         private readonly IUserAccountService _accounts;
@@ -153,6 +144,11 @@ namespace OpenSim.Continuum.WebUI
                 return;
             }
             relative = _integration.ResolvePage(relative);
+            if (request.HttpMethod == "POST" && !_integration.AccountTransportAllowed(request))
+            {
+                WriteError(response, HttpStatusCode.Forbidden, "Use HTTPS for account operations");
+                return;
+            }
             if (UnsupportedLegacyPages.Contains(relative))
             {
                 WriteError(response, HttpStatusCode.NotFound, "This legacy WhiteCore workflow is not available through OpenSim services");
@@ -172,7 +168,10 @@ namespace OpenSim.Continuum.WebUI
                 return;
             }
             UserAccount currentUser = GetAuthenticatedUser(request);
-            bool accountPage = relative.StartsWith("user/", StringComparison.OrdinalIgnoreCase)
+            bool accountPage = (relative.Equals("auctions.html", StringComparison.OrdinalIgnoreCase) && request.HttpMethod == "POST")
+                || relative.Equals("events/add_event.html", StringComparison.OrdinalIgnoreCase)
+                || relative.Equals("classifieds/add_classified.html", StringComparison.OrdinalIgnoreCase)
+                || relative.StartsWith("user/", StringComparison.OrdinalIgnoreCase)
                 || relative.Equals("userhome.html", StringComparison.OrdinalIgnoreCase)
                 || relative.Equals("friends.html", StringComparison.OrdinalIgnoreCase)
                 || relative.Equals("transactions.html", StringComparison.OrdinalIgnoreCase);
@@ -197,9 +196,26 @@ namespace OpenSim.Continuum.WebUI
             if (request.HttpMethod == "POST")
             {
                 if (!IsSameOrigin(request)) { WriteError(response, HttpStatusCode.Forbidden, "Cross-site request rejected"); return; }
+                if (relative.Equals("user/partnership.html", StringComparison.OrdinalIgnoreCase)
+                    && !AllowAttempt("partnership:" + currentUser.PrincipalID, 30, TimeSpan.FromMinutes(15)))
+                { WriteError(response, (HttpStatusCode)429, "Too many partnership operations; try again later"); return; }
+                if (relative.Equals("user/deleteaccount.html", StringComparison.OrdinalIgnoreCase)
+                    && !AllowAttempt("closure:" + currentUser.PrincipalID, 5, TimeSpan.FromMinutes(15)))
+                { WriteError(response, (HttpStatusCode)429, "Too many account closure attempts; try again later"); return; }
+                if (relative.Equals("auctions.html", StringComparison.OrdinalIgnoreCase)
+                    && !AllowAttempt("auction:" + (currentUser?.PrincipalID.ToString() ?? _integration.RequestAddress(request)), 30, TimeSpan.FromMinutes(10)))
+                { WriteError(response, (HttpStatusCode)429, "Too many auction operations; try again later"); return; }
+                if ((relative.Equals("classifieds/add_classified.html", StringComparison.OrdinalIgnoreCase)
+                        || relative.Equals("user/classified_edit.html", StringComparison.OrdinalIgnoreCase)
+                        || relative.Equals("user/classifieds.html", StringComparison.OrdinalIgnoreCase))
+                    && !AllowAttempt("classified:" + currentUser.PrincipalID, 30, TimeSpan.FromMinutes(10)))
+                { WriteError(response, (HttpStatusCode)429, "Too many classified operations; try again later"); return; }
                 if (relative.Equals("register.html", StringComparison.OrdinalIgnoreCase)
-                    && !AllowAttempt("register:" + request.RemoteIPEndPoint?.Address, _registrationAttempts, _registrationWindow))
+                    && !AllowAttempt("register:" + _integration.RequestAddress(request), _registrationAttempts, _registrationWindow))
                 { WriteError(response, (HttpStatusCode)429, "Too many registration attempts; try again later"); return; }
+                if (relative.Equals("forgot_pass.html", StringComparison.OrdinalIgnoreCase)
+                    && !AllowAttempt("recovery:" + _integration.RequestAddress(request), 5, TimeSpan.FromMinutes(15)))
+                { WriteError(response, (HttpStatusCode)429, "Too many recovery attempts; try again later"); return; }
                 if (request.ContentLength64 < 0 || request.ContentLength64 > 64 * 1024)
                 {
                     WriteError(response, HttpStatusCode.RequestEntityTooLarge, "Request is too large");
@@ -213,6 +229,11 @@ namespace OpenSim.Continuum.WebUI
                 {
                     string responseMessage = WebUIServiceIntegration.IsSuccessfulMutation(message) ? message
                         : WebUIServiceIntegration.IsWarningMutation(message) ? "~" + message : "!" + message;
+                    if (message == "Account closed; identity and records retained")
+                    {
+                        if (TryReadCookie(request, out UUID closedUser, out string closedToken)) _authentication.Release(closedUser, closedToken);
+                        response.AddHeader("Set-Cookie", "ContinuumWebUI=; Path=" + _mountPath + "; Max-Age=0; HttpOnly; SameSite=Lax");
+                    }
                     WriteText(response, HttpStatusCode.OK, responseMessage);
                     return;
                 }
@@ -269,35 +290,68 @@ namespace OpenSim.Continuum.WebUI
             var menus = new List<Dictionary<string, object>>
             {
                 Menu("home", "Home", "home.html"),
+                Menu("news", "News", "news.html"),
                 Menu("search", "Search", "search.html"),
                 Menu("world_map", "World map", "world_map.html"),
                 Menu("destinations", "Destinations", "destinations.html"),
                 Menu("events", "Events", "events.html"),
+                Menu("auctions", "Land auctions", "auctions.html"),
                 Menu("classifieds", "Classifieds", "classifieds.html"),
                 Menu("experiences", "Experiences", "experiences.html"),
                 Menu("user_search", "Residents", "user_search.html"),
                 Menu("region_search", "Regions", "region_search.html"),
                 MenuGroup("account-tools", "Account", "userhome.html", authenticated, new[]
                 {
-                    Child("userhome", "Dashboard", "userhome.html"), Child("profile_edit", "Edit profile", "user/profile_edit.html"),
+                    Child("support", "Contact support", "user/support.html"), Child("userhome", "Dashboard", "userhome.html"), Child("profile_edit", "Edit profile", "user/profile_edit.html"),
+                    Child("user-contact", "Contact details", "user/contact.html"),
+                    Child("user-partnership", "Partnership", "user/partnership.html"),
+                    Child("user-account-settings", "Account settings", "user/update_user.html"),
+                    Child("user-close-account", "Close account", "user/deleteaccount.html"),
                     Child("user-email", "Change email", "user/email.html"), Child("user-password", "Change password", "user/password.html"),
                     Child("friends", "Friends", "friends.html"), Child("groups", "Groups", "groups.html"),
                     Child("user-region_manager", "My regions", "user/region_manager.html"), Child("user-estate_manager", "My estates", "user/estate_manager.html"),
                     Child("user-classifieds", "My classifieds", "user/classifieds.html"), Child("user-events", "My events", "user/events.html"),
+                    Child("user-purchases", "Currency credits", "user/purchases.html"),
                     Child("user-transactions", "My transactions", "user/transactions.html")
                 }),
                 MenuGroup("administration", "Administration", "admin/statistics.html", administrator, new[]
                 {
                     Child("admin-statistics", "Grid statistics", "admin/statistics.html"), Child("online_users", "Online users", "online_users.html"),
                     Child("admin-region_manager", "Grid regions", "admin/region_manager.html"), Child("admin-estate_manager", "Grid estates", "admin/estate_manager.html"),
+                    Child("admin-news_manager", "News management", "admin/news_manager.html"),
+                    Child("admin-welcome", "Welcome content", "admin/welcomescreen_manager.html"),
+                    Child("admin-portal", "Portal settings", "admin/settings_manager.html"),
+                    Child("admin-navigation", "Navigation", "admin/page_manager.html"),
+                    Child("admin-console", "Native consoles", "admin/sim_console.html"),
+                    Child("admin-grid-settings", "Grid identity and login", "admin/gridsettings_manager.html"),
+                    Child("admin-portal-reset", "Restore portal defaults", "admin/factory_reset.html"),
+                    Child("admin-purchases", "Resident currency credits", "admin/purchases.html"),
                     Child("admin-transactions", "Grid transactions", "admin/transactions.html"), Child("admin-user_manager", "Resident administration", "admin/user_manager.html"),
                     Child("admin-user-register", "Create resident", "admin/user_register.html"),
                     Child("abuse_manager", "Abuse reports", "abuse_manager.html")
                 }),
+                Menu("user-region-edit", "Manage region", "user/region_edit.html", false),
+                Menu("admin-region-edit", "Manage region", "admin/region_edit.html", false),
+                Menu("user-estate-edit", "Edit estate", "user/estate_edit.html", false),
+                Menu("admin-estate-edit", "Edit estate", "admin/estate_edit.html", false),
+                Menu("support", "Contact support", "user/support.html", false),
+                Menu("admin-welcome", "Welcome content", "admin/welcomescreen_manager.html", false),
+                Menu("admin-portal", "Portal settings", "admin/settings_manager.html", false),
+                Menu("admin-navigation", "Navigation", "admin/page_manager.html", false),
+                Menu("admin-console", "Native consoles", "admin/sim_console.html", false),
+                Menu("admin-grid-settings", "Grid identity and login", "admin/gridsettings_manager.html", false),
+                Menu("admin-portal-reset", "Restore portal defaults", "admin/factory_reset.html", false),
                 Menu("login", "Log in", "login.html", false),
                 Menu("register", "Sign up", "register.html", false),
+                Menu("password-recovery", "Recover account", "forgot_pass.html", false),
                 Menu("userhome", "Account", "userhome.html", false),
                 Menu("profile_edit", "Edit profile", "user/profile_edit.html", false),
+                Menu("user-purchases", "Currency credits", "user/purchases.html", false),
+                Menu("admin-purchases", "Resident currency credits", "admin/purchases.html", false),
+                Menu("user-contact", "Contact details", "user/contact.html", false),
+                Menu("user-partnership", "Partnership", "user/partnership.html", false),
+                Menu("user-account-settings", "Account settings", "user/update_user.html", false),
+                Menu("user-close-account", "Close account", "user/deleteaccount.html", false),
                 Menu("user-email", "Change email", "user/email.html", false),
                 Menu("user-password", "Change password", "user/password.html", false),
                 Menu("friends", "Friends", "friends.html", false),
@@ -306,9 +360,16 @@ namespace OpenSim.Continuum.WebUI
                 Menu("user-estate_manager", "My estates", "user/estate_manager.html", false),
                 Menu("user-classifieds", "My classifieds", "user/classifieds.html", false),
                 Menu("user-events", "My events", "user/events.html", false),
+                Menu("event-create", "Create event", "events/add_event.html", false),
+                Menu("classified-create", "Create classified", "classifieds/add_classified.html", false),
+                Menu("classified-edit", "Edit classified", "user/classified_edit.html", false),
+                Menu("event-edit", "Edit event", "user/edit_event.html", false),
                 Menu("user-transactions", "My transactions", "user/transactions.html", false),
                 Menu("admin-region_manager", "Grid regions", "admin/region_manager.html", false),
                 Menu("admin-estate_manager", "Grid estates", "admin/estate_manager.html", false),
+                Menu("admin-news_manager", "News management", "admin/news_manager.html", false),
+                Menu("admin-news_add", "Create news", "admin/news_add.html", false),
+                Menu("admin-news_edit", "Edit news", "admin/news_edit.html", false),
                 Menu("admin-statistics", "Grid statistics", "admin/statistics.html", false),
                 Menu("online_users", "Online users", "online_users.html", false),
                 Menu("admin-transactions", "Grid transactions", "admin/transactions.html", false),
@@ -545,7 +606,7 @@ namespace OpenSim.Continuum.WebUI
 
         private void HandleLogin(IOSHttpRequest request, IOSHttpResponse response)
         {
-            string attemptKey = "login:" + request.RemoteIPEndPoint?.Address;
+            string attemptKey = "login:" + _integration.RequestAddress(request);
             if (!AllowAttempt(attemptKey, _loginAttempts, _loginWindow))
             {
                 WriteError(response, (HttpStatusCode)429, "Too many login attempts; try again later");
@@ -563,6 +624,8 @@ namespace OpenSim.Continuum.WebUI
             string username = (form["username"] ?? string.Empty).Trim();
             string password = form["password"] ?? string.Empty;
             UserAccount account = FindAccount(username);
+            if (account?.UserLevel < 0) account = null;
+            string credentialVersion = account == null ? null : _integration.WebCredentialVersion(account.PrincipalID);
             string token = account == null ? string.Empty : _authentication.Authenticate(
                 account.PrincipalID, Util.Md5Hash(password), SessionLifetimeMinutes);
             if (string.IsNullOrEmpty(token))
@@ -570,10 +633,18 @@ namespace OpenSim.Continuum.WebUI
                 WriteError(response, HttpStatusCode.Unauthorized, "Invalid user name or password");
                 return;
             }
+            string stamp = _integration.WebSessionStamp(account.PrincipalID, token);
+            if (stamp == null || !PasswordRecoveryStore.Equal(credentialVersion, _integration.WebCredentialVersion(account.PrincipalID)))
+            {
+                _authentication.Release(account.PrincipalID, token);
+                WriteError(response, HttpStatusCode.ServiceUnavailable, "Sign-in could not complete. Try again or contact the grid team");
+                return;
+            }
             ClearAttempts(attemptKey);
-            string cookie = "ContinuumWebUI=" + account.PrincipalID + "." + Uri.EscapeDataString(token)
+            string cookieToken = stamp.Length == 0 ? Uri.EscapeDataString(token) : "v2:" + Uri.EscapeDataString(token) + "." + stamp;
+            string cookie = "ContinuumWebUI=" + account.PrincipalID + "." + cookieToken
                 + "; Path=" + _mountPath + "; Max-Age=" + _sessionSeconds + "; HttpOnly; SameSite=Lax"
-                + (request.IsSecured ? "; Secure" : string.Empty);
+                + (_integration.RequestIsSecure(request) ? "; Secure" : string.Empty);
             response.AddHeader("Set-Cookie", cookie);
             response.Redirect(_mountPath + "/", HttpStatusCode.SeeOther);
         }
@@ -618,9 +689,12 @@ namespace OpenSim.Continuum.WebUI
 
         private UserAccount GetAuthenticatedUser(IOSHttpRequest request)
         {
-            if (!TryReadCookie(request, out UUID principal, out string token)) return null;
+            if (!_integration.AccountTransportAllowed(request)
+                || !TryReadCookie(request, out UUID principal, out string token, out string stamp)
+                || !_integration.ValidWebSessionStamp(principal, token, stamp)) return null;
             if (!_authentication.Verify(principal, token, SessionLifetimeMinutes)) return null;
-            return _accounts.GetUserAccount(UUID.Zero, principal);
+            var account = _accounts.GetUserAccount(UUID.Zero, principal);
+            return account?.UserLevel >= 0 ? account : null;
         }
 
         // OpenSim authentication lifetimes are expressed in minutes, while HTTP Max-Age is seconds.
@@ -658,9 +732,13 @@ namespace OpenSim.Continuum.WebUI
         }
 
         private static bool TryReadCookie(IOSHttpRequest request, out UUID principal, out string token)
+            => TryReadCookie(request, out principal, out token, out _);
+
+        private static bool TryReadCookie(IOSHttpRequest request, out UUID principal, out string token, out string stamp)
         {
             principal = UUID.Zero;
             token = null;
+            stamp = null;
             string header = request.Headers["Cookie"];
             if (string.IsNullOrEmpty(header)) return false;
             foreach (string item in header.Split(';'))
@@ -670,7 +748,16 @@ namespace OpenSim.Continuum.WebUI
                 string value = part.Substring("ContinuumWebUI=".Length);
                 int dot = value.IndexOf('.');
                 if (dot < 1 || !UUID.TryParse(value.Substring(0, dot), out principal)) return false;
-                token = Uri.UnescapeDataString(value.Substring(dot + 1));
+                string raw = value.Substring(dot + 1);
+                if (raw.StartsWith("v2:", StringComparison.Ordinal))
+                {
+                    int separator = raw.LastIndexOf('.');
+                    if (separator < 4 || raw.Length - separator - 1 != 64) return false;
+                    stamp = raw.Substring(separator + 1);
+                    raw = raw.Substring(3, separator - 3);
+                }
+                if (raw.Length > 2048) return false;
+                token = Uri.UnescapeDataString(raw);
                 return token.Length > 0;
             }
             return false;
