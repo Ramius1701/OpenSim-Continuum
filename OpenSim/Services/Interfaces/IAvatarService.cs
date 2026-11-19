@@ -90,6 +90,27 @@ namespace OpenSim.Services.Interfaces
     /// Each region/client that uses avatars will have a data structure
     /// of this type representing the avatars.
     /// </summary>
+public static class AvatarDataKeys
+{
+    /// <summary>Server-side baking's bake index (ADR-004). Covers <c>Bake:</c>, <c>BakeHash:</c>, <c>BakeCOFVersion</c>, <c>BakeSize</c> and <c>BakeUpdated</c> in one prefix.</summary>
+    public const string BakeIndexPrefix = "Bake";
+
+    /// <summary>Every prefix <see cref="IAvatarService.SetAvatar"/> preserves.</summary>
+    public static readonly string[] PreservedPrefixes = { BakeIndexPrefix };
+
+    /// <summary>True when the named row belongs to a module rather than to the appearance record.</summary>
+    public static bool IsPreserved(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+        foreach (string prefix in PreservedPrefixes)
+            if (name.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+}
+
+
     public class AvatarData
     {
         // This pretty much determines which name/value pairs will be
@@ -151,8 +172,9 @@ namespace OpenSim.Services.Interfaces
             // Wearables
             Data["AvatarHeight"] = appearance.AvatarHeight.ToString();
 
-            for (int i = 0 ; i < AvatarWearable.LEGACY_VERSION_MAX_WEARABLES ; i++)
+            for (int i = 0 ; i < appearance.Wearables.Length ; i++)
             {
+                if (appearance.Wearables[i] is null) continue;
                 for (int j = 0 ; j < appearance.Wearables[i].Count ; j++)
                 {
                     string fieldName = String.Format("Wearable {0}:{1}", i, j);
@@ -289,49 +311,64 @@ namespace OpenSim.Services.Interfaces
                     appearance.VisualParams = binary;
                 }
 
-                AvatarWearable[] wearables = appearance.Wearables;
-                int currentLength = wearables.Length;
-                foreach (KeyValuePair<string, string> _kvp in Data)
+            AvatarWearable[] wearables = appearance.Wearables;
+            int currentLength = wearables.Length;
+
+            // The key is "Wearable <type>:<index>" and BOTH numbers matter. Several wearables of one type
+            // are layered in index order, later index on top (LLTexLayerTemplate::render, lltexlayer.cpp:1659-1689),
+            // so a record read back in row order would silently reorder them: Data comes from a row store, which
+            // owes no order at all. Collect first, then apply by (type, index).
+            var wornRows = new List<(int Type, int Index, UUID ItemID, UUID AssetID)>();
+            foreach (KeyValuePair<string, string> _kvp in Data)
+            {
+                // New style wearables
+                if (_kvp.Key.StartsWith("Wearable ")  && _kvp.Key.Length > 9)
                 {
-                    // New style wearables
-                    if (_kvp.Key.StartsWith("Wearable ")  && _kvp.Key.Length > 9)
-                    {
-                        string wearIndex = _kvp.Key.Substring(9);
-                        string[] wearIndices = wearIndex.Split(new char[] {':'});
-                        int index = Convert.ToInt32(wearIndices[0]);
+                    string wearIndex = _kvp.Key.Substring(9);
+                    string[] wearIndices = wearIndex.Split(new char[] {':'});
+                    int index = Convert.ToInt32(wearIndices[0]);
+                    // A record written before the index was carried has one entry per type and no ":<index>";
+                    // it reads as index 0, which is what it was.
+                    int slot = wearIndices.Length > 1 ? Convert.ToInt32(wearIndices[1]) : 0;
 
-                        string[] ids = _kvp.Value.Split(new char[] {':'});
-                        UUID itemID = new UUID(ids[0]);
-                        UUID assetID = new UUID(ids[1]);
-                        if (index >= currentLength)
-                        {
-                            Array.Resize(ref wearables, index + 1);
-                            for (int i = currentLength ; i < wearables.Length ; i++)
-                                wearables[i] = new AvatarWearable();
-                            currentLength = wearables.Length;           
-                        }   
-                        wearables[index].Add(itemID, assetID);
-                        continue;
-                    }
-                    // Attachments
-                    if (_kvp.Key.StartsWith("_ap_") && _kvp.Key.Length > 4)
+                    string[] ids = _kvp.Value.Split(new char[] {':'});
+                    wornRows.Add((index, slot, new UUID(ids[0]), new UUID(ids[1])));
+                    continue;
+                }
+                // Attachments
+                if (_kvp.Key.StartsWith("_ap_") && _kvp.Key.Length > 4)
+                {
+                    string pointStr = _kvp.Key.Substring(4);
+                    int point = 0;
+                    if (Int32.TryParse(pointStr, out point))
                     {
-                        string pointStr = _kvp.Key.Substring(4);
-                        int point = 0;
-                        if (Int32.TryParse(pointStr, out point))
-                        {
-                            List<string> idList = new List<string>(_kvp.Value.Split(new char[] {','}));
+                        List<string> idList = new List<string>(_kvp.Value.Split(new char[] {','}));
 
-                            appearance.SetAttachment(point, UUID.Zero, UUID.Zero);
-                            foreach (string id in idList)
-                            {
-                                UUID uuid = UUID.Zero;
-                                if(UUID.TryParse(id, out uuid))
-                                    appearance.SetAttachment(point | 0x80, uuid, UUID.Zero);
-                            }
+                        appearance.SetAttachment(point, UUID.Zero, UUID.Zero);
+                        foreach (string id in idList)
+                        {
+                            UUID uuid = UUID.Zero;
+                            if(UUID.TryParse(id, out uuid))
+                                appearance.SetAttachment(point | 0x80, uuid, UUID.Zero);
                         }
                     }
                 }
+            }
+
+            wornRows.Sort((a, b) => a.Type != b.Type ? a.Type.CompareTo(b.Type) : a.Index.CompareTo(b.Index));
+            foreach (var row in wornRows)
+            {
+                if (row.Type < 0 || row.Type >= AvatarWearable.MAX_WEARABLES) continue;
+                if (row.Type >= currentLength)
+                {
+                    Array.Resize(ref wearables, row.Type + 1);
+                    for (int i = currentLength ; i < wearables.Length ; i++)
+                        wearables[i] = new AvatarWearable();
+                    currentLength = wearables.Length;
+                }
+                wearables[row.Type].Add(row.ItemID, row.AssetID);
+            }
+            appearance.Wearables = wearables;
 
                 if (appearance.Wearables[AvatarWearable.BODY].Count == 0)
                     appearance.Wearables[AvatarWearable.BODY].Wear(

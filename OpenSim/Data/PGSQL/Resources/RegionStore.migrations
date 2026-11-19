@@ -1309,3 +1309,6 @@ COMMIT;
 BEGIN;
 ALTER TABLE "prims" ADD COLUMN "StartStr" TEXT;
 COMMIT;
+
+:VERSION 59         #----- persist script Experience links (Tranquillity 148896caec)
+ALTER TABLE primitems ADD COLUMN "experienceID" uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';

@@ -1005,10 +1005,11 @@ namespace OpenSim.Region.ClientStack.Linden
                         prim.RezzerID = creatorID;
                         prim.CreationDate = Util.UnixTimeSinceEpoch();
 
-                        if (grp == null)
-                            prim.Name = assetName;
-                        else
-                            prim.Name = assetName + "#" + i.ToString();
+                        // Tranquillity 8fa0ba65b4: preserve the viewer's mesh instance label.
+                        string meshName = inner_instance_list.TryGetValue("mesh_name", out OSD label)
+                            && label.Type == OSDType.String ? label.AsString() : null;
+                        prim.Name = !string.IsNullOrWhiteSpace(meshName) ? meshName
+                            : grp == null ? assetName : assetName + "#" + i.ToString();
 
                         prim.EveryoneMask = 0;
                         prim.GroupMask = 0;

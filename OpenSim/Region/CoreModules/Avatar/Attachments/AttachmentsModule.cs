@@ -364,7 +364,11 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
                 }
 
                 List<SceneObjectGroup> attachments = new(ad.AttachmentObjects.Count);
-                int i = 0;
+                AgentCircuitData circuit = m_scene.AuthenticateHandler?.GetAgentCircuitData(sp.UUID);
+                bool foreign = (circuit is not null &&
+                    (circuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0)
+                    || m_scene.UserManagementModule?.IsLocalGridUser(sp.UUID) == false;
+
                 for (int indx = 0; indx < ad.AttachmentObjects.Count; ++indx)
                 {
                     if(ad.AttachmentObjects[indx] is SceneObjectGroup sog && sog.OwnerID.Equals(sp.UUID))
@@ -372,7 +376,15 @@ namespace OpenSim.Region.CoreModules.Avatar.Attachments
                         sog.LocalId = 0;
                         sog.RootPart.ClearUpdateSchedule();
 
-                        sog.SetState(ad.AttachmentObjectStates[i++], m_scene);
+                        string state = ad.AttachmentObjectStates is not null && indx < ad.AttachmentObjectStates.Count
+                            ? ad.AttachmentObjectStates[indx] : null;
+                        if (foreign)
+                        {
+                            ForeignExperienceLinks.ClearObject(sog);
+                            state = ForeignExperienceLinks.ClearScriptState(state);
+                        }
+                        if (!string.IsNullOrEmpty(state))
+                            sog.SetState(state, m_scene);
                         attachments.Add(sog);
                     }
                 }

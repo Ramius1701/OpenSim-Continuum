@@ -130,6 +130,7 @@
     GroupsServiceConnector = "${Const|PrivatePort}/OpenSim.Addons.Groups.dll:GroupsServiceRobustConnector"
     ;; Uncomment to provide bakes caching
     ; BakedTextureService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XBakesConnector"
+    ; AppearanceServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:AppearanceServerConnector"
 
     ;; Uncomment for UserProfiles see [UserProfilesService] to configure...
     ; UserProfilesServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:UserProfilesConnector"
@@ -676,6 +677,8 @@
      ;; Allow banning via hashed MAC
     ;DeniedMacs = "YOURLONGMACTRSING ANOTHERMAC"
 
+    ; AgentAppearanceServiceURL = "https://YOUR-GRID-PUBLIC-URL/"
+
 [MapImageService]
     LocalServiceModule = "OpenSim.Services.MapImageService.dll:MapImageService"
 
@@ -808,3 +811,9 @@
 [ContinuumWebUIConsoles]
     ; Simulator-West = https://sim-west.example.org/console/
     ; ROBUST = https://robust-console.example.org/
+
+; Opt-in server-side appearance baking: see doc/server-side-baking.md.
+[AppearanceService]
+    LocalServiceModule = "OpenSim.Services.AvatarService.dll:AppearanceService"
+    AvatarService = "OpenSim.Services.AvatarService.dll:AvatarService"
+    AssetService = "OpenSim.Services.AssetService.dll:AssetService"

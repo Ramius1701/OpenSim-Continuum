@@ -83,6 +83,7 @@ namespace OpenSim.Services.LLLoginService
         protected int m_MaxAgentGroups = 42;
         protected string m_DestinationGuide;
         protected string m_AvatarPicker;
+        protected string m_AgentAppearanceServiceURL;
         protected Regex m_AllowedClientsRegex;
         protected Regex m_DeniedClientsRegex;
         protected string m_DeniedMacs;
@@ -139,6 +140,9 @@ namespace OpenSim.Services.LLLoginService
             m_ClassifiedFee = m_LoginServerConfig.GetString("ClassifiedFee", string.Empty);
             m_DestinationGuide = m_LoginServerConfig.GetString ("DestinationGuide", string.Empty);
             m_AvatarPicker = m_LoginServerConfig.GetString("AvatarPicker", string.Empty);
+            m_AgentAppearanceServiceURL = m_LoginServerConfig.GetString("AgentAppearanceServiceURL", string.Empty).Trim();
+            if (m_AgentAppearanceServiceURL.Length != 0)
+                m_AgentAppearanceServiceURL = m_AgentAppearanceServiceURL.TrimEnd('/') + "/";
 
             m_allowLoginFallbackToAnyRegion = m_LoginServerConfig.GetBoolean("AllowLoginFallbackToAnyRegion", m_allowLoginFallbackToAnyRegion);
 
@@ -714,6 +718,7 @@ namespace OpenSim.Services.LLLoginService
                         m_MapTileURL, m_ProfileURL, m_OpenIDURL, m_SearchURL, m_Currency, m_DSTZone,
                         m_DestinationGuide, m_AvatarPicker, realID, m_ClassifiedFee,m_MaxAgentGroups);
 
+                response.AgentAppearanceServiceURL = m_AgentAppearanceServiceURL;
                 response.EventNotifications = m_eventNotifications?.Get(account.PrincipalID) ?? new ArrayList();
 
                     m_log.DebugFormat("[LLOGIN SERVICE]: All clear. Sending login response to {0} {1}", firstName, lastName);

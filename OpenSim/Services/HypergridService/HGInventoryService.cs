@@ -61,6 +61,7 @@ namespace OpenSim.Services.HypergridService
         public HGInventoryService(IConfigSource config, string configName)
             : base(config, configName)
         {
+            m_AcceptsExperienceLinks = false;
             m_log.Debug("[HGInventory Service]: Starting");
             if (configName != string.Empty)
                 m_ConfigName = configName;

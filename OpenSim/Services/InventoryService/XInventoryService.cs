@@ -44,6 +44,7 @@ namespace OpenSim.Services.InventoryService
 
         protected IXInventoryData m_Database;
         protected bool m_AllowDelete = true;
+        protected bool m_AcceptsExperienceLinks = true;
         protected string m_ConfigName = "InventoryService";
 
         public XInventoryService(IConfigSource config)
@@ -510,7 +511,14 @@ namespace OpenSim.Services.InventoryService
 //            m_log.DebugFormat(
 //                "[XINVENTORY SERVICE]: Adding item {0} {1} to folder {2} for {3}", item.Name, item.ID, item.Folder, item.Owner);
 
-            return m_Database.StoreItem(ConvertFromOpenSim(item));
+            var record = ConvertFromOpenSim(item);
+            if (!m_AcceptsExperienceLinks)
+            {
+                if (m_Database.GetItems(["inventoryID"], [item.ID.ToString()]).Length != 0)
+                    return false;
+                record.experienceID = UUID.Zero;
+            }
+            return m_Database.StoreItem(record);
         }
 
         public virtual bool UpdateItem(InventoryItemBase item)
@@ -532,6 +540,9 @@ namespace OpenSim.Services.InventoryService
 
                 return false;
             }
+
+            if (!m_AcceptsExperienceLinks && retrievedItem.Owner != item.Owner)
+                return false;
 
             // Do not allow invariants to change.  Changes to folder ID occur in MoveItems()
             if (retrievedItem.InvType != item.InvType
@@ -562,7 +573,10 @@ namespace OpenSim.Services.InventoryService
                 item.Owner = retrievedItem.Owner;
             }
 
-            return m_Database.StoreItem(ConvertFromOpenSim(item));
+            var record = ConvertFromOpenSim(item);
+            if (!m_AcceptsExperienceLinks)
+                record.experienceID = retrievedItem.AssetID == item.AssetID ? retrievedItem.ExperienceID : UUID.Zero;
+            return m_Database.StoreItem(record);
         }
 
         public virtual bool MoveItems(UUID principalID, List<InventoryItemBase> items)
@@ -718,7 +732,8 @@ namespace OpenSim.Services.InventoryService
                 SalePrice = item.salePrice,
                 SaleType = (byte)item.saleType,
                 Flags = (uint)item.flags,
-                CreationDate = item.creationDate
+                CreationDate = item.creationDate,
+                ExperienceID = item.experienceID
             };
         }
 
@@ -745,7 +760,8 @@ namespace OpenSim.Services.InventoryService
                 salePrice = item.SalePrice,
                 saleType = (int)item.SaleType,
                 flags = (int)item.Flags,
-                creationDate = item.CreationDate
+                creationDate = item.CreationDate,
+                experienceID = item.InvType == (int)InventoryType.LSL ? item.ExperienceID : UUID.Zero
             };
         }
 
@@ -793,7 +809,7 @@ namespace OpenSim.Services.InventoryService
                 if (parent.Length < 1)
                     return false;
 
-                if (parent[0].type == (int)FolderType.Trash || folder[0].type == (int)FolderType.LostAndFound)
+                if (parent[0].type == (int)FolderType.Trash || parent[0].type == (int)FolderType.LostAndFound)
                     return true;
                 if (parent[0].type == (int)FolderType.Root)
                     return false;

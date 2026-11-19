@@ -847,8 +847,8 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory
 
                 SetAppearanceAssets(id, sp.Appearance);
 
-                m_scene.AvatarService.SetAppearance(id, sp.Appearance);
-                //m_scene.EventManager.TriggerAvatarAppearanceChanged(sp);
+                if (m_scene.AvatarService.SetAppearance(id, sp.Appearance))
+                    m_scene.EventManager.TriggerAvatarAppearanceChanged(sp);
             }
         }
 

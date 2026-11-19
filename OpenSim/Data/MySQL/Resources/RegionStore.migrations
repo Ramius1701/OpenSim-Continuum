@@ -580,3 +580,6 @@ ALTER TABLE `prims`
 	ADD COLUMN `AllowUnsit` TINYINT(3) NULL DEFAULT '1',
 	ADD COLUMN `ScriptedSitOnly` TINYINT(3) NULL DEFAULT '0';
 COMMIT;
+
+:VERSION 69         #----- persist script Experience links (Tranquillity 148896caec)
+ALTER TABLE primitems ADD COLUMN experienceID char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';

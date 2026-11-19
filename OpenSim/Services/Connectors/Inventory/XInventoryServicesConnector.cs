@@ -66,6 +66,8 @@ namespace OpenSim.Services.Connectors
         private const double CACHE_EXPIRATION_SECONDS = 30.0;
         private static readonly ExpiringCacheOS<UUID, InventoryItemBase> m_ItemCache = new(15000);
 
+        public bool ExchangeExperienceLinks { get; set; } = true;
+
         public XInventoryServicesConnector()
         {
         }
@@ -424,7 +426,8 @@ namespace OpenSim.Services.Connectors
                         { "SalePrice", item.SalePrice.ToString() },
                         { "SaleType", item.SaleType.ToString() },
                         { "Flags", item.Flags.ToString() },
-                        { "CreationDate", item.CreationDate.ToString() }
+                        { "CreationDate", item.CreationDate.ToString() },
+                        { "ExperienceID", (ExchangeExperienceLinks ? item.ExperienceID : UUID.Zero).ToString() }
                     });
 
             return CheckReturn(ret);
@@ -456,7 +459,8 @@ namespace OpenSim.Services.Connectors
                         { "SalePrice", item.SalePrice.ToString() },
                         { "SaleType", item.SaleType.ToString() },
                         { "Flags", item.Flags.ToString() },
-                        { "CreationDate", item.CreationDate.ToString() }
+                        { "CreationDate", item.CreationDate.ToString() },
+                        { "ExperienceID", (ExchangeExperienceLinks ? item.ExperienceID : UUID.Zero).ToString() }
                     });
 
             bool result = CheckReturn(ret);
@@ -705,7 +709,7 @@ namespace OpenSim.Services.Connectors
             return new InventoryFolderBase();
         }
 
-        private static InventoryItemBase BuildItem(Dictionary<string,object> data)
+        private InventoryItemBase BuildItem(Dictionary<string,object> data)
         {
             try
             {
@@ -730,6 +734,8 @@ namespace OpenSim.Services.Connectors
                     SaleType = byte.Parse((string)data["SaleType"]),
                     Flags = uint.Parse((string)data["Flags"]),
                     CreationDate = int.Parse((string)data["CreationDate"]),
+                    ExperienceID = ExchangeExperienceLinks && data.TryGetValue("ExperienceID", out var exp)
+                        && UUID.TryParse(exp as string, out UUID id) ? id : UUID.Zero,
                     Description = (string)data["Description"]
                 };
                 if (data.TryGetValue("CreatorData", out object oCreatorData))

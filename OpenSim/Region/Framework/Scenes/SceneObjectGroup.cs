@@ -2738,8 +2738,6 @@ namespace OpenSim.Region.Framework.Scenes
                     }
                 }
             }
-            else
-                StopMoveToTarget();
         }
 
         public void StopMoveToTarget()

@@ -177,11 +177,16 @@ namespace OpenSim.Data.PGSQL
 
         public bool SetDataItem(UUID principalID, string item, string value)
         {
-            string sql = string.Format("update {0} set {1} = :{1} where uuid = :UUID", m_Realm, item);
+            // Tranquillity b805e944b9: bind both values and quote mixed-case auth columns.
+            if (item is not ("passwordHash" or "passwordSalt" or "webLoginKey" or "accountType" or "rsaOnly" or "rsaKey"))
+                return false;
+
+            string sql = $"""UPDATE {m_Realm} SET "{item}" = :Value WHERE uuid = :UUID""";
             using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
             using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
             {
-                cmd.Parameters.Add(m_database.CreateParameter("\"" + item + "\"", value));
+                cmd.Parameters.Add(m_database.CreateParameter("Value", value));
+                cmd.Parameters.Add(m_database.CreateParameter("UUID", principalID));
                 conn.Open();
                 if (cmd.ExecuteNonQuery() > 0)
                     return true;

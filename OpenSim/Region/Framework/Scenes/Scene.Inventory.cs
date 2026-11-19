@@ -750,7 +750,8 @@ namespace OpenSim.Region.Framework.Scenes
                 AssetType = item.AssetType,
                 InvType = item.InvType,
                 Folder = recipientFolderId,
-                Flags = item.Flags
+                Flags = item.Flags,
+                ExperienceID = item.ExperienceID
             };
 
             if (Permissions.PropagatePermissions() && recipient != senderId)
@@ -1112,7 +1113,7 @@ namespace OpenSim.Region.Framework.Scenes
                     remoteClient, item.CreatorId, item.CreatorData, newFolderID,
                     newName, item.Description, item.Flags, callbackID, item.AssetID, (sbyte)item.AssetType, (sbyte)item.InvType,
                     item.BasePermissions, item.CurrentPermissions, item.EveryOnePermissions,
-                    item.NextPermissions, item.GroupPermissions, Util.UnixTimeSinceEpoch());
+                    item.NextPermissions, item.GroupPermissions, Util.UnixTimeSinceEpoch(), item.ExperienceID);
             }
             else
             {
@@ -1125,7 +1126,7 @@ namespace OpenSim.Region.Framework.Scenes
                         remoteClient, item.CreatorId, item.CreatorData, newFolderID, newName, item.Description, item.Flags, callbackID,
                         item.AssetID, (sbyte)item.AssetType, (sbyte)item.InvType,
                         item.NextPermissions, item.NextPermissions, item.EveryOnePermissions & item.NextPermissions,
-                        item.NextPermissions, item.GroupPermissions, Util.UnixTimeSinceEpoch());
+                        item.NextPermissions, item.GroupPermissions, Util.UnixTimeSinceEpoch(), item.ExperienceID);
                 }
             }
         }
@@ -1221,6 +1222,17 @@ namespace OpenSim.Region.Framework.Scenes
             string name, string description, uint flags, uint callbackID, UUID assetID, sbyte assetType, sbyte invType,
             uint baseMask, uint currentMask, uint everyoneMask, uint nextOwnerMask, uint groupMask, int creationDate)
         {
+            CreateNewInventoryItem(remoteClient, creatorID, creatorData, folderID, name, description,
+                flags, callbackID, assetID, assetType, invType, baseMask, currentMask, everyoneMask,
+                nextOwnerMask, groupMask, creationDate, UUID.Zero);
+        }
+
+        private void CreateNewInventoryItem(
+            IClientAPI remoteClient, string creatorID, string creatorData, UUID folderID,
+            string name, string description, uint flags, uint callbackID, UUID assetID, sbyte assetType, sbyte invType,
+            uint baseMask, uint currentMask, uint everyoneMask, uint nextOwnerMask, uint groupMask, int creationDate,
+            UUID experienceID)
+        {
             InventoryItemBase item = new()
             {
                 Owner = remoteClient.AgentId,
@@ -1239,7 +1251,8 @@ namespace OpenSim.Region.Framework.Scenes
                 EveryOnePermissions = everyoneMask,
                 GroupPermissions = groupMask,
                 BasePermissions = baseMask,
-                CreationDate = creationDate
+                CreationDate = creationDate,
+                ExperienceID = experienceID
             };
             // special AnimationSet case
             if (item.InvType == (int)CustomInventoryType.AnimationSet)
@@ -1450,7 +1463,8 @@ namespace OpenSim.Region.Framework.Scenes
                 Name = taskItem.Name,
                 AssetType = taskItem.Type,
                 InvType = taskItem.InvType,
-                Flags = taskItem.Flags
+                Flags = taskItem.Flags,
+                ExperienceID = taskItem.ExperienceID
             };
 
             // The code below isn't OK. It doesn't account for flags being changed

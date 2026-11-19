@@ -706,7 +706,7 @@ namespace OpenSim.Region.PhysicsModule.Meshing
             }
 
             PrimMesher.SculptMesh.SculptType sculptType;
-            switch ((OpenMetaverse.SculptType)primShape.SculptType)
+            switch ((OpenMetaverse.SculptType)(primShape.SculptType & 0x07))
             {
                 case OpenMetaverse.SculptType.Cylinder:
                     sculptType = PrimMesher.SculptMesh.SculptType.cylinder;

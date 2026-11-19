@@ -179,6 +179,7 @@ namespace OpenSim.Services.LLLoginService
         private ArrayList globalTextures;
         private ArrayList eventCategories;
         public ArrayList EventNotifications { get; set; } = new();
+        public string AgentAppearanceServiceURL { get; set; } = string.Empty;
         private ArrayList uiConfig;
         private ArrayList classifiedCategories;
         private ArrayList inventoryRoot;
@@ -579,6 +580,7 @@ namespace OpenSim.Services.LLLoginService
                 responseData["look_at"] = lookAt;
                 responseData["max-agent-groups"] = MaxAgentGroups;
                 responseData["message"] = welcomeMessage;
+                if (!string.IsNullOrEmpty(AgentAppearanceServiceURL)) responseData["agent_appearance_service"] = AgentAppearanceServiceURL;
                 responseData["region_x"] = (Int32)(RegionX);
                 responseData["region_y"] = (Int32)(RegionY);
                 responseData["region_size_x"] = (Int32)RegionSizeX;
@@ -712,8 +714,13 @@ namespace OpenSim.Services.LLLoginService
                 map["look_at"] = OSD.FromString(lookAt);
                 map["max-agent-groups"] = OSD.FromInteger(MaxAgentGroups);
                 map["message"] = OSD.FromString(welcomeMessage);
+                if (!string.IsNullOrEmpty(AgentAppearanceServiceURL)) map["agent_appearance_service"] = OSD.FromString(AgentAppearanceServiceURL);
                 map["region_x"] = OSD.FromInteger(RegionX);
                 map["region_y"] = OSD.FromInteger(RegionY);
+                // The same keys, from the same values, as the XML-RPC reply (ToHashtable), so
+                // both forms give the region size (a viewer reading the LLSD reply took every region as 256 m until it moved).
+                map["region_size_x"] = OSD.FromInteger(RegionSizeX);
+                map["region_size_y"] = OSD.FromInteger(RegionSizeY);
 
                 if (mapTileURL != String.Empty)
                     map["map-server-url"] = OSD.FromString(mapTileURL);

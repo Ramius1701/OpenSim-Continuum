@@ -886,6 +886,7 @@ namespace OpenSim.Framework
             // include sculpt UUID
             if (SculptEntry)
             {
+                hash = djb2(hash, SculptType);
                 byte[] scaleBytes = this.SculptTexture.GetBytes();
                 for (int i = 0; i < scaleBytes.Length; i++)
                     hash = djb2(hash, scaleBytes[i]);
@@ -1356,7 +1357,7 @@ namespace OpenSim.Framework
             {
                 ReflectionProbe = new Primitive.ReflectionProbe
                 {
-                    Ambiance = Utils.Clamp(Utils.BytesToFloat(data, pos), 0, 1.0f),
+                    Ambiance = Utils.Clamp(Utils.BytesToFloat(data, pos), 0, 100f),
                     ClipDistance = Utils.Clamp(Utils.BytesToFloat(data, pos + 4), 0, 1024f),
                     Flags = data[pos + 8]
                 };

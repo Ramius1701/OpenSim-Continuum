@@ -1336,6 +1336,7 @@ namespace OpenSim.Data.SQLite
             createCol(items, "everyonePermissions", typeof(UInt32));
             createCol(items, "groupPermissions", typeof(UInt32));
             createCol(items, "flags", typeof(UInt32));
+            createCol(items, "experienceID", typeof(String));
 
             items.PrimaryKey = new DataColumn[] { items.Columns["itemID"] };
 
@@ -1835,7 +1836,7 @@ namespace OpenSim.Data.SQLite
             taskItem.Type = Convert.ToInt32(row["assetType"]);
 
             taskItem.Name = (String)row["name"];
-            taskItem.Description = (String)row["description"];
+            taskItem.Description = row["description"] is DBNull ? string.Empty : (String)row["description"];
             taskItem.CreationDate = Convert.ToUInt32(row["creationDate"]);
             taskItem.CreatorIdentification = (String)row["creatorID"];
             taskItem.OwnerID = new UUID((String)row["ownerID"]);
@@ -1848,6 +1849,7 @@ namespace OpenSim.Data.SQLite
             taskItem.EveryonePermissions = Convert.ToUInt32(row["everyonePermissions"]);
             taskItem.GroupPermissions = Convert.ToUInt32(row["groupPermissions"]);
             taskItem.Flags = Convert.ToUInt32(row["flags"]);
+            taskItem.ExperienceID = DBGuid.FromDB(row["experienceID"]);
 
             return taskItem;
         }
@@ -2251,6 +2253,7 @@ namespace OpenSim.Data.SQLite
             row["everyonePermissions"] = taskItem.EveryonePermissions;
             row["groupPermissions"] = taskItem.GroupPermissions;
             row["flags"] = taskItem.Flags;
+            row["experienceID"] = taskItem.ExperienceID.ToString();
         }
 
         /// <summary>
@@ -2965,17 +2968,46 @@ namespace OpenSim.Data.SQLite
             return new UUID[0];
         }
 
+        // Tranquillity e9ba7f6eed: persist region extras on SQLite as on the other stores.
         public void SaveExtra(UUID regionID, string name, string value)
         {
+            lock (ds)
+            {
+                using var cmd = new SQLiteCommand(
+                    "INSERT INTO regionextra (RegionID, Name, value) VALUES (:RegionID, :Name, :Value) " +
+                    "ON CONFLICT (RegionID, Name) DO UPDATE SET value = excluded.value", m_conn);
+                cmd.Parameters.AddWithValue(":RegionID", regionID.ToString());
+                cmd.Parameters.AddWithValue(":Name", name);
+                cmd.Parameters.AddWithValue(":Value", (object)value ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
         }
 
         public void RemoveExtra(UUID regionID, string name)
         {
+            lock (ds)
+            {
+                using var cmd = new SQLiteCommand(
+                    "DELETE FROM regionextra WHERE RegionID = :RegionID AND Name = :Name", m_conn);
+                cmd.Parameters.AddWithValue(":RegionID", regionID.ToString());
+                cmd.Parameters.AddWithValue(":Name", name);
+                cmd.ExecuteNonQuery();
+            }
         }
 
         public Dictionary<string, string> GetExtra(UUID regionID)
         {
-            return null;
+            var result = new Dictionary<string, string>();
+            lock (ds)
+            {
+                using var cmd = new SQLiteCommand(
+                    "SELECT Name, value FROM regionextra WHERE RegionID = :RegionID", m_conn);
+                cmd.Parameters.AddWithValue(":RegionID", regionID.ToString());
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                    result[reader.GetString(0)] = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+            }
+            return result;
         }
     }
 }

@@ -2466,6 +2466,10 @@ namespace OpenSim.Region.Framework.Scenes
             dupe.m_sittingAvatars = new HashSet<ScenePresence>();
             dupe.SitTargetAvatar = UUID.Zero;
             // safeguard  actual copy is done in sog.copy
+            // Tranquillity 37c1781019: the copied vehicle must own its settings.
+            if (m_vehicleParams != null)
+                dupe.m_vehicleParams = new SOPVehicle { vd = m_vehicleParams.vd };
+
             dupe.KeyframeMotion = null;
             dupe.PayPrice = (int[])PayPrice.Clone();
 

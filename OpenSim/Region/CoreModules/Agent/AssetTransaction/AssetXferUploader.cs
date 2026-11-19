@@ -338,6 +338,59 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
             }
         }
 
+        public InventoryUploadResult CompleteInventoryUpload(IClientAPI client, InventoryItemBase item, out UUID storedAsset)
+        {
+            storedAsset = UUID.Zero;
+            lock (this)
+            {
+                if (client is null || item is null || item.Owner != client.AgentId
+                    || ourClient is null || ourClient.AgentId != client.AgentId || ourClient.SessionId != client.SessionId)
+                    return InventoryUploadResult.Rejected;
+                if (m_uploadState != UploadState.Complete)
+                    return InventoryUploadResult.Pending;
+                if (m_createItem || m_updateItem || m_updateTaskItem || m_asset.FullID == UUID.Zero
+                    || m_asset.Type != item.AssetType || m_asset.Data is null)
+                    return InventoryUploadResult.Rejected;
+
+                var current = m_Scene.InventoryService.GetItem(client.AgentId, item.ID);
+                if (current is null || current.Owner != client.AgentId || current.AssetID != item.AssetID
+                    || current.AssetType != item.AssetType)
+                    return InventoryUploadResult.Rejected;
+
+                if (item.AssetType == (int)AssetType.Clothing || item.AssetType == (int)AssetType.Bodypart
+                    || item.AssetType == (int)CustomAssetType.AnimationSet)
+                    m_oldData = m_Scene.AssetService.Get(item.AssetID.ToString())?.Data;
+                if (ValidateAssets() == 0)
+                    return InventoryUploadResult.Rejected;
+
+                m_asset.Name = item.Name;
+                m_asset.Description = item.Description;
+                string stored = m_Scene.AssetService.Store(m_asset);
+                if (!UUID.TryParse(stored, out UUID assetID) || assetID == UUID.Zero || assetID != m_asset.FullID)
+                    return InventoryUploadResult.Rejected;
+                var updated = (InventoryItemBase)item.Clone();
+                updated.AssetID = assetID;
+                if (!m_Scene.InventoryService.UpdateItem(updated))
+                    return InventoryUploadResult.Rejected;
+                var persisted = m_Scene.InventoryService.GetItem(client.AgentId, item.ID);
+                if (persisted is null || persisted.Owner != client.AgentId || persisted.AssetID != assetID)
+                    return InventoryUploadResult.Rejected;
+
+                storedAsset = assetID;
+                m_transactions.RemoveXferUploader(m_transactionID);
+                try
+                {
+                    client.SendInventoryItemCreateUpdate(persisted, m_transactionID, 0);
+                    m_Scene.EventManager.TriggerOnNewInventoryItemUploadComplete(persisted, 0);
+                }
+                catch (Exception e)
+                {
+                    m_log.Warn("[ASSET UPLOADER]: Inventory update persisted but notification failed", e);
+                }
+                return InventoryUploadResult.Applied;
+            }
+        }
+
         public void RequestUpdateInventoryItem(IClientAPI remoteClient, InventoryItemBase item)
         {
             // We must lock to avoid a race with a separate thread uploading the asset.

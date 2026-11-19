@@ -624,7 +624,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                     ScenePresence scenePresence;
                     if (m_scene.TryGetScenePresence(avatar_id, out scenePresence))
                     {
-                        UpdateScriptExperiencePerms(scenePresence, true);
+                        UpdateScriptExperiencePerms(scenePresence, true, experience_id);
                     }
                 }
             }
@@ -647,7 +647,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
                 }
 
                 if (m_scene.TryGetScenePresence(avatar_id, out ScenePresence scenePresence))
-                    UpdateScriptExperiencePerms(scenePresence, true);
+                    UpdateScriptExperiencePerms(scenePresence, true, experience_id);
             }
             return updated;
         }
@@ -900,16 +900,70 @@ namespace OpenSim.Region.ClientStack.LindenCaps
         public const int ACCESS_LIST_ALLOWED = 8;
         public const int ACCESS_LIST_BLOCKED = 0x10;
 
-        private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
+        private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent, UUID withdrawnExperience = default)
         {
-            var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
+            // Explicit withdrawal is scoped to one Experience and does not depend on parcel lookup.
+            HashSet<UUID> allowed = withdrawnExperience.IsZero() ? GetPermittedExperiences(avatar) : null;
+            if (withdrawnExperience.IsZero() && allowed is null)
+                return;
+
+            bool MustRevoke(UUID experienceID) => !withdrawnExperience.IsZero()
+                ? experienceID == withdrawnExperience : !allowed.Contains(experienceID);
+
+            m_scene.ForEachSOG(sog =>
+            {
+                sog.ForEachPart(part =>
+                {
+                    foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+                    {
+                        // JoinAnExperience identifies an active Experience grant;
+                        // do not depend on an exact aggregate runtime mask.
+                        if ((item.PermsMask & 0x2000) != 0 && item.PermsGranter == avatar.UUID)
+                        {
+                            if (MustRevoke(item.ExperienceID))
+                            {
+                                int revokedMask = item.PermsMask;
+                                item.PermsGranter = UUID.Zero;
+                                item.PermsMask = 0;
+
+                                if ((revokedMask & 0x04) != 0) // PERMISSION_TAKE_CONTROLS
+                                    avatar.UnRegisterControlEventsToScript(part.LocalId, item.ItemID);
+
+                                foreach (var e in m_ScriptModules)
+                                {
+                                    e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
+                                        avatar.UUID.ToString(),
+                                        // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
+                                        via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/
+                                    });
+                                }
+                            }
+                        }
+                    }
+                });
+
+
+                if (sog.IsAttachment && sog.AttachedAvatar == avatar.UUID &&
+                    sog.AttachedExperienceID != UUID.Zero)
+                {
+                    if (MustRevoke(sog.AttachedExperienceID))
+                    {
+                        m_scene.AttachmentsModule?.DetachSingleAttachmentToInv(avatar, sog);
+                    }
+                }
+            });
+        }
+
+        private HashSet<UUID> GetPermittedExperiences(ScenePresence avatar)
+        {
+            var land = m_scene.LandChannel?.GetLandObject(avatar.AbsolutePosition);
             if (land == null)
             {
                 m_log.WarnFormat(
                     "[EXPERIENCE]: Unable to evaluate parcel Experience policy for avatar {0} at {1}",
                     avatar.UUID,
                     avatar.AbsolutePosition);
-                return;
+                return null;
             }
 
             UUID[] estateAllowed = m_scene.RegionInfo.EstateSettings.AllowedExperiences ?? Array.Empty<UUID>();
@@ -936,44 +990,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps
             allowed.IntersectWith(agentAllowed);
             allowed.ExceptWith(blockedExperiences);
 
-            m_scene.ForEachSOG(sog =>
-            {
-                sog.ForEachPart(part =>
-                {
-                    foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
-                    {
-                        // JoinAnExperience identifies an active Experience grant;
-                        // do not depend on an exact aggregate runtime mask.
-                        if ((item.PermsMask & 0x2000) != 0 && item.PermsGranter == avatar.UUID)
-                        {
-                            if (!allowed.Contains(item.ExperienceID))
-                            {
-                                item.PermsGranter = UUID.Zero;
-                                item.PermsMask = 0;
-
-                                foreach (var e in m_ScriptModules)
-                                {
-                                    e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
-                                        avatar.UUID.ToString(),
-                                        // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
-                                        via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/
-                                    });
-                                }
-                            }
-                        }
-                    }
-                });
-
-
-                if (sog.IsAttachment && sog.AttachedAvatar == avatar.UUID &&
-                    sog.AttachedExperienceID != UUID.Zero)
-                {
-                    if (!allowed.Contains(sog.AttachedExperienceID))
-                    {
-                        m_scene.AttachmentsModule.DetachSingleAttachmentToInv(avatar, sog);
-                    }
-                }
-            });
+            return allowed;
         }
 
         public bool IsExperienceEnabled(UUID experience_id)

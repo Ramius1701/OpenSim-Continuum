@@ -988,7 +988,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             //RegionProtocols
                 // bit 0 signals server side texture baking
                 // bit 63 signals more than 6 baked textures support"
-            zc.AddUInt64(1UL << 63);
+            zc.AddUInt64((1UL << 63) | (m_scene.RequestModuleInterface<IServerSideBakingRegion>()?.ServerSideBakingEnabled == true ? 1UL : 0UL));
 
             buf.DataLength = zc.Finish();
             m_udpServer.SendUDPPacket(m_udpClient, buf, ThrottleOutPacketType.Unknown);
@@ -4518,8 +4518,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP
             if(len > 0)
                 Buffer.BlockCopy(visualParams, 0, data, pos, len); pos += len;
 
-            // no AppearanceData
-            data[pos++] = 0;
+            var baking = m_scene.RequestModuleInterface<IServerSideBakingRegion>();
+            int cofVersion = baking?.ServerSideBakingEnabled == true ? baking.BakedCofVersion(targetID) : -1;
+            if (cofVersion < 0)
+                data[pos++] = 0;
+            else
+            {
+                data[pos++] = 1;
+                data[pos++] = 1; // AppearanceVersion
+                Utils.IntToBytesSafepos(cofVersion, data, pos); pos += 4;
+                Utils.UIntToBytesSafepos(0, data, pos); pos += 4; // Appearance flags
+            }
             // AppearanceHover vector 3
             data[pos++] = 1;
             //Utils.FloatToBytesSafepos(0, data, pos); pos += 4;

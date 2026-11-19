@@ -567,7 +567,8 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             {"PermsGranter", ProcessTIPermsGranter },
             {"PermsMask", ProcessTIPermsMask },
             {"Type", ProcessTIType },
-            {"OwnerChanged", ProcessTIOwnerChanged }
+            {"OwnerChanged", ProcessTIOwnerChanged },
+            {"ExperienceID", ProcessTIExperienceID }
         }.ToFrozenDictionary();
 
         private static readonly FrozenDictionary<string, Action<PrimitiveBaseShape, XmlReader>> m_ShapeXmlProcessors = new Dictionary<string, Action<PrimitiveBaseShape, XmlReader>>()
@@ -1227,6 +1228,11 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
             item.Type = reader.ReadElementContentAsInt("Type", string.Empty);
         }
 
+        private static void ProcessTIExperienceID(TaskInventoryItem item, XmlReader reader)
+        {
+            item.ExperienceID = Util.ReadUUID(reader, "ExperienceID");
+        }
+
         private static void ProcessTIOwnerChanged(TaskInventoryItem item, XmlReader reader)
         {
             item.OwnerChanged = Util.ReadBoolean(reader);
@@ -1810,6 +1816,9 @@ namespace OpenSim.Region.Framework.Scenes.Serialization
 
                     bool ownerChanged = !options.ContainsKey("wipe-owners") && item.OwnerChanged;
                     writer.WriteElementString("OwnerChanged", ownerChanged.ToString().ToLower());
+
+                    if (item.ExperienceID.IsNotZero() && !options.ContainsKey("wipe-owners"))
+                        WriteUUID(writer, "ExperienceID", item.ExperienceID, options);
 
                     writer.WriteEndElement(); // TaskInventoryItem
                 }

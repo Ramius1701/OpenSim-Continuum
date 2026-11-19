@@ -1,13 +1,16 @@
 # Donor feature audit and integration disposition
 
 <!-- continuum-current-status:begin -->
-> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
-> ports/native workflow adapters are implemented in source. The former 11 blocked
-> WebUI routes now have native workflows. Live/provider acceptance remains open.
-> See the [current donor audit](whitecore-continuum-improvement-audit.md),
-> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
-> Earlier dated checkpoints below retain their historical scope; they do not
-> supersede this status or certify deployment.
+> Project checkpoint — 2026-11-19: selected Tranquillity stable-release ports,
+> including native AIS and server-side baking, are implemented in this source
+> snapshot. Release and automated suites passed. Your OpenSim
+> submissions #75–77 are adapted while preserving native Continuum protections.
+> See the [current Tranquillity ledger](tranquillity-release-review.md),
+> [baking configuration](server-side-baking.md) and
+> [test handoff](donor-feature-test-handoff.md). Live acceptance remains separate
+> from publication; AIS/baking stay off by default. lickx, Mobius and the selected
+> WhiteCore ports/native workflows retain their earlier source-complete status.
+> Earlier dated checkpoints below are historical, not the current source backlog.
 <!-- continuum-current-status:end -->
 
 Date: 2026-08-01  

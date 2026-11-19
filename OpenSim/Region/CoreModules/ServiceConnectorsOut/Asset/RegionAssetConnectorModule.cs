@@ -40,6 +40,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
@@ -227,7 +228,15 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Asset
         {
             if (m_HGConnector == null || string.IsNullOrEmpty(ForeignAssetService))
                 return null;
-            return m_HGConnector.Get(id , ForeignAssetService, true);
+            AssetBase asset = m_HGConnector.Get(id, ForeignAssetService, false);
+            if (asset?.Type == (sbyte)AssetType.Object)
+            {
+                byte[] data = ForeignExperienceLinks.ClearObjectXml(asset.Data);
+                if (data is null)
+                    return null;
+                asset.Data = data;
+            }
+            return asset;
         }
 
         public AssetBase GetForeign(string id)

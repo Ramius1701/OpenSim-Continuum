@@ -702,6 +702,7 @@ namespace OpenSim.Server.Handlers.Inventory
             ret["AssetType"] = item.AssetType.ToString();
             ret["BasePermissions"] = item.BasePermissions.ToString();
             ret["CreationDate"] = item.CreationDate.ToString();
+            ret["ExperienceID"] = item.ExperienceID.ToString();
             if (item.CreatorId != null)
                 ret["CreatorId"] = item.CreatorId.ToString();
             else
@@ -768,6 +769,8 @@ namespace OpenSim.Server.Handlers.Inventory
             item.SaleType = byte.Parse(data["SaleType"].ToString());
             item.Flags = uint.Parse(data["Flags"].ToString());
             item.CreationDate = int.Parse(data["CreationDate"].ToString());
+            if (data.TryGetValue("ExperienceID", out var experience) && UUID.TryParse(experience as string, out UUID experienceID))
+                item.ExperienceID = experienceID;
 
             return item;
         }

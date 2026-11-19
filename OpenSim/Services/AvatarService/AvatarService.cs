@@ -29,6 +29,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Linq;
 using Nini.Config;
 using log4net;
 using OpenSim.Framework;
@@ -41,9 +42,14 @@ namespace OpenSim.Services.AvatarService
 {
     public class AvatarService : AvatarServiceBase, IAvatarService
     {
+        private static readonly object[] AvatarGates = System.Linq.Enumerable.Range(0, 64).Select(_ => new object()).ToArray();
+        private static object Gate(UUID id) => AvatarGates[(id.GetHashCode() & int.MaxValue) % AvatarGates.Length];
+
         private static readonly ILog m_log =
                 LogManager.GetLogger(
                 MethodBase.GetCurrentMethod().DeclaringType);
+
+        protected AvatarService(IConfigSource config, IAvatarData database) : base(config, database) { }
 
         public AvatarService(IConfigSource config)
             : base(config)
@@ -64,6 +70,11 @@ namespace OpenSim.Services.AvatarService
         }
 
         public AvatarData GetAvatar(UUID principalID)
+        {
+            lock (Gate(principalID)) return GetAvatarCore(principalID);
+        }
+
+        private AvatarData GetAvatarCore(UUID principalID)
         {
             AvatarBaseData[] av = m_Database.Get("PrincipalID", principalID.ToString());
             AvatarData ret = new AvatarData();
@@ -88,13 +99,24 @@ namespace OpenSim.Services.AvatarService
 
         public bool SetAvatar(UUID principalID, AvatarData avatar)
         {
+            lock (Gate(principalID)) return SetAvatarCore(principalID, avatar);
+        }
+
+        private bool SetAvatarCore(UUID principalID, AvatarData avatar)
+        {
             int count = 0;
             foreach (KeyValuePair<string, string> kvp in avatar.Data)
                 if (kvp.Key.StartsWith("_"))
                     count++;
 
 //            m_log.DebugFormat("[AVATAR SERVICE]: SetAvatar for {0}, attachs={1}", principalID, count);
+            List<AvatarBaseData> preserved = new();
+            foreach (var row in m_Database.Get("PrincipalID", principalID.ToString()))
+                if (row.Data.TryGetValue("Name", out string name) && AvatarDataKeys.IsPreserved(name))
+                    preserved.Add(row);
             m_Database.Delete("PrincipalID", principalID.ToString());
+            foreach (var row in preserved)
+                if (!m_Database.Store(row)) return false;
 
             AvatarBaseData av = new AvatarBaseData();
             av.Data = new Dictionary<string,string>();
@@ -140,6 +162,7 @@ namespace OpenSim.Services.AvatarService
                 if (!m_Database.Store(av))
                 {
                     m_Database.Delete("PrincipalID", principalID.ToString());
+                    foreach (var row in preserved) m_Database.Store(row);
                     return false;
                 }
             }
@@ -149,10 +172,20 @@ namespace OpenSim.Services.AvatarService
 
         public bool ResetAvatar(UUID principalID)
         {
+            lock (Gate(principalID)) return ResetAvatarCore(principalID);
+        }
+
+        private bool ResetAvatarCore(UUID principalID)
+        {
             return m_Database.Delete("PrincipalID", principalID.ToString());
         }
 
         public bool SetItems(UUID principalID, string[] names, string[] values)
+        {
+            lock (Gate(principalID)) return SetItemsCore(principalID, names, values);
+        }
+
+        private bool SetItemsCore(UUID principalID, string[] names, string[] values)
         {
             AvatarBaseData av = new AvatarBaseData();
             av.Data = new Dictionary<string,string>();
@@ -174,6 +207,11 @@ namespace OpenSim.Services.AvatarService
         }
 
         public bool RemoveItems(UUID principalID, string[] names)
+        {
+            lock (Gate(principalID)) return RemoveItemsCore(principalID, names);
+        }
+
+        private bool RemoveItemsCore(UUID principalID, string[] names)
         {
             foreach (string name in names)
             {

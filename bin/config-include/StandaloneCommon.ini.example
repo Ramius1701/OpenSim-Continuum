@@ -435,3 +435,11 @@
 
     UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
     AuthenticationServiceModule = "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService"
+
+; Optional public baked-texture endpoint for standalone server-side baking.
+[AppearanceService]
+    LocalServiceModule = "OpenSim.Services.AvatarService.dll:AppearanceService"
+    AvatarService = "OpenSim.Services.AvatarService.dll:AvatarService"
+    AssetService = "OpenSim.Services.AssetService.dll:AssetService"
+; In [Modules], set AppearanceServiceInConnector = true; in [LoginService], set
+; AgentAppearanceServiceURL to this simulator's public HTTP(S) base URL ending in /.

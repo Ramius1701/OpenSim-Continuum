@@ -604,7 +604,7 @@ namespace OpenSim.Region.ScriptEngine.Yengine
             int permsMask = 0;
             double minEventDelay = 0.0;
             Object[] pluginData = new Object[0];
-            UUID experienceKey = UUID.Zero;
+            UUID? experienceKey = null;
 
             LinkedList<EventParams> eventQueue = new LinkedList<EventParams>();
 
@@ -895,7 +895,8 @@ namespace OpenSim.Region.ScriptEngine.Yengine
 
             m_Item.PermsGranter = permsGranter;
             m_Item.PermsMask = permsMask;
-            m_Item.ExperienceID = experienceKey;
+            if (experienceKey.HasValue)
+                m_Item.ExperienceID = experienceKey.Value;
             m_Part.Inventory.UpdateInventoryItem(m_Item, false, false);
 
             lock (m_RunLock)

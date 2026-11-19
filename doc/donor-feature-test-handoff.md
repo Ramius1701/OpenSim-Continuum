@@ -1,13 +1,16 @@
 # Donor feature testing handoff
 
 <!-- continuum-current-status:begin -->
-> Project checkpoint — 2026-10-24: lickx, Mobius and the selected WhiteCore
-> ports/native workflow adapters are implemented in source. The former 11 blocked
-> WebUI routes now have native workflows. Live/provider acceptance remains open.
-> See the [current donor audit](whitecore-continuum-improvement-audit.md),
-> [WebUI backlog](parity-webui.md) and [test handoff](donor-feature-test-handoff.md).
-> Earlier dated checkpoints below retain their historical scope; they do not
-> supersede this status or certify deployment.
+> Project checkpoint — 2026-11-19: selected Tranquillity stable-release ports,
+> including native AIS and server-side baking, are implemented in this source
+> snapshot. Release and automated suites passed. Your OpenSim
+> submissions #75–77 are adapted while preserving native Continuum protections.
+> See the [current Tranquillity ledger](tranquillity-release-review.md),
+> [baking configuration](server-side-baking.md) and
+> [test handoff](donor-feature-test-handoff.md). Live acceptance remains separate
+> from publication; AIS/baking stay off by default. lickx, Mobius and the selected
+> WhiteCore ports/native workflows retain their earlier source-complete status.
+> Earlier dated checkpoints below are historical, not the current source backlog.
 <!-- continuum-current-status:end -->
 
 Date: 2026-08-01
@@ -1146,3 +1149,202 @@ Review and MATERIALS.md explain that procedural joints need export baking.
 Footprint/1577 architectural objects unchanged; interiors/lift openings, working
 lifts, baked export textures, LOD/physics and OpenSim live acceptance unfinished.
 No live grid operations or uploads occurred.
+
+### Tranquillity: storage, mesh uploads and reflection probes
+
+- [ ] On a disposable SQLite region upgraded from RegionStore v43, write/update
+  module extras for two regions, restart, and remove one key without changing
+  the other region. Load prim inventory with both empty and NULL descriptions.
+- [ ] On disposable PostgreSQL, update a known authentication field for one
+  test account; confirm the other account is unchanged and a missing account
+  or unknown field returns false.
+- [ ] In Firestorm, upload a named multipart mesh, verify each label in the
+  linked object and after relog; check a legacy upload without instance names.
+- [ ] Set a reflection probe above 1 ambiance; save/restart and verify ambiance
+  and clip distance are retained and LSL flags read back as an integer.
+
+### Tranquillity: script Experience links in region storage
+
+- [ ] On disposable SQLite, MySQL/MariaDB and PostgreSQL, upgrade a region
+  database with existing prim inventory. Verify old items remain unassociated,
+  a linked script retains its Experience on restart, and clearing its link
+  persists. Verify stored linkage does not replace normal consent checks.
+- [ ] Separately validate object archives, resident inventory, Hypergrid import
+  and active consent revocation when their respective source changes land.
+
+### Tranquillity: Experience withdrawal and simulator lifecycle
+
+- [ ] With an active Experience holding controls and an Experience attachment,
+  block or forget it in Firestorm. Verify controls are released, the denial
+  event fires, and the affected attachment detaches. Repeat with parcel data
+  unavailable and verify unrelated grants remain active.
+- [ ] Confirm llGetMass during a sit/stand or local teleport still returns the
+  last valid avatar mass while the physics actor is temporarily absent.
+- [ ] Close a disposable simulator while a resident logs out. Confirm shutdown
+  completes and remaining clients receive the normal disconnect notice.
+
+### Tranquillity: vehicle movement and sculpt compatibility
+
+- [ ] In a disposable region, copy a scripted vehicle and change the copy's
+  settings. Confirm the original retains its flags and parameters. Reapply
+  settings after a physics rebuild and verify stale flags are removed.
+- [ ] Start llMoveToTarget and call it again with zero or negative tau; verify
+  the original motion continues and llStopMoveToTarget still stops it.
+- [ ] Rez sculpt prims sharing a texture with different topology, mirror and
+  invert settings. Verify their physics shapes match each variant after cache
+  warm-up and region restart.
+
+### Tranquillity: Experience links in resident inventory
+
+- [ ] With separate simulator and ROBUST processes, compile a local script into
+  an Experience, move it into resident inventory, copy it, then put both
+  copies into objects after relog. Confirm the association survives and that
+  ordinary resident consent is still needed.
+- [ ] Upgrade each supported inventory database with legacy items; confirm
+  unlinked items stay unlinked. Confirm that foreign inventory reads do not
+  import an association and writes cannot set one.
+
+### Tranquillity: object archive and Hypergrid Experience links
+
+- [ ] Take and rez a local object containing an Experience-linked script. Save
+  and reload an OAR and test an IAR containing that object asset. Verify the
+  link survives and still requires resident consent.
+- [ ] Import a new foreign object asset and cross a Hypergrid boundary with
+  linked attachments and saved script state. Confirm links and grants are
+  stripped, unrelated state still loads, and the stored copy stays unlinked
+  after local take/re-rez. Check a normal local crossing preserves the link.
+- [ ] Repeat with previously cached foreign assets and record any remaining
+  route that requires a separate cleanup or import guard.
+
+### Tranquillity: AIS v3 acceptance (after full capability is wired)
+
+- [ ] In Firestorm verify owned item/folder fetch, links, nested children and
+  Current Outfit resolution; check large folders and ordinary legacy inventory
+  when AIS is disabled.
+- [ ] Before enabling AIS, verify write, copy, purge, delete and outfit changes,
+  folder versions, library access and restart persistence in a disposable grid.
+
+- [ ] For AIS metadata PATCH, verify item rename/description and ordinary
+  folder rename persist after relog, with stable item asset, permissions and
+  Experience link. Check returned folder versions and concurrent viewer edits
+  before enabling the capability.
+
+- [ ] Verify AIS folder/link creation and item deletion in Firestorm after
+  registration. Check partial-create replies, retry behavior, provider
+  deletion policy, folder versions, and that deleting a link keeps its target.
+
+- [ ] In a disposable grid, verify AIS Trash and Lost And Found purge and
+  folder removal, protected folder refusal, partial deletion replies, and
+  provider delete-policy enforcement. Include concurrent inventory changes
+  before enabling the capability.
+
+- [ ] With Firestorm, replace Current Outfit and saved Outfit links, including
+  a base-outfit folder link and an explicit empty array. Verify malformed
+  requests and failed writes preserve the existing outfit, and concurrent
+  changes do not cause duplicate or missing wearables before enabling AIS.
+
+- [ ] In Firestorm, browse library item and folder data, copy one category
+  shallow and recursive, and verify copied assets, permissions, destination
+  ownership and folder versions after relog. Verify retry behavior and library
+  categories containing links before advertising the capability.
+
+- [ ] Before advertising AIS, verify Firestorm reuses the transaction ID and
+  exact request on retry; confirm the same IDs and no duplicate rows. Exercise
+  parallel writes against one outfit and compare returned folder versions with
+  the resident inventory after relog. Check region changes and cross-process
+  writes separately from the process-local replay guarantee.
+
+### Registered AIS test-grid checkpoint — 2026-11-19
+
+- [ ] Use only a disposable grid to opt in with `[AIS] ExperimentalEnabled=true`.
+  Verify both capabilities appear in the seed response and disappear after
+  logout, region removal and restart; default-off grids retain stock inventory.
+- [ ] Exercise GET, metadata PATCH, category POST, outfit PUT, item/category
+  DELETE and library COPY through Firestorm. Verify versions against stored
+  inventory after relog; repeat requests with the same transaction ID and body.
+- [ ] Check stock move fallback separately; the donor does not apply parent_id.
+  AIS remains experimental pending the viewer/provider checks in this handoff.
+
+### Native AIS upload acceptance — 2026-11-19
+
+- [ ] On a disposable grid with experimental AIS enabled, edit and save a
+  notecard and wearable through Firestorm. Confirm the returned asset ID is the
+  stored asset, the data loads after relog, and item metadata and folder versions
+  agree with native inventory. Transfer completion is simulated in the automated
+  fixture; real viewer upload transport still needs this check.
+- [ ] Retry the same PATCH hash_id without query tid after upload completion;
+  verify one saved item and the same asset ID. Retry while transfer is pending
+  and confirm 503 leaves inventory unchanged, then completion succeeds. Changed
+  metadata under a consumed hash must be refused.
+- [ ] Confirm a second viewer session cannot consume the first session's upload,
+  missing transactions do not create uploads, and unowned wearable textures are
+  rejected by the native validation path. Exercise asset/inventory provider
+  outages and verify no success reply claims an unsaved inventory asset. An
+  inventory failure after asset storage can leave an unreferenced asset.
+- [ ] Check upload retry across region changes, simulator processes and restart
+  separately: replay is bounded and process-local, not a persistent transaction.
+
+### AIS library links and asset scope — 2026-11-19
+
+- [ ] In Firestorm copy a library category containing item links, folder links
+  and cross-folder targets. Confirm links point to the new resident copies when
+  included, keep valid external library targets otherwise, and still resolve
+  after relog. Include shallow copies excluding a target subfolder.
+- [ ] Inject a copy provider failure and inspect the explicit partial reply and
+  inventory. No new link should precede its copied target; exact retry must not
+  create another partial tree within the process-local replay window. Confirm
+  returned versions against inventory on each enabled provider.
+- [ ] Save wearables and notecards using the native upload transaction path.
+  Ordinary Firestorm item update helpers remove asset_id/shadow_id in favor of
+  hash_id. Changed direct asset_id is refused (unchanged accepted), consistent
+  with retaining native transaction validation. If a real viewer workflow needs
+  direct rebinding, capture its request and establish native permission behavior
+  before selecting an additional port.
+
+### Tranquillity stable-source closeout acceptance — 2026-11-19
+
+The selected stable source port is implemented; these checks are live acceptance,
+not instructions to rebuild stock OpenSim behavior. Do not use older numbered
+batch notes as the current source backlog. Configuration: server-side-baking.md.
+
+- [ ] Enable baking on a disposable region with its public appearance service
+  and login URL configured. Use Firestorm and a compatible LL viewer; verify
+  first login, relog, outfit changes, removal/layering of clothing, Physics and
+  Universal/BOM wearables, hover appearance and visibility to another resident.
+  Compare stored COF versions and the actual appearance packets and texture URLs.
+- [ ] Test normal, cold and warm bakes, root/child crossings and teleports between
+  baking-enabled and client-baking regions. Log out during a pending save/bake.
+  Verify no stale outfit wins at login; delay the inventory service beyond five
+  seconds and verify fallback and that late reads never apply to the presence.
+- [ ] Verify the public texture connector behind the grid's actual proxy/TLS
+  configuration. Wrong agents, channels and expected assets must not return other
+  content. Test the standalone adapter separately, including multi-region removal
+  and process restart. Keep bin/runtimes with the distribution.
+- [ ] Exercise MySQL/MariaDB and PostgreSQL alongside SQLite/native row fixtures:
+  avatar save, layered-order readback, Universal slots, bake reuse and index
+  preservation. Inject asset/index failures; previous assets must remain usable
+  and a refused index must not become a successful appearance. Inspect partial
+  provider writes and unreferenced assets; local locks are not a cross-process
+  transaction. Test two simulators updating one resident independently.
+- [ ] Generate the private real-outfit reference captures using the recipes in
+  tests/Continuum.Baking.Tests/Golden and rerun the skipped reference tests.
+  Include real Universal/BOM content, which the stock reference sets do not cover.
+  No capture recipe was executed against a real grid during the port.
+- [ ] Validate native group powers across several simultaneous roles, titles,
+  owners, invited/open/banned/HG joins, notices and group chat. Confirm a refused
+  fee-bearing join cancels the reservation and role edits refresh the viewer.
+- [ ] Exercise cancelled land sales containing objects, free/paid/failed-payment
+  sales, authorized buyers, group purchase/deed powers, resale-disabled estates,
+  abandonment and auctions. Confirm exact committed payment and auction safeguards
+  survive the adapted upstream submission; do not double-subscribe transfer events.
+- [ ] Verify LLSD and XML-RPC login into rectangular/variable-sized regions and
+  confirm their region dimensions match before the first crossing.
+- [ ] Check Rubber and legacy Light default physics behavior with the enabled
+  native physics engine and confirm explicit physics overrides still apply.
+- [ ] Repeat the earlier AIS and foreign Experience cold/warm-cache/HG checks.
+  Operator-loaded archives keep the existing trust model; this port does not
+  retroactively rewrite cached objects or stored assets.
+
+The final Release build and automated suites are source evidence only. No live
+configuration/database, deployment, user upload, payment or viewer session was
+changed by this closeout.

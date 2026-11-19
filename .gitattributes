@@ -21,3 +21,11 @@
 *.so  binary
 *.dylib binary
 *.anim binary
+
+# Preserve vendored viewer data and notices; binary reference vectors must not
+# undergo line-ending conversion or textual whitespace checks.
+OpenSim/Appearance/Baking/Data/avatar_lad.xml -text -whitespace
+ThirdParty/AppearanceBaking/* -text -whitespace
+tests/Continuum.Baking.Tests/Vectors/**/*.rgba binary
+tests/Continuum.Baking.Tests/Vectors/**/*.morph binary
+tests/Continuum.Baking.Tests/Vectors/**/*.bin binary

@@ -318,7 +318,7 @@ namespace OpenSim.Region.PhysicsModules.SharedBase
             // vehicleActor.ProcessSetVehicle((VehicleData)vdata);
 
             this.VehicleType = (int)vdata.m_type;
-            this.VehicleFlags(-1, false);   // clears all flags
+            this.VehicleFlags(-1, true);    // clears all flags
             this.VehicleFlags((int)vdata.m_flags, false);
 
             // Linear properties

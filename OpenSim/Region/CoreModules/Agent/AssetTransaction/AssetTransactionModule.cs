@@ -41,7 +41,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
 {
     [Extension(Path = "/OpenSim/RegionModules", NodeName = "RegionModule", Id = "AssetTransactionModule")]
     public class AssetTransactionModule : INonSharedRegionModule,
-            IAgentAssetTransactions
+            IAgentAssetTransactions, IConfirmedAgentAssetTransactions
     {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -66,6 +66,7 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         {
             m_Scene = scene;
             scene.RegisterModuleInterface<IAgentAssetTransactions>(this);
+            scene.RegisterModuleInterface<IConfirmedAgentAssetTransactions>(this);
             scene.EventManager.OnNewClient += NewClient;
         }
 
@@ -177,6 +178,19 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
         /// <param name="remoteClient"></param>
         /// <param name="transactionID"></param>
         /// <param name="item"></param>
+        public InventoryUploadResult CompleteInventoryUpload(IClientAPI client, UUID transaction,
+            InventoryItemBase item, out UUID storedAsset)
+        {
+            storedAsset = UUID.Zero;
+            if (client is null || item is null || item.Owner != client.AgentId || transaction == UUID.Zero)
+                return InventoryUploadResult.Rejected;
+            AgentAssetTransactions transactions;
+            lock (AgentTransactions)
+                if (!AgentTransactions.TryGetValue(client.AgentId, out transactions))
+                    return InventoryUploadResult.Missing;
+            return transactions.CompleteInventoryUpload(client, transaction, item, out storedAsset);
+        }
+
         public void HandleItemUpdateFromTransaction(IClientAPI remoteClient,
                 UUID transactionID, InventoryItemBase item)
         {

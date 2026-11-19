@@ -1412,6 +1412,77 @@
       </Files>
     </Project>
 
+    <!-- Tranquillity compositor, isolated from the region and native OpenSim services. -->
+    <Project name="OpenSimNGC.Appearance.Baking" path="OpenSim/Appearance/Baking" type="Library">
+      <Configuration name="Debug"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+      <Configuration name="Release"><Options><OutputPath>../../../bin/</OutputPath></Options></Configuration>
+      <ReferencePath>../../../bin/</ReferencePath>
+      <Reference name="OpenMetaverseTypes"/>
+      <PackageReference name="SkiaSharp" version="4.153.1"/>
+      <PackageReference name="SkiaSharp.NativeAssets.Linux.NoDependencies" version="4.153.1"/>
+      <PackageReference name="CoreJ2K.Skia" version="2.4.1.108"/>
+      <Files>
+        <Match pattern="*.cs" recurse="false"/>
+        <Match pattern="avatar_lad.xml" path="Data" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.avatar_lad.xml"/>
+        <Match pattern="aux_base.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.aux_base.tga"/>
+        <Match pattern="blush_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.blush_alpha.tga"/>
+        <Match pattern="body_skingrain.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.body_skingrain.tga"/>
+        <Match pattern="bodyfreckles_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bodyfreckles_alpha.tga"/>
+        <Match pattern="bump_face_wrinkles.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_face_wrinkles.tga"/>
+        <Match pattern="bump_head_base.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_head_base.tga"/>
+        <Match pattern="bump_lowerbody_base.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_lowerbody_base.tga"/>
+        <Match pattern="bump_pants_wrinkles.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_pants_wrinkles.tga"/>
+        <Match pattern="bump_shirt_wrinkles.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_shirt_wrinkles.tga"/>
+        <Match pattern="bump_upperbody_base.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.bump_upperbody_base.tga"/>
+        <Match pattern="eyebrows_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.eyebrows_alpha.tga"/>
+        <Match pattern="eyeliner_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.eyeliner_alpha.tga"/>
+        <Match pattern="eyeshadow_inner_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.eyeshadow_inner_alpha.tga"/>
+        <Match pattern="eyeshadow_outer_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.eyeshadow_outer_alpha.tga"/>
+        <Match pattern="eyewhite.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.eyewhite.tga"/>
+        <Match pattern="facehair_chincurtains_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.facehair_chincurtains_alpha.tga"/>
+        <Match pattern="facehair_moustache_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.facehair_moustache_alpha.tga"/>
+        <Match pattern="facehair_sideburns_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.facehair_sideburns_alpha.tga"/>
+        <Match pattern="facehair_soulpatch_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.facehair_soulpatch_alpha.tga"/>
+        <Match pattern="freckles_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.freckles_alpha.tga"/>
+        <Match pattern="glove_length_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.glove_length_alpha.tga"/>
+        <Match pattern="gloves_fingers_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.gloves_fingers_alpha.tga"/>
+        <Match pattern="head_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_alpha.tga"/>
+        <Match pattern="head_color.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_color.tga"/>
+        <Match pattern="head_hair.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_hair.tga"/>
+        <Match pattern="head_highlights_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_highlights_alpha.tga"/>
+        <Match pattern="head_shading_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_shading_alpha.tga"/>
+        <Match pattern="head_skingrain.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.head_skingrain.tga"/>
+        <Match pattern="jacket_length_lower_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.jacket_length_lower_alpha.tga"/>
+        <Match pattern="jacket_length_upper_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.jacket_length_upper_alpha.tga"/>
+        <Match pattern="jacket_open_lower_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.jacket_open_lower_alpha.tga"/>
+        <Match pattern="jacket_open_upper_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.jacket_open_upper_alpha.tga"/>
+        <Match pattern="lipgloss_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lipgloss_alpha.tga"/>
+        <Match pattern="lips_mask.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lips_mask.tga"/>
+        <Match pattern="lipstick_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lipstick_alpha.tga"/>
+        <Match pattern="lowerbody_color.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lowerbody_color.tga"/>
+        <Match pattern="lowerbody_highlights_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lowerbody_highlights_alpha.tga"/>
+        <Match pattern="lowerbody_shading_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.lowerbody_shading_alpha.tga"/>
+        <Match pattern="nailpolish_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.nailpolish_alpha.tga"/>
+        <Match pattern="pants_length_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.pants_length_alpha.tga"/>
+        <Match pattern="pants_waist_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.pants_waist_alpha.tga"/>
+        <Match pattern="rosyface_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.rosyface_alpha.tga"/>
+        <Match pattern="shirt_bottom_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.shirt_bottom_alpha.tga"/>
+        <Match pattern="shirt_collar_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.shirt_collar_alpha.tga"/>
+        <Match pattern="shirt_collar_back_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.shirt_collar_back_alpha.tga"/>
+        <Match pattern="shirt_sleeve_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.shirt_sleeve_alpha.tga"/>
+        <Match pattern="shoe_height_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.shoe_height_alpha.tga"/>
+        <Match pattern="skirt_length_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.skirt_length_alpha.tga"/>
+        <Match pattern="skirt_slit_back_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.skirt_slit_back_alpha.tga"/>
+        <Match pattern="skirt_slit_front_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.skirt_slit_front_alpha.tga"/>
+        <Match pattern="skirt_slit_left_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.skirt_slit_left_alpha.tga"/>
+        <Match pattern="skirt_slit_right_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.skirt_slit_right_alpha.tga"/>
+        <Match pattern="upperbody_color.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.upperbody_color.tga"/>
+        <Match pattern="upperbody_highlights_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.upperbody_highlights_alpha.tga"/>
+        <Match pattern="upperbody_shading_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.upperbody_shading_alpha.tga"/>
+        <Match pattern="upperbodyfreckles_alpha.tga" path="Data/character" buildAction="EmbeddedResource" resourceName="OpenSimNGC.Appearance.Baking.Data.character.upperbodyfreckles_alpha.tga"/>
+      </Files>
+    </Project>
+
     <Project name="OpenSim.Region.OptionalModules" path="OpenSim/Region/OptionalModules" type="Library">
       <Configuration name="Debug">
         <Options>
@@ -1429,6 +1500,7 @@
       <Reference name="Ionic.Zip"/>
       <Reference name="NDesk.Options"/>
       <Reference name="OpenMetaverseTypes"/>
+      <Reference name="OpenSimNGC.Appearance.Baking"/>
       <Reference name="OpenMetaverse.StructuredData"/>
       <Reference name="OpenMetaverse"/>
       <Reference name="System.Data.SQLite"/>

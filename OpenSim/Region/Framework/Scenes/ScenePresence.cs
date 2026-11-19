@@ -586,6 +586,7 @@ namespace OpenSim.Region.Framework.Scenes
         /// </summary>
         
         PhysicsActor m_physActor;
+        private volatile float m_lastKnownMass;
         public PhysicsActor PhysicsActor
         {
             get
@@ -1797,6 +1798,10 @@ namespace OpenSim.Region.Framework.Scenes
             PhysicsActor pa = Interlocked.Exchange(ref m_physActor, null);
             if (pa != null)
             {
+                float mass = pa.Mass;
+                if (float.IsFinite(mass) && mass > 0)
+                    m_lastKnownMass = mass;
+
                 //PhysicsActor.OnRequestTerseUpdate -= SendTerseUpdateToAllClients;
                 pa.OnOutOfBounds -= OutOfBoundsCall;
                 pa.OnCollisionUpdate -= PhysicsCollisionUpdate;
@@ -5898,10 +5903,13 @@ namespace OpenSim.Region.Framework.Scenes
         public float GetMass()
         {
             PhysicsActor pa = PhysicsActor;
-            if (pa != null)
-                return pa.Mass;
-            else
-                return 0;
+            if (pa is null)
+                return m_lastKnownMass;
+
+            float mass = pa.Mass;
+            if (float.IsFinite(mass) && mass > 0)
+                m_lastKnownMass = mass;
+            return mass;
         }
 
         internal void Jump(float impulseZ)

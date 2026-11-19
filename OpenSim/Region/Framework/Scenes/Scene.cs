@@ -1560,12 +1560,16 @@ namespace OpenSim.Region.Framework.Scenes
             // Kick all ROOT agents with the message, 'The simulator is going down'
             ForEachScenePresence(delegate(ScenePresence avatar)
             {
+                IClientAPI client = avatar.ControllingClient;
+                if (client is null)
+                    return;
+
                 avatar.RemoveNeighbourRegion(RegionInfo.RegionHandle);
 
                 if (!avatar.IsChildAgent)
-                    avatar.ControllingClient.Kick("The simulator is going down.");
+                    client.Kick("The simulator is going down.");
 
-                avatar.ControllingClient.SendShutdownConnectionNotice();
+                client.SendShutdownConnectionNotice();
             });
 
             // Stop updating the scene objects and agents.

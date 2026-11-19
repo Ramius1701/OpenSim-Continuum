@@ -186,6 +186,17 @@ namespace OpenSim.Region.CoreModules.Agent.AssetTransaction
             uploader.RequestUpdateTaskInventoryItem(remoteClient, item);
         }
 
+        public InventoryUploadResult CompleteInventoryUpload(IClientAPI client, UUID transaction,
+            InventoryItemBase item, out UUID storedAsset)
+        {
+            storedAsset = UUID.Zero;
+            AssetXferUploader uploader;
+            lock (XferUploaders)
+                if (!XferUploaders.TryGetValue(transaction, out uploader))
+                    return InventoryUploadResult.Missing;
+            return uploader.CompleteInventoryUpload(client, item, out storedAsset);
+        }
+
         public void RequestUpdateInventoryItem(IClientAPI remoteClient,
                 UUID transactionID, InventoryItemBase item)
         {

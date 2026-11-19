@@ -392,6 +392,8 @@ namespace OpenSim.Framework
         }
         protected int m_creationDate = (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
 
+        public UUID ExperienceID { get; set; }
+
         public InventoryItemBase()
         {
         }

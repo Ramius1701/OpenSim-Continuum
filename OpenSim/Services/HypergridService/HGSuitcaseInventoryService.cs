@@ -66,6 +66,7 @@ namespace OpenSim.Services.HypergridService
         public HGSuitcaseInventoryService(IConfigSource config, string configName)
             : base(config, configName)
         {
+            m_AcceptsExperienceLinks = false;
             m_log.DebugFormat("[HG SUITCASE INVENTORY SERVICE]: Starting with config name {0}", configName);
             if (configName != string.Empty)
                 m_ConfigName = configName;

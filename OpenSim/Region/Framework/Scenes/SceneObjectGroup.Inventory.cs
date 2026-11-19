@@ -159,7 +159,8 @@ namespace OpenSim.Region.Framework.Scenes
                 CreatorID = item.CreatorIdAsUuid,
                 Type = item.AssetType,
                 InvType = item.InvType,
-                Flags = item.Flags
+                Flags = item.Flags,
+                ExperienceID = item.ExperienceID
             };
 
             if (agentID.NotEqual(part.OwnerID) && m_scene.Permissions.PropagatePermissions())

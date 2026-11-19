@@ -39,6 +39,11 @@ namespace OpenSim.Services.AvatarService
     {
         protected IAvatarData m_Database = null;
 
+        protected AvatarServiceBase(IConfigSource config, IAvatarData database) : base(config)
+        {
+            m_Database = database ?? throw new ArgumentNullException(nameof(database));
+        }
+
         public AvatarServiceBase(IConfigSource config)
             : base(config)
         {

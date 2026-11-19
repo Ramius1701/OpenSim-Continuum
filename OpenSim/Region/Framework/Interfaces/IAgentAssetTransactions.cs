@@ -31,6 +31,16 @@ using OpenSim.Region.Framework.Scenes;
 
 namespace OpenSim.Region.Framework.Interfaces
 {
+    public enum InventoryUploadResult { Missing, Pending, Rejected, Applied }
+
+    // Optional capability: do not change third-party implementations of the
+    // legacy void interface or treat an accepted queued upload as a saved item.
+    public interface IConfirmedAgentAssetTransactions
+    {
+        InventoryUploadResult CompleteInventoryUpload(IClientAPI client, UUID transaction,
+            InventoryItemBase item, out UUID storedAsset);
+    }
+
     public interface IAgentAssetTransactions
     {
         void HandleItemUpdateFromTransaction(IClientAPI remoteClient, UUID transactionID,

@@ -1655,3 +1655,18 @@
     ;; Type /93 auctions in Firestorm to browse, start, bid or cancel.
     ;; Firestorm's native ViewerStartAuction message is also supported.
     ; ChatChannel = 93
+
+[AIS]
+    ; Test-grid only: advertise experimental InventoryAPIv3 and LibraryAPIv3.
+    ; Default false preserves the stock inventory capabilities.
+    ; Upload transaction binding, folder moves, full library link copying and
+    ; cross-process mutation coordination are still under reconciliation.
+    ; See doc/tranquillity-release-review.md before enabling.
+    ExperimentalEnabled = false
+
+; Server-side texture composition is opt-in; stock client baking stays the default.
+; Configure the public appearance service and login URL first. See doc/server-side-baking.md.
+[Appearance]
+    ServerSideBaking = false
+    BakeSize = 1024
+    BakeQuality = 0.85
